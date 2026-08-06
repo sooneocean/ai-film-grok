@@ -125,3 +125,140 @@ def assert_still_is_unique(
             "do not copy/link the same PNG across shots. "
             "See references/lessons-2026-07-29-still-unique-no-reuse.md"
         )
+
+
+# Path / note markers that mean "ffmpeg crop from cast master" fallback (savani EP02).
+_CROP_MASTER_MARKERS = (
+    "crop-master",
+    "crop_master",
+    "cropfrommaster",
+    "from-master-crop",
+    "from_master_crop",
+    "master_crop",
+    "cropmaster",
+    "ffmpeg-crop-master",
+    "whole-episode-crop",
+)
+
+
+def _record_looks_like_crop_master(rec: dict[str, Any]) -> tuple[bool, str]:
+    """Return (is_crop_master_suspect, reason_tag)."""
+    path = str(rec.get("path") or "").lower()
+    note = str(rec.get("note") or rec.get("notes") or rec.get("review_note") or "").lower()
+    source = str(
+        rec.get("source")
+        or rec.get("still_source")
+        or rec.get("derived_from")
+        or rec.get("parent")
+        or ""
+    ).lower()
+    kind = str(rec.get("source_kind") or rec.get("kind") or "").lower()
+    blob = " ".join([path, note, source, kind])
+    for m in _CROP_MASTER_MARKERS:
+        if m in blob.replace(" ", ""):
+            return True, f"marker:{m}"
+    # Explicit flags
+    if rec.get("crop_from_master") is True or rec.get("from_cast_master_crop") is True:
+        return True, "flag:crop_from_master"
+    if kind in {"crop_master", "master_crop", "ffmpeg_crop_master"}:
+        return True, f"kind:{kind}"
+    # parent_sha shared later; single-record parent_id pointing at cast master
+    parent = str(rec.get("parent_shot_id") or rec.get("parent_still") or "").lower()
+    if parent in {"cast_master", "master", "style_master", "character_master"}:
+        return True, f"parent:{parent}"
+    return False, ""
+
+
+def crop_master_still_report(
+    manifest: dict[str, Any],
+    *,
+    required_shot_ids: list[str] | None = None,
+    soft_ratio: float = 0.35,
+    hard_ratio: float = 0.55,
+    min_shots: int = 4,
+) -> dict[str, Any]:
+    """Flag seasons that mostly re-use cast-master crops as stills (savani lesson).
+
+    Soft when ≥soft_ratio of approved stills look like crop-master; hard when
+    ≥hard_ratio (or all tagged share one parent_sha). Does not replace exact
+    sha uniqueness — that is still hard via active_still_reuse_report.
+    """
+    stills = manifest.get("stills") if isinstance(manifest.get("stills"), dict) else {}
+    required = [str(x) for x in (required_shot_ids or list(stills.keys()))]
+    tagged: list[dict[str, str]] = []
+    approved_ids: list[str] = []
+    parent_sha_groups: dict[str, list[str]] = defaultdict(list)
+
+    for sid in required:
+        rec = stills.get(sid)
+        if not isinstance(rec, dict) or rec.get("status") != "approved":
+            continue
+        approved_ids.append(sid)
+        hit, why = _record_looks_like_crop_master(rec)
+        if hit:
+            tagged.append({"shot_id": sid, "reason": why})
+        psha = rec.get("parent_sha256") or rec.get("parent_sha") or rec.get("crop_source_sha256")
+        if isinstance(psha, str) and psha.strip():
+            parent_sha_groups[psha.strip()].append(sid)
+
+    n = len(approved_ids)
+    t = len(tagged)
+    ratio = (t / n) if n else 0.0
+    large_parent = [
+        {"parent_sha256": sha, "shots": ids}
+        for sha, ids in parent_sha_groups.items()
+        if len(ids) >= max(min_shots, 3)
+    ]
+    # Parent-sha mass crop: count those shots as tagged for ratio if not already
+    parent_mass_ids = {s for g in large_parent for s in g["shots"]}
+    effective_tagged = {x["shot_id"] for x in tagged} | parent_mass_ids
+    eff_n = len(effective_tagged)
+    eff_ratio = (eff_n / n) if n else 0.0
+
+    codes: list[str] = []
+    severity = "ok"
+    if n >= min_shots and eff_ratio >= hard_ratio:
+        codes.append("STILL_CROP_MASTER_DOMINANT")
+        severity = "hard"
+    elif n >= min_shots and (ratio >= soft_ratio or eff_ratio >= soft_ratio or large_parent):
+        codes.append("STILL_CROP_MASTER_WARN")
+        severity = "soft"
+    if large_parent and "STILL_CROP_MASTER_PARENT_SHA" not in codes:
+        codes.append("STILL_CROP_MASTER_PARENT_SHA")
+
+    ok = severity != "hard"
+    if severity == "ok":
+        reason = "no crop-master still dominance"
+    elif severity == "soft":
+        reason = (
+            f"{eff_n}/{n} approved stills look like cast-master crop variants "
+            f"({eff_ratio:.0%}) — ban whole-episode crop-master silent fallback; "
+            "regenerate narrative stills. See memory 2026-08-06-h3-native-ship-review-lessons."
+        )
+    else:
+        reason = (
+            f"{eff_n}/{n} approved stills are crop-master-like ({eff_ratio:.0%}) — "
+            "hard block bulk until distinct keyframes exist per shot"
+        )
+
+    return {
+        "ok": ok,
+        "severity": severity,
+        "codes": codes,
+        "approved_count": n,
+        "tagged_count": t,
+        "effective_tagged_count": eff_n,
+        "ratio": round(ratio, 4),
+        "effective_ratio": round(eff_ratio, 4),
+        "tagged": tagged[:40],
+        "parent_sha_groups": large_parent[:10],
+        "reason": reason,
+        "next": (
+            [
+                "regenerate stills from undress-anchor / state photos — not ffmpeg crop of cast master",
+                "do not silent-ID-rename EP stills across episodes",
+            ]
+            if severity != "ok"
+            else []
+        ),
+    }

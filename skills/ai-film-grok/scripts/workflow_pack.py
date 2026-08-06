@@ -275,6 +275,10 @@ def _bulk_next_cmd_for_failure(
             f'cat "{r}/receipts/duration-target.json"  '
             f"# planned sum ≪ target: add shots or FLF (~5.2s H3) / lower target_duration"
         ),
+        "crop_master_still": (
+            f'cat "{r}/receipts/crop-master-still.json"  '
+            f"# regenerate narrative stills; ban whole-episode cast-master crop"
+        ),
     }
     return cmd_map.get(failed_id, f'aifilm bulk-preflight --root "{r}"')
 
@@ -354,9 +358,45 @@ def bulk_preflight(
             required_shot_ids=shot_ids,
             keyframes_dir=root / "keyframes",
         )
-        add("still_uniqueness", bool(still_u.get("ok")), detail=still_u.get("note"))
+        add(
+            "still_uniqueness",
+            bool(still_u.get("ok")),
+            detail=still_u.get("reason") or still_u.get("note"),
+        )
     except Exception as exc:  # noqa: BLE001
         add("still_uniqueness", True, skipped=True, error=str(exc)[:120])
+
+    # Q1.4 crop-master dominance (savani): soft warn / hard if most stills are master crops
+    skip_crop = os.environ.get("AIFILM_SKIP_CROP_MASTER_STILL", "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+    if skip_crop:
+        add("crop_master_still", True, skipped=True, escape="AIFILM_SKIP_CROP_MASTER_STILL=1")
+    else:
+        try:
+            from still_uniqueness import crop_master_still_report
+            from util import write_json as _wj
+
+            crop_rep = crop_master_still_report(man, required_shot_ids=shot_ids)
+            try:
+                _wj(root / "receipts" / "crop-master-still.json", crop_rep)
+            except Exception:
+                pass
+            # Soft: ok=True so bulk continues with visibility; hard: ok=False blocks
+            add(
+                "crop_master_still",
+                bool(crop_rep.get("ok")),
+                severity=crop_rep.get("severity"),
+                codes=crop_rep.get("codes"),
+                effective_ratio=crop_rep.get("effective_ratio"),
+                reason=crop_rep.get("reason"),
+                next=crop_rep.get("next"),
+            )
+        except Exception as exc:  # noqa: BLE001
+            add("crop_master_still", True, skipped=True, error=str(exc)[:120])
 
     try:
         from anatomy_safety import anatomy_safety_report, requires_anatomy_safety
@@ -517,7 +557,13 @@ def bulk_preflight(
         # Per-fail weapon-named recovery (agent glance)
         for c in failed:
             cid = str(c.get("id") or "")
-            if cid in {"still_source", "still_uniqueness", "state_index", "geometry"}:
+            if cid in {
+                "still_source",
+                "still_uniqueness",
+                "crop_master_still",
+                "state_index",
+                "geometry",
+            }:
                 c["weapon_hint"] = f"still={still}"
             elif cid == "anatomy_stills":
                 c["weapon_hint"] = f"edit={edit}; ban I2V on poison ({motion})"

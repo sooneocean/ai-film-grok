@@ -110,6 +110,94 @@ def _ffprobe_has_audio(path: Path) -> bool:
         return False
 
 
+def _mean_volume_db(path: Path) -> float | None:
+    """Best-effort volumedetect; None if ffmpeg missing or silent fail."""
+    try:
+        from core.media_ops import probe_native_audio_mean_volume
+
+        return probe_native_audio_mean_volume(path)
+    except Exception:
+        pass
+    try:
+        r = subprocess.run(
+            [
+                "ffmpeg",
+                "-hide_banner",
+                "-i",
+                str(path),
+                "-af",
+                "volumedetect",
+                "-f",
+                "null",
+                "-",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=60,
+            check=False,
+        )
+        import re
+
+        m = re.search(
+            r"mean_volume:\s*(-?\d+(?:\.\d+)?)\s*dB",
+            (r.stderr or "") + (r.stdout or ""),
+        )
+        return float(m.group(1)) if m else None
+    except (OSError, subprocess.TimeoutExpired, ValueError):
+        return None
+
+
+def sample_native_audio_audit(
+    shot_ids: list[str],
+    parts: list[Path],
+    *,
+    sample_n: int = 3,
+    silence_db: float = -45.0,
+) -> dict[str, Any]:
+    """Q5.2 soft native-audio honesty: stream + mean_volume on head samples."""
+    n = max(0, min(int(sample_n), len(parts)))
+    rows: list[dict[str, Any]] = []
+    silentish = 0
+    no_stream = 0
+    for i in range(n):
+        has = _ffprobe_has_audio(parts[i])
+        mean = _mean_volume_db(parts[i]) if has else None
+        if not has:
+            no_stream += 1
+        if mean is not None and mean < silence_db:
+            silentish += 1
+        rows.append(
+            {
+                "shot_id": shot_ids[i],
+                "path": str(parts[i]),
+                "has_audio_stream": has,
+                "mean_volume_db": mean,
+                "likely_silent": bool(mean is not None and mean < silence_db),
+            }
+        )
+    codes: list[str] = []
+    if no_stream == n and n > 0:
+        codes.append("NATIVE_AUDIO_NO_STREAM_SAMPLE")
+    if silentish >= max(1, n // 2) and n > 0:
+        codes.append("NATIVE_AUDIO_QUIET_SAMPLE")
+    if codes:
+        next_hint = [
+            "aac stream ≠ intelligible Mandarin — spot-listen before claiming native dialogue",
+            "fallback: Edge TTS ADR clock + ship_hardburn captions via aifilm final",
+        ]
+    else:
+        next_hint = []
+    return {
+        "sample_n": n,
+        "rows": rows,
+        "codes": codes,
+        "ok": not codes,
+        "severity": "soft" if codes else "ok",
+        "next": next_hint,
+        "note": "volumedetect only; not ASR. aac≠中文对白清晰.",
+    }
+
+
 def _hard_concat(parts: list[Path], out: Path) -> None:
     out.parent.mkdir(parents=True, exist_ok=True)
     lst = out.parent / f".ship_native_concat_{out.stem}.txt"
@@ -210,11 +298,9 @@ def ship_native(
 
     audio_flags = [_ffprobe_has_audio(p) for p in parts]
     with_audio = sum(1 for a in audio_flags if a)
-    sample_n = max(0, min(int(sample_audio), len(parts)))
-    sample_notes = [
-        {"shot_id": shot_ids[i], "path": str(parts[i]), "has_audio_stream": audio_flags[i]}
-        for i in range(sample_n)
-    ]
+    audio_audit = sample_native_audio_audit(
+        shot_ids, parts, sample_n=int(sample_audio or 3)
+    )
 
     dur_rep = check_duration_vs_target(root_p, spec, parts)
 
@@ -232,7 +318,8 @@ def ship_native(
         "shot_ids": shot_ids,
         "clip_count": len(parts),
         "clips_with_audio_stream": with_audio,
-        "audio_sample": sample_notes,
+        "audio_sample": audio_audit.get("rows"),
+        "native_audio_audit": audio_audit,
         "out": str(out),
         "duration_target": dur_rep,
         "notes": [
@@ -240,7 +327,11 @@ def ship_native(
             "not master_lock; run gate-auto + review-final for formal master",
             "optional: aifilm final --skip-canonical-truth for Edge+hardburn path",
         ],
-        "next": list(dur_rep.get("next") or []),
+        "next": list(
+            dict.fromkeys(
+                list(dur_rep.get("next") or []) + list(audio_audit.get("next") or [])
+            )
+        ),
     }
 
     if dry_run:

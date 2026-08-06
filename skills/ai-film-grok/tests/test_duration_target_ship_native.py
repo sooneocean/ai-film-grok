@@ -69,6 +69,74 @@ class TestDurationTarget(unittest.TestCase):
         self.assertEqual(r["severity"], "hard")
 
 
+class TestCropMasterStill(unittest.TestCase):
+    def test_clean_stills_ok(self) -> None:
+        from assets.still_uniqueness import crop_master_still_report
+
+        man = {
+            "stills": {
+                f"s{i:02d}": {
+                    "status": "approved",
+                    "path": f"keyframes/s{i:02d}.png",
+                    "sha256": f"abc{i}",
+                }
+                for i in range(1, 6)
+            }
+        }
+        r = crop_master_still_report(man)
+        self.assertTrue(r["ok"])
+        self.assertEqual(r["severity"], "ok")
+
+    def test_dominant_crop_master_hard(self) -> None:
+        from assets.still_uniqueness import crop_master_still_report
+
+        man = {
+            "stills": {
+                f"s{i:02d}": {
+                    "status": "approved",
+                    "path": f"keyframes/crop-master_s{i:02d}.png",
+                    "note": "ffmpeg crop from cast master",
+                    "sha256": f"crop{i}",
+                }
+                for i in range(1, 8)
+            }
+        }
+        r = crop_master_still_report(man, min_shots=4)
+        self.assertFalse(r["ok"])
+        self.assertEqual(r["severity"], "hard")
+        self.assertIn("STILL_CROP_MASTER_DOMINANT", r["codes"])
+
+    def test_parent_sha_mass_soft(self) -> None:
+        from assets.still_uniqueness import crop_master_still_report
+
+        # 4 share parent_sha (mass group) + 4 clean → 50% → soft (default hard 55%)
+        man = {
+            "stills": {
+                **{
+                    f"s{i:02d}": {
+                        "status": "approved",
+                        "path": f"keyframes/s{i:02d}.png",
+                        "parent_sha256": "MASTERSHA",
+                        "sha256": f"var{i}",
+                    }
+                    for i in range(1, 5)
+                },
+                **{
+                    f"s{i:02d}": {
+                        "status": "approved",
+                        "path": f"keyframes/unique_{i:02d}.png",
+                        "sha256": f"uniq{i}",
+                    }
+                    for i in range(5, 9)
+                },
+            }
+        }
+        r = crop_master_still_report(man, soft_ratio=0.35, hard_ratio=0.55, min_shots=4)
+        self.assertTrue(r["ok"])
+        self.assertEqual(r["severity"], "soft")
+        self.assertIn("STILL_CROP_MASTER_WARN", r["codes"])
+
+
 class TestShipNativeDry(unittest.TestCase):
     def test_dry_run_writes_receipt(self) -> None:
         import tempfile

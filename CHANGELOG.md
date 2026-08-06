@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.39.82] - 2026-08-06
+
+### Added (effect board Q1.4 + Q5.2 closeout)
+- **Q1.4** `crop_master_still_report` in `assets/still_uniqueness.py`: flag whole-episode cast-master crop stills (path/note/parent_sha); soft ≥35% / hard ≥55%; bulk-preflight check + `receipts/crop-master-still.json`. Escape `AIFILM_SKIP_CROP_MASTER_STILL=1`.
+- **Q5.2** `h3 ship-native` native audio sample audit: stream + `volumedetect` mean_volume (soft codes `NATIVE_AUDIO_*`); notes aac≠Mandarin.
+- Tests extended in `test_duration_target_ship_native.py`.
+
 ## [2.39.81] - 2026-08-06
 
 ### Added (effect board Q4.1 + Q5.1)
