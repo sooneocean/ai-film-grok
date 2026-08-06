@@ -32,12 +32,12 @@ def test_watchdog_disabled_passthrough() -> None:
 def test_watchdog_fast_ok_without_signal(monkeypatch) -> None:
     # Force the non-SIGALRM (thread) branch to keep the test deterministic.
     fake_signal = types.SimpleNamespace()  # no SIGALRM attribute
-    monkeypatch.setattr("post.render_final.signal", fake_signal)
+    monkeypatch.setattr("final.watchdog.signal", fake_signal)
     assert _run_with_watchdog(lambda: "ok", timeout=5) == "ok"
 
 
 def test_watchdog_times_out_without_signal(monkeypatch) -> None:
     fake_signal = types.SimpleNamespace()  # no SIGALRM attribute
-    monkeypatch.setattr("post.render_final.signal", fake_signal)
+    monkeypatch.setattr("final.watchdog.signal", fake_signal)
     with pytest.raises(RenderTimeoutError):
         _run_with_watchdog(lambda: time.sleep(1), timeout=0.2)

@@ -2,7 +2,8 @@
 
 Keeps `import audio_plan` / `from audio_plan import …` working for hard-compat.
 """
-from audio import audio_plan as _impl
 import sys as _sys
+
+from audio import audio_plan as _impl
 
 _sys.modules[__name__] = _impl

@@ -11,14 +11,14 @@ Locks fail-closed surfaces that must never regress on the designed-post path:
 
 from __future__ import annotations
 
-import pytest
-
 import json
 import sys
 import tempfile
 import unittest
 from pathlib import Path
 from unittest import mock
+
+import pytest
 
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))

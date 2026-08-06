@@ -78,7 +78,7 @@ class ApiBackend(Backend):
                 if r.status_code >= 400:
                     raise RuntimeError(f"HTTP {r.status_code}: {r.text[:200]}")
                 break
-            except Exception as ex:
+            except Exception:
                 if attempt == 3:
                     raise
                 time.sleep(_backoff(attempt))
@@ -100,7 +100,7 @@ class ApiBackend(Backend):
                 if r.status_code >= 500:
                     raise RuntimeError(f"HTTP {r.status_code}")
                 break
-            except Exception as ex:
+            except Exception:
                 if attempt == 3:
                     raise
                 time.sleep(_backoff(attempt))

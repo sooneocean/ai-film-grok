@@ -7,7 +7,7 @@ Public re-export: ``render_final._run_with_watchdog``.
 from __future__ import annotations
 
 import signal
-from typing import Any, Callable, TypeVar
+from typing import TypeVar
 
 from final.errors import RenderTimeoutError
 

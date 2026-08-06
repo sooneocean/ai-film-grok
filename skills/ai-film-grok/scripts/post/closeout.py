@@ -788,7 +788,7 @@ def closeout_status(root: Path | str) -> dict[str, Any]:
             "next_cmd": (
                 None
                 if official_final_readback.get("present")
-                else f'cat receipts/official-final-report.json  # after final'
+                else 'cat receipts/official-final-report.json  # after final'
             ),
         }
     )

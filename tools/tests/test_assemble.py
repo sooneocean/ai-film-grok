@@ -17,7 +17,7 @@ HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if HERE not in os.sys.path:
     os.sys.path.insert(0, HERE)
 
-from assemble import energy_bucket, match_bgm, auto_manifest
+from assemble import match_bgm, auto_manifest
 
 
 class TestMatchBgm(unittest.TestCase):

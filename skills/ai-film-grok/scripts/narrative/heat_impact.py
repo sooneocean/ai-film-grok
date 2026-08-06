@@ -1,11 +1,23 @@
 """Impact pack."""
 from __future__ import annotations
+
 from typing import Any
-from edit_policy_shared import PolicyError
-from heat_phase import SEX_PHASES, infer_heat_phase, normalize_heat_scale
-from heat_coitus import _shot_has_penetration_verb, _shot_visual_pose_blob, lint_sex_arc, resolve_coitus_beat, resolve_sex_pose, shot_coitus_readable
-from heat_wardrobe import resolve_wardrobe_state, shot_has_undress_action
-from heat_spice import HARDCORE_CRAFT_SPINE, _NAR_SEX_VERB_MARKERS, nar_has_extreme_spice, nar_has_sex_verb, nar_has_spice
+
+from heat_coitus import (
+    _shot_has_penetration_verb,
+    _shot_visual_pose_blob,
+    lint_sex_arc,
+    resolve_coitus_beat,
+    shot_coitus_readable,
+)
+from heat_phase import SEX_PHASES, infer_heat_phase
+from heat_spice import (
+    _NAR_SEX_VERB_MARKERS,
+    nar_has_extreme_spice,
+    nar_has_sex_verb,
+)
+from heat_wardrobe import resolve_wardrobe_state
+
 __all__ = ["ECCHI_CHECKLIST_ITEMS","_ECCHI_DISTANCE","_ECCHI_WARDROBE","_ECCHI_SENSORY","_ECCHI_POWER","_ECCHI_DOUBLE","_ECCHI_COMPLETE","lint_ecchi_checklist","suggest_impact_boost_actions","apply_impact_boost_patches","compute_erotic_impact_score","lint_sex_detail_cu","_is_detail_cu_shot","lint_size_ladder","_shot_size_rank","lint_vo_motion_align","lint_montage_craft"]
 def _shot_duration_sec(shot, default=6.0):
     try:

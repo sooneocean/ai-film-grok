@@ -1,8 +1,15 @@
 """Wardrobe pack."""
 from __future__ import annotations
+
 from typing import Any
+
 from edit_policy_shared import PolicyError
-from heat_phase import DEFAULT_BARE_PEAK_REQUIRED, DEFAULT_SHOT_DURATION_SEC, SEX_PHASES, infer_heat_phase, normalize_heat_phase, normalize_heat_scale
+from heat_phase import (
+    DEFAULT_BARE_PEAK_REQUIRED,
+    SEX_PHASES,
+    infer_heat_phase,
+)
+
 __all__ = ["WARDROBE_STATES","WARDROBE_UNDRESS_RANK","SEX_WARDROBE_OK","SEX_WARDROBE_STRONG","PHASE_WARDROBE_FLOOR","_EXPOSED_WARDROBE_MARKERS","_UNDRESS_ACTION_MARKERS","_FULL_DRESS_MARKERS","_WARDROBE_START_POSE_HINT","_WARDROBE_SUBJECT_MUST_INCLUDE","_shot_visual_blob","normalize_wardrobe_state","resolve_wardrobe_state","shot_has_undress_action","wardrobe_undress_rank","_write_shot_wardrobe_state","apply_wardrobe_continuity","_ensure_start_pose_wardrobe","lint_sex_wardrobe","resolve_partner_wardrobe_state","lint_both_undress"]
 # Wardrobe ladder for sex (办事必须卸甲/脱衣 · 2026-07-21)
 # full/armored = 登场定妆；partial = 失序半脱；undressed/bare = 办事层裸露可读

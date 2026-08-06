@@ -11,7 +11,6 @@ transition atomically (backup -> move file -> update catalog -> revision bump
     python3 tools/approve_asset.py --asset-id ... --dry-run
 """
 import argparse
-import json
 import os
 import shutil
 import subprocess

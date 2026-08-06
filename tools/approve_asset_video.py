@@ -5,7 +5,6 @@ Mirrors tools/approve_asset.py for the video lane (atomic: backup -> move file
 -> update catalog -> revision bump -> re-validate).
 """
 import argparse
-import json
 import os
 import shutil
 import subprocess

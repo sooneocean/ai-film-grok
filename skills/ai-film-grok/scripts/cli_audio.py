@@ -2,7 +2,8 @@
 
 Keeps `import cli_audio` / `from cli_audio import …` working for hard-compat.
 """
-from cli import cli_audio as _impl
 import sys as _sys
+
+from cli import cli_audio as _impl
 
 _sys.modules[__name__] = _impl

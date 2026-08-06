@@ -6,7 +6,6 @@ import json
 from pathlib import Path
 
 import pytest
-
 from util import read_json_source
 from util.errors import FilmError
 from util.retry import retry_call
@@ -74,7 +73,7 @@ def test_poll_until_timeout() -> None:
 
 
 def test_parse_mean_volume_db() -> None:
-    from core.media_ops import parse_mean_volume_db, parse_max_volume_db, parse_volume_stats
+    from core.media_ops import parse_max_volume_db, parse_mean_volume_db, parse_volume_stats
 
     assert parse_mean_volume_db("mean_volume: -22.5 dB") == pytest.approx(-22.5)
     assert parse_mean_volume_db("nope") is None

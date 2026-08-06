@@ -5,7 +5,8 @@ Keeps `import face_identity_hash` / `from face_identity_hash import …` working
 
 from __future__ import annotations
 
-from assets import face_identity_hash as _impl
 import sys as _sys
+
+from assets import face_identity_hash as _impl
 
 _sys.modules[__name__] = _impl

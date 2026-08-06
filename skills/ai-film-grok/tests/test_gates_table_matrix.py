@@ -27,7 +27,6 @@ from film_spec import zero_narration_gate  # noqa: E402
 from i2v_motion_gate import I2VMotionGateError, assert_i2v_final_gate_for_export  # noqa: E402
 from production_gates import ProductionGateError, assert_heat_allows_final  # noqa: E402
 
-
 # ── meaning_gate_enabled ─────────────────────────────────────────────────────
 
 

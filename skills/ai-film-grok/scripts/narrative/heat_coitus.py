@@ -1,10 +1,39 @@
 """Coitus pack."""
 from __future__ import annotations
+
 from typing import Any
-from edit_policy_shared import COITUS_BEATS, COITUS_REQUIRED_BEATS, PolicyError, _COITUS_PSEUDO_ONLY, _COITUS_READABLE_MARKERS
-from heat_phase import SEX_PHASES, infer_heat_phase, normalize_heat_scale
+
+from edit_policy_shared import (
+    _COITUS_PSEUDO_ONLY,
+    _COITUS_READABLE_MARKERS,
+    COITUS_BEATS,
+    COITUS_REQUIRED_BEATS,
+)
+from heat_phase import SEX_PHASES, infer_heat_phase
 from heat_wardrobe import resolve_wardrobe_state
-__all__ = ["SEX_POSES","COITUS_BEAT_DEFAULT_POSE","SEX_ARC_BEATS","SEX_ARC_REQUIRED","resolve_sex_pose","_shot_visual_pose_blob","shot_coitus_readable","shot_coitus_pseudo_only","resolve_coitus_beat","lint_coitus_grammar","resolve_sex_arc_beat","_shot_has_penetration_verb","_shot_has_release_marker","lint_sex_arc","lint_sex_pose_variety","_SEX_ARC_PENETRATION_MARKERS","_SEX_ARC_RELEASE_MARKERS","_SEX_ARC_FOREPLAY_MARKERS"]
+
+__all__ = [
+    "SEX_POSES",
+    "COITUS_BEAT_DEFAULT_POSE",
+    "COITUS_BEATS",
+    "COITUS_REQUIRED_BEATS",
+    "SEX_ARC_BEATS",
+    "SEX_ARC_REQUIRED",
+    "resolve_sex_pose",
+    "_shot_visual_pose_blob",
+    "shot_coitus_readable",
+    "shot_coitus_pseudo_only",
+    "resolve_coitus_beat",
+    "lint_coitus_grammar",
+    "resolve_sex_arc_beat",
+    "_shot_has_penetration_verb",
+    "_shot_has_release_marker",
+    "lint_sex_arc",
+    "lint_sex_pose_variety",
+    "_SEX_ARC_PENETRATION_MARKERS",
+    "_SEX_ARC_RELEASE_MARKERS",
+    "_SEX_ARC_FOREPLAY_MARKERS",
+]
 def _shot_duration_sec(shot, default=6.0):
     try:
         d=float(shot.get("duration_sec") or default)

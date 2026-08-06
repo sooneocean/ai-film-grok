@@ -17,7 +17,6 @@ import json
 import os
 import re
 import sys
-from datetime import datetime
 
 LIB_SCHEMA = "aifilm-video-library-v1"
 ASSET_SCHEMA = "aifilm-video-asset-v1"

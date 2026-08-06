@@ -1,8 +1,7 @@
 """R4 action policy + catalog advance coverage."""
 
-from spine.action_policy import resolve_policy, resolve_skill_id
+from spine.action_policy import catalog_advance_ids, resolve_policy, resolve_skill_id
 from spine.advance import ADVANCE_ACTIONS, advance_eligible_ids
-from spine.action_policy import catalog_advance_ids
 
 
 def test_resolve_skill_defaults():

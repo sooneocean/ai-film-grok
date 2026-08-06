@@ -278,9 +278,7 @@ def plan_shots(
         # Act/climax: prefer more plates at H3 nominal, not 8s paper duration
         # (S0.1 · 2026-08-06 — 8s floor caused DURATION_MEDIA_SHORT vs ~5.2s H3).
         floor = per_floor
-        if heat_phase in {"act", "climax"}:
-            floor = max(per_floor, min(H3_PLAN_DURATION_CAP_SEC, 5.0))
-        elif heat_phase == "foreplay":
+        if heat_phase in {"act", "climax"} or heat_phase == "foreplay":
             floor = max(per_floor, min(H3_PLAN_DURATION_CAP_SEC, 5.0))
         per = _duration_for_nar(nar, floor=floor, cap=H3_PLAN_DURATION_CAP_SEC)
         # Size ladder: setup wide → act medium → climax CU → lock insert

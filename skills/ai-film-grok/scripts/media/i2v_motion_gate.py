@@ -740,11 +740,10 @@ def collect_motion_gate_rows(
 ) -> list[dict[str, Any]]:
     """Phase B/2.37 · Auto-build gate rows from film-spec + means (measure if missing).
 
-    Mean resolution order per shot:
-      1) receipts/i2v-high-motion-audit.json per_shot
-      2) takes/<id>/*.mp4.json sidecar mean|mean_absdiff|motion_mean
-      3) measure takes (write sidecars) — pick max mean
-      4) manifest clips[id] mean or measure clip path
+    Mean resolution per shot — **max across sources** (stale audit must not hide stronger takes):
+      1) takes/<id>/*.mp4.json sidecars (measure if missing) — pick max mean
+      2) manifest clips[id] mean / measure clip path
+      3) receipts/i2v-high-motion-audit.json per_shot (legacy cache)
     Missing mean → row still emitted (gate will flag MEAN missing / fail floor).
     """
     base = Path(root).expanduser().resolve()
@@ -798,57 +797,61 @@ def collect_motion_gate_rows(
         df = str(sh.get("dramatic_function") or dsl.get("dramatic_function") or "").strip()
         wardrobe = str(sh.get("wardrobe_state") or "").strip()
         heat = str(sh.get("heat_phase") or "").strip()
-        mean: float | None = mean_by_id.get(sid)
+        mean: float | None = None
         mean_path: str | None = None
-        if mean is None:
-            takes_dir = base / "takes" / sid
-            best_mean: float | None = None
-            if takes_dir.is_dir():
-                for p in sorted(takes_dir.glob("*.mp4")):
-                    m_local: float | None = None
-                    for side in (Path(str(p) + ".json"), p.with_suffix(".json")):
-                        if not side.is_file():
+        takes_dir = base / "takes" / sid
+        if takes_dir.is_dir():
+            for p in sorted(takes_dir.glob("*.mp4")):
+                m_local: float | None = None
+                for side in (Path(str(p) + ".json"), p.with_suffix(".json")):
+                    if not side.is_file():
+                        continue
+                    data = read_json(side) or {}
+                    for key in ("mean", "mean_absdiff", "motion_mean"):
+                        if data.get(key) is None:
                             continue
-                        data = read_json(side) or {}
-                        for key in ("mean", "mean_absdiff", "motion_mean"):
-                            if data.get(key) is None:
-                                continue
-                            try:
-                                m_local = float(data[key])
-                                break
-                            except (TypeError, ValueError):
-                                continue
-                        if m_local is not None:
+                        try:
+                            m_local = float(data[key])
                             break
-                    if m_local is None and measure_missing:
-                        m_local = measure_mean_absdiff(p)
-                        if m_local is not None:
-                            write_mean_sidecar(p, m_local)
-                    if m_local is not None and (best_mean is None or m_local > best_mean):
-                        best_mean = m_local
-                        mean_path = str(p)
-            mean = best_mean
-        if mean is None and isinstance(clips.get(sid), dict):
+                        except (TypeError, ValueError):
+                            continue
+                    if m_local is not None:
+                        break
+                if m_local is None and measure_missing:
+                    m_local = measure_mean_absdiff(p)
+                    if m_local is not None:
+                        write_mean_sidecar(p, m_local)
+                if m_local is not None and (mean is None or m_local > mean):
+                    mean = m_local
+                    mean_path = str(p)
+        if isinstance(clips.get(sid), dict):
             c = clips[sid]
+            c_mean: float | None = None
             for key in ("mean", "mean_absdiff", "motion_mean"):
                 if c.get(key) is None:
                     continue
                 try:
-                    mean = float(c[key])
+                    c_mean = float(c[key])
                     break
                 except (TypeError, ValueError):
                     continue
-            if mean is None and measure_missing:
+            if c_mean is None and measure_missing:
                 raw_path = c.get("path") or c.get("file")
                 if raw_path:
                     cp = Path(str(raw_path))
                     if not cp.is_absolute():
                         cp = base / cp
                     if cp.is_file():
-                        mean = measure_mean_absdiff(cp)
-                        if mean is not None:
-                            write_mean_sidecar(cp, mean)
-                            mean_path = str(cp)
+                        c_mean = measure_mean_absdiff(cp)
+                        if c_mean is not None:
+                            write_mean_sidecar(cp, c_mean)
+            if c_mean is not None and (mean is None or c_mean > mean):
+                mean = c_mean
+                raw_path = c.get("path") or c.get("file")
+                if raw_path:
+                    mean_path = str(raw_path)
+        if mean is None and sid in mean_by_id:
+            mean = mean_by_id[sid]
         source = None
         if isinstance(clips.get(sid), dict):
             source = clips[sid].get("source") or clips[sid].get("provider")

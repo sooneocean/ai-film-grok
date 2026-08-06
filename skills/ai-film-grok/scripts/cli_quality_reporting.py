@@ -2,7 +2,8 @@
 
 Keeps `import cli_quality_reporting` / `from cli_quality_reporting import …` working for hard-compat.
 """
-from cli import cli_quality_reporting as _impl
 import sys as _sys
+
+from cli import cli_quality_reporting as _impl
 
 _sys.modules[__name__] = _impl

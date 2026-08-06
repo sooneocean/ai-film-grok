@@ -1,7 +1,8 @@
 """Multi-heroine pack."""
 from __future__ import annotations
+
 from typing import Any
-from edit_policy_shared import PolicyError
+
 __all__ = ["_MULTI_HEROINE_PROMPT_MARKERS","_MALE_CAST_IDS","resolve_heroine_cast_mode","lint_multi_heroine"]
 _MULTI_HEROINE_PROMPT_MARKERS: tuple[str, ...] = (
     "双女主",

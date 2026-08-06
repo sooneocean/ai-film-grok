@@ -1,13 +1,26 @@
 """Unit tests for H3 combo matrix + pure scorer/verdict (no Comfy)."""
 from __future__ import annotations
-import json, tempfile, unittest
+
+import json
+import tempfile
+import unittest
 from pathlib import Path
+
 from h3_combo_eval import (
-    DEFAULT_SEED, DEFAULT_STEPS, build_combo_matrix, build_eval_film_spec,
-    load_combo_winners, merge_winners_into_effect_defaults, prepare_eval_root,
-    rank_lanes, score_combo_row, winner_tips_from_registry, write_winners_registry,
+    DEFAULT_SEED,
+    DEFAULT_STEPS,
+    build_combo_matrix,
+    build_eval_film_spec,
+    load_combo_winners,
+    merge_winners_into_effect_defaults,
+    prepare_eval_root,
+    rank_lanes,
+    score_combo_row,
+    winner_tips_from_registry,
+    write_winners_registry,
 )
 from h3_mode import effect_tips, preferred_mode_for_lane
+
 
 class ComboMatrixTests(unittest.TestCase):
     def test_matrix_covers_t2v_i2v_r2v(self) -> None:
@@ -117,6 +130,7 @@ class FamilyApplyTests(unittest.TestCase):
     def test_production_prompt_gets_family_micro_life(self) -> None:
         """Empty-DSL hero shot should pick soft_portrait_alive and inject micro-life."""
         from pathlib import Path
+
         from h3_workflow import _prompt_for_shot
 
         thin = {
@@ -138,6 +152,7 @@ class FamilyApplyTests(unittest.TestCase):
 
     def test_high_motion_family_header(self) -> None:
         from pathlib import Path
+
         from h3_workflow import _prompt_for_shot
 
         shot = {
@@ -175,7 +190,7 @@ if __name__ == "__main__":
 
 class Round2MatrixTests(unittest.TestCase):
     def test_r2_matrix_covers_optimized_families(self) -> None:
-        from h3_combo_eval import build_combo_matrix, PROMPT_FAMILIES
+        from h3_combo_eval import PROMPT_FAMILIES, build_combo_matrix
         combos = build_combo_matrix(round=2, include_flf=False)
         modes = {c.mode for c in combos}
         self.assertIn("i2v", modes)
@@ -188,10 +203,10 @@ class Round2MatrixTests(unittest.TestCase):
 
     def test_r3_timeline_ab_pairs(self) -> None:
         from h3_combo_eval import (
+            PROMPT_FAMILIES,
             build_combo_matrix,
             compile_family_author_prompt,
             prepare_eval_root,
-            PROMPT_FAMILIES,
         )
         combos = build_combo_matrix(round=3, include_flf=False)
         fams = {c.family for c in combos}

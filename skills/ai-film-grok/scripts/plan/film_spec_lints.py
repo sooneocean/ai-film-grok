@@ -6,72 +6,8 @@ Public entry remains ``film_spec.validate_film_spec`` via re-export.
 
 from __future__ import annotations
 
-import contextlib
 import re
 from typing import Any
-
-from audio_recipe import (
-    AudioRecipeError,
-    apply_audio_recipes_to_spec,
-    probe_caps_for_root,
-)
-from content_channels import lint_content_channels
-from continuity import (
-    lint_continuity,
-    lint_frame_chain,
-    lint_meaningful_motion,
-    lint_production_consistency,
-    lint_transition_styles,
-    lint_vo_motion_link,
-)
-from continuity_chain import (
-    is_long_form,
-)
-from dialogue_broll import DialogueBrollError, iter_dialogue_broll, validate_dialogue_broll
-from dialogue_contracts import summarize_dialogue_contracts
-from edit_policy import (
-    _CRAFT_WHY,
-    DEFAULT_TRANSITION_SEC,
-    PolicyError,
-    apply_coverage_defaults_to_shot,
-    apply_heat_phase_defaults,
-    apply_wardrobe_continuity,
-    compute_erotic_impact_score,
-    edit_crafts_to_intents,
-    enforce_continue_hard_joins,
-    lint_character_stance,
-    lint_heat_arc,
-    lint_multi_heroine,
-    normalize_edit_craft,
-    normalize_heat_scale,
-    normalize_transition_intent,
-    normalize_transition_sec,
-    normalize_transition_styles,
-    normalize_xfade_style,
-    resolve_heroine_cast_mode,
-    suggest_edit_crafts,
-    suggest_transition_intents,
-    suggest_transition_styles,
-    validate_motion,
-)
-from framing_lint import lint_composition_rules, lint_framing_iron, lint_vertical_safe_area
-from narrative_timeline import (
-    NarrativeTimelineError,
-    validate_linear_narration,
-    validate_sfx_scene_bindings,
-)
-from rhythm import lint_rhythm
-from security_policy import SecurityPolicyError, validate_identifier
-from sound_plan import (
-    SoundPlanError,
-    default_sound_plan_for_film,
-    inject_auto_sfx_if_empty,
-    inject_music_energy_spotting,
-    inject_sex_sfx_from_shots,
-    resolve_sidechain,
-    validate_sound_plan,
-)
-from transition_ops import TransitionOperationError, build_transition_operations
 
 try:
     from plan.film_spec_constants import *  # noqa: F403
@@ -87,7 +23,6 @@ from film_spec_profile import (  # noqa: F401
     resolve_h3_config,
     resolve_i2v_profile,
 )
-
 
 __all__ = [
     "FilmSpecError","iter_film_spec_shots","_required_text","estimate_nar_vo_sec",

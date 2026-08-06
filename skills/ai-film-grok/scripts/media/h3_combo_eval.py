@@ -12,10 +12,11 @@ import json
 import shutil
 import subprocess
 import time
+from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 DEFAULT_SEED = 20260805
 DEFAULT_STEPS = 20
@@ -784,7 +785,7 @@ def rank_lanes(
     return {
         "schema_version": 1,
         "kind": VERDICT_KIND,
-        "ts": datetime.now(timezone.utc).isoformat(),
+        "ts": datetime.now(UTC).isoformat(),
         "winners": winners,
         "recipes": recipes,
         "rows_scored": len(enriched),
@@ -832,7 +833,7 @@ def merge_winners_into_effect_defaults(verdict: dict[str, Any]) -> dict[str, Any
         "kind": "h3-combo-winners",
         "policy": "h3_max_effect_combo_v1",
         "source_verdict_kind": VERDICT_KIND,
-        "ts": verdict.get("ts") or datetime.now(timezone.utc).isoformat(),
+        "ts": verdict.get("ts") or datetime.now(UTC).isoformat(),
         "lanes": {
             "hero_identity_lock": {
                 "preferred_mode": (recipes.get("hero_identity_lock") or {}).get("mode", "i2v"),
@@ -1220,7 +1221,7 @@ def run_combo_grid(
 
     ab_metrics = {
         "schema_version": 1, "kind": "h3-combo-ab-metrics",
-        "ts": datetime.now(timezone.utc).isoformat(),
+        "ts": datetime.now(UTC).isoformat(),
         "seed": DEFAULT_SEED, "steps": DEFAULT_STEPS, "eval_root": str(root),
         "rows": rows, "capacity_log_tail": capacity_log[-5:],
     }

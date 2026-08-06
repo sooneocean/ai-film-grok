@@ -6,7 +6,6 @@ Iron: no silent i2v_provider / h3 profile default changes — move-only peel.
 
 from __future__ import annotations
 
-
 # Motion provider profiles. Adult meat stays local H3; LTX is opt-in audio lane.
 # ``seedance_first`` and ``grok_primary`` remain readable compatibility inputs.
 I2V_PROVIDERS = frozenset({"frw", "frw-ltx23", "grok", "comfy-h3", "auto"})

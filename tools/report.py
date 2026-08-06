@@ -24,8 +24,7 @@ MANIFEST = os.path.join(LIB, "..", "tts-evaluations", "manifest.json")
 def _report_video():
     """Parallel observability for the video shot lane (Grok Video 1.5 + H3)."""
     try:
-        from video_pipeline_lib import (load_vcatalog, load_vgaps, load_vjobs,
-                                         VIDEO_LIB)
+        from video_pipeline_lib import (load_vcatalog, load_vgaps, load_vjobs)
     except Exception as e:
         print(f"\n(video lane skipped: {e})")
         return

@@ -13,7 +13,6 @@ if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
 
 from composition_anti_hijack import (  # noqa: E402
-    apply_anti_hijack_to_candidates,
     infer_want,
     score_frame_array,
 )

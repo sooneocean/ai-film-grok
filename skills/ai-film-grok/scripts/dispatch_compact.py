@@ -5,7 +5,8 @@ Keeps `import dispatch_compact` / `from dispatch_compact import …` working for
 
 from __future__ import annotations
 
-from spine import dispatch_compact as _impl
 import sys as _sys
+
+from spine import dispatch_compact as _impl
 
 _sys.modules[__name__] = _impl

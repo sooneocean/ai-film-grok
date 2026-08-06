@@ -52,7 +52,9 @@ class ValidateCatalogTests(unittest.TestCase):
         self.d = tempfile.mkdtemp(prefix="aifilm-val-")
         # a real wav so the path-exists check passes
         wav = os.path.join(self.d, "amb-test.wav")
-        import wave, struct, math
+        import wave
+        import struct
+        import math
         with wave.open(wav, "wb") as w:
             w.setnchannels(2); w.setsampwidth(2); w.setframerate(44100)
             fr = b"".join(struct.pack("<h", int(24000 * math.sin(2 * math.pi * 220 * i / 44100))) * 2

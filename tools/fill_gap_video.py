@@ -8,7 +8,6 @@ resolved asset, and maintains use_count/last_used_at/last_used_film_id.
     python3 tools/fill_gap_video.py --film-id "第4章..." --shot-id ep01_sc01_bt02_sh01
 """
 import argparse
-import json
 import os
 import shutil
 import sys

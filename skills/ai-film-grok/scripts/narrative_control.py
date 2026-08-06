@@ -5,7 +5,8 @@ Keeps `import narrative_control` / `from narrative_control import …` working f
 
 from __future__ import annotations
 
-from plan import narrative_control as _impl
 import sys as _sys
+
+from plan import narrative_control as _impl
 
 _sys.modules[__name__] = _impl

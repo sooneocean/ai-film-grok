@@ -26,10 +26,10 @@ def test_spine_package_and_shim_identity() -> None:
 
 
 def test_gates_and_plan_shims() -> None:
-    import preflight as pre_shim
-    import gates.preflight as pre_pkg
     import beat_spine as bs_shim
+    import gates.preflight as pre_pkg
     import plan.beat_spine as bs_pkg
+    import preflight as pre_shim
 
     assert pre_shim is pre_pkg
     assert bs_shim is bs_pkg
@@ -51,10 +51,10 @@ def test_shim_modules_are_thin() -> None:
 
 def test_edit_policy_shared_shim_and_cycle_free_heat() -> None:
     """Shared leaf breaks heat↔policy cycle; shim identity matches package."""
+    import edit_policy as policy
+    import edit_policy_heat as heat
     import edit_policy_shared as shim
     import narrative.edit_policy_shared as pkg
-    import edit_policy_heat as heat
-    import edit_policy as policy
 
     assert shim is pkg
     assert heat.PolicyError is policy.PolicyError is pkg.PolicyError
@@ -64,10 +64,10 @@ def test_edit_policy_shared_shim_and_cycle_free_heat() -> None:
 
 def test_w7_cli_package_and_shim_identity() -> None:
     """W7 · cli_*.py live under scripts/cli/ with thin top-level shims."""
-    import cli.cli_post as pkg
-    import cli_post as shim
     import cli.cli_media as media_pkg
+    import cli.cli_post as pkg
     import cli_media as media_shim
+    import cli_post as shim
 
     assert shim is pkg
     assert media_shim is media_pkg
@@ -79,10 +79,10 @@ def test_w7_cli_package_and_shim_identity() -> None:
 
 def test_w7_post_package_and_shim_identity() -> None:
     """W7 · post domain modules live under scripts/post/ with thin shims."""
-    import post.compose_render as pkg
     import compose_render as shim
-    import post.export_composition as exp_pkg
     import export_composition as exp_shim
+    import post.compose_render as pkg
+    import post.export_composition as exp_pkg
 
     assert shim is pkg
     assert exp_shim is exp_pkg
@@ -93,8 +93,8 @@ def test_w7_post_package_and_shim_identity() -> None:
 
 def test_w7_plan_package_and_shim_identity() -> None:
     """W7 · plan domain modules live under scripts/plan/ with thin shims."""
-    import plan.film_spec as pkg
     import film_spec as shim
+    import plan.film_spec as pkg
     import plan.story_plan as sp_pkg
     import story_plan as sp_shim
 
@@ -107,10 +107,10 @@ def test_w7_plan_package_and_shim_identity() -> None:
 
 def test_w7_narrative_package_and_shim_identity() -> None:
     """W7 · narrative domain modules live under scripts/narrative/ with thin shims."""
-    import narrative.edit_policy as pkg
     import edit_policy as shim
-    import narrative.heat_check as hc_pkg
     import heat_check as hc_shim
+    import narrative.edit_policy as pkg
+    import narrative.heat_check as hc_pkg
 
     assert shim is pkg
     assert hc_shim is hc_pkg

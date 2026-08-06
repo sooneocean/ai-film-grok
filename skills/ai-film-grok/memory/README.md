@@ -23,6 +23,7 @@
 | 卸装不回穿 + 尺度兜底 | [wardrobe-no-redress](2026-08-06-wardrobe-no-redress-fullnude-fallback.md) |
 | 正牌 final IRON | [suse-ep01-final](2026-08-06-suse-ep01-official-final-iron.md) |
 | H3 原声季审片 | [h3-native-ship](2026-08-06-h3-native-ship-review-lessons.md) |
+| **plate 有片仍无聊 / mix 假死** | [plate-boring-mean-mix](2026-08-06-plate-boring-mean-mix-iron.md) |
 | C1 capacity-wait | [c1-capacity](2026-08-06-c1-capacity-wait-iron.md) |
 | Comfy 隧道 auto | [tunnel-ensure](2026-08-06-comfy-tunnel-auto-ensure.md) |
 | 构图防抢走 | [anti-hijack](2026-08-05-composition-anti-hijack.md) |

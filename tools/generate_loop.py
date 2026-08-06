@@ -38,8 +38,7 @@ import hashlib
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from pipeline_lib import (load_generators, load_gaps, save_gaps, load_jobs,
                           save_jobs, load_catalog, LIB, now_iso)
-from router import (choose_backend, capable_backends, find_existing_candidate,
-                    choose_route)
+from router import (capable_backends, find_existing_candidate)
 from backends import get_backend
 from breaker import CircuitBreaker
 from tts import gap_asset_kind, choose_tts_engine

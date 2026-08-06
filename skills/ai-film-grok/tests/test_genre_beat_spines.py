@@ -13,13 +13,13 @@ from __future__ import annotations
 
 import json
 import sys
-import tempfile
 from pathlib import Path
 
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 
+from beat_spine import list_spines, load_spine, spine_exists
 from story_plan import (
     DRAMATIC_FUNCS,
     GENRES,
@@ -28,8 +28,6 @@ from story_plan import (
     normalize_story,
     select_beat_spine,
 )
-
-from beat_spine import list_spines, load_spine, spine_exists
 
 # ---------------------------------------------------------------------------
 # Beat spine loader validation

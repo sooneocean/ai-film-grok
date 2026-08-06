@@ -13,9 +13,8 @@ import os
 import shutil
 import hashlib
 import subprocess
-from datetime import datetime, timezone
 
-from pipeline_lib import (VIDEO_LIB, VCAT, VGAP, VJOBS, now_iso, cosine)
+from pipeline_lib import (VCAT, VGAP, VJOBS, now_iso)
 
 VALID_MODES = {"t2v", "i2v", "r2v"}
 

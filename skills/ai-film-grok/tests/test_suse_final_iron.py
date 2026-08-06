@@ -15,7 +15,6 @@ sys.path.insert(0, str(SCRIPTS))
 from film_spec import FilmSpecError, validate_film_spec  # noqa: E402
 from final.voice import check_vo_window_triangle  # noqa: E402
 
-
 _DF = {
     "setup": "hook",
     "foreplay": "sensory",

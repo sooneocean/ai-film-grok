@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+from datetime import UTC
 from pathlib import Path
 from typing import Any
 
@@ -442,10 +443,16 @@ def run_h3(args: argparse.Namespace) -> dict[str, Any]:
                 include_challenge=not bool(getattr(args, "no_challenge", False)),
             )
         elif action == "combo-eval":
-            from datetime import datetime, timezone
-            from h3_combo_eval import build_combo_matrix, prepare_eval_root, run_combo_grid, write_winners_registry
+            from datetime import datetime
+
+            from h3_combo_eval import (
+                build_combo_matrix,
+                prepare_eval_root,
+                run_combo_grid,
+                write_winners_registry,
+            )
             skill_root = Path(__file__).resolve().parents[2]
-            default_root = skill_root / "artifacts" / "5090-evaluation" / f"h3-combo-eval-{datetime.now(timezone.utc).strftime('%Y%m%d')}"
+            default_root = skill_root / "artifacts" / "5090-evaluation" / f"h3-combo-eval-{datetime.now(UTC).strftime('%Y%m%d')}"
             eval_root = Path(args.root).expanduser().resolve() if args.root else default_root
             still = getattr(args, "still", None)
             if still is None:

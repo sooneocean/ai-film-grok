@@ -17,8 +17,6 @@ without re-testing happy-path bulk.
 
 from __future__ import annotations
 
-import pytest
-
 import json
 import os
 import sys
@@ -27,17 +25,19 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
+import pytest
+
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
 pytestmark = pytest.mark.hotpath
 
 import final_stages  # noqa: E402
-from final.delivery_class import plate_blocks_final_complete  # noqa: E402
 from compose_render import ComposeRenderError, assert_underlay_not_double_burn  # noqa: E402
+from final.delivery_class import plate_blocks_final_complete  # noqa: E402
+from final.manifest import build_final_film_manifest_entry  # noqa: E402
 from h3_fill_idle import fill_idle_until_empty, run_next_fill_idle  # noqa: E402
 from longform import estimate_plate_timeout  # noqa: E402
-from final.manifest import build_final_film_manifest_entry  # noqa: E402
 from mix_partial import write_final_mix_partial_receipt  # noqa: E402
 from post_doctor import run_post_doctor  # noqa: E402
 from post_route import (  # noqa: E402

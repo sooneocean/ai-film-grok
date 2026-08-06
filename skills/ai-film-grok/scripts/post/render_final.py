@@ -55,10 +55,7 @@ from security_policy import (
 )
 from sound_plan import (
     SoundPlanError,
-    apply_mute_windows_to_samples,
-    apply_sfx_accents_to_samples,
     build_mood_timeline,
-    expand_sound_events,
     inject_auto_sfx_if_empty,
     resolve_loudnorm,
     resolve_music_template,
@@ -145,21 +142,9 @@ from final.enhance import (  # noqa: E402, F401
     build_post_enhancement_vf_chain,
     resolve_subtitle_mode,
 )
-from final.errors import RenderError, RenderTimeoutError  # noqa: E402
-from final.watchdog import _run_with_watchdog  # noqa: E402, F401
-from final.render_defaults import (  # noqa: E402, F401
-    DEFAULT_BGM_GEN_AMP,
-    DEFAULT_MUSIC_VOLUME,
-    DEFAULT_SUB_MAX_CHARS,
-    DEFAULT_VO_GAIN,
-    DEFAULT_VO_PITCH,
-    DEFAULT_VO_RATE,
-    DEFAULT_VOCAL_COLOR_GAIN,
-    SR,
-)
+from final.errors import RenderError, RenderTimeoutError  # noqa: E402, F401
 from final.io import read_json  # noqa: E402, F401
 from final.manifest import build_final_film_manifest_entry  # noqa: E402, F401
-from final.voice_mix_config import resolve_final_voice_mix_config  # noqa: E402, F401
 from final.media_ops import (  # noqa: E402, F401
     apply_dialogue_broll_visual,
     concat_audio_segments,
@@ -183,6 +168,16 @@ from final.native_audio import (  # noqa: E402, F401
     resolve_native_audio_gain,
     resolve_native_audio_volume,
 )
+from final.render_defaults import (  # noqa: E402, F401
+    DEFAULT_BGM_GEN_AMP,
+    DEFAULT_MUSIC_VOLUME,
+    DEFAULT_SUB_MAX_CHARS,
+    DEFAULT_VO_GAIN,
+    DEFAULT_VO_PITCH,
+    DEFAULT_VO_RATE,
+    DEFAULT_VOCAL_COLOR_GAIN,
+    SR,
+)
 from final.voice import (  # noqa: E402, F401
     _HEROINE_SPEAKERS,
     _NARRATOR_SPEAKERS,
@@ -198,6 +193,8 @@ from final.voice import (  # noqa: E402, F401
     validate_voice_language_locks,
     voice_for_shot,
 )
+from final.voice_mix_config import resolve_final_voice_mix_config  # noqa: E402, F401
+from final.watchdog import _run_with_watchdog  # noqa: E402, F401
 
 
 def resolve_font() -> str:
@@ -1916,6 +1913,16 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
         sidechain["performance_duck_db"] = performance_bgm.get("duck_db")
     sc_frag = sidechain_filter_fragment(sidechain)
     filters_help = run(["ffmpeg", "-filters"], check=False).stdout
+    # Long multi-stem plates: dynamic_eq (sidechain+acrossover) can hang 30–60m+.
+    # AIFILM_FORCE_SIMPLE_AMIX=1 → plain amix (no duck).
+    # AIFILM_FORCE_BROADBAND_DUCK=1 → sidechaincompress only (light duck, no acrossover).
+    _env_on = lambda k: os.environ.get(k, "").strip().lower() in {"1", "true", "yes", "on"}
+    if _env_on("AIFILM_FORCE_SIMPLE_AMIX"):
+        filters_help = ""
+        mix_spotting["force_simple_amix"] = True
+    elif _env_on("AIFILM_FORCE_BROADBAND_DUCK"):
+        filters_help = (filters_help or "").replace("acrossover", "___disabled_acrossover___")
+        mix_spotting["force_broadband_duck"] = True
 
     try:
         from acoustic_policy import resolve_acoustic_space
@@ -2438,9 +2445,9 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
                     "-c:v",
                     "libx264",
                     "-preset",
-                    "fast",
+                    "medium",
                     "-crf",
-                    "20",
+                    "16",
                     "-pix_fmt",
                     "yuv420p",
                     str(video_subbed),
@@ -2463,7 +2470,7 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
             "-c:a",
             "aac",
             "-b:a",
-            "192k",
+            "256k",
             "-shortest",
             str(final_path),
         ]

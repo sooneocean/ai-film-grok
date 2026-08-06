@@ -178,8 +178,8 @@ def main():
                  f"待路由 tts 缺口：{len(tts_open)}</p>"
                  + (f"<ul>{tts_items}</ul>" if tts_items else
                     "<p>暂无 tts 缺口。</p>") +
-                 f"<p>TTS 缺口由评估引擎样本池提供服务，不经过声音生成后端，"
-                 f"因此不会出现在下方 BGM 候选列表中。</p></article>")
+                 "<p>TTS 缺口由评估引擎样本池提供服务，不经过声音生成后端，"
+                 "因此不会出现在下方 BGM 候选列表中。</p></article>")
 
     # video (shot) pipeline status — third lane
     vcat = load_vcatalog()

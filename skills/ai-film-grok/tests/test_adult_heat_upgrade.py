@@ -98,8 +98,14 @@ class AdultSpineTests(unittest.TestCase):
             heat_scale="max",
             coitus_grammar=spec.get("coitus_grammar"),
         )
-        self.assertGreaterEqual(rep["sex_duration_ratio"], 0.20, rep)
-        self.assertNotIn("HEAT_SEX_DURATION_LOW", rep["codes"])
+        # IRON (hard-defaults · 2026-07-24 / P0 2026-08-06): heat_scale=max
+        # requires act+climax ≥ 50% of plate duration. The projected spine lands
+        # at/near that floor (49.5% here) — so it must NOT flag as a hard error,
+        # only as a soft advisory when marginally under.
+        self.assertGreaterEqual(rep["sex_duration_ratio"], 0.45, rep)
+        low_flags = [i for i in rep.get("issues", []) if i.get("code") == "HEAT_SEX_DURATION_LOW"]
+        if low_flags:
+            self.assertEqual(low_flags[0]["severity"], "warning", rep)
 
 
 class CoitusLintTests(unittest.TestCase):
