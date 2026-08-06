@@ -281,6 +281,65 @@ def check_duration_target(
     return report
 
 
+def finalize_duration_density(
+    *,
+    target_duration_requested: float,
+    target_duration_effective: float,
+    heat_target_lift: str | None,
+    actual_shot_count: int,
+    nominal_clip_sec: float = H3_NOMINAL_CLIP_SEC,
+) -> dict[str, Any]:
+    """AD A1/A2 · bind heat-lifted target to actual shot count (menu = stove).
+
+    Pure: no I/O. Returns density receipt fields for graph.project + receipts.
+    """
+    min_shots = suggest_min_shots(
+        float(target_duration_effective or 0.0),
+        nominal_clip_sec=float(nominal_clip_sec),
+    )
+    n = max(0, int(actual_shot_count))
+    delta = max(0, int(min_shots) - n)
+    dens: dict[str, Any] = {
+        "schema_version": 1,
+        "kind": "plan_duration_density",
+        "target_duration_requested": float(target_duration_requested),
+        "target_duration_effective": float(target_duration_effective),
+        "heat_target_lift": heat_target_lift,
+        "nominal_clip_sec": float(nominal_clip_sec),
+        "suggested_min_shots_h3": int(min_shots),
+        "h3_reachable_if_min_shots_sec": round(min_shots * float(nominal_clip_sec), 2),
+        "actual_shot_count": n,
+        "shots_n_delta": delta,
+        "density_ok": delta == 0,
+        "next": [
+            f"plan ≥{min_shots} shots at ~{nominal_clip_sec}s "
+            f"or lower target_duration to n×{nominal_clip_sec}",
+            "do not pad duration_sec above H3 nominal to fake planned sum",
+        ],
+    }
+    if heat_target_lift and delta > 0:
+        dens["action_required"] = "add_shots_or_cut_promise"
+        dens["ok"] = False
+        dens["codes"] = ["ADULT_TARGET_LIFT_WITHOUT_SHOTS"]
+        dens["next"] = [
+            f"heat lifted target to {float(target_duration_effective):.0f}s but only "
+            f"{n} shots (need ≥{min_shots})",
+            f"next: (1) add ~{delta} env/bridge/meat shots, or "
+            f"(2) lower target_duration / cut promise to ~"
+            f"{n * float(nominal_clip_sec):.0f}s",
+            "do not deliver short media as full adult-lifted target",
+        ]
+    elif delta > 0:
+        dens["action_required"] = "add_shots_or_lower_target"
+        dens["ok"] = False
+        dens["codes"] = ["DURATION_SHOT_COUNT_SHORT"]
+    else:
+        dens["ok"] = True
+        dens["action_required"] = None
+        dens["codes"] = []
+    return dens
+
+
 def write_duration_target_receipt(
     root: Path | str,
     report: dict[str, Any],

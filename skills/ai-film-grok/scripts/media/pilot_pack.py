@@ -278,6 +278,75 @@ def pilot_pack(root: Path | str, *, shots: list[str] | None = None) -> dict[str,
     h3_trio = _h3_mode_trio(base, spec if isinstance(spec, dict) else {}, picked)
     profile = str(spec.get("_i2v_profile") or "").strip().lower()
 
+    # AD A3 · debrief 30s gate (soft by default; hard when design-go missing or strict env)
+    debrief_gate: dict[str, Any] = {
+        "present": False,
+        "confirmed": False,
+        "design_go_ok": None,
+    }
+    try:
+        from script_value_debrief import check_root, load_debrief
+
+        deb = load_debrief(base)
+        debrief_gate["present"] = bool(deb)
+        if deb:
+            conf = deb.get("user_confirmed") or deb.get("confirmed")
+            debrief_gate["confirmed"] = conf is True or str(conf).lower() in {
+                "1",
+                "true",
+                "yes",
+                "confirmed",
+            }
+        try:
+            cr = check_root(base)
+            if isinstance(cr, dict):
+                debrief_gate["check"] = {
+                    "ok": cr.get("ok"),
+                    "codes": cr.get("codes"),
+                }
+                if cr.get("confirmed") is True:
+                    debrief_gate["confirmed"] = True
+        except Exception:  # noqa: BLE001
+            pass
+    except Exception as exc:  # noqa: BLE001
+        debrief_gate["error"] = str(exc)[:120]
+    design_go_path = base / "receipts" / "design-go.json"
+    if design_go_path.is_file():
+        dgo = read_json(design_go_path) or {}
+        if isinstance(dgo, dict):
+            debrief_gate["design_go_ok"] = bool(dgo.get("ok") or dgo.get("go_ready"))
+            debrief_gate["design_go_blockers"] = dgo.get("blockers") or []
+
+    # AD C1 · pilot 批片三看 (composition / wardrobe / poison) — checklist in receipt
+    three_look = {
+        "schema_version": 1,
+        "kind": "pilot_three_look",
+        "items": [
+            {
+                "id": "composition_subject",
+                "label": "构图主体=女主/承诺角色，非沙俯视脚印/男胸抢戏",
+                "required": True,
+                "checked": False,
+                "how": "aifilm anti-hijack / multi-seed shortlist composition column",
+            },
+            {
+                "id": "wardrobe_rank",
+                "label": "衣着 rank 只前进（不回穿）；尺度失败走 scale_fallback 再 promote",
+                "required": True,
+                "checked": False,
+                "how": "receipts/scale-fallback.json + wardrobe_honesty on graph",
+            },
+            {
+                "id": "poison_scan",
+                "label": "毒镜扫一眼：禁 futa/喷奶/霓虹生殖器；毒 still 禁 I2V",
+                "required": True,
+                "checked": False,
+                "how": "anatomy_safe + poison gate on register",
+            },
+        ],
+        "note": "human must check before pilot approve phrase; machine lists discipline only",
+    }
+
     blockers: list[str] = []
     if not media_ok:
         blockers.append("PILOT_MEDIA_NOT_READY")
@@ -298,10 +367,33 @@ def pilot_pack(root: Path | str, *, shots: list[str] | None = None) -> dict[str,
         in {"1", "true", "yes", "on"}
     ):
         blockers.append("PILOT_H3_MODE_TRIO_INCOMPLETE")
+    # debrief: hard when design-go already red on debrief, or strict env
+    debrief_strict = os.environ.get("AIFILM_DEBRIEF_STRICT", "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+    if debrief_strict and not debrief_gate.get("present"):
+        blockers.append("PILOT_DEBRIEF_MISSING")
+    elif debrief_strict and not debrief_gate.get("confirmed"):
+        blockers.append("PILOT_DEBRIEF_UNCONFIRMED")
+    elif debrief_gate.get("design_go_ok") is False and (
+        "debrief_missing" in (debrief_gate.get("design_go_blockers") or [])
+        or "debrief_unconfirmed" in (debrief_gate.get("design_go_blockers") or [])
+    ):
+        blockers.append("PILOT_DEBRIEF_DESIGN_GO_BLOCK")
 
     ok = not blockers
     next_cmd: str | None = None
-    if "PILOT_MEDIA_NOT_READY" in blockers:
+    if "PILOT_DEBRIEF_MISSING" in blockers or "PILOT_DEBRIEF_UNCONFIRMED" in blockers:
+        next_cmd = (
+            f'aifilm plan debrief --root "{base}" --action seed  # then confirm beats; '
+            f'aifilm design-go --root "{base}"'
+        )
+    elif "PILOT_DEBRIEF_DESIGN_GO_BLOCK" in blockers:
+        next_cmd = f'aifilm design-go --root "{base}"  # fix debrief then re-pack pilot'
+    elif "PILOT_MEDIA_NOT_READY" in blockers:
         next_cmd = f'aifilm pilot report --root "{base}"  # register pilot stills+clips first'
     elif "PILOT_SCORECARD_INCOMPLETE" in blockers:
         next_cmd = (
@@ -334,7 +426,7 @@ def pilot_pack(root: Path | str, *, shots: list[str] | None = None) -> dict[str,
     )
     payload = {
         "kind": "pilot-go",
-        "schema_version": 2,
+        "schema_version": 3,
         "root": str(base),
         "at": utc_now(),
         "ok": ok,
@@ -342,6 +434,8 @@ def pilot_pack(root: Path | str, *, shots: list[str] | None = None) -> dict[str,
         "shots": picked,
         "suggested_shots": report.get("suggested_shots") or pick_pilot_shots(spec),
         "script_value_preference": value_pref,
+        "debrief_gate": debrief_gate,
+        "three_look": three_look,
         "media": report.get("media"),
         "ready_count": report.get("ready_count"),
         "all_media_ready": media_ok,
@@ -366,6 +460,11 @@ def pilot_pack(root: Path | str, *, shots: list[str] | None = None) -> dict[str,
             else f"pilot-block-{(blockers[0] if blockers else 'unknown').lower()}",
             "cmd": next_cmd or bulk_hint,
             "why": "pilot GO pack ready for bulk" if ok else f"blocked: {','.join(blockers)}",
+        },
+        "ad_discipline": {
+            "three_look_before_approve": True,
+            "anti_hijack_on_shortlist": True,
+            "debrief_before_media": True,
         },
     }
     path = base / RECEIPT_REL

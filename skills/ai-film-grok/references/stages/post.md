@@ -9,7 +9,9 @@
 - title / end card / grade：正式链单引擎，避免双烧；ship 硬烧字幕可与 HF underlay 并存（字已在 plate 则 HF 勿再叠一层）。
 - `final` 技术成功 ≠ `final_complete`；仍需 post audit、caption attestation 与完整观看。
 - **H3 槽（S0.5）**：短源 ~5.2s → plan `duration_sec` 默认 ≤5.2；forbid_loop 可 stretch 上限约 **~5.9s**；禁空写 8–10s。`OFFICIAL_FINAL_PLATE` ≠ master。
-- **交付前 1 屏抽检：** 见 [deliver.md · 真片 final 抽检清单](deliver.md)（official-final-report / final-timeout / 口白窗 / BGM source / plate≠master）。
+- **交付前 1 屏抽检：** 见 [deliver.md · 真片 final 抽检清单](deliver.md)（official-final-report / final-timeout / 口白窗 / BGM source / plate≠master / 时长诚实 / 抽听中文）。
+- **改 final 清缓存：** 重出 final 前删/重绑 `receipts/quality-report.json` 与叙事证据；closeout 红 → 固定 `next_cmd`，禁止手点循环刷绿。
+- **门红 plate 话术：** gate-auto 红只 ship `OFFICIAL_FINAL_PLATE` / PARTIAL，禁文案写成 master。
 
 ## P0 · final 工程（2026-07-24 ep2 复盘 · 2026-08-03 Wave D）
 

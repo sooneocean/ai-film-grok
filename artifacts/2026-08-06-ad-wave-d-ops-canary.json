@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "kind": "ad_wave_d_ops_canary",
+  "at": "2026-08-06T07:00:37.041744+00:00",
+  "tunnel": {
+    "18188": {
+      "ok": false,
+      "error": "<urlopen error [Errno 61] Connection refused>",
+      "url": "http://127.0.0.1:18188/system_stats"
+    },
+    "8188": {
+      "ok": false,
+      "error": "<urlopen error [Errno 61] Connection refused>",
+      "url": "http://127.0.0.1:8188/system_stats"
+    }
+  },
+  "capacity": {
+    "help_ok": false,
+    "status": "cli_present"
+  },
+  "host": {
+    "vm_stat_head": "Mach Virtual Memory Statistics: (page size of 16384 bytes)\nPages free:                                     4394.\nPages active:                                 162849.\nPages inactive:                               153744.\nPages speculative:                              8376.\nPages throttled:                                   0.\nPages wired down:                             228117.\nPages purgeable:                                   6."
+  },
+  "until_empty": {
+    "executed": false,
+    "status": "OPEN_OPS",
+    "reason": "AD Wave D: no user exclusive GPU day this session; refuse fake queue_empty",
+    "required": [
+      "tunnel 18188 up",
+      "variety green film",
+      "--i-own-the-gpu",
+      "host RAM healthy"
+    ]
+  },
+  "fill_idle_promote": {
+    "executed": false,
+    "status": "OPEN_OPS",
+    "note": "needs idle 5090 + human PK"
+  },
+  "ok_honest": true,
+  "note": "honest OPEN_OPS is DONE for ops wave without exclusive GPU"
+}

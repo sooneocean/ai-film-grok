@@ -662,7 +662,143 @@ def closeout_status(root: Path | str) -> dict[str, Any]:
         }
     steps.append(fid_step)
 
-    soft_ids = {"desktop_exported", "input_fidelity"}
+    # AD A4/B · duration honesty canary + final report read-back (advisory soft)
+    duration_honesty: dict[str, Any] = {
+        "ok": True,
+        "advisory": True,
+        "planned_sec": None,
+        "media_sec": None,
+        "shot_n": None,
+        "target_sec": None,
+        "codes": [],
+    }
+    try:
+        from plan.duration_target import (
+            check_duration_target,
+            flatten_shots,
+            planned_sum_duration_sec,
+            resolve_target_duration_sec,
+        )
+
+        spec = read_json(base / "film-spec.json") or {}
+        shots = flatten_shots(spec if isinstance(spec, dict) else {})
+        duration_honesty["shot_n"] = len(shots)
+        duration_honesty["planned_sec"] = round(planned_sum_duration_sec(shots), 3)
+        duration_honesty["target_sec"] = resolve_target_duration_sec(
+            spec if isinstance(spec, dict) else {}
+        )
+        # media sum from approved clips when available
+        media_sum = None
+        try:
+            man = read_json(base / "manifest.json") or {}
+            clips = man.get("clips") if isinstance(man, dict) else {}
+            if isinstance(clips, dict):
+                total_m = 0.0
+                n_m = 0
+                for _sid, c in clips.items():
+                    if not isinstance(c, dict):
+                        continue
+                    if str(c.get("status") or "") not in {"approved", "selected", "hero"}:
+                        continue
+                    for k in ("duration_sec", "duration", "mean_duration_sec"):
+                        if c.get(k) is not None:
+                            try:
+                                total_m += float(c[k])
+                                n_m += 1
+                                break
+                            except (TypeError, ValueError):
+                                pass
+                if n_m:
+                    media_sum = total_m
+        except Exception:  # noqa: BLE001
+            media_sum = None
+        duration_honesty["media_sec"] = (
+            None if media_sum is None else round(float(media_sum), 3)
+        )
+        rep = check_duration_target(
+            spec if isinstance(spec, dict) else {},
+            media_sum_sec=media_sum,
+        )
+        duration_honesty["codes"] = list(rep.get("codes") or [])
+        duration_honesty["severity"] = rep.get("severity")
+        duration_honesty["ok"] = bool(rep.get("ok"))
+        duration_honesty["message"] = rep.get("message")
+        duration_honesty["next"] = rep.get("next") or []
+        write_json(
+            base / "receipts" / "duration-honesty-closeout.json",
+            {**duration_honesty, "kind": "duration_honesty_closeout", "at": utc_now()},
+        )
+    except Exception as exc:  # noqa: BLE001
+        duration_honesty["ok"] = True
+        duration_honesty["error"] = str(exc)[:160]
+
+    official_final_readback: dict[str, Any] = {
+        "required_fields": [
+            "status/delivery_class",
+            "master_lock",
+            "path or plate path",
+        ],
+        "present": False,
+        "plate_vs_master": "unknown",
+        "note": "agent must read official-final-report before claiming final done",
+    }
+    ofr = read_json(base / "receipts" / "official-final-report.json") or {}
+    if isinstance(ofr, dict) and ofr:
+        official_final_readback["present"] = True
+        official_final_readback["status"] = ofr.get("status") or ofr.get("delivery_class")
+        official_final_readback["master_lock"] = ofr.get("master_lock")
+        if plate["is_official_plate"] or ofr.get("master_lock") is False:
+            official_final_readback["plate_vs_master"] = "PLATE_NOT_MASTER"
+        elif ofr.get("master_lock") is True:
+            official_final_readback["plate_vs_master"] = "MASTER"
+        else:
+            official_final_readback["plate_vs_master"] = str(
+                ofr.get("status") or ofr.get("delivery_class") or "present"
+            )
+
+    steps.append(
+        {
+            "id": "duration_honesty",
+            "ok": True,  # advisory; hard path is bulk-preflight / duration_target
+            "advisory": True,
+            "detail": duration_honesty.get("message")
+            or (
+                f"planned={duration_honesty.get('planned_sec')} "
+                f"target={duration_honesty.get('target_sec')} "
+                f"shots={duration_honesty.get('shot_n')}"
+            ),
+            "codes": duration_honesty.get("codes") or [],
+            "next_cmd": (
+                None
+                if duration_honesty.get("ok")
+                else (
+                    (duration_honesty.get("next") or [None])[0]
+                    or f'aifilm bulk-preflight --root "{base}"'
+                )
+            ),
+        }
+    )
+    steps.append(
+        {
+            "id": "official_final_readback",
+            "ok": True,
+            "advisory": True,
+            "detail": official_final_readback.get("plate_vs_master"),
+            "readback": official_final_readback,
+            "next_cmd": (
+                None
+                if official_final_readback.get("present")
+                else f'cat receipts/official-final-report.json  # after final'
+            ),
+        }
+    )
+
+    soft_ids = {
+        "desktop_exported",
+        "input_fidelity",
+        "duration_honesty",
+        "official_final_readback",
+    }
     if not film_core_hard:
         soft_ids.add("film_core")
     # hard fidelity when marked hard and not ok
@@ -699,6 +835,8 @@ def closeout_status(root: Path | str) -> dict[str, Any]:
             "clips_complete": bool(gates.get("clips_complete")),
         },
         "plate_honesty": plate,
+        "duration_honesty": duration_honesty,
+        "official_final_readback": official_final_readback,
         "final": final_rec,
         "heat": {
             "active": heat.get("active"),

@@ -1,0 +1,8 @@
+{
+  "schema_version": 1,
+  "kind": "ad_wave_d_until_empty_stopped",
+  "status": "STOPPED_BY_USER",
+  "reason": "user: generated content has problems — halt exclusive drain",
+  "film_root": "/Users/dex/AI FILM SPACE/0805/savani-ep01-5m",
+  "killed": ["h3 cycle until-empty (was 51254)", "savani h3 run processes"]
+}

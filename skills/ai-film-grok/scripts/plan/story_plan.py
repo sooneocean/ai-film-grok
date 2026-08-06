@@ -1057,7 +1057,7 @@ def build_planned_graph(
     heat = (
         normalized.get("heat_signals") if isinstance(normalized.get("heat_signals"), dict) else {}
     )
-    from plan.duration_target import H3_NOMINAL_CLIP_SEC, suggest_min_shots
+    from plan.duration_target import H3_NOMINAL_CLIP_SEC, finalize_duration_density
 
     target_requested = float(target_duration)
     heat_target_lift: str | None = None
@@ -1070,23 +1070,15 @@ def build_planned_graph(
     elif heat.get("heat_scale") == "max" and target_duration < 50:
         target_duration = 55.0
         heat_target_lift = "heat_scale_max"
-    # S0.4 · bind H3 shot density advice to heat-lifted target (metadata only)
-    min_shots_h3 = suggest_min_shots(float(target_duration), nominal_clip_sec=H3_NOMINAL_CLIP_SEC)
-    duration_density = {
-        "schema_version": 1,
-        "kind": "plan_duration_density",
-        "target_duration_requested": target_requested,
-        "target_duration_effective": float(target_duration),
-        "heat_target_lift": heat_target_lift,
-        "nominal_clip_sec": float(H3_NOMINAL_CLIP_SEC),
-        "suggested_min_shots_h3": int(min_shots_h3),
-        "h3_reachable_if_min_shots_sec": round(min_shots_h3 * float(H3_NOMINAL_CLIP_SEC), 2),
-        "next": [
-            f"plan ≥{min_shots_h3} shots at ~{H3_NOMINAL_CLIP_SEC}s "
-            f"or lower target_duration to n×{H3_NOMINAL_CLIP_SEC}",
-            "do not pad duration_sec above H3 nominal to fake planned sum",
-        ],
-    }
+    # S0.4 placeholder; finalized after shot_i known (AD A1/A2)
+    duration_density = finalize_duration_density(
+        target_duration_requested=target_requested,
+        target_duration_effective=float(target_duration),
+        heat_target_lift=heat_target_lift,
+        actual_shot_count=0,
+        nominal_clip_sec=float(H3_NOMINAL_CLIP_SEC),
+    )
+    min_shots_h3 = int(duration_density.get("suggested_min_shots_h3") or 0)
     # S3.1 · wardrobe ambition vs honest model cap (metadata; scale_fallback enforces at promote)
     heat_scale = str(heat.get("heat_scale") or "").strip().lower()
     hardcore = bool(heat.get("hardcore") or heat.get("dual_climax"))
@@ -1257,7 +1249,27 @@ def build_planned_graph(
         if isinstance(x, dict)
     ]
 
+    # AD A1/A2 · after plan: actual shot count vs H3 min (heat lift must add shots or cut promise)
+    actual_shot_count = max(0, int(shot_i) - 1)
+    duration_density = finalize_duration_density(
+        target_duration_requested=target_requested,
+        target_duration_effective=float(target_duration),
+        heat_target_lift=heat_target_lift,
+        actual_shot_count=actual_shot_count,
+        nominal_clip_sec=float(H3_NOMINAL_CLIP_SEC),
+    )
+    min_shots_h3 = int(duration_density.get("suggested_min_shots_h3") or 0)
+    shots_n_delta = int(duration_density.get("shots_n_delta") or 0)
+
     root_s = str(root) if root else ""
+    density_warnings: list[str] = []
+    if shots_n_delta > 0:
+        density_warnings.append(
+            f"H3 density: have {actual_shot_count} shots, need ≥{min_shots_h3} for "
+            f"{float(target_duration):.0f}s target (~{H3_NOMINAL_CLIP_SEC}s/clip); "
+            f"delta={shots_n_delta}"
+            + (f" [heat_lift={heat_target_lift}]" if heat_target_lift else "")
+        )
     graph = {
         "schema_version": GRAPH_SCHEMA_VERSION,
         "kind": "vertical-drama-graph",
@@ -1286,15 +1298,7 @@ def build_planned_graph(
         "characters": characters,
         "locations": locations,
         "props": [],
-        "warnings": list(normalized.get("warnings") or [])
-        + (
-            [
-                f"H3 density: need ≥{min_shots_h3} shots for "
-                f"{float(target_duration):.0f}s target (~{H3_NOMINAL_CLIP_SEC}s/clip)"
-            ]
-            if heat_target_lift
-            else []
-        ),
+        "warnings": list(normalized.get("warnings") or []) + density_warnings,
     }
     screenplay = (
         normalized.get("dialogue_screenplay")
@@ -2766,6 +2770,45 @@ def run_plan(
                 }
             )
             write_json(root / "brief.json", brief)
+            # AD A2 · adult/heat target lift must leave a machine receipt (shots vs promise)
+            density = (
+                (graph.get("project") or {}).get("duration_density")
+                if isinstance(graph.get("project"), dict)
+                else None
+            )
+            if isinstance(density, dict) and (
+                density.get("heat_target_lift") or density.get("shots_n_delta")
+            ):
+                lift_receipt = {
+                    "schema_version": 1,
+                    "kind": "adult-target-shot-lift",
+                    "at": utc_now(),
+                    "ok": bool(density.get("ok") is True or density.get("density_ok") is True),
+                    "heat_target_lift": density.get("heat_target_lift"),
+                    "target_duration_requested": density.get("target_duration_requested"),
+                    "target_duration_effective": density.get("target_duration_effective"),
+                    "actual_shot_count": density.get("actual_shot_count") or len(shots_flat),
+                    "suggested_min_shots_h3": density.get("suggested_min_shots_h3"),
+                    "shots_n_delta": density.get("shots_n_delta"),
+                    "action_required": density.get("action_required"),
+                    "codes": density.get("codes") or [],
+                    "next": density.get("next") or [],
+                    "note": (
+                        "adult lift without enough shots → add shots or cut promise; "
+                        "bulk-preflight / duration_target hard on shortfall"
+                    ),
+                }
+                write_json(root / "receipts" / "adult-target-shot-lift.json", lift_receipt)
+            write_json(
+                root / "receipts" / "duration-density.json",
+                {
+                    "schema_version": 1,
+                    "kind": "duration_density",
+                    "at": utc_now(),
+                    "shot_count": len(shots_flat),
+                    **(density if isinstance(density, dict) else {}),
+                },
+            )
             spec_report = {
                 "ok": True,
                 "draft": True,
@@ -2778,6 +2821,7 @@ def run_plan(
                 "scene_count": len(spec.get("scenes") or []),
                 "path": str(root / "film-spec.json"),
                 "dialogue_scene_package": str(root / "dialogue-scene-package.json"),
+                "duration_density": density if isinstance(density, dict) else None,
                 "note": "Run aifilm write-spec --root to validate + inject prompts",
             }
 

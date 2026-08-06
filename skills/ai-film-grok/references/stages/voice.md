@@ -16,6 +16,8 @@
 - **对白镜 VO-fit**：时长≈pre+VO+post，禁短口白硬贴 6s 死气；见 [vo-drag](../lessons-2026-07-20-vo-drag-motion-snap.md) · [huangdao](../lessons-2026-08-03-huangdao-rhythm-still-voice-silk.md)。
 - **字幕验收 = 像素可见（P0 · v3）**：每条对白 cue 抽帧人眼可读；ship 硬烧优先。用户报「没字幕」先抽帧再改，勿只改 HF CSS。
 - final 前自检：`speaker | voice | spoken_lang=zh | screen_mode | caption_pixels=ok`。
+- **口白窗**：TTS ≤ cue ≤ slot；超窗 **砍 spoken / vo_rate**，禁只拉长 cue。
+- **抽听（AD B3）**：ship 前每场 ≥1 句人耳可懂中文；有 aac ≠ 可懂。
 
 色气 BGM 默认 **rnb**。中文 VO primary=Edge。机读：[hard-defaults](../hard-defaults.md) · [weapon-inventory](../weapon-inventory.md)。  
 深入：[dialogue-first-workflow](../dialogue-first-workflow.md) · [vo-modes](../vo-modes.md) · [voices](../voices.md) · [caption-hardburn](../memory/2026-08-03-huangdao-caption-hardburn-meat-variety.md)

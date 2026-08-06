@@ -1,5 +1,16 @@
 # Changelog
 
+## [2.40.16] - 2026-08-06
+
+### Added (AD process implementation · code closeout)
+- **Ship** `finalize_duration_density` + plan `adult-target-shot-lift` / `duration-density` receipts (A1/A2).
+- **pilot-go v3:** `debrief_gate` + `three_look` (composition/wardrobe/poison).
+- **closeout:** advisory `duration_honesty` + `official_final_readback` steps.
+- **stages** agent/post/visual/voice/deliver AD discipline cards; hard-defaults row.
+- **Plan:** `docs/plans/2026-08-06-ad-process-optimization-todoplan.md`.
+- **Tests:** `tests/test_ad_process_optimization.py`.
+- **Ops canaries:** artifacts AD wave D tunnel/OPEN_OPS + user-stopped exclusive drain.
+
 ## [2.40.14] - 2026-08-06
 
 ### Product (Wave N1 · nutrient L4 defaults)

@@ -31,7 +31,9 @@ L5 endframe handoff  → 下镜 L3（continue；smash 勿盲 promote）
 - `state-index check|plan` 先于 bulk；衣着状态只前进，已脱不得回穿。
 - Continue 镜使用已批准末帧作为下一镜输入，按实际姿势、服装与视线接戏。
 - pilot 必须由用户批准；付费或外部生成必须实时 capability 检查。
-- **Pilot GO 包**：`aifilm pilot pack` → `receipts/pilot-go.json`（三镜+卸装三拍+score+heat+state）；bulk 前一屏。
+- **Pilot GO 包**：`aifilm pilot pack` → `receipts/pilot-go.json`（三镜+卸装三拍+score+heat+state + **three_look 构图/衣着/毒镜** + debrief_gate）；bulk 前一屏。
+- **选片（AD C2）**：`select-shortlist` multi-take **禁只比 mean**；须 composition anti-hijack 列；`receipts/select-shortlist.json` `mean_only_forbidden=true`。
+- **尺度 promote（AD C3）**：`scale-fallback` `promote_ban` 时禁 blind approve；须 re-gen soft-max 或 review-note 含 `soft-max`/`scale_fallback`。
 - **Bulk 单门**：`aifilm bulk-preflight`；**pilot 已批后 media-queue 默认硬拦**（逃生 `AIFILM_SKIP_BULK_PREFLIGHT=1` / `--allow-without-pilot`）。
 - **设计期 variety**：`aifilm variety-precheck`（体位/脸 CU/邻镜 motion）— bulk 前改 spec 比重渲便宜。
 - **5090**：`aifilm gpu-lease acquire|heartbeat|release`；`tunnel-probe`（18188→8188）；进度只认 `queue-progress` 非空 takes。

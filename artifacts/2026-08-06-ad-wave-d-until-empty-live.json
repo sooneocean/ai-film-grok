@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "kind": "ad_wave_d_until_empty_live",
+  "at": "2026-08-06T07:17:13.790594+00:00",
+  "status": "RUNNING",
+  "film_root": "/Users/dex/AI FILM SPACE/0805/savani-ep01-5m",
+  "film": "savani-ep01-5m",
+  "exclusive": true,
+  "flags": [
+    "--until-empty",
+    "--execute",
+    "--i-own-the-gpu",
+    "--free-first",
+    "--continue-on-capacity",
+    "--capacity-wait-sec 600",
+    "--max-cycles 40"
+  ],
+  "pid_cycle": 51254,
+  "pending_at_start": 35,
+  "eta_hours_at_start": 4.73,
+  "comfy_tunnel": "http://127.0.0.1:18188",
+  "first_proof": "queue_running>=1 after free-memory + capacity ready",
+  "log": "/Users/dex/AI FILM SPACE/0805/savani-ep01-5m/receipts/h3-until-empty-live.log",
+  "note": "User authorized exclusive 5090. Foreign cancel never used. Dual run-next killed to avoid double-submit.",
+  "watch": [
+    "aifilm h3 capacity-plan --root \"/Users/dex/AI FILM SPACE/0805/savani-ep01-5m\"",
+    "tail -f \"/Users/dex/AI FILM SPACE/0805/savani-ep01-5m/receipts/h3-until-empty-live.log\"",
+    "curl -s http://127.0.0.1:18188/queue | head -c 200"
+  ]
+}

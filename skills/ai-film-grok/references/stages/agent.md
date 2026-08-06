@@ -18,4 +18,13 @@
 | **人审边界** | gate-auto 后人只做 pilot / PK / review-final；减 thrash |
 | **GPU** | 默认 `run-next --max 5`；until-empty 须 `--i-own-the-gpu`；busy 零 submit |
 
-深入资料：[craft-spine.md](../craft-spine.md) · [directors-lens.md](../directors-lens.md) · [script-value-debrief.md](../script-value-debrief.md) · [professional-director-system.md](../professional-director-system.md)
+## 副导演工序（AD · 2026-08-06）
+
+| 纪律 | 要求 |
+|------|------|
+| **时长诚实** | `shots_min = ceil(target/5.2)`；adult 抬 target → 加镜 **或** 砍 promise；看 `receipts/duration-density.json` / `adult-target-shot-lift.json` |
+| **debrief 30s** | lock / pilot 前 debrief present+confirmed；`design-go` 红则先补 |
+| **肉戏预算前置** | plan 就要 ≥4 体位 / ≥2 脸 CU / ≥2 L4（variety 预检），禁 final 前硬刷 |
+| **pilot 三看** | 构图主体 / 衣着 rank / 毒镜 — `pilot-go.json` → `three_look` |
+
+深入资料：[craft-spine.md](../craft-spine.md) · [directors-lens.md](../directors-lens.md) · [script-value-debrief.md](../script-value-debrief.md) · [professional-director-system.md](../professional-director-system.md) · plan `docs/plans/2026-08-06-ad-process-optimization-todoplan.md`
