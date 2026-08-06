@@ -37,6 +37,7 @@ from final.delivery_class import plate_blocks_final_complete  # noqa: E402
 from compose_render import ComposeRenderError, assert_underlay_not_double_burn  # noqa: E402
 from h3_fill_idle import fill_idle_until_empty, run_next_fill_idle  # noqa: E402
 from longform import estimate_plate_timeout  # noqa: E402
+from final.manifest import build_final_film_manifest_entry  # noqa: E402
 from mix_partial import write_final_mix_partial_receipt  # noqa: E402
 from post_doctor import run_post_doctor  # noqa: E402
 from post_route import (  # noqa: E402
@@ -381,6 +382,28 @@ class PlateTimeoutFloorHotpathTests(unittest.TestCase):
 
 
 class QueueHonestyHotpathTests(unittest.TestCase):
+    def test_run_next_queue_empty_records_open_ops_and_decision_tree(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            write_json(root / "film-spec.json", {"title": "hotpath-queue-empty", "scenes": []})
+            with mock.patch(
+                "h3_fill_idle.next_fill_idle_job",
+                return_value={"ok": True, "next": None, "pending_count": 3},
+            ):
+                rep = run_next_fill_idle(root, execute=True, max_jobs=1)
+            self.assertEqual(rep.get("skipped_reason"), "queue_empty")
+            self.assertEqual(rep.get("halt_reason_code"), "RUN_QUEUE_EMPTY")
+            self.assertEqual(rep.get("halt_reason_group"), "queue")
+            self.assertTrue(rep.get("open_ops"))
+            open_op = rep["open_ops"][0]
+            self.assertEqual(open_op.get("halt_reason_code"), "RUN_QUEUE_EMPTY")
+            self.assertEqual(open_op.get("halt_reason_group"), "queue")
+            self.assertEqual(open_op.get("reason"), "queue_empty")
+            self.assertEqual(open_op.get("pending_after"), 3)
+            self.assertEqual(open_op.get("next_after"), None)
+            self.assertIn("request", rep.get("decision_tree") or {})
+            self.assertEqual(len(rep.get("decision_trees") or []), 1)
+
     def test_run_next_capacity_skip_has_machine_reason(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -480,6 +503,28 @@ class FinalHonestyHotpathTests(unittest.TestCase):
             self.assertFalse(report.get("ok"))
             self.assertTrue(report.get("blocks_ship_complete"))
             self.assertIn("PLATE_CLAIMED_FINAL_COMPLETE", report.get("codes") or [])
+
+    def test_official_final_visibility_defaults_for_manifest_entry(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            report_path = root / "receipts" / "official-final-report.json"
+            report_path.parent.mkdir(parents=True, exist_ok=True)
+            report_path.write_text(
+                json.dumps({"status": "OFFICIAL_FINAL_PLATE"}),
+                encoding="utf-8",
+            )
+            entry = build_final_film_manifest_entry(
+                final_path=Path("/tmp/final.mp4"),
+                output_sha256="sha256-mock",
+                duration_sec=7.7,
+                report_path=report_path,
+                technical_qa={"ok": True},
+                official_final=json.loads(report_path.read_text(encoding="utf-8")),
+            )
+            self.assertEqual(entry["delivery_class"], "OFFICIAL_FINAL_PLATE")
+            self.assertEqual(entry["delivery_source"], "official_final_report")
+            self.assertEqual(entry["delivery_visibility"], "visible_plate")
+            self.assertFalse(entry["master_lock"])
 
 
 if __name__ == "__main__":
