@@ -21,6 +21,54 @@ from tts import gap_asset_kind
 MANIFEST = os.path.join(LIB, "..", "tts-evaluations", "manifest.json")
 
 
+def _report_video():
+    """Parallel observability for the video shot lane (Grok Video 1.5 + H3)."""
+    try:
+        from video_pipeline_lib import (load_vcatalog, load_vgaps, load_vjobs,
+                                         VIDEO_LIB)
+    except Exception as e:
+        print(f"\n(video lane skipped: {e})")
+        return
+    try:
+        from coverage_video import analyze as _vcov
+    except Exception:
+        _vcov = None
+    cat = load_vcatalog()
+    A = cat.get("assets", {})
+    gaps = load_vgaps()
+    jobs = load_vjobs()
+    print("\n──────── video shot library ────────")
+    print(f"catalog revision {cat.get('revision')} · shots {len(A)}")
+    print("─ shots by status ─")
+    for k, v in sorted(collections.Counter(a.get("status") for a in A.values()).items()):
+        print(f"  {k:22} {v}")
+    by_mode = collections.Counter(a.get("mode") for a in A.values())
+    if by_mode:
+        print("─ shots by mode (t2v/i2v/r2v) ─")
+        for k, v in sorted(by_mode.items()):
+            print(f"  {k:6} {v}")
+    print("─ video gaps by status ─")
+    gst = collections.Counter(g.get("status") for g in gaps)
+    for k, v in sorted(gst.items()):
+        print(f"  {k:22} {v}")
+    open_gen = [g for g in gaps if g.get("status") == "open" and g.get("action") == "generate"]
+    print(f"  open generate gaps (need a backend): {len(open_gen)}")
+    if _vcov:
+        try:
+            ca = _vcov(cat, gaps)
+            starved = [r for r in ca["rows"] if r["status"] == "STARVED"]
+            thin = [r for r in ca["rows"] if r["status"] == "THIN"]
+            print(f"  shot coverage: STARVED={len(starved)} THIN={len(thin)} "
+                  f"(target-min {ca['target_min']})")
+        except Exception as e:
+            print(f"  (video coverage skipped: {e})")
+    print("─ video generation jobs by backend/status ─")
+    jb = collections.Counter(j.get("backend") for j in jobs)
+    js = collections.Counter(j.get("status") for j in jobs)
+    for b, n in sorted(jb.items()):
+        print(f"  backend {b:14} jobs={n}  status={dict(js)}")
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--no-audit", action="store_true")
@@ -120,6 +168,8 @@ def main():
                 j = next((x for x in jobs if x.get("job_id") == g.get("generation_job_id")), None)
                 if not j or j.get("status") == "failed":
                     print(f"  STUCK routed_generate gap {g['gap_id'][:12]}… (job {j.get('status') if j else 'missing'})")
+
+    _report_video()
 
 
 if __name__ == "__main__":

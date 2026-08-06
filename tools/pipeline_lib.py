@@ -16,11 +16,29 @@ import math
 from datetime import datetime, timezone
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-LIB = os.path.join(ROOT, "bgm-library")
+
+
+def _env(name, default):
+    """Allow tests / alternate workspaces to redirect a library root via env.
+
+    Defaults are unchanged when the var is unset, so production behavior is
+    identical. Set AIFILM_BGM_LIB / AIFILM_VIDEO_LIB to point the lanes at a
+    throwaway copy (used by tools/self_test.py and tools/tests)."""
+    return os.environ.get(name, default)
+
+
+LIB = _env("AIFILM_BGM_LIB", os.path.join(ROOT, "bgm-library"))
 CAT = os.path.join(LIB, "catalog.json")
 GAP = os.path.join(LIB, "gap-queue.jsonl")
 JOBS = os.path.join(LIB, "generation-jobs.jsonl")
 GEN = os.path.join(LIB, "generators.json")
+
+# --- video lane mirrors the bgm lane (parallel, asset_kind-aware) ----------
+VIDEO_LIB = _env("AIFILM_VIDEO_LIB", os.path.join(ROOT, "video-library"))
+VCAT = os.path.join(VIDEO_LIB, "catalog.json")
+VGAP = os.path.join(VIDEO_LIB, "gap-queue.jsonl")
+VJOBS = os.path.join(VIDEO_LIB, "generation-jobs.jsonl")
+VGEN = os.path.join(VIDEO_LIB, "generators.json")
 
 # --- state machine contract (single source of truth) -----------------------
 ASSET_STATUSES = {"approved", "pending_human_review", "rejected"}

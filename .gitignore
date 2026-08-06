@@ -14,6 +14,9 @@ melo-cache/
 *.flac
 *.mp3
 *.onnx
+*.mp4
+*.mov
+*.webm
 
 # Python
 __pycache__/
@@ -21,3 +24,5 @@ __pycache__/
 
 # Generator runtime scratch (job tickets); the ledger is generation-jobs.jsonl
 bgm-library/.gen-tickets/
+video-library/.gen-tickets/
+video-library/.gen-tmp/

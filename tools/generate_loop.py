@@ -53,6 +53,7 @@ def _build_spec(gap, togen):
     t = togen.get(gap["gap_id"], {})
     return {
         "gap_id": gap["gap_id"],
+        "asset_kind": "bgm",
         "mood": gap.get("mood"),
         "stem_profile": gap.get("stem_profile"),
         "energy": gap.get("energy", 0.35),

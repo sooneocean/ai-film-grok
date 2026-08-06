@@ -126,14 +126,20 @@ def main():
         jobs_done = sum(1 for j in jobs if j.get("status") == "done")
         approved = sum(1 for a in cat["assets"].values() if a["status"] == "approved")
         new_assets = len(cat["assets"])
+        # Two gaps can legitimately resolve to the SAME approved asset (eligibility
+        # dedup, or the mock backend producing byte-identical clips), so the
+        # invariant is distinct generated assets, not 1-per-gap.
+        distinct_assets = len({j.get("output_asset_id") for j in jobs
+                               if j.get("output_asset_id")})
 
-        print(f"  assets created : {new_assets}")
+        print(f"  assets created : {new_assets} (distinct generated: {distinct_assets})")
         print(f"  approved       : {approved}")
         print(f"  jobs done      : {jobs_done}")
         print(f"  generate gaps filled: {gen_filled} (of {expect} tracked by id)")
         print(f"  total filled incl. pre-existing: {total_filled}")
 
-        ok = (new_assets == expect and approved == expect and jobs_done == expect and gen_filled == expect)
+        ok = (approved == new_assets == distinct_assets
+              and jobs_done >= distinct_assets and gen_filled == expect)
         # TTS gap must have been routed (logged) but NOT generated/filled
         tts_routed = "tts gap" in r.stdout
         tts_still_open = all(g.get("status") == "open" for g in gaps if g.get("gap_id") in tts_ids)
@@ -188,6 +194,50 @@ def main():
         # Round 7-C: the unified dispatcher must delegate `check` correctly
         rc2 = _run(["tools/pipeline.py", "check"], cwd=T)
         ok = ok and rc2.returncode == 0
+
+        # ---- VIDEO lane end-to-end (MockVideoBackend) + lane isolation ----
+        # Fresh empty video library so validation only sees generated shots,
+        # plus 3 open video generate gaps (t2v/i2v/r2v). The video one-shot must
+        # close them via generation WITHOUT touching the bgm catalog or the
+        # tts gap (three lanes stay isolated).
+        vlib = os.path.join(T, "video-library")
+        os.makedirs(os.path.join(vlib, "pending"), exist_ok=True)
+        json.dump({"schema": "aifilm-video-library-v1", "revision": 0,
+                   "updated_at": "2026-08-06T00:00:00+00:00", "assets": {}},
+                  open(os.path.join(vlib, "catalog.json"), "w", encoding="utf-8"))
+        vgaps = [
+            {"gap_id": f"vgap-{i}", "action": "generate", "status": "open",
+             "asset_kind": "video", "mood": "cinematic", "mode": m,
+             "scene": f"sc{i}", "style": "filmic", "energy": 0.5,
+             "duration": 12, "resolution": "1080p"}
+            for i, m in enumerate(["t2v", "i2v", "r2v"])]
+        with open(os.path.join(vlib, "gap-queue.jsonl"), "w", encoding="utf-8") as f:
+            for g in vgaps:
+                f.write(json.dumps(g, ensure_ascii=False) + "\n")
+        bgm_before = len(json.load(open(os.path.join(T, "bgm-library", "catalog.json"),
+                                        encoding="utf-8"))["assets"])
+        r = _run(["tools/video_pipeline.py", "one-shot", "--demo"], cwd=T)
+        vcat = json.load(open(os.path.join(vlib, "catalog.json"), encoding="utf-8"))
+        vgaps_out = [json.loads(l) for l in open(os.path.join(vlib, "gap-queue.jsonl"),
+                                                 encoding="utf-8") if l.strip()]
+        vjobs = [json.loads(l) for l in open(os.path.join(vlib, "generation-jobs.jsonl"),
+                                             encoding="utf-8") if l.strip()]
+        v_approved = sum(1 for a in vcat["assets"].values() if a["status"] == "approved")
+        v_filled = sum(1 for g in vgaps_out if g.get("status") == "filled")
+        bgm_after = len(json.load(open(os.path.join(T, "bgm-library", "catalog.json"),
+                                       encoding="utf-8"))["assets"])
+        tts_still_open = all(g.get("status") == "open"
+                              for g in _load_gaps(T) if g.get("asset_kind") == "tts")
+        print(f"  video assets created : {len(vcat['assets'])} (approved {v_approved})")
+        print(f"  video gaps filled    : {v_filled}/3")
+        print(f"  video jobs done      : {sum(1 for j in vjobs if j.get('status')=='done')}")
+        print(f"  bgm catalog assets before/after: {bgm_before}/{bgm_after} "
+              f"(must be equal — no leak)")
+        print(f"  tts gap still open    : {tts_still_open} (lane isolation)")
+        ok = (ok and len(vcat["assets"]) == 3 and v_approved == 3 and v_filled == 3
+              and bgm_after == bgm_before and tts_still_open)
+        rc3 = _run(["tools/video_pipeline.py", "check"], cwd=T)
+        ok = ok and rc3.returncode == 0
 
         if ok:
             print("\nSELF-TEST PASS ✓ — closed loop + TTS dual-pipeline + Round6 fill-open/duration verified")

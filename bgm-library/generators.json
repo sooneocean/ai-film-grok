@@ -1,12 +1,13 @@
 {
   "schema": "aifilm-generators-v1",
-  "updated_at": "2026-08-06T10:30:00+00:00",
-  "note": "Backend-agnostic generator registry. Adding a sound source = adding one entry here; the router and generate_loop never change. status mirrors tts-evaluations engine status (active | pending | archived_failed) so a credit-exhausted backend (like fish was) is auto-excluded from routing.",
+  "updated_at": "2026-08-06T11:00:00+00:00",
+  "note": "Backend-agnostic generator registry. asset_kind tags each backend as serving the bgm or video lane so the router can filter by lane (same split as the bgm/tts lanes). Adding a sound/video source = one entry here; the router + generate_loop never change. status mirrors tts-evaluations engine status (active | pending | archived_failed) so a credit-exhausted backend (like fish was) is auto-excluded from routing.",
   "backends": {
     "acestep": {
       "id": "acestep",
       "label": "ACE-Step (local RTX 5090)",
       "kind": "local",
+      "asset_kind": ["bgm"],
       "status": "active",
       "cost": "free (local GPU)",
       "capabilities": {
@@ -27,6 +28,7 @@
       "id": "ltx23",
       "label": "LTX 2.3 (native audio+video, open/cloud)",
       "kind": "api",
+      "asset_kind": ["bgm"],
       "status": "active",
       "cost": "API or self-hosted",
       "capabilities": {
@@ -39,31 +41,45 @@
       "auth_env": "LTX_API_KEY",
       "license_note": "check LTX Studio commercial terms before film use"
     },
-    "grok15": {
-      "id": "grok15",
-      "label": "Grok 1.5 (API)",
-      "kind": "api",
+    "grok-video15": {
+      "id": "grok-video15",
+      "label": "Grok Video 1.5 (xAI OAuth, cloud)",
+      "kind": "video_api",
+      "asset_kind": ["video"],
       "status": "active",
-      "role": "TBD: confirm whether it emits BGM beds or voice/dialogue",
-      "cost": "API credits",
+      "cost": "API credits (xAI)",
       "capabilities": {
-        "moods": ["ambient", "rnb"],
-        "stem_profiles": ["pad", "full"],
-        "loopable": false,
-        "max_duration": 30
+        "modes": ["t2v", "i2v", "r2v"],
+        "moods": ["ambient", "rnb", "dark", "warm", "playful", "sensual", "cinematic", "documentary", "dramatic"],
+        "scenes": ["*"],
+        "max_duration": 15,
+        "resolutions": ["480p", "720p", "1080p"]
       },
-      "endpoint": "REPLACE_ME: https://api.x.ai/v1/audio",
+      "endpoint": "REPLACE_ME: https://api.x.ai/v1/video",
       "auth_env": "XAI_API_KEY",
-      "license_note": "confirm xAI audio-output license for commercial film"
+      "license_note": "confirm xAI video-output license for commercial film"
     },
     "h3": {
       "id": "h3",
-      "label": "H3 (voice/sound source)",
-      "kind": "api",
-      "status": "pending",
-      "note": "interface not yet provided — register invocation/endpoint once known",
-      "capabilities": {},
-      "license_note": "TBD"
+      "label": "H3 (local RTX 5090 video: t2v / i2v / r2v)",
+      "kind": "video_local",
+      "asset_kind": ["video"],
+      "status": "active",
+      "cost": "free (local GPU)",
+      "capabilities": {
+        "modes": ["t2v", "i2v", "r2v"],
+        "moods": ["*"],
+        "scenes": ["*"],
+        "max_duration": 30,
+        "resolutions": ["480p", "720p", "1080p", "1440p"]
+      },
+      "invocation": {
+        "type": "command",
+        "cmd": "REPLACE_ME <real H3 cmd keeping {mode}{seed}{prompt}{image}{reference}{duration}{resolution}{out}{job_id} placeholders, e.g. h3 --mode {mode} --seed {seed} --prompt {prompt} --image {image} --reference {reference} --duration {duration} --resolution {resolution} --out {out}>",
+        "watch_dir": "video-library/pending",
+        "out_pattern": "{job_id}.mp4"
+      },
+      "license_note": "locally generated; owner holds rights"
     }
   }
 }

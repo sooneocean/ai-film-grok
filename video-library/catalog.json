@@ -1,0 +1,7 @@
+{
+  "schema": "aifilm-video-library-v1",
+  "revision": 0,
+  "updated_at": "2026-08-06T11:00:00+00:00",
+  "note": "Video shot library (Grok Video 1.5 cloud + local H3 i2v/r2v/t2v). Mirrors bgm-library contract. Media (.mp4) is NOT versioned; only metadata.",
+  "assets": {}
+}

@@ -24,11 +24,21 @@ def capable_backends(spec, generators, exclude=(), breaker=None):
     current submit loop). `breaker`, if given, additionally drops any backend
     currently tripped open (see breaker.CircuitBreaker) so a flaky API source
     is cooled down instead of hammered.
+
+    Lane + mode awareness:
+      - spec["asset_kind"] filters backends by lane ("bgm" vs "video"). When the
+        spec omits asset_kind (legacy callers, tests), only bgm/untagged
+        backends are considered so existing behavior is unchanged.
+      - spec["mode"] (video: t2v/i2v/r2v) and spec["resolution"] further narrow
+        video-capable backends.
     """
     backends = generators.get("backends", {})
     mood = spec.get("mood")
     stem = spec.get("stem_profile")
     dur = spec.get("duration", 30)
+    mode = spec.get("mode")
+    res = spec.get("resolution")
+    spec_ak = spec.get("asset_kind")
     open_bk = breaker.open_set() if breaker else set()
     cands = []
     for bid, cfg in backends.items():
@@ -38,6 +48,15 @@ def capable_backends(spec, generators, exclude=(), breaker=None):
             continue
         if cfg.get("status") != "active":
             continue
+        # --- lane filter (bgm / video) ---
+        bk_ak = cfg.get("asset_kind")
+        if spec_ak:
+            if not bk_ak or spec_ak not in bk_ak:
+                continue
+        else:
+            # legacy callers: only bgm / untagged backends
+            if bk_ak and "bgm" not in bk_ak:
+                continue
         cap = cfg.get("capabilities", {})
         moods = cap.get("moods", [])
         if moods and "*" not in moods and mood not in moods:
@@ -45,6 +64,16 @@ def capable_backends(spec, generators, exclude=(), breaker=None):
         stems = cap.get("stem_profiles", [])
         if stems and stem and stem not in stems:
             continue
+        # --- video mode filter (t2v / i2v / r2v) ---
+        if mode:
+            modes = cap.get("modes", [])
+            if modes and mode not in modes:
+                continue
+        # --- resolution filter ---
+        if res:
+            ress = cap.get("resolutions", [])
+            if ress and res not in ress:
+                continue
         if dur and cap.get("max_duration") and dur > cap["max_duration"]:
             continue
         cands.append((bid, cfg))
@@ -88,12 +117,42 @@ def find_existing_candidate(gap, catalog=None, tol_energy=0.1, min_sim=0.95):
     return None
 
 
+def find_existing_video_candidate(gap, vcat=None, tol_energy=0.1, min_sim=0.95):
+    """Eligibility shortcut for the video lane: if an already-approved shot
+    already matches this gap (mood + scene + mode + close energy), return its
+    id so the loop FILLS instead of GENERATES — avoiding a wasteful regen.
+    Returns asset_id or None."""
+    if vcat is None:
+        from video_pipeline_lib import load_vcatalog
+        vcat = load_vcatalog()
+    mood = gap.get("mood")
+    scene = gap.get("scene")
+    mode = gap.get("mode")
+    energy = gap.get("energy")
+    for aid, a in vcat.get("assets", {}).items():
+        if a.get("status") != "approved":
+            continue
+        if a.get("mood") != mood:
+            continue
+        if scene and a.get("scene") and a.get("scene") != scene:
+            continue
+        if mode and a.get("mode") and a.get("mode") != mode:
+            continue
+        if energy is not None and abs((a.get("energy") or 0) - energy) > tol_energy:
+            continue
+        return aid
+    return None
+
+
 def choose_route(gap, generators=None):
-    """Top-level gap router. Honors asset_kind: a tts gap is routed to an active
-    TTS engine (selection only — engines are evaluated, not generated here),
-    a bgm gap goes through the capability matrix. Returns (kind, target) where
-    target is a backend id or 'tts:<engine>'."""
-    if gap.get("asset_kind") == "tts":
+    """Top-level gap router. Honors asset_kind:
+      - a tts gap is routed to an active TTS engine (selection only — engines
+        are evaluated, not generated here);
+      - a video gap goes through the capability matrix (modes t2v/i2v/r2v);
+      - a bgm gap goes through the capability matrix (mood/stem/duration).
+    Returns (kind, target) where target is a backend id or 'tts:<engine>'."""
+    ak = gap.get("asset_kind") or "bgm"
+    if ak == "tts":
         mpath = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                              "tts-evaluations", "manifest.json")
         if os.path.exists(mpath):
@@ -102,8 +161,13 @@ def choose_route(gap, generators=None):
                 if e.get("status") == "active" and e.get("samples"):
                     return "tts", f"tts:{eid}"
         return "tts", None
-    spec = {"mood": gap.get("mood"), "stem_profile": gap.get("stem_profile"),
-            "duration": gap.get("duration")}
+    if ak == "video":
+        spec = {"asset_kind": "video", "mood": gap.get("mood"),
+                "mode": gap.get("mode", "t2v"), "duration": gap.get("duration"),
+                "scene": gap.get("scene"), "resolution": gap.get("resolution")}
+        return "video", choose_backend(spec, generators)
+    spec = {"asset_kind": "bgm", "mood": gap.get("mood"),
+            "stem_profile": gap.get("stem_profile"), "duration": gap.get("duration")}
     return "bgm", choose_backend(spec, generators)
 
 

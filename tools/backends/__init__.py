@@ -54,10 +54,19 @@ def get_backend(id, cfg):
     if id == "mock" or cfg.get("_mock"):
         from .mock import MockBackend
         return MockBackend(cfg)
+    if cfg.get("_mock_video"):
+        from .mock_video import MockVideoBackend
+        return MockVideoBackend(cfg)
     if kind == "local":
         from .acestep import AceStepLocalBackend
         return AceStepLocalBackend(cfg)
     if kind == "api":
         from .api import ApiBackend
         return ApiBackend(cfg)
+    if kind == "video_api":
+        from .video_api import VideoApiBackend
+        return VideoApiBackend(cfg)
+    if kind == "video_local":
+        from .h3_local import H3LocalBackend
+        return H3LocalBackend(cfg)
     raise ValueError(f"unknown backend kind {kind!r} for {id}")

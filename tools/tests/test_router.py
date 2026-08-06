@@ -7,11 +7,11 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # tests dir for 
 from router import capable_backends, choose_backend, find_existing_candidate, choose_route
 
 GEN = {"schema": "aifilm-generators-v1", "backends": {
-    "acestep": {"status": "active", "kind": "local",
+    "acestep": {"status": "active", "kind": "local", "asset_kind": ["bgm"],
                 "capabilities": {"moods": ["ambient"], "stem_profiles": [], "max_duration": 120}},
-    "ltx23": {"status": "active", "kind": "api",
+    "ltx23": {"status": "active", "kind": "api", "asset_kind": ["bgm"],
               "capabilities": {"moods": ["ambient"], "stem_profiles": ["pad"], "max_duration": 60}},
-    "grok15": {"status": "active", "kind": "api",
+    "grok15": {"status": "active", "kind": "api", "asset_kind": ["bgm"],
                "capabilities": {"moods": ["dramatic"], "stem_profiles": [], "max_duration": 90}},
     "fish": {"status": "archived_failed", "kind": "api",
              "capabilities": {"moods": ["ambient"], "stem_profiles": [], "max_duration": 60}},
