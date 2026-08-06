@@ -423,40 +423,11 @@ def review(
 def enable_lipsync(
     root: Path | str, *, shot_id: str, speaker: str, face_target: str, audio_sha256: str
 ) -> dict[str, Any]:
-    root, package = _load_package(root)
-    if package.get("mode") == "aroll":
-        raise ShortformError("A-roll preserves source lip-sync and cannot enable a new backend")
-    if not _SHA256.fullmatch(audio_sha256):
-        raise ShortformError("audio_sha256 must be SHA-256")
-    for beat in package.get("beats") or []:
-        for shot in beat.get("shots") or []:
-            if shot.get("id") != shot_id:
-                continue
-            camera = shot.get("camera") or {}
-            if (
-                shot.get("screen_mode") != "on_camera"
-                or camera.get("shot_size")
-                not in {"medium close-up", "close-up", "extreme close-up"}
-                or camera.get("angle") not in {"front", "three-quarter"}
-            ):
-                raise ShortformError("lip-sync requires on-camera front/three-quarter near shot")
-            shot.update(
-                {
-                    "lipsync": True,
-                    "speaker": speaker,
-                    "face_target": face_target,
-                    "audio_sha256": audio_sha256,
-                    "requires_sample_review": True,
-                }
-            )
-            package["reviews"]["sample"] = {
-                "status": "pending",
-                "invalidated_at": utc_now(),
-                "reason": "lip-sync binding changed",
-            }
-            package["status"] = "pending_sample_review"
-            return _save(root, package)
-    raise ShortformError(f"unknown shot {shot_id}")
+    del root, shot_id, speaker, face_target, audio_sha256
+    raise ShortformError(
+        "post lipsync removed (v2.40); use prefer_native Grok/H3 dialogue. "
+        "See references/lipsync.md"
+    )
 
 
 def render_lipsync(
@@ -468,76 +439,11 @@ def render_lipsync(
     out: Path | None = None,
     backend: str = "auto",
 ) -> dict[str, Any]:
-    """Render one explicitly-bound B/C candidate through the locked backend.
-
-    This is intentionally an explicit command: planning or binding a shortform
-    package never submits RTX work. The rendered result remains a sample
-    candidate until the second human review gate is recorded.
-    """
-    root, package = _load_package(root)
-    if package.get("mode") == "aroll":
-        raise ShortformError("A-roll preserves source lip-sync and cannot render a new backend")
-    if package.get("reviews", {}).get("plan", {}).get("status") != "approved":
-        raise ShortformError("approve the shortform plan before rendering a lip-sync sample")
-    target_shot = next(
-        (
-            shot
-            for beat in package.get("beats") or []
-            for shot in beat.get("shots") or []
-            if shot.get("id") == shot_id
-        ),
-        None,
+    del root, shot_id, video, audio, out, backend
+    raise ShortformError(
+        "post lipsync removed (v2.40); use prefer_native Grok/H3 dialogue. "
+        "See references/lipsync.md"
     )
-    if not isinstance(target_shot, dict) or target_shot.get("lipsync") is not True:
-        raise ShortformError("shot is not an explicitly enabled lip-sync target")
-    input_video = _inside(root, video, label="lip-sync video")
-    input_audio = _inside(root, audio, label="lip-sync audio")
-    if _sha256(input_audio) != target_shot.get("audio_sha256"):
-        raise ShortformError("lip-sync audio hash does not match the bound final audio")
-    if out is None:
-        target = _safe_output(
-            root,
-            root / "candidates" / "shortform-lipsync" / f"{shot_id}.mp4",
-            label="lip-sync output",
-        )
-    else:
-        target = _safe_output(root, Path(out), label="lip-sync output")
-    from lipsync_backend import LipSyncError, lipsync_one
-
-    try:
-        backend_receipt = lipsync_one(
-            video=input_video,
-            audio=input_audio,
-            out=target,
-            backend=backend,
-            allow_unapproved=False,
-            allow_node_fallback=False,
-        )
-    except LipSyncError as exc:
-        raise ShortformError(str(exc)) from exc
-    if not target.is_file() or target.is_symlink() or target.stat().st_size <= 0:
-        raise ShortformError("locked lip-sync backend produced no safe candidate")
-    candidate = {
-        "path": _relative(root, target),
-        "sha256": _sha256(target),
-        "video_sha256": _sha256(input_video),
-        "audio_sha256": _sha256(input_audio),
-        "backend": backend_receipt.get("chosen_backend")
-        or backend_receipt.get("backend")
-        or backend,
-        "status": "pending_human_review",
-        "created_at": utc_now(),
-    }
-    target_shot["lipsync_candidate"] = candidate
-    package["reviews"]["sample"] = {
-        "status": "pending",
-        "invalidated_at": utc_now(),
-        "reason": "new lip-sync candidate requires viewing",
-    }
-    package["status"] = "pending_sample_review"
-    _save(root, package)
-    write_json(root / "receipts" / "shortform-lipsync" / f"{shot_id}.json", candidate)
-    return {"ok": True, "shot_id": shot_id, "candidate": candidate}
 
 
 def aroll_broll(root: Path | str, *, beat_id: str) -> list[dict[str, Any]]:

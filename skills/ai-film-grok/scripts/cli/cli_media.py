@@ -877,9 +877,17 @@ def cmd_register_still(args: argparse.Namespace) -> int:
                     "ahash_distance": face_id_result.get("ahash_distance"),
                     "dhash_distance": face_id_result.get("dhash_distance"),
                 }
-                if bool(getattr(args, "require_face_identity", False)) and not face_id_result.get(
-                    "ok"
-                ):
+                # v2.40: enrolled cast → default hard reject (escape AIFILM_SKIP_FACE_IDENTITY=1)
+                skip_face = os.environ.get("AIFILM_SKIP_FACE_IDENTITY", "").strip().lower() in {
+                    "1",
+                    "true",
+                    "yes",
+                    "on",
+                }
+                require_face = (not skip_face) or bool(
+                    getattr(args, "require_face_identity", False)
+                )
+                if require_face and not face_id_result.get("ok"):
                     raise FilmError(
                         f"face-identity verify failed for {args.shot_id} vs {char_guess}: "
                         f"score={face_id_result.get('score')} "

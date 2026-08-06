@@ -1,11 +1,8 @@
 #!/usr/bin/env python3
-"""Render a formal final film: edge-tts VO + optional lip-sync + BGM + FFmpeg plate.
+"""Render a formal final film: edge-tts VO + BGM + FFmpeg plate.
 
-Adapted from ai-film-codex postproduction (render_motion_film / make_v6 patterns)
-for ai-film-grok local manifests and Grok I2V clips.
-
-Lip-sync stage (optional): after VO, retime talking faces with MuseTalk/Wav2Lip/external
-so mouth matches 口白 — see references/lipsync.md.
+Post lipsync removed (v2.40): dialogue uses native clip audio (prefer_native).
+``--lipsync`` must stay ``off``. See references/lipsync.md.
 """
 
 from __future__ import annotations
@@ -86,13 +83,12 @@ from util.subprocess import run as util_run
 # local sibling import
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 try:
-    from lipsync_backend import enforce_dialogue_lipsync, lipsync_one, should_lipsync_shot
-    from lipsync_backend import probe as lipsync_probe
+    from lipsync_backend import LipSyncError, enforce_dialogue_lipsync
 except ImportError:  # pragma: no cover
-    lipsync_one = None  # type: ignore
-    should_lipsync_shot = None  # type: ignore
     enforce_dialogue_lipsync = None  # type: ignore
-    lipsync_probe = None  # type: ignore
+
+    class LipSyncError(RuntimeError):  # type: ignore
+        pass
 
 try:
     from music_cue import (
@@ -378,15 +374,6 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
     # 色气 / storyteller → seductive R&B by default；音乐必须远低于旁白
     mood = args.music_mood or ("rnb" if vo_mode in ("storyteller", "hybrid") else "playful")
     lipsync_mode = (getattr(args, "lipsync", None) or "off").lower()
-    # Storyteller: never lipsync unless user forced --lipsync require
-    if vo_mode == "storyteller" and lipsync_mode not in (
-        "require",
-        "wav2lip",
-        "external",
-    ):
-        if lipsync_mode != "off":
-            log("storyteller mode → force lipsync off")
-        lipsync_mode = "off"
     tts_info = tts_probe() if tts_probe else {}
     log(
         f"vo_mode={vo_mode} tts={tts_backend}->{tts_info.get('active')} voice={voice} "
@@ -397,15 +384,19 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
 
     shots = flatten_shots(spec, film_root=root)
     if enforce_dialogue_lipsync is None:
-        raise RenderError("dialogue lip-sync gate is unavailable")
-    try:
-        lipsync_mode = enforce_dialogue_lipsync(
-            vo_mode=vo_mode,
-            shots=shots,
-            requested=lipsync_mode,
-        )
-    except Exception as exc:
-        raise RenderError(str(exc)) from exc
+        if lipsync_mode != "off":
+            raise RenderError(
+                "post lipsync removed (v2.40); use --lipsync off and prefer_native dialogue"
+            )
+    else:
+        try:
+            lipsync_mode = enforce_dialogue_lipsync(
+                vo_mode=vo_mode,
+                shots=shots,
+                requested=lipsync_mode,
+            )
+        except (LipSyncError, Exception) as exc:
+            raise RenderError(str(exc)) from exc
     try:
         # The validator runs in flatten_shots; this makes the renderer's TTS
         # selection explicit and refuses ambiguous multi-turn shots.
@@ -910,7 +901,7 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
             }
         )
 
-    # 2) Stretch each clip to VO length, then optional lip-sync on talking shots
+    # 2) Stretch each clip to VO length (post lipsync removed — native audio only)
     lipsync_report: list[dict[str, Any]] = []
     stretched: list[Path] = []
     shots_by_id = {shot.get("id"): shot for shot in shots}
@@ -921,7 +912,7 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
         checkpoint_contract = {
             "tts_backend": str(tts_backend),
             "vo_mode": vo_mode,
-            "lipsync": lipsync_mode,
+            "lipsync": "off",
             "native_audio_volume": native_audio_volume,
         }
         checkpoint_signature = checkpoint.signature(
@@ -930,7 +921,7 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
             width=width,
             height=height,
             fps=fps,
-            lipsync=lipsync_mode,
+            lipsync="off",
             in_point_sec=item.get("in_point_sec"),
             out_point_sec=item.get("out_point_sec"),
             contract=checkpoint_contract,
@@ -944,9 +935,6 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
                 item["stretch_plan"] = metadata.get("stretch_plan")
                 if metadata.get("target") is not None:
                     item["target"] = float(metadata["target"])
-                cached_lipsync = metadata.get("lipsync")
-                if isinstance(cached_lipsync, dict) and cached_lipsync.get("id"):
-                    lipsync_report.append(cached_lipsync)
                 cached_output = Path(str(cached["output"]))
                 stretched.append(cached_output)
                 log(f"resume {item['id']} -> {cached_output.name}")
@@ -983,75 +971,6 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
             f"freeze={stretch_plan.get('freeze_sec')}"
         )
 
-        shot_meta = shots_by_id.get(item["id"], {})
-        want_ls = False
-        if lipsync_mode != "off" and should_lipsync_shot is not None:
-            want_ls = should_lipsync_shot(shot_meta)
-        if want_ls and lipsync_one is not None and lipsync_mode != "off":
-            ls_out = work / f"v_{i:02d}_{item['id']}_lipsync.mp4"
-            backend = "require" if lipsync_mode == "require" else lipsync_mode
-            # Only the legacy Wav2Lip path may use a still; RTX dubbing preserves the approved clip.
-            face_src = out
-            kf = keyframes_dir / f"{item['id']}.jpg"
-            if not kf.is_file():
-                for ext in (".png", ".jpeg", ".webp"):
-                    alt = keyframes_dir / f"{item['id']}{ext}"
-                    if alt.is_file():
-                        kf = alt
-                        break
-            if lipsync_mode == "wav2lip" and kf.is_file():
-                face_src = kf
-            try:
-                log(f"lipsync {item['id']} face={face_src.name} backend={backend}...")
-                result = lipsync_one(
-                    video=face_src,
-                    audio=item["wav"],
-                    out=ls_out,
-                    backend=backend if backend != "require" else "require",
-                )
-                if result.get("ok") and ls_out.is_file():
-                    # Strip embedded audio; final mix uses narration+BGM stems
-                    ls_video_only = work / f"v_{i:02d}_{item['id']}_ls_v.mp4"
-                    run(
-                        [
-                            "ffmpeg",
-                            "-y",
-                            "-i",
-                            str(ls_out),
-                            "-an",
-                            "-c:v",
-                            "libx264",
-                            "-preset",
-                            "fast",
-                            "-crf",
-                            "20",
-                            "-pix_fmt",
-                            "yuv420p",
-                            "-t",
-                            f"{item['target']:.3f}",
-                            str(ls_video_only),
-                        ]
-                    )
-                    out = ls_video_only
-                    lipsync_report.append({"id": item["id"], **result})
-                else:
-                    lipsync_report.append(
-                        {
-                            "id": item["id"],
-                            "ok": False,
-                            "skipped": True,
-                            "detail": result,
-                        }
-                    )
-                    if lipsync_mode != "auto":
-                        raise RenderError(
-                            f"lipsync required but skipped for {item['id']}: {result}"
-                        )
-            except Exception as exc:
-                lipsync_report.append({"id": item["id"], "ok": False, "error": str(exc)})
-                if lipsync_mode != "auto":
-                    raise RenderError(f"lipsync failed for {item['id']}: {exc}") from exc
-                log(f"lipsync skip {item['id']}: {exc}")
         stretched.append(out)
         checkpoint.mark_done(
             item["id"],
@@ -1061,10 +980,7 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
                 "target": item["target"],
                 "checkpoint_contract": checkpoint_contract,
                 "stretch_plan": item.get("stretch_plan"),
-                "lipsync": next(
-                    (entry for entry in reversed(lipsync_report) if entry.get("id") == item["id"]),
-                    None,
-                ),
+                "lipsync": None,
             },
         )
 
@@ -2520,8 +2436,8 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
         "provider_visual": "grok-imagine",
         "post_engine": "ai-film-grok/render_final.py",
         "lipsync": {
-            "mode": lipsync_mode,
-            "probe": lipsync_probe() if lipsync_probe else None,
+            "mode": "off",
+            "frozen": True,
             "shots": lipsync_report,
         },
     }
@@ -2783,8 +2699,8 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument(
         "--lipsync",
         default="off",
-        choices=["auto", "off", "require", "latentsync", "external", "wav2lip"],
-        help="Lip-sync OFF by default; RTX node uses LatentSync for approved close-up repair.",
+        choices=["off"],
+        help="Post lipsync removed (v2.40); only off. Dialogue = native Grok/H3 audio.",
     )
     p.add_argument(
         "--allow-loop-risk",

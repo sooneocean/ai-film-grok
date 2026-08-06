@@ -974,107 +974,24 @@ def cmd_sfx_library(args: argparse.Namespace) -> int:
         raise FilmError(str(exc)) from exc
 
 
-def cmd_lipsync_canary(args: argparse.Namespace) -> int:
-    from lipsync_canary import LipsyncCanaryError, run_lipsync_canary
+def _lipsync_frozen_cmd(args: argparse.Namespace) -> int:
+    """All lipsync CLI surfaces are tombstones (v2.40)."""
+    del args
+    from lipsync_backend import LIPSYNC_FROZEN_MSG
 
-    root = Path(args.root).expanduser().resolve()
-    try:
-        report = run_lipsync_canary(
-            root,
-            shot_id=str(args.shot_id),
-            backend=str(getattr(args, "backend", None) or "auto"),
-            video=Path(args.video).expanduser() if getattr(args, "video", None) else None,
-            audio=Path(args.audio).expanduser() if getattr(args, "audio", None) else None,
-        )
-    except LipsyncCanaryError as exc:
-        raise FilmError(str(exc)) from exc
-    _emit(report)
-    # not ready unlock path is soft fail (exit 1) but not crash
-    return 0 if report.get("ok") else 1
+    raise FilmError(LIPSYNC_FROZEN_MSG)
+
+
+def cmd_lipsync_canary(args: argparse.Namespace) -> int:
+    return _lipsync_frozen_cmd(args)
 
 
 def cmd_lipsync_pilot(args: argparse.Namespace) -> int:
-    from lipsync_pilot import (
-        LipsyncPilotError,
-        create_pilot,
-        rerun_musetalk,
-        review_template,
-        run_pilot,
-    )
-
-    try:
-        action = str(args.lipsync_pilot_action)
-        if action == "create":
-            report = create_pilot(
-                args.root,
-                front_video=args.front_video,
-                three_quarter_video=args.three_quarter_video,
-                moving_video=args.moving_video,
-                japanese_audio=args.japanese_audio,
-                approval_receipt=args.approval_receipt,
-            )
-        elif action == "run":
-            report = run_pilot(args.root)
-        elif action == "rerun-musetalk":
-            report = rerun_musetalk(args.root, sample_id=args.sample)
-        else:
-            report = review_template(args.root)
-    except LipsyncPilotError as exc:
-        raise FilmError(str(exc)) from exc
-    _emit(report)
-    return 0 if report.get("ok", True) else 1
+    return _lipsync_frozen_cmd(args)
 
 
 def cmd_lipsync_challenge(args: argparse.Namespace) -> int:
-    from lipsync_challenge import (
-        LipsyncChallengeError,
-        build_challenge_report,
-        create_blind_package,
-        create_challenge,
-        record_blind_review,
-        register_result,
-    )
-
-    try:
-        action = str(args.lipsync_challenge_action)
-        if action == "create":
-            report = create_challenge(
-                args.root,
-                fixtures={
-                    "front_closeup": Path(args.front_closeup),
-                    "three_quarter": Path(args.three_quarter),
-                    "occlusion_motion": Path(args.occlusion_motion),
-                    "anime": Path(args.anime),
-                },
-                japanese_audio=Path(args.japanese_audio),
-                approval_receipt=Path(args.approval_receipt),
-            )
-        elif action == "register-result":
-            report = register_result(
-                args.root,
-                fixture_id=args.fixture_id,
-                backend_id=args.backend_id,
-                output=Path(args.output),
-                metrics_receipt=Path(args.metrics_receipt),
-                runtime_receipt=Path(args.runtime_receipt),
-            )
-        elif action == "blind-package":
-            report = create_blind_package(args.root)
-        elif action == "review":
-            report = record_blind_review(
-                args.root,
-                reviewer=args.reviewer,
-                review=read_json(Path(args.review_json)),
-            )
-        else:
-            report = build_challenge_report(
-                args.root,
-                license_receipt=Path(args.license_receipt) if args.license_receipt else None,
-            )
-    except LipsyncChallengeError as exc:
-        raise FilmError(str(exc)) from exc
-    _emit(report)
-    return 0 if report.get("ok", True) else 1
+    return _lipsync_frozen_cmd(args)
 
 
 def cmd_capability(args: argparse.Namespace) -> int:
@@ -1217,19 +1134,6 @@ def cmd_tts_rehearse(args: argparse.Namespace) -> int:
 
 
 def cmd_lipsync_node(args: argparse.Namespace) -> int:
-    from config_loader import get_config
-    from lipsync_node_client import LipsyncNodeError, health
-
-    cfg = get_config()
-    if not cfg.lipsync_node_base_url or not cfg.lipsync_node_token:
-        raise FilmError(
-            "set AIFILM_LIPSYNC_NODE_BASE_URL and AIFILM_LIPSYNC_NODE_TOKEN in config.env"
-        )
-    try:
-        report = health(cfg.lipsync_node_base_url, cfg.lipsync_node_token)
-    except LipsyncNodeError as exc:
-        raise FilmError(str(exc)) from exc
-    _emit(report)
-    return 0 if report.get("ok") else 1
+    return _lipsync_frozen_cmd(args)
 
 

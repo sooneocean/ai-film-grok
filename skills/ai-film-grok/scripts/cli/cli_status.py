@@ -376,14 +376,10 @@ def cmd_doctor(args: argparse.Namespace) -> int:
         environment_warnings.append(
             f"skill config.env must be owner-only (mode {oct(config_env_mode)})"
         )
-    requested_lipsync = str(lipsync_info.get("env_backend") or "auto")
-    ready_lipsync_backends = list(lipsync_info.get("ready") or [])
-    if requested_lipsync == "require":
-        lipsync_required_ok = bool(ready_lipsync_backends)
-    else:
-        lipsync_required_ok = requested_lipsync in {"off", "auto"} or bool(
-            (lipsync_info.get("backends") or {}).get(requested_lipsync)
-        )
+    # Post lipsync removed (v2.40): never block doctor on missing LatentSync/MuseTalk.
+    lipsync_required_ok = True
+    ready_lipsync_backends: list[str] = []
+    requested_lipsync = "off"
     report = {
         "ok": True,
         "skill_dir": str(skill_dir),
@@ -423,9 +419,9 @@ def cmd_doctor(args: argparse.Namespace) -> int:
             "motion": "FRW LTX 2.3 → FRW API I2V → Grok Video 1.5",
             "motion_multi_ref": "reference_to_video (agent tool)",
             "vo": "MiMo (default; limited-time free), MiniMax/Fish/edge, or structured AIFILM_TTS_ARGV (cross-provider fallback is opt-in)",
-            "lipsync": "locked MuseTalk/Wav2Lip or structured AIFILM_LIPSYNC_ARGV (optional post)",
+            "lipsync": "removed (v2.40) — prefer_native Grok/H3 dialogue audio only",
             "bgm": "numpy procedural R&B (default) or user music file",
-            "post": "render_final.py (FFmpeg + PIL subs + optional lipsync)",
+            "post": "render_final.py (FFmpeg + PIL subs; post lipsync removed)",
             "post_designed": (
                 "export-compose + compose-render (HyperFrames E2E; "
                 "Remotion auto-render when node_modules ready else next_steps)"
@@ -619,9 +615,10 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     }
     optional_capabilities = {
         "lipsync": {
-            "enabled": requested_lipsync not in {"off", "auto"},
-            "requested_backend": requested_lipsync,
-            "ready": bool(ready_lipsync_backends),
+            "enabled": False,
+            "frozen": True,
+            "requested_backend": "off",
+            "ready": False,
             "ready_backends": ready_lipsync_backends,
             "required_request_satisfied": lipsync_required_ok,
         },
