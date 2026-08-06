@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.40.43] - 2026-08-06
+
+### Changed (code metabolism round 4 · P3-1×10 + spine_helpers/render_defaults tests)
+- **P3-1 migrate + hard-compat shims (10):** `cache`/`take_registry`/`motion_evidence`/`visual_text_repair`/`visual_text_audit`→`media/`; `performance_timeline`/`platform_package`→`post/`; `prompt_budget`/`optimization_dashboard`/`optimization_taxonomy`→`plan/`.
+- **P4-1:** `tests/test_util_spine_helpers.py` (present/export_desktop_name) + `tests/test_final_render_defaults.py` (mix defaults).
+- **Inventory** refreshed (non-shim top ~83→~73).
+- Iron: public `import name` preserved; no heat/i2v/pilot retune.
+
 ## [2.40.42] - 2026-08-06
 
 ### Changed (CTO optimization · G0 + A1 fail-closed gates)

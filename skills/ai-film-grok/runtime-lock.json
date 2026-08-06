@@ -534,7 +534,7 @@
     },
     {
       "path": "scripts/cache.py",
-      "sha256": "ad3c18cc721e277eeb5d881e9c47097e35feb816ee2e7b9c740ec2a85956e0d8"
+      "sha256": "3c0616f1832e27b21ea82ebe471616677c1fc713a07776c135bb0dfaec6f4262"
     },
     {
       "path": "scripts/capability_report.py",
@@ -1358,7 +1358,7 @@
     },
     {
       "path": "scripts/gates/cinematic_gate.py",
-      "sha256": "bed0bc3ca41ff9b5365961632cf24041fc0b0ff330ca46b28ff609d6b464e21a"
+      "sha256": "5042a80552613735ff5db18e6e22b2f617075c3235e57c7bfe8bb5580dfcd168"
     },
     {
       "path": "scripts/gates/continuity_programmatic.py",
@@ -1386,7 +1386,7 @@
     },
     {
       "path": "scripts/gates/narrative_rebind.py",
-      "sha256": "7992e2de181a5e99bed7b64d33d215bee9f79d00516a35f3ca085f5728b32f79"
+      "sha256": "29a5b2190f4150c2bf50e39cdbfa3e5cd43e8b8d6d522fe159c3f11563b192bf"
     },
     {
       "path": "scripts/gates/native_text_gate.py",
@@ -1398,11 +1398,11 @@
     },
     {
       "path": "scripts/gates/production_gates.py",
-      "sha256": "2870969808d3bdac8806f823abf340e52ccbfdd21ebfcc6d5b99aa94581f9351"
+      "sha256": "8eec92fc78f10fddbfb17fcc22b26faaab935ef65ce59019e2ac9efa9af688d8"
     },
     {
       "path": "scripts/gates/quality_gates.py",
-      "sha256": "e0ca56561b5e79cc755a1106c8ab46a031ea38399165d2a563f064190216534c"
+      "sha256": "1770ea8a47c5e31adcf8f900439dda1798f2de0dc4066136a9a9ae5e3426eb75"
     },
     {
       "path": "scripts/generation_ready.py",
@@ -1569,6 +1569,10 @@
       "sha256": "dd4e2c23bdfe157cdc9095e0f3e9fdb641f624fba95e48bf08c721f590aa653f"
     },
     {
+      "path": "scripts/media/cache.py",
+      "sha256": "ad3c18cc721e277eeb5d881e9c47097e35feb816ee2e7b9c740ec2a85956e0d8"
+    },
+    {
       "path": "scripts/media/cloud_media_download.py",
       "sha256": "a0af5ab98afe32d865b9b394011dae872bf5a661c0866280dd0aa6e8439efe44"
     },
@@ -1681,6 +1685,10 @@
       "sha256": "3a56599000d06db41bb3cde4689afd6416b2f854f063b96349d9404a6b47a9a5"
     },
     {
+      "path": "scripts/media/motion_evidence.py",
+      "sha256": "ace3e0228f9fdce2a741614e4db64282b97ff3618bcd6de82fb9ad734da47491"
+    },
+    {
       "path": "scripts/media/pilot_pack.py",
       "sha256": "ab95c4c2517a35dbc21514b4d575575e567519775b6b245e12a7a49882cb648c"
     },
@@ -1719,6 +1727,18 @@
     {
       "path": "scripts/media/still_source.py",
       "sha256": "a8ec847b53335e57543912b0e18229e451f081a2ae569e8b232e4968e8d7f3c5"
+    },
+    {
+      "path": "scripts/media/take_registry.py",
+      "sha256": "fbd12b1b1f1f202e2787e0f127164c6246b560cc98a88ca659c088c1375e81cf"
+    },
+    {
+      "path": "scripts/media/visual_text_audit.py",
+      "sha256": "cb257ce7ae3127f36773d3e66432c9baedec59d484127b7f070a3702d3dde765"
+    },
+    {
+      "path": "scripts/media/visual_text_repair.py",
+      "sha256": "b31d1cae6d9968cc8558cf89aa167815d0da448433c51f546636b1f03ec0de6f"
     },
     {
       "path": "scripts/media/wan_dancer_probe.py",
@@ -1774,7 +1794,7 @@
     },
     {
       "path": "scripts/motion_evidence.py",
-      "sha256": "ace3e0228f9fdce2a741614e4db64282b97ff3618bcd6de82fb9ad734da47491"
+      "sha256": "adc46b96d1f592981544812af3b0bee497490acec71a62e3c4cf0b1931d29ce7"
     },
     {
       "path": "scripts/motion_plan.py",
@@ -1966,7 +1986,7 @@
     },
     {
       "path": "scripts/optimization_dashboard.py",
-      "sha256": "f03da991effd67eb157a03acc3c927def969830f3a7808b9b25d3b20849abac9"
+      "sha256": "2b7e1da8c5d2b8a25cea2dee376c68f678b819d2678b2be41b44227c81af684a"
     },
     {
       "path": "scripts/optimization_experiments.py",
@@ -1982,7 +2002,7 @@
     },
     {
       "path": "scripts/optimization_taxonomy.py",
-      "sha256": "95e380e782205d54d02c9e37f1d9ab622bd6829b5744f69c7565f1165eed18f4"
+      "sha256": "90f951c6c038014977e63b74b9aa4475d773d706f02e595c90143386e802964a"
     },
     {
       "path": "scripts/performance_candidates.py",
@@ -2002,7 +2022,7 @@
     },
     {
       "path": "scripts/performance_timeline.py",
-      "sha256": "f9a6884d1b1dad7edd1636b19c283a2f0ba5b6cdfcf51150a00f40c11f2780ba"
+      "sha256": "d200340ab2b061202b921b6621c387f77ce8a2f2279333c6dc8f64d8f7df179f"
     },
     {
       "path": "scripts/picture_lock.py",
@@ -2097,8 +2117,16 @@
       "sha256": "0b1135dcf21747a228853a6b3fc48b4920810fe93ac6eb976956d3aff877ee68"
     },
     {
+      "path": "scripts/plan/optimization_dashboard.py",
+      "sha256": "f03da991effd67eb157a03acc3c927def969830f3a7808b9b25d3b20849abac9"
+    },
+    {
       "path": "scripts/plan/optimization_experiments.py",
       "sha256": "f46d0f75b1893a36b07241ea940b0171354bb179089a8fc54ffc84e48857b9cd"
+    },
+    {
+      "path": "scripts/plan/optimization_taxonomy.py",
+      "sha256": "95e380e782205d54d02c9e37f1d9ab622bd6829b5744f69c7565f1165eed18f4"
     },
     {
       "path": "scripts/plan/planning_autopilot.py",
@@ -2135,6 +2163,10 @@
     {
       "path": "scripts/plan/production_truth.py",
       "sha256": "3ff2bd383cb9e23154bb20087c3b7fb4214fde64e0fcb1ef3ae363964911462f"
+    },
+    {
+      "path": "scripts/plan/prompt_budget.py",
+      "sha256": "81b51101cc3bd0a2289c56e21728ad18ec17d21f63775a84aad2d70613258057"
     },
     {
       "path": "scripts/plan/prompt_compression_pilot.py",
@@ -2198,7 +2230,7 @@
     },
     {
       "path": "scripts/platform_package.py",
-      "sha256": "d57d2267cba1c387c9e95f7d3a29d4a5b6273ef5a1a79c22765b48965a7d7397"
+      "sha256": "b15985918eb3b9719c56c0baae755d57786977365456712132a67090ff5ebd78"
     },
     {
       "path": "scripts/post/__init__.py",
@@ -2273,8 +2305,16 @@
       "sha256": "c830536fde66b3b046514ac94e83c64280bb7ceca419c34cdfc58966d41b317e"
     },
     {
+      "path": "scripts/post/performance_timeline.py",
+      "sha256": "f9a6884d1b1dad7edd1636b19c283a2f0ba5b6cdfcf51150a00f40c11f2780ba"
+    },
+    {
       "path": "scripts/post/picture_lock.py",
       "sha256": "d9e09b4a5685e17e625e445c0fa552cbbbcbd847c73ebd96515c8e8fa0256337"
+    },
+    {
+      "path": "scripts/post/platform_package.py",
+      "sha256": "d57d2267cba1c387c9e95f7d3a29d4a5b6273ef5a1a79c22765b48965a7d7397"
     },
     {
       "path": "scripts/post/post_audit.py",
@@ -2410,7 +2450,7 @@
     },
     {
       "path": "scripts/prompt_budget.py",
-      "sha256": "81b51101cc3bd0a2289c56e21728ad18ec17d21f63775a84aad2d70613258057"
+      "sha256": "11ec492af5de4c09dea8abafce7f781037eecc341b60d9d5de62a0d817da9f6b"
     },
     {
       "path": "scripts/prompt_compression_pilot.py",
@@ -2710,7 +2750,7 @@
     },
     {
       "path": "scripts/take_registry.py",
-      "sha256": "fbd12b1b1f1f202e2787e0f127164c6246b560cc98a88ca659c088c1375e81cf"
+      "sha256": "60a282cff7649fb46def6d98c48e3e80dd637ccbb192d8e9432913801c7e84e5"
     },
     {
       "path": "scripts/test-skill",
@@ -2806,11 +2846,11 @@
     },
     {
       "path": "scripts/visual_text_audit.py",
-      "sha256": "cb257ce7ae3127f36773d3e66432c9baedec59d484127b7f070a3702d3dde765"
+      "sha256": "9d250c3d3bbaf4ade45c9c11ae85e7ee1e8cdecb70409864a5f156f9ff246a9c"
     },
     {
       "path": "scripts/visual_text_repair.py",
-      "sha256": "b31d1cae6d9968cc8558cf89aa167815d0da448433c51f546636b1f03ec0de6f"
+      "sha256": "8ad83c6f076700006f8f39b78fb2442e9a99ea57dc477c1828f936bced49df41"
     },
     {
       "path": "scripts/vo_atempo.py",
