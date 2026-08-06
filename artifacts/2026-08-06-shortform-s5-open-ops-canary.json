@@ -1,0 +1,92 @@
+{
+  "schema_version": 1,
+  "kind": "shortform-s5-open-ops-canary",
+  "at": "2026-08-06T06:18:28.155284+00:00",
+  "plugin": "2.40.2",
+  "board": "docs/plans/2026-08-06-shortform-optimization-todoplan.md",
+  "s5_1_gpu_drain": {
+    "status": "OPEN_OPS",
+    "comfy_tunnel": "http://127.0.0.1:18188/system_stats",
+    "probe": "timeout_3s_no_bytes",
+    "note": "5090/Comfy unreachable this session; no until-empty execute (multi-agent no-hog + exclusive flag required when free)",
+    "when_idle": "aifilm h3 capacity-plan --root <film> && aifilm h3 cycle --until-empty --execute --free-first --i-own-the-gpu"
+  },
+  "s5_2_duration_honesty": {
+    "status": "PROBED",
+    "films": [
+      {
+        "film": "savani-ep01-5m",
+        "path": "/Users/dex/AI FILM SPACE/0805/savani-ep01-5m",
+        "ok": true,
+        "severity": "ok",
+        "codes": [],
+        "target": 211.8,
+        "planned": 211.513,
+        "media_sum": 211.847,
+        "shot_count": 41,
+        "suggested_min_shots_h3": 41,
+        "h3_reachable_sec": 213.2,
+        "media_clips_measured": 41,
+        "message": "planned 211.5s vs target 211.8s (gap +0.3s); media 211.8s ok",
+        "next": []
+      },
+      {
+        "film": "savani-ep02-5m",
+        "path": "/Users/dex/AI FILM SPACE/0805/savani-ep02-5m",
+        "ok": true,
+        "severity": "ok",
+        "codes": [],
+        "target": 211.8,
+        "planned": 211.513,
+        "media_sum": 211.847,
+        "shot_count": 41,
+        "suggested_min_shots_h3": 41,
+        "h3_reachable_sec": 213.2,
+        "media_clips_measured": 41,
+        "message": "planned 211.5s vs target 211.8s (gap +0.3s); media 211.8s ok",
+        "next": []
+      },
+      {
+        "film": "savani-ep03-5m",
+        "path": "/Users/dex/AI FILM SPACE/0805/savani-ep03-5m",
+        "ok": true,
+        "severity": "soft",
+        "codes": [
+          "DURATION_TARGET_OVER_SOFT"
+        ],
+        "target": 108.5,
+        "planned": 211.513,
+        "media_sum": 211.847,
+        "shot_count": 41,
+        "suggested_min_shots_h3": 21,
+        "h3_reachable_sec": 213.2,
+        "media_clips_measured": 41,
+        "message": "planned 211.5s vs target 108.5s (gap -103.0s / -95%); media 211.8s codes=['DURATION_TARGET_OVER_SOFT']",
+        "next": [
+          "planned 211.5s exceeds target 108s — trim or raise target"
+        ]
+      },
+      {
+        "film": "suse-evolution-ep01",
+        "path": "/Users/dex/AI FILM SPACE/0805/suse-evolution-ep01",
+        "ok": true,
+        "severity": "soft",
+        "codes": [
+          "DURATION_PLAN_OVERLONG_SOFT"
+        ],
+        "target": 113.2,
+        "planned": 113.2,
+        "media_sum": 134.342,
+        "shot_count": 26,
+        "suggested_min_shots_h3": 22,
+        "h3_reachable_sec": 135.2,
+        "media_clips_measured": 26,
+        "message": "planned 113.2s vs target 113.2s (gap -0.0s / -0%); media 134.3s codes=['DURATION_PLAN_OVERLONG_SOFT']",
+        "next": [
+          "13/26 shots have duration_sec > H3 nominal 5.2s — clamp plan or re-I2V longer takes"
+        ]
+      }
+    ],
+    "note": "S0 detectors live; films still short vs H3 reachable until replan/add shots or lower target"
+  }
+}

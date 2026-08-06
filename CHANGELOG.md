@@ -2,9 +2,10 @@
 
 ## [2.40.2] - 2026-08-06
 
-### Docs (shortform board CODE CLOSED)
-- Mark `docs/plans/2026-08-06-shortform-optimization-todoplan.md` **CODE CLOSED**: S0–S4 shipped; residual **S5 OPEN_OPS** only.
-- Ledger: S1.3 Mandarin soft/hard · S3 wardrobe_ambition/honest_cap already in tree at 2.40.1 path.
+### Docs (shortform board CODE CLOSED + S5 probe)
+- Mark `docs/plans/2026-08-06-shortform-optimization-todoplan.md` **CODE CLOSED**: S0–S4 shipped; residual **S5.1 OPEN_OPS** only.
+- **S5 canary** `artifacts/2026-08-06-shortform-s5-open-ops-canary.json`: Comfy 18188 timeout (no drain); savani ep01/02 duration honesty **ok** after target≈media.
+- memory: `2026-08-06-shortform-s5-open-ops.md`.
 
 ## [2.40.1] - 2026-08-06
 

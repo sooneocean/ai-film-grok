@@ -6,8 +6,9 @@
 |----|-----|
 | Repo | `/Users/dex/.grok/plugins/ai-film-grok` |
 | 范围 | 默认 shortform 主产线 + `cli:shortform` 旁路 |
-| 状态 | **CODE CLOSED / SHIPPED** (plugin **2.40.1+**) · **S5 OPEN_OPS only** |
-| 拍板记录 | fail-closed + 明确 next；S2.3 export-spec **不做**；S5 等人+GPU |
+| 状态 | **CODE CLOSED / SHIPPED** (plugin **2.40.2**) · **S5.1 OPEN_OPS** · **S5.2 PROBED** |
+| 拍板记录 | fail-closed + 明确 next；S2.3 export-spec **不做**；S5.1 等人+GPU |
+| S5 canary | `artifacts/2026-08-06-shortform-s5-open-ops-canary.json` · memory `2026-08-06-shortform-s5-open-ops` |
 | 与旧板关系 | 产品面 `2026-08-06-optimization-todoplan` A/B 已收；本档 = 短版收口真相 |
 
 ### 收口账实（全部可交付代码项）
@@ -222,10 +223,10 @@
 
 ### Wave S5 · OPEN_OPS（不阻塞代码）
 
-| ID | Todo | 验收 |
-|----|------|------|
-| **S5.1** | 5090 idle 时单 owner until-empty → `queue_empty` | takes↑ + receipt；遵守 multi-agent no-hog |
-| **S5.2** | 一片真 shortform 走 S0 后 plan→bulk 无 `DURATION_MEDIA_SHORT_HARD`（或明确降 target） | 片根 canary JSON |
+| ID | Todo | 验收 | 2026-08-06 实探 |
+|----|------|------|----------------|
+| **S5.1** | 5090 idle 时单 owner until-empty → `queue_empty` | takes↑ + receipt；遵守 multi-agent no-hog | **OPEN_OPS**：`18188` Comfy timeout；未 submit drain |
+| **S5.2** | 一片真 shortform 走 S0 后 plan→bulk 无 `DURATION_MEDIA_SHORT_HARD`（或明确降 target） | 片根 canary JSON | **PROBED**：savani ep01/02 target≈media 211.8s → duration **ok**；canary JSON 已写 |
 
 ---
 
