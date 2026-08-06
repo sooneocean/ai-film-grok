@@ -1,5 +1,16 @@
 # Changelog
 
+## [2.40.25] - 2026-08-06
+
+### Changed (senior-dev 代码质量把控 · Phase 2 统一错误体系 · P2-1)
+- **统一错误继承层级（P2-1）**：9 个子系统的 `*Error` 由 `RuntimeError` 改继承 `FilmError`（`util/errors`），保留原类名与 `RuntimeError` 兼容性：
+  - gates 子系统：`ProductionGateError` / `PreflightError` / `CinematicGateError` / `GateAutoError` / `ContinuityProgrammaticError` / `NarrativeRebindError` / `DeliveryArtifactError`
+  - final 子系统：`final/errors.RenderError`（含传递继承的 `RenderTimeoutError`）
+  - post 子系统：`post/render_final_music.RenderError`、`post/render_final.LipSyncError`（位于 ImportError 回退块）
+- **故意不动**：以 `ValueError` 为基类的错误保持原样，避免破坏现有 `except ValueError` 处理点（向后兼容器于 P2-1 范围之外）。
+- **测试**：`tests/test_error_hierarchy.py`（参数化，9 类 + RenderTimeoutError 传递 + `FilmError` 兜底捕获，验证既继承 `FilmError` 又仍是 `RuntimeError`）。`tests/test_gate_fail_closed.py`/`tests/test_util_logger.py`/`tests/test_render_final_dimension.py` 19 用例全绿。
+- **P2-2 结论**：复测发现 `read_json` 已被 `util.require_json_as`/`require_json_fnv`/`soft_json` 集中收口（本地 6 处是薄封装而非重复实现），判定为已完成，不做高风险删除重构。
+
 ## [2.40.24] - 2026-08-06
 
 ### Changed (senior-dev 代码质量把控 · Phase 1 拆解巨型函数 · 参考模式)

@@ -69,6 +69,7 @@ from sound_plan import (
 )
 from transition_ops import TransitionOperationError, bind_transition_operations_to_timeline
 from util import utc_now, write_json
+from util.errors import FilmError
 
 # local sibling import
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -77,7 +78,7 @@ try:
 except ImportError:  # pragma: no cover
     enforce_dialogue_lipsync = None  # type: ignore
 
-    class LipSyncError(RuntimeError):  # type: ignore
+    class LipSyncError(FilmError):  # type: ignore
         pass
 
 try:

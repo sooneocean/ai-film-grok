@@ -22,6 +22,7 @@ from pathlib import Path
 from typing import Any
 
 from util import read_json, utc_now, write_json
+from util.errors import FilmError
 
 RECEIPT = "gate-auto.json"
 I2V_RECEIPT = "i2v-final-gate.json"
@@ -36,7 +37,7 @@ HUMAN_ONLY = (
 )
 
 
-class GateAutoError(RuntimeError):
+class GateAutoError(FilmError):
     pass
 
 

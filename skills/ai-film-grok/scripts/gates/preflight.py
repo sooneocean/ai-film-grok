@@ -26,6 +26,7 @@ from production_gates import (
     transition_policy_report,
 )
 from util import read_json, utc_now
+from util.errors import FilmError
 
 ECCHI_TONE = re.compile(
     r"色气|里番|同人|诱惑|后宫|sensual|ecchi|seductive|rnb|soul",
@@ -33,7 +34,7 @@ ECCHI_TONE = re.compile(
 )
 
 
-class PreflightError(RuntimeError):
+class PreflightError(FilmError):
     pass
 
 

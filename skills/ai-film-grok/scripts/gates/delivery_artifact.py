@@ -12,6 +12,7 @@ from typing import TypeAlias
 
 from security_policy import SecurityPolicyError, safe_existing_file
 from util import read_json, sha256_file, utc_now, write_json
+from util.errors import FilmError
 
 JsonValue: TypeAlias = str | int | float | bool | None | list["JsonValue"] | dict[str, "JsonValue"]
 
@@ -22,7 +23,7 @@ class FinalArtifact:
     sha256: str
 
 
-class DeliveryArtifactError(RuntimeError):
+class DeliveryArtifactError(FilmError):
     pass
 
 

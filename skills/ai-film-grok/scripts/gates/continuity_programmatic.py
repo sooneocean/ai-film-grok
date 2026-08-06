@@ -17,12 +17,13 @@ from pathlib import Path
 from typing import Any
 
 from util import read_json, utc_now, write_json
+from util.errors import FilmError
 
 _FORBIDDEN_JOIN = re.compile(r"\b(dissolve|freeze|reverse|xfade)\b", re.I)
 _JOIN_LINE = re.compile(r"(?:join|continue|match.?cut)", re.I)
 
 
-class ContinuityProgrammaticError(RuntimeError):
+class ContinuityProgrammaticError(FilmError):
     pass
 
 

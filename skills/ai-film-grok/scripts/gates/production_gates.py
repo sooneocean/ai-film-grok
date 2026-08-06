@@ -26,6 +26,7 @@ from film_spec import (
     validate_film_spec,
 )
 from util import read_json
+from util.errors import FilmError
 
 PILOT_MAX_SHOTS_WITHOUT_APPROVAL = 3
 PILOT_APPROVAL_NAME = "pilot-approval.json"
@@ -34,7 +35,7 @@ _MAX_BENCHMARK_ARTIFACT_BYTES = 2 * 1024 * 1024 * 1024
 _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 
 
-class ProductionGateError(RuntimeError):
+class ProductionGateError(FilmError):
     """Raised when a production gate blocks the operation."""
 
 

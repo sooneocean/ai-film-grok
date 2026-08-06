@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+from util.errors import FilmError
 
-class RenderError(RuntimeError):
+
+class RenderError(FilmError):
     pass
 
 

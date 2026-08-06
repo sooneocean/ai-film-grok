@@ -12,11 +12,12 @@ from pathlib import Path
 from typing import Any
 
 from util import read_json, utc_now, write_json
+from util.errors import FilmError
 
 RECEIPT = "narrative-rebind.json"
 
 
-class NarrativeRebindError(RuntimeError):
+class NarrativeRebindError(FilmError):
     pass
 
 

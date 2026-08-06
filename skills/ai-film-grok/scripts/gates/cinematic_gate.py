@@ -15,11 +15,12 @@ from pathlib import Path
 from typing import Any
 
 from util import read_json, utc_now, write_json
+from util.errors import FilmError
 
 RECEIPT_NAME = "cinematic-gate.json"
 
 
-class CinematicGateError(RuntimeError):
+class CinematicGateError(FilmError):
     """Desktop/export blocked by cinematic-gate."""
 
 

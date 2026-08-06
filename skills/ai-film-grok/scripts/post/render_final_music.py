@@ -19,12 +19,13 @@ from logger import log
 from runtime_policy import sha256
 from sound_plan import resolve_music_template_timeline
 from util import run_ffmpeg, write_json
+from util.errors import FilmError
 
 # Local defs — avoid circular import with render_final (which re-exports this module).
 SR = 44100
 
 
-class RenderError(RuntimeError):
+class RenderError(FilmError):
     pass
 
 
