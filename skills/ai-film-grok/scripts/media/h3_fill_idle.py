@@ -886,10 +886,13 @@ def wait_for_comfy_capacity(
     max_wait_sec: float = 0.0,
     poll_sec: float = _CAPACITY_WAIT_POLL_DEFAULT,
     sleep_fn=None,
+    free_first_when_idle: bool = False,
 ) -> dict:
     """Poll soft capacity until ready or timeout. Never cancels foreign work.
 
     ``max_wait_sec<=0`` returns a single probe (no sleep). ``sleep_fn`` is injectable for tests.
+    When ``free_first_when_idle`` is set, if the queue becomes empty but RAM/VRAM floors
+    still block, call free-memory once (safe path only — never while ``COMFY_QUEUE_BUSY``).
     """
     import time as _time
 
@@ -898,6 +901,8 @@ def wait_for_comfy_capacity(
     poll = max(0.5, float(poll_sec or _CAPACITY_WAIT_POLL_DEFAULT))
     started = _time.monotonic()
     probes = 0
+    free_attempts: list[dict[str, Any]] = []
+    freed_once = False
     last = probe_comfy_capacity_soft()
     probes += 1
     if last.get("ready") is True or max_wait <= 0:
@@ -911,6 +916,7 @@ def wait_for_comfy_capacity(
             "poll_sec": poll,
             "probes": probes,
             "last": _capacity_snapshot(last),
+            "free_attempts": free_attempts,
             "outcome": "ready" if last.get("ready") is True else "not_ready_no_wait",
         }
 
@@ -930,8 +936,32 @@ def wait_for_comfy_capacity(
                 "poll_sec": poll,
                 "probes": probes,
                 "last": _capacity_snapshot(last),
+                "free_attempts": free_attempts,
                 "outcome": "ready_after_wait",
             }
+        # Queue cleared but models still hold VRAM → free once, never cancel work.
+        if free_first_when_idle and not freed_once:
+            codes = _capacity_blocker_codes(last)
+            if _QUEUE_BUSY_CODE not in codes and (codes & _MEMORY_FLOOR_CODES):
+                free_rep = prepare_capacity_free_first(free_first=True, dry_run=False)
+                free_attempts.append(free_rep)
+                freed_once = True
+                if free_rep.get("outcome") == "ready_after_free" or (
+                    free_rep.get("after") or {}
+                ).get("ready") is True:
+                    return {
+                        "schema_version": 1,
+                        "kind": "ai-film-capacity-wait",
+                        "ok": True,
+                        "ready": True,
+                        "waited_sec": round(_time.monotonic() - started, 2),
+                        "max_wait_sec": max_wait,
+                        "poll_sec": poll,
+                        "probes": probes,
+                        "last": free_rep.get("after") or _capacity_snapshot(last),
+                        "free_attempts": free_attempts,
+                        "outcome": "ready_after_idle_free",
+                    }
 
     return {
         "schema_version": 1,
@@ -943,6 +973,7 @@ def wait_for_comfy_capacity(
         "poll_sec": poll,
         "probes": probes,
         "last": _capacity_snapshot(last),
+        "free_attempts": free_attempts,
         "outcome": "timeout_still_blocked",
     }
 
@@ -978,12 +1009,24 @@ def recover_capacity_contention(
         max_wait_sec=float(capacity_wait_sec or 0.0),
         poll_sec=poll_sec,
         sleep_fn=sleep_fn,
+        free_first_when_idle=bool(free_first),
     )
     report["wait"] = wait_rep
     if wait_rep.get("ready") is True:
         report["ready"] = True
         report["outcome"] = wait_rep.get("outcome") or "ready"
         return report
+
+    # Final free attempt if wait timed out with idle memory floors only.
+    if bool(free_first):
+        free_final = prepare_capacity_free_first(free_first=True, dry_run=False)
+        report["free_final"] = free_final
+        if free_final.get("outcome") == "ready_after_free" or (
+            free_final.get("after") or {}
+        ).get("ready") is True:
+            report["ready"] = True
+            report["outcome"] = "ready_after_final_free"
+            return report
 
     final = probe_comfy_capacity_soft()
     report["final"] = _capacity_snapshot(final)

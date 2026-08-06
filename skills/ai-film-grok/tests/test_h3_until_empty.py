@@ -461,6 +461,53 @@ class CapacityWaitTests(unittest.TestCase):
         self.assertEqual(rep.get("max_wait_sec"), 7200.0)
         self.assertTrue(rep.get("ready"))
 
+    def test_capacity_wait_frees_when_queue_idle_memory_floor(self) -> None:
+        """After foreign queue drains, free-memory once so VRAM floor can clear."""
+        from h3_fill_idle import wait_for_comfy_capacity
+
+        busy = {
+            "ok": True,
+            "ready": False,
+            "status": "blocked",
+            "blockers": [{"code": "COMFY_QUEUE_BUSY", "message": "busy"}],
+        }
+        mem = {
+            "ok": True,
+            "ready": False,
+            "status": "blocked",
+            "blockers": [{"code": "VRAM_BELOW_FLOOR", "message": "low"}],
+        }
+        ready = {"ok": True, "ready": True, "status": "ready", "blockers": []}
+        probes = {"n": 0}
+
+        def _probe():
+            probes["n"] += 1
+            if probes["n"] <= 1:
+                return busy
+            return mem
+
+        free_calls = {"n": 0}
+
+        def _free(**_k):
+            free_calls["n"] += 1
+            return {
+                "outcome": "ready_after_free",
+                "after": {"ready": True},
+                "freed": True,
+            }
+
+        with mock.patch("h3_fill_idle.probe_comfy_capacity_soft", side_effect=_probe):
+            with mock.patch("h3_fill_idle.prepare_capacity_free_first", side_effect=_free):
+                rep = wait_for_comfy_capacity(
+                    max_wait_sec=30.0,
+                    poll_sec=0.01,
+                    sleep_fn=lambda _s: None,
+                    free_first_when_idle=True,
+                )
+        self.assertTrue(rep.get("ready"))
+        self.assertEqual(rep.get("outcome"), "ready_after_idle_free")
+        self.assertGreaterEqual(free_calls["n"], 1)
+
 
 if __name__ == "__main__":
     unittest.main()

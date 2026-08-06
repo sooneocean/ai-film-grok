@@ -1,5 +1,10 @@
 # Changelog
 
+## [2.39.86] - 2026-08-06
+
+### Fixed (C1 free-after-idle)
+- capacity wait: when queue goes idle but VRAM/RAM floors remain, **free-memory once** (`free_first_when_idle`); final free attempt after wait timeout. Never cancel foreign prompts.
+
 ## [2.39.85] - 2026-08-06
 
 ### Fixed (C1 ops heartbeat)
