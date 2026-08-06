@@ -178,6 +178,34 @@ class UntilEmptyTests(unittest.TestCase):
             self.assertTrue((root / "receipts" / "fill-idle-until-empty.json").is_file())
 
 
+    def test_until_empty_missing_skip_reason_is_machine_coded(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _film(root)
+
+            def _fake_run_next(*_a, **_k):
+                return {
+                    "ok": True,
+                    "jobs_ran": 0,
+                    "pending_after": 1,
+                    "next_after": {"shot_id": "meat1"},
+                }
+
+            with mock.patch("h3_fill_idle.run_next_fill_idle", side_effect=_fake_run_next):
+                rep = fill_idle_until_empty(
+                    root,
+                    execute=True,
+                    i_own_the_gpu=True,
+                    max_jobs_per_cycle=1,
+                    max_cycles=1,
+                    include_challenge=True,
+                )
+            self.assertEqual(rep["halt_reason_code"], "RUN_DECISION_MISSING")
+            self.assertEqual(rep["halt_reason_group"], "scheduler")
+            self.assertEqual(rep["cycles"][0].get("halt_reason_code"), "RUN_DECISION_MISSING")
+            self.assertEqual(rep["cycles"][0].get("skipped_reason"), "run_next_missing")
+
+
     def test_until_empty_capacity_not_ready_stop(self) -> None:
         """AF5 · capacity block must stop execute honestly (not run_failed)."""
         with tempfile.TemporaryDirectory() as tmp:

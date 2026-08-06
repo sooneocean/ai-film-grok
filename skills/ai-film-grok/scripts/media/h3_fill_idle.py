@@ -43,6 +43,93 @@ _UNTIL_EMPTY_MAX_JOBS_PER_CYCLE = 20
 # (never silent heat drop — still in film; just stop burning 5090 forever).
 # Override with AIFILM_H3_FLOOR_RETRY_CAP (0 = unlimited).
 _H3_FLOOR_RETRY_CAP_DEFAULT = 5
+_H3_FILL_IDLE_HALT_REASON_MAP = {
+    "dry_run_pass_execute": ("RUN_NOT_EXECUTED_DRY_RUN", "operator"),
+    "capacity_not_ready": ("RUN_NOT_EXECUTED_CAPACITY", "capacity"),
+    "queue_empty": ("RUN_QUEUE_EMPTY", "queue"),
+    "queue_empty_after_runs": ("RUN_QUEUE_EMPTY", "queue"),
+    "exclusive_gpu_required": ("RUN_EXCLUSIVE_GPU_REQUIRED", "ownership"),
+    "run_failed": ("RUN_EXECUTION_FAILED", "execution"),
+    "no_progress": ("RUN_NO_PROGRESS", "scheduler"),
+    "run_next_missing": ("RUN_DECISION_MISSING", "scheduler"),
+    "capacity_waiting": ("RUN_WAITING_FOR_CAPACITY", "capacity"),
+    "": ("RUN_EXECUTED", "executed"),
+    None: ("RUN_EXECUTED", "executed"),
+}
+
+
+def _halt_reason_code_and_group(reason: str | None) -> tuple[str, str]:
+    return _H3_FILL_IDLE_HALT_REASON_MAP.get(
+        str(reason or "").strip(),
+        ("RUN_UNKNOWN", "execution"),
+    )
+
+
+def _normalize_skip_reason(skip_reason: str | None, *, jobs_ran: int) -> str:
+    normalized = str(skip_reason or "").strip()
+    if normalized and normalized != "None":
+        return normalized
+    if jobs_ran == 0:
+        return "run_next_missing"
+    return ""
+
+
+def _build_run_next_trace(
+    *,
+    root: Path,
+    include_challenge: bool,
+    execute: bool,
+    register: bool,
+    require_capacity: bool,
+    seed: int,
+    timeout_sec: int,
+    max_jobs: int,
+    free_memory_on_mode_switch: bool,
+    next_report: dict[str, Any] | None,
+    skipped_reason: str | None,
+) -> dict[str, Any]:
+    """Reusable machine evidence for replaying this run-next decision path."""
+    return {
+        "kind": "ai-film-h3-run-next-decision-tree",
+        "at": utc_now(),
+        "request": {
+            "root": str(root),
+            "include_challenge": bool(include_challenge),
+            "execute": bool(execute),
+            "register": bool(register),
+            "require_capacity": bool(require_capacity),
+            "seed": int(seed),
+            "timeout_sec": int(timeout_sec),
+            "max_jobs": int(max_jobs),
+            "free_memory_on_mode_switch": bool(free_memory_on_mode_switch),
+        },
+        "next_report": next_report,
+        "skipped_reason": skipped_reason,
+    }
+
+
+def _run_next_open_ops_record(
+    reason: str | None,
+    *,
+    decision_tree: dict[str, Any],
+    command: str | None,
+    next_after: dict[str, Any] | None = None,
+    pending_after: int | None = None,
+) -> dict[str, Any]:
+    """Machine-readable record for a skipped run-next iteration."""
+    code, group = _halt_reason_code_and_group(reason)
+    return {
+        "schema_version": 1,
+        "kind": "ai-film-h3-run-next-open-op",
+        "at": utc_now(),
+        "reason": str(reason or "") or None,
+        "halt_reason_code": code,
+        "halt_reason_group": group,
+        "command": command,
+        "next_after": next_after,
+        "pending_after": pending_after,
+        "decision_tree": decision_tree,
+    }
 
 
 def _h3_floor_retry_cap() -> int:
@@ -1859,15 +1946,27 @@ def fill_idle_until_empty(
         )
         ran = int(run_rep.get("jobs_ran") or 0)
         total_ran += ran
-        skipped = str(run_rep.get("skipped_reason") or "")
+        skipped = _normalize_skip_reason(
+            run_rep.get("skipped_reason"),
+            jobs_ran=ran,
+        )
         cycle_row: dict[str, Any] = {
             "cycle": cycle_i + 1,
             "jobs_ran": ran,
             "skipped_reason": skipped or None,
+            "halt_reason_code": _halt_reason_code_and_group(skipped)[0]
+            if skipped
+            else None,
+            "halt_reason_group": _halt_reason_code_and_group(skipped)[1]
+            if skipped
+            else None,
+            "decision_tree": (run_rep.get("decision_tree") if isinstance(run_rep, dict) else None),
             "ok": bool(run_rep.get("ok") is not False),
             "pending_after": run_rep.get("pending_after"),
             "next_after": run_rep.get("next_after"),
         }
+        if isinstance(run_rep.get("open_ops"), list):
+            cycle_row["open_ops"] = run_rep.get("open_ops")
         cycles.append(cycle_row)
         if not execute:
             stop_reason = "dry_run_pass_execute"
@@ -1950,6 +2049,9 @@ def fill_idle_until_empty(
         "capacity_waits": capacity_waits,
         "free_prep": free_prep,
         "stop_reason": stop_reason,
+        "halt_reason_code": _halt_reason_code_and_group(stop_reason)[0],
+        "halt_reason_group": _halt_reason_code_and_group(stop_reason)[1],
+        "skipped_reason": stop_reason,
         "cycles_run": len(cycles),
         "max_cycles": max_cycles,
         "max_jobs_per_cycle": max_jobs_per_cycle,
@@ -2150,23 +2252,70 @@ def run_next_fill_idle(
         "run_result": None,
         "next_report": None,
         "free_memory_on_mode_switch": bool(free_memory_on_mode_switch),
+        "halt_reason_code": None,
+        "halt_reason_group": None,
+        "decision_tree": None,
+        "decision_trees": [],
+        "open_ops": [],
     }
     prev_mode: str | None = None
+
+    def _mark_halt(reason: str, *, decision_tree: dict[str, Any], command: str | None = None) -> None:
+        code, group = _halt_reason_code_and_group(reason)
+        last_out["skipped_reason"] = reason
+        last_out["halt_reason_code"] = code
+        last_out["halt_reason_group"] = group
+        if reason == "capacity_not_ready" and last_out.get("ok") is True:
+            last_out["ok"] = True
+        run_rep = _run_next_open_ops_record(
+            reason,
+            decision_tree=decision_tree,
+            command=command,
+            next_after=nxt_rep.get("next") if isinstance(nxt_rep, dict) else None,
+            pending_after=nxt_rep.get("pending_count") if isinstance(nxt_rep, dict) else None,
+        )
+        last_out["open_ops"].append(run_rep)
 
     for job_i in range(max_jobs):
         nxt_rep = next_fill_idle_job(base, include_challenge=include_challenge, check_capacity=True)
         last_out["next_report"] = nxt_rep
+        decision_trace = _build_run_next_trace(
+            root=base,
+            include_challenge=include_challenge,
+            execute=bool(execute),
+            register=bool(register),
+            require_capacity=bool(require_capacity),
+            seed=int(seed),
+            timeout_sec=int(timeout_sec),
+            max_jobs=max_jobs,
+            free_memory_on_mode_switch=bool(free_memory_on_mode_switch),
+            next_report=nxt_rep,
+            skipped_reason=None,
+        )
+        last_out["decision_tree"] = decision_trace
+        last_out["decision_trees"].append(decision_trace)
         nxt = nxt_rep.get("next") if isinstance(nxt_rep.get("next"), dict) else None
         if not nxt:
-            last_out["skipped_reason"] = "queue_empty" if job_i == 0 else "queue_empty_after_runs"
+            _mark_halt(
+                "queue_empty" if job_i == 0 else "queue_empty_after_runs",
+                decision_tree=decision_trace,
+            )
             break
         if not execute:
-            last_out["skipped_reason"] = "dry_run_pass_execute"
+            _mark_halt(
+                "dry_run_pass_execute",
+                decision_tree=decision_trace,
+                command=(nxt.get("command") if isinstance(nxt, dict) else None),
+            )
             last_out["command"] = nxt.get("command")
             last_out["next"] = nxt
             break
         if require_capacity and nxt_rep.get("capacity_ready") is False:
-            last_out["skipped_reason"] = "capacity_not_ready"
+            _mark_halt(
+                "capacity_not_ready",
+                decision_tree=decision_trace,
+                command=(nxt.get("command") if isinstance(nxt, dict) else None),
+            )
             last_out["ok"] = True  # advisory skip, not hard fail
             last_out["command"] = nxt.get("command")
             break
@@ -2204,6 +2353,7 @@ def run_next_fill_idle(
                 "ok": bool(result.get("ok")),
                 "deliver_path": result.get("deliver_path"),
                 "free_memory": fm,
+                "decision_tree": decision_trace,
             }
             runs.append(run_row)
             last_out["ran"] = True
@@ -2229,19 +2379,33 @@ def run_next_fill_idle(
                 )[:300]
                 if _is_capacity_contention_error(err_txt):
                     # Race: probe said ready; submit hit queue/VRAM floor.
-                    last_out["skipped_reason"] = "capacity_not_ready"
+                    _mark_halt(
+                        "capacity_not_ready",
+                        decision_tree=decision_trace,
+                        command=run_row.get("deliver_path"),
+                    )
                     last_out["ok"] = True
                     last_out["error"] = err_txt
                     run_row["error"] = err_txt[:200]
                     run_row["capacity_contention"] = True
                 else:
-                    last_out["skipped_reason"] = "run_failed"
+                    _mark_halt(
+                        "run_failed",
+                        decision_tree=decision_trace,
+                        command=run_row.get("deliver_path"),
+                    )
+                    last_out["error"] = err_txt
+                    run_row["error"] = err_txt[:200]
                 break
         except Exception as exc:  # noqa: BLE001
             err_txt = str(exc)[:300]
             if _is_capacity_contention_error(err_txt):
                 last_out["ok"] = True
-                last_out["skipped_reason"] = "capacity_not_ready"
+                _mark_halt(
+                    "capacity_not_ready",
+                    decision_tree=decision_trace,
+                    command=str(nxt.get("command")),
+                )
                 last_out["error"] = err_txt
                 runs.append(
                     {
@@ -2251,11 +2415,16 @@ def run_next_fill_idle(
                         "ok": False,
                         "error": err_txt[:200],
                         "capacity_contention": True,
+                        "decision_tree": decision_trace,
                     }
                 )
             else:
                 last_out["ok"] = False
-                last_out["skipped_reason"] = "run_failed"
+                _mark_halt(
+                    "run_failed",
+                    decision_tree=decision_trace,
+                    command=str(nxt.get("command")),
+                )
                 last_out["error"] = err_txt
                 runs.append(
                     {
@@ -2264,6 +2433,7 @@ def run_next_fill_idle(
                         "stage": stage,
                         "ok": False,
                         "error": err_txt[:200],
+                        "decision_tree": decision_trace,
                     }
                 )
             break
