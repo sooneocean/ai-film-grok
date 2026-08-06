@@ -975,6 +975,13 @@ def cmd_register_clip(args: argparse.Namespace) -> int:
             raise FilmError(
                 "Approved clips require --identity-approved after canonical identity review"
             )
+        # P0 · face-identity-pixel: a failed post_audit must block clip approval
+        from production_gates import assert_face_identity_passed as _assert_face_id
+
+        try:
+            _assert_face_id(root, force=False, env_skip=False, proven_drift_only=True)
+        except Exception as exc:  # ProductionGateError → re-wrapped as FilmError
+            raise FilmError(f"face-identity post_audit failed: {exc}") from exc
         if not motion_approved:
             raise FilmError(
                 "Approved clips require --motion-approved after watching the complete clip"

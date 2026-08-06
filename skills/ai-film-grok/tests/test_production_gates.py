@@ -9,6 +9,7 @@ import tempfile
 import unittest
 from hashlib import sha256
 from pathlib import Path
+from typing import Any
 from unittest.mock import patch
 
 import pytest
@@ -23,7 +24,11 @@ from film_spec import RECOMMENDED_NAR_CHARS  # noqa: E402
 from performance_candidates import sign_receipt  # noqa: E402
 from production_gates import (  # noqa: E402
     ProductionGateError,
+    anti_boring_variety_report,
+    assert_anti_boring_variety,
+    assert_continuity_chain_passed,
     assert_dialogue_drama_production_evidence,
+    assert_face_identity_passed,
     assert_no_loop_risk,
     assert_pilot_user_approved,
     loop_risk_shots_from_spec,
@@ -425,6 +430,237 @@ class LoopRiskGateTests(unittest.TestCase):
                     },
                     env_skip=False,
                 )
+
+
+class AntiBoringGateTests(unittest.TestCase):
+    def _spec(self, shots: list[dict], **extra: Any) -> dict:
+        spec = {"scenes": [{"shots": shots}]}
+        spec.update(extra)
+        return spec
+
+    def test_main_beat_too_short_blocks_strict(self) -> None:
+        spec = self._spec(
+            [
+                {"id": "s1", "dramatic_function": "hook", "duration_sec": 6},
+                {"id": "s2", "dramatic_function": "act", "duration_sec": 3},
+            ],
+            anti_boring_strict=True,
+        )
+        with self.assertRaisesRegex(ProductionGateError, "ANTI_BORING_MAIN_BEAT_TOO_SHORT"):
+            assert_anti_boring_variety(spec=spec)
+
+    def test_size_field_conflict_blocks_strict(self) -> None:
+        spec = self._spec(
+            [{"id": "s1", "shot_size": "medium", "dsl": {"shot_size": "close_up"}}],
+            anti_boring_strict=True,
+        )
+        with self.assertRaisesRegex(ProductionGateError, "ANTI_BORING_SIZE_FIELD_CONFLICT"):
+            assert_anti_boring_variety(spec=spec)
+
+    def test_motion_adjacent_dup_blocks_strict(self) -> None:
+        spec = self._spec(
+            [
+                {"id": "s1", "dsl": {"motion": "slow push-in"}},
+                {"id": "s2", "dsl": {"motion": "slow push-in"}},
+            ],
+            anti_boring_strict=True,
+        )
+        with self.assertRaisesRegex(ProductionGateError, "ANTI_BORING_MOTION_ADJACENT_DUP"):
+            assert_anti_boring_variety(spec=spec)
+
+    def test_size_sequence_flat_blocks_strict(self) -> None:
+        spec = self._spec(
+            [
+                {"id": "s1", "shot_size": "medium"},
+                {"id": "s2", "shot_size": "medium"},
+                {"id": "s3", "shot_size": "medium"},
+            ],
+            anti_boring_strict=True,
+        )
+        with self.assertRaisesRegex(ProductionGateError, "ANTI_BORING_SIZE_SEQUENCE_FLAT"):
+            assert_anti_boring_variety(spec=spec)
+
+    def test_non_strict_reports_soft_not_block(self) -> None:
+        spec = self._spec(
+            [
+                {"id": "s1", "shot_size": "medium"},
+                {"id": "s2", "shot_size": "medium"},
+                {"id": "s3", "shot_size": "medium"},
+            ],
+            anti_boring_strict=False,
+        )
+        out = assert_anti_boring_variety(spec=spec)
+        self.assertTrue(out.get("ok"))
+        self.assertTrue(out.get("soft"))
+
+    def test_variety_ok_strict_passes(self) -> None:
+        spec = self._spec(
+            [
+                {
+                    "id": "s1",
+                    "dramatic_function": "hook",
+                    "duration_sec": 6,
+                    "shot_size": "wide",
+                    "dsl": {"motion": "push-in"},
+                },
+                {
+                    "id": "s2",
+                    "dramatic_function": "act",
+                    "duration_sec": 5,
+                    "shot_size": "medium",
+                    "dsl": {"motion": "orbit"},
+                },
+                {
+                    "id": "s3",
+                    "dramatic_function": "climax",
+                    "duration_sec": 5,
+                    "shot_size": "cu",
+                    "dsl": {"motion": "pull-back"},
+                },
+            ],
+            anti_boring_strict=True,
+        )
+        self.assertTrue(assert_anti_boring_variety(spec=spec).get("ok"))
+
+    def test_report_codes_present(self) -> None:
+        spec = self._spec(
+            [
+                {"id": "s1", "shot_size": "medium", "dsl": {"shot_size": "cu"}},
+                {"id": "s2", "dramatic_function": "act", "duration_sec": 3},
+                {"id": "s3", "dsl": {"motion": "hold"}},
+                {"id": "s4", "dsl": {"motion": "hold"}},
+            ]
+        )
+        report = anti_boring_variety_report(spec)
+        codes = set(report["codes"])
+        self.assertIn("ANTI_BORING_SIZE_FIELD_CONFLICT", codes)
+        self.assertIn("ANTI_BORING_MAIN_BEAT_TOO_SHORT", codes)
+        self.assertIn("ANTI_BORING_MOTION_ADJACENT_DUP", codes)
+
+
+class FaceIdentityGateTests(unittest.TestCase):
+    def _write_cast_root(self, tmp: str, *, verified: bool, n_fail: int, enrolled: dict) -> Path:
+        root = Path(tmp)
+        (root / "receipts").mkdir(parents=True, exist_ok=True)
+        (root / "style-bible.json").write_text(
+            json.dumps(
+                {
+                    "cast_masters": {
+                        "hero": "canonical/cast/hero.png",
+                        "villain": "canonical/cast/villain.png",
+                    }
+                }
+            ),
+            encoding="utf-8",
+        )
+        receipt = {
+            "schema_version": 1,
+            "kind": "face-identity",
+            "verified": verified,
+            "enrolled": enrolled,
+            "checks": [],
+            "audit": {"n_checks": 3, "n_fail": n_fail},
+        }
+        (root / "receipts" / "face-identity.json").write_text(
+            json.dumps(receipt), encoding="utf-8"
+        )
+        return root
+
+    def test_no_cast_masters_passes(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "film-spec.json").write_text("{}", encoding="utf-8")
+            self.assertTrue(assert_face_identity_passed(root).get("ok"))
+
+    def test_failed_audit_blocks(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._write_cast_root(tmp, verified=False, n_fail=2, enrolled={"hero": {}})
+            with self.assertRaisesRegex(ProductionGateError, "FACE_IDENTITY_DRIFT"):
+                assert_face_identity_passed(root)
+
+    def test_no_receipt_soft_only(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "style-bible.json").write_text(
+                json.dumps({"cast_masters": {"hero": "canonical/cast/hero.png"}}),
+                encoding="utf-8",
+            )
+            out = assert_face_identity_passed(root)
+            self.assertTrue(out.get("ok"))
+            self.assertTrue(out.get("soft"))
+
+    def test_enroll_gap_hard_under_strict(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._write_cast_root(tmp, verified=False, n_fail=0, enrolled={})
+            (root / "film-spec.json").write_text(
+                json.dumps({"face_identity_strict": True}), encoding="utf-8"
+            )
+            with self.assertRaisesRegex(ProductionGateError, "FACE_IDENTITY_ENROLL_GAP"):
+                assert_face_identity_passed(root)
+
+    def test_enroll_gap_soft_without_strict(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._write_cast_root(tmp, verified=False, n_fail=0, enrolled={})
+            out = assert_face_identity_passed(root)
+            self.assertTrue(out.get("ok"))
+            self.assertTrue(out.get("soft"))
+
+
+class ContinuityChainGateTests(unittest.TestCase):
+    def _root(self, *, strict: bool) -> Path:
+        import continuity_chain as cc
+
+        root = Path(tempfile.mkdtemp())
+        shots = [
+            {
+                "id": f"shot{i:02d}",
+                "dramatic_function": "action",
+                "nar": "测",
+                "duration_sec": 6,
+                "dsl": {
+                    "action": "steps",
+                    "motion": "steps forward",
+                    "start_pose": "a",
+                    "end_pose": "b",
+                    "chain_mode": "continue",
+                },
+            }
+            for i in range(1, 7)
+        ]
+        spec = {
+            "title": "chain-gate",
+            "long_form": True,
+            "transition_sec": 0.3,
+            "transition_default": "soft",
+            "continuity_chain_strict": strict,
+            "scenes": [{"shots": shots}],
+        }
+        (root / "film-spec.json").write_text(json.dumps(spec), encoding="utf-8")
+        cc.init_chain_doc(root, spec)
+        cc.upsert_join(
+            root,
+            from_id="shot05",
+            to_id="shot06",
+            mode="continue",
+            last_sha="same",
+            first_sha="same",
+            checklist={k: "pass" for k in (
+                "pose", "gaze", "hands_props", "travel", "axis",
+                "hair", "wardrobe", "weather", "lighting",
+            )},
+        )
+        return root
+
+    def test_dissolve_coverup_hard_under_strict(self) -> None:
+        root = self._root(strict=True)
+        with self.assertRaisesRegex(ProductionGateError, "CONTINUITY_COVERUP_DISSOLVE"):
+            assert_continuity_chain_passed(root)
+
+    def test_env_skip_escape(self) -> None:
+        root = self._root(strict=True)
+        with patch.dict(os.environ, {"AIFILM_SKIP_CONTINUITY_GATE": "1"}):
+            out = assert_continuity_chain_passed(root)
+        self.assertTrue(out.get("skipped"))
 
 
 if __name__ == "__main__":

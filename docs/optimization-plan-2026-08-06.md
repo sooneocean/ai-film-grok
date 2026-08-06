@@ -1,0 +1,198 @@
+# ai-film-grok 内容创作质量优化计划（专家团诊断 · 2026-08-06）
+
+> 主理人：司远（Soren）｜版本：基于 ai-film-grok `v2.39.95`  
+> 说明：本计划由创意制片人整合**叙事/视觉/视频/后期/音频**五域诊断而成。各域结论均锚定项目真实子系统与既有踩坑 lesson（references 共 165 篇、lessons 77 个），目标是把"门绿但翻车"的已知坑位固化为自动硬门，并把 lesson 级经验晋升为默认策略。
+
+---
+
+## 执行状态（2026-08-06 已落地）
+
+P0 五个自动硬门已全部实现并接入门禁/流水线，相关测试全绿（新增 56 用例，全量非 slow 套件 3153 passed）。详见 CHANGELOG `2.39.96`。
+
+| P0 | 门 | 落地文件 | 测试 |
+|----|----|---------|------|
+| 1 | 抗无聊硬门 | `gates/production_gates.py` `assert_anti_boring_variety` + `preflight` 接入 | `test_production_gates.py::AntiBoringGateTests` |
+| 2 | 每镜脸身份 post_audit 门 | `gates/production_gates.py` `assert_face_identity_passed` + `preflight` + `cli_media.register_clip` 注入 | `test_production_gates.py::FaceIdentityGateTests` |
+| 3 | 九项接戏程序化校验 | `assets/continuity_chain.py` 九项清单 + 字节复用 + **新增禁止掩盖检测**（byte-identical continue 缝叠长 dissolve / 定格倒放插镜）+ `gates/production_gates.py` `assert_continuity_chain_passed` | `test_continuity_chain.py`（含 coverup 用例） |
+| 4 | render_final 超时/假死防护 | `post/render_final.py` `_run_with_watchdog` + `--render-timeout`（默认 1800s，0 关闭）+ `final/errors.py` `RenderTimeoutError` | `test_render_watchdog.py` |
+| 5 | TTS 语言乒乓校验 | `audio/voice_cast_profiles.py` `detect_language_pingpong` + `audio/audio_plan.py` 接入（dry-run 输出 `tts_language_issues`） | `test_tts_language_pingpong.py` |
+
+> P1/P2（lesson→默认硬门晋升、运动量化门、5090 调度器、字幕/headroom 自动、BGM 抗疲劳、lipsync 自动晋级、visual_bible 自动、H3 Fill-Idle 自动、sung 生成、HF 转场全量、长片 SOP 固化）为后续深化与规模化阶段，未在本轮执行。
+
+---
+
+## 0. 现状成熟度概览
+
+| 维度     | 成熟度                                        | 一句话结论                                 |
+| ------ | ------------------------------------------ | ------------------------------------- |
+| 叙事/剧本  | 高（有 drama_graph + script-value-debrief 锁门） | 缺**自动抗无聊/弧线完整性**校验                    |
+| 视觉一致性  | 高（style_lock + face pixel hash）            | 缺**每镜自动 post_audit 门**与发色/首帧毒化默认硬锁    |
+| 视频/运镜  | 高（三级 fallback + continuity_chain）          | 缺**九项接戏程序化校验**与运动量化门                  |
+| 后期/交付  | 中高（editorial-craft + delivery gates）       | **final 超时/假死**与字幕/headroom 偶发问题未自动防护 |
+| 音频/本地化 | 高（5 配方 + 5 轨 + 多 TTS）                      | **TTS 语言乒乓**、sung 缺失、lipsync 晋级未全自动化  |
+
+**核心思路**：项目不缺能力，缺的是"把已验证的 lesson 变成默认门禁 + 程序化校验"。本计划 80% 的工作是**固化与自动化**，而非从零新增。
+
+---
+
+## 1. 叙事 / 剧本（笔澜视角）
+
+**现状强项**：`drama_graph` + `narrative_control` 推导、`script-value-debrief`（L0–L4 呈现价值锁门）、`dialogue-first` 中文主链、`edit_policy_heat` 尺度控制。
+
+**最影响成片质量的短板**
+
+1. **抗无聊未固化**：`shot-variety-anti-boring(P0)` 仍停留在 lesson——主戏≥4.5s、景别真变、motion 禁复制没有自动卡，导致"门绿但难看"。
+2. **narrative 收尾重绑弱**：`closeout-gates(P0)` 要求收尾 narrative 重绑，但实现松散、易漏。
+3. **成人弧线完整性无校验**：`adult-scale-max-sex-arc` 要求前戏→插入→射出全有，未自动检查 beat 齐备。
+4. **多 POV / 角色立场**未与分镜自动绑定（`character-stance`）。
+
+**优先级优化建议**
+
+| 优先级    | 目标                | 具体动作                                        | 落地模块/文件                                                                 | 预期收益       |
+| ------ | ----------------- | ------------------------------------------- | ----------------------------------------------------------------------- | ---------- |
+| **P0** | 抗无聊自动硬门           | 在 production gate 加：主戏时长、景别序列去重、motion 描述去重 | `scripts/gates/production_gates.py` + 晋升 `shot-variety-anti-boring` 为硬门 | 直接消除最大观感问题 |
+| P1     | narrative 收尾重绑自动化 | closeout 阶段强制 narrative 重绑检查并写 receipt      | `scripts/spine/advance.py` + `receipts/`                                | 收尾不丢叙事承诺   |
+| P1     | 成人弧线完整性校验         | beat 序列校验前戏/插入/射出齐备                         | `scripts/narrative/edit_policy_heat.py`                                 | 尺度拉满且结构完整  |
+| P2     | 多 POV 自动分镜标签      | character-stance 生成 shot 级 POV 标签供剪辑用       | `scripts/plan/*` + `scripts/assets/*`                                   | 剪辑可自动做立场切换 |
+
+> **Top-1 ROI**：抗无聊自动硬门——成本最低、观感提升最直观。
+
+---
+
+## 2. 视觉一致性 / 画风锁定（珀西视角）
+
+**现状强项**：`style_lock`（高动 MEDIUM LOCK cel）、`face_identity` 像素哈希 + `post_audit`、`keyframe-first` 状态照、`wardrobe_ladder`。
+
+**最影响成片质量的短板**
+
+1. **脸身份漂移**：`face-identity-pixel(P0)` 有哈希，但高动/换装后未强制每镜 `post_audit` 通过才 `register-clip`。
+2. **发色/首帧毒化/静帧压缩**仍是 lesson 级（`hair-color-lock`、`keyframe-first-frame-poison`、`keyframe-no-compress`），未进 `style_lock` 默认。
+3. **写实 vs 漫剧介质路由**稳定性未自动化（`photoreal-vs-manhua-stability`）。
+
+**优先级优化建议**
+
+| 优先级    | 目标                | 具体动作                                           | 落地模块/文件                                             | 预期收益      |
+| ------ | ----------------- | ---------------------------------------------- | --------------------------------------------------- | --------- |
+| **P0** | 每镜脸身份自动门          | `register-clip` 强制 face post_audit 不通过即 reject | `scripts/assets/face_identity.py` + post audit      | 一致性最大痛点根治 |
+| P1     | lesson→默认硬锁       | 发色/静帧压缩/首帧毒化晋升 `style_lock` 默认硬 NEG/校验         | `scripts/assets/style_lock.py` + `hard-defaults.md` | 减少人工守门    |
+| P1     | 介质自动路由            | 按 cast_state 稳定性评分选 I2V 路线（写实/漫剧）              | `scripts/media/*` 路由层                               | 降低出图漂移    |
+| P2     | visual_bible 自动生成 | 从状态照抽取 palette/光照签名生成 style-bible              | `scripts/assets/visual_bible.py`                    | 全片视觉语法自洽  |
+
+> **Top-1 ROI**：每镜脸身份自动门。
+
+---
+
+## 3. 视频生成 / 运镜 / 跨镜连续性（维欧视角）
+
+**现状强项**：三级 fallback（FRW LTX 2.3→FRW API→Grok Video 1.5）、`keyframe-first`、`continuity_chain` 逐字节末帧复用、`H3 max effect` 锁脸/R2V。
+
+**最影响成片质量的短板**
+
+1. **九项接戏仍靠人工 md**：`continuity_chain` 禁止 dissolve/定格/倒放/插镜掩盖，但无程序化校验，长片最易崩。
+2. **运动质量无量化门**：`action-fluency`/`meaningful-motion` 仍 lesson，register 仅靠队列粗判。
+3. **5090 资源争抢**：`comfy-multifilm-contention-oom(P0)` 多片抢卡 + OOM 风险。
+4. **FRW 403/502 退避**对长片不友好、canary 链路重。
+
+**优先级优化建议**
+
+| 优先级    | 目标                | 具体动作                                                                   | 落地模块/文件                             | 预期收益         |
+| ------ | ----------------- | ---------------------------------------------------------------------- | ----------------------------------- | ------------ |
+| **P0** | 九项接戏程序化校验         | 解析 receipts/continuity_chain，禁 dissolve/定格/倒放/插镜；末帧 hash 校验 continue 缝 | `scripts/media/` 或 `scripts/gates/` | 长片接戏最大崩点根治   |
+| P1     | 运动量化门             | 光流/像素差阈值嵌入 register 验收                                                 | `media-queue` `complete` 判定         | 动作流畅可量化      |
+| P1     | 5090 统一调度器        | free-first 空闲挑战 + 单 client 强制 + capacity 真窗口                           | `comfy-lan-control` / `media-queue` | 杜绝 OOM/抢卡    |
+| P2     | H3 Fill-Idle 自动派单 | R2V=能量位自动选取 + P2 空闲挑战自动派                                               | `weapon-lane-matrix`                | GPU 利用率与质量兼顾 |
+
+> **Top-1 ROI**：九项接戏程序化校验。
+
+---
+
+## 4. 后期剪辑 / 字幕 / 合成 / 交付（柯立视角）
+
+**现状强项**：`editorial-craft` / `edit-strategy-voice-coupled`、`字幕硬烧`、`render_final`、`delivery gates`。
+
+**最影响成片质量的短板**
+
+1. **final 超时/sidechain 假死**：`evirus-ch04-bulk-final-iron(P0)` 无自动重试/拆分，长片易半路死。
+2. **中文字幕偶发问题**：无空格或 PIL 渲染失败未自动检测修复。
+3. **headroom 裁头**靠人工；quality 缓存/export 链在 closeout 弱。
+4. **HF 转场受控策略**未全量铺开。
+
+**优先级优化建议**
+
+| 优先级    | 目标              | 具体动作                               | 落地模块/文件                                        | 预期收益     |
+| ------ | --------------- | ---------------------------------- | ---------------------------------------------- | -------- |
+| **P0** | final 交付可靠性防护   | render_final 加超时/假死自动防护（分片重试 + 心跳） | `scripts/post/render_final.py`                 | 交付最大风险消除 |
+| P1     | 字幕硬烧自动校验        | 像素含中文 + 无空格检测 + PIL fallback       | `scripts/post/compose.py`                      | 字幕零事故    |
+| P1     | headroom 自动构图保护 | 定器双锁/短 insert 自动插入防裁头              | `scripts/post/*`                               | 主戏不丢头    |
+| P2     | HF 转场默认开启       | 受控策略全量 + export read-back 全量       | `hf-transition-policy` + `scripts/post/export` | 剪辑语言统一   |
+
+
+
+> **Top-1 ROI**：render_final 超时/假死防护。
+
+---
+
+## 5. 音频 / 口型 / 本地化（艾达视角）
+
+**现状强项**：`audio-recipe` 5 配方自动路由、5 轨母带、`loudnorm -16±2` 单一真相、TTS 适配器族、`lipsync` 5 后端挑战、`scene-sound-standard(P0)`。
+
+**最影响成片质量的短板**
+
+1. **TTS 语言乒乓**：`ep2-voice-heat-final(P0)` 口白中文/角色日文需人工守，禁乒乓未自动。
+2. **sung 不自动生成**：`musical_hybrid` 降级（缺 HeartMuLa 适配器）。
+3. **BGM 抗疲劳**长片强度不够；纯乐器兜底未自动触发。
+4. **lipsync 后端晋级**未全自动化（5090 CUDA12.8 canary）。
+
+**优先级优化建议**
+
+| 优先级    | 目标                   | 具体动作                             | 落地模块/文件                            | 预期收益      |
+| ------ | -------------------- | -------------------------------- | ---------------------------------- | --------- |
+| **P0** | TTS 语言乒乓自动校验         | audio_plan 写语言标记 + final 检查禁中日乒乓 | `scripts/audio/audio_plan.py`      | 对白可信度最大痛点 |
+| P1     | BGM 抗疲劳增强            | 长片重复检测 + 纯乐器兜底自动触发               | `scripts/audio/bgm-generation.py`  | 长片不腻      |
+| P1     | lipsync 自动 canary 晋级 | Wav2Lip→LatentSync/MuseTalk 自动晋级 | `scripts/audio/lipsync_backend.py` | 口型质量阶梯提升  |
+| P2     | sung 自动生成            | HeartMuLa 适配器补 musical_hybrid    | `scripts/audio/*`                  | 音乐剧能力闭环   |
+
+> **Top-1 ROI**：TTS 语言乒乓自动校验。
+
+---
+
+## 6. 统一优先级路线图（执行顺序 & 依赖）
+
+### P0 — 快速胜（约 1–2 周，5 个自动硬门，消除"门绿但翻车"）
+
+1. 抗无聊硬门（`gates/production_gates.py`）
+2. 每镜脸身份 post_audit 门（`assets/face_identity.py`）
+3. 九项接戏程序化校验（`media/` 或 `gates/`）
+4. render_final 超时/假死防护（`post/render_final.py`）
+5. TTS 语言乒乓校验（`audio/audio_plan.py`）
+
+> 这 5 项互相独立、风险低、收益高，建议并行开工。
+
+### P1 — 深化（约 2–4 周，lesson→默认硬门 + 自动化）
+
+- 发色/首帧毒化/静帧压缩晋升 `style_lock` 默认
+- narrative 收尾重绑、成人弧线完整性校验
+- 运动量化门、5090 统一调度器
+- 字幕硬烧/headroom 自动、BGM 抗疲劳、lipsync 自动晋级
+
+### P2 — 规模化（约 1–2 月，能力闭环）
+
+- visual_bible 自动生成、介质自动路由
+- H3 Fill-Idle 自动派单
+- sung 自动生成（HeartMuLa）
+- HF 转场全量 + 长片 SOP 固化（`short-drama-sop-bridge`）
+
+---
+
+## 7. 验收与验证
+
+- **门禁真相**：`make check-all`（validate + ruff + doctor + `pytest -m 'not slow'`）全绿 + 相关 pytest 绿 + `plugin validate` 过。
+- **doctor 探针**：为 5 个 P0 新门禁各加一个 doctor 探针，确保"能力缺失即红"。
+- **人工 champion**：每完成一个 P0，挑一段历史易翻车片段重跑，盲测观感对比。
+- **迭代纪律**：每个 lesson→硬门晋升后，把对应 lesson 标记为已归档，更新 `references/INDEX.md`。
+
+---
+
+## 8. 一句话总结
+
+这个项目已经是工业级流水线，**质量提升的杠杆不在"加功能"，而在"把 77 个踩坑 lesson 固化成默认门禁 + 程序化校验"**。先打 5 个 P0 自动硬门，把"门绿但翻车"清零，再逐层深化。

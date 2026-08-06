@@ -53,6 +53,92 @@ def event_language(event: dict[str, Any]) -> str:
     return VOCAL_LANGUAGE.get(event_type, "zh")
 
 
+# Vocal event types that carry TTS language (mirrors audio_timeline.VOCAL_TYPES; kept
+# local to avoid an import cycle with audio_timeline).
+_TTS_VOCAL_TYPES = frozenset({"dialogue", "inner_voice", "media_voice", "narration"})
+
+
+def _event_lang_safe(event: dict[str, Any]) -> str:
+    """Resolve language, never raising — falls back to the raw explicit value."""
+    try:
+        return event_language(event)
+    except Exception:  # noqa: BLE001 - retired-ja / unsupported still yields a code
+        raw = (
+            event.get("language")
+            or event.get("spoken_lang")
+            or event.get("dialogue_spoken_lang")
+            or "?"
+        )
+        return str(raw).strip().lower() or "?"
+
+
+def _is_pingpong(seq: list[str]) -> bool:
+    """True for an A,B,A,B… oscillation over >=4 events (exactly two distinct langs)."""
+    if len(seq) < 4 or len(set(seq)) != 2:
+        return False
+    return all(seq[i] != seq[i + 1] for i in range(len(seq) - 1))
+
+
+def detect_language_pingpong(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """P0-5: flag unjustified TTS language ping-pong (references/lessons-2026-07-23-…).
+
+    Adjacent TTS language flips must be explained by a speaker-layer change. We flag:
+      * TTS_LANG_FLIP_NO_SPEAKER_CHANGE — consecutive vocal events with different
+        languages but the *same* speaker (no layer change to justify the flip).
+      * TTS_LANG_PINGPONG — a single speaker's language oscillates A,B,A,B… (>=4).
+
+    Japanese is retired (zh-only), so ``event_language`` raises on ``ja``; we still
+    capture the offending raw code via ``_event_lang_safe`` so the flip is reported.
+    """
+    issues: list[dict[str, Any]] = []
+    vocal = [
+        e
+        for e in (events or [])
+        if isinstance(e, dict) and str(e.get("type") or "").lower() in _TTS_VOCAL_TYPES
+    ]
+    seqs = [_event_lang_safe(e) for e in vocal]
+
+    # Consecutive same-speaker flips.
+    for i in range(1, len(vocal)):
+        la, lb = seqs[i - 1], seqs[i]
+        if la == lb:
+            continue
+        sa = str(vocal[i - 1].get("speaker") or vocal[i - 1].get("speaker_id") or "").strip().lower()
+        sb = str(vocal[i].get("speaker") or vocal[i].get("speaker_id") or "").strip().lower()
+        if sa and sa == sb:
+            issues.append(
+                {
+                    "code": "TTS_LANG_FLIP_NO_SPEAKER_CHANGE",
+                    "severity": "warning",
+                    "message": (
+                        f"same speaker '{sa}' flips TTS language {la}→{lb} "
+                        "without a speaker-layer change (references: 成块切换，speaker 可解释)"
+                    ),
+                    "speaker": sa,
+                }
+            )
+
+    # Per-speaker oscillation (A,B,A,B…).
+    by_speaker: dict[str, list[str]] = {}
+    for e, lang in zip(vocal, seqs, strict=False):
+        s = str(e.get("speaker") or e.get("speaker_id") or "").strip().lower() or "__none__"
+        by_speaker.setdefault(s, []).append(lang)
+    for s, seq in by_speaker.items():
+        if _is_pingpong(seq):
+            issues.append(
+                {
+                    "code": "TTS_LANG_PINGPONG",
+                    "severity": "warning",
+                    "message": (
+                        f"speaker '{s}' oscillates TTS language {seq[:6]} "
+                        "(ping-pong; must be block-level switching)"
+                    ),
+                    "speaker": s,
+                }
+            )
+    return issues
+
+
 def profile_hash(profile: dict[str, Any]) -> str:
     clean = {
         key: value for key, value in profile.items() if key not in {"profile_hash", "tts_stale"}

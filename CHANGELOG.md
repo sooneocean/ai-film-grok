@@ -1,5 +1,19 @@
 # Changelog
 
+## [2.40.7] - 2026-08-06
+
+### Added (content-quality P0 hard gates — close the "gate-green-but-fails" gap)
+Five auto hard gates from the expert-panel optimization plan, all fail-closed with `AIFILM_SKIP_*_GATE=1` emergency escapes and soft-by-default incremental rollout:
+
+- **Anti-boring gate** (`gates/production_gates.py::assert_anti_boring_variety`): main beats >=4.5s, real shot-size changes, no adjacent motion duplicate, no flat size sequence; wired into `preflight`. (lesson: shot-variety-anti-boring)
+- **Per-shot face-identity post_audit gate** (`assert_face_identity_passed`): rejects proven pixel drift; enrolled-gap / not-audited surfaced soft unless `face_identity_strict` or adult max heat. Injected into `cli_media.register_clip` (proven-drift-only block). (lesson: face-identity-pixel)
+- **Nine-item continuity programmatic check** (`assets/continuity_chain.py`): byte-identical first/last reuse + nine-item checklist, plus new **forbidden-coverup detection** — long dissolve (>=0.28s) on a byte-identical match-cut join, and freeze/reverse/insert motion tokens on a continue join. First-class `assert_continuity_chain_passed` gate added. (references/continuity_chain.md §1.④)
+- **render_final watchdog** (`post/render_final.py::_run_with_watchdog` + `--render-timeout` default 1800s, 0 disables): total wall-clock guard so a stalled pipeline raises a clean `RenderTimeoutError` instead of hanging (假死). Per-subprocess ffmpeg timeouts (AIFILM_FFMPEG_TIMEOUT) already cover individual calls.
+- **TTS language ping-pong check** (`audio/voice_cast_profiles.py::detect_language_pingpong`): flags same-speaker adjacent language flips and A,B,A,B oscillation not explained by a speaker-layer change; surfaced in `audio_plan` (`tts_language_issues` + recommendation).
+
+### Tests
+- Added 56 cases across `test_production_gates.py`, `test_continuity_chain.py`, `test_render_watchdog.py`, `test_tts_language_pingpong.py`.
+
 ## [2.40.6] - 2026-08-06
 
 ### Added (quality P1 · narrative rebind + hair + adult arc closeout)

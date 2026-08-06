@@ -14,6 +14,9 @@ from pathlib import Path
 from typing import Any
 
 from production_gates import (
+    ProductionGateError,
+    anti_boring_variety_report,
+    assert_face_identity_passed,
     load_pilot_approval,
     loop_risk_shots_from_spec,
     pilot_is_user_approved,
@@ -790,6 +793,92 @@ def run_preflight(root: Path) -> dict[str, Any]:
                 hard.append(mm_issue)
             else:
                 soft.append(mm_issue)
+
+        # --- Anti-boring variety (shot-variety-anti-boring P0) ---
+        # Hard when anti_boring_strict; otherwise soft advisory so authors see variety debt.
+        try:
+            abr = anti_boring_variety_report(spec)
+            ab_codes = list(abr.get("codes") or [])
+            if ab_codes:
+                ab_strict = spec.get("anti_boring_strict") is True
+                ab_issue = _issue(
+                    "hard" if ab_strict else "soft",
+                    "anti_boring_variety",
+                    f"anti-boring variety {'hard' if ab_strict else 'soft'}: {ab_codes} "
+                    f"— {(abr.get('issues') or [{}])[0].get('message', '')[:120]}",
+                    fix=(
+                        "每镜一运动语言(禁相邻同 dsl.motion)；景别每 ≤2 镜一变(禁连续≥3镜同 size)；"
+                        "主戏镜 duration_sec ≥4.5s；shot_size 三处同值。见 "
+                        "lessons-2026-07-29-shot-variety-anti-boring.md"
+                    ),
+                )
+                if ab_strict:
+                    hard.append(ab_issue)
+                else:
+                    soft.append(ab_issue)
+        except Exception as exc:
+            soft.append(
+                _issue(
+                    "soft",
+                    "anti_boring_probe_error",
+                    f"anti-boring probe failed: {exc}"[:200],
+                    fix="check production_gates.anti_boring_variety_report",
+                )
+            )
+
+        # --- Face-identity post_audit (face-identity-pixel P0) ---
+        # Proven drift (post_audit n_fail>0) is always hard; gaps hard under strict/adult max.
+        try:
+            fi_report = assert_face_identity_passed(root, force=False, env_skip=False)
+            if fi_report.get("skipped") is True:
+                pass
+            elif not fi_report.get("ok"):
+                hard.append(
+                    _issue(
+                        "hard",
+                        "face_identity_gate",
+                        f"face-identity gate: {fi_report.get('codes')} — "
+                        f"{(fi_report.get('issues') or [{}])[0].get('message','')[:120]}",
+                        fix=(
+                            "aifilm face-identity enroll-bible && aifilm face-identity audit --root "
+                            f'"{root}"（漂移 keyframe 重拍/重编辑后再批准）'
+                        ),
+                    )
+                )
+            elif fi_report.get("soft"):
+                soft.append(
+                    _issue(
+                        "soft",
+                        "face_identity_gate",
+                        f"face-identity advisory: {fi_report.get('codes')} — "
+                        f"{(fi_report.get('issues') or [{}])[0].get('message','')[:120]}",
+                        fix=(
+                            "aifilm face-identity enroll-bible && aifilm face-identity audit --root "
+                            f'"{root}"'
+                        ),
+                    )
+                )
+        except ProductionGateError as exc:
+            hard.append(
+                _issue(
+                    "hard",
+                    "face_identity_gate",
+                    f"face-identity gate: {str(exc)[:200]}",
+                    fix=(
+                        "aifilm face-identity enroll-bible && aifilm face-identity audit --root "
+                        f'"{root}"（漂移 keyframe 重拍/重编辑后再批准）'
+                    ),
+                )
+            )
+        except Exception as exc:
+            soft.append(
+                _issue(
+                    "soft",
+                    "face_identity_probe_error",
+                    f"face-identity probe failed: {exc}"[:200],
+                    fix="check production_gates.assert_face_identity_passed",
+                )
+            )
 
         # Speaker ↔ picture (on_camera): soft by default; hard on max dialogue_drama
         try:

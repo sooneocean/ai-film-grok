@@ -32,6 +32,7 @@ def build_audio_plan(
     timeline_error: str | None = None
     voice_cast: dict[str, Any] | None = None
     tts_manifest: dict[str, Any] | None = None
+    tts_language_issues: list[dict[str, Any]] = []
     try:
         from audio_timeline import build_mix_execution_plan, caption_bindings, validate_timeline
         from audio_timeline import compile_timeline as compile_audio_timeline
@@ -43,9 +44,18 @@ def build_audio_plan(
             path = persist_timeline(root, timeline)
             timeline["path"] = str(path)
         timeline["caption_bindings"] = caption_bindings(timeline)
+        from voice_cast_profiles import detect_language_pingpong
+
+        tts_language_issues = detect_language_pingpong(timeline.get("events") or [])
         if write_timeline:
             import json
 
+            issues_path = root / "audio" / "tts-language-issues.json"
+            issues_path.parent.mkdir(parents=True, exist_ok=True)
+            issues_path.write_text(
+                json.dumps(tts_language_issues, ensure_ascii=False, indent=2) + "\n",
+                encoding="utf-8",
+            )
             bindings_path = root / "audio" / "caption-bindings.json"
             bindings_path.write_text(
                 json.dumps(timeline["caption_bindings"], ensure_ascii=False, indent=2) + "\n",
@@ -171,6 +181,12 @@ def build_audio_plan(
         recommendations.append(
             "lipsync targets set but no locked backend — lipsync-canary after backend-lock"
         )
+    if tts_language_issues:
+        codes = sorted({i.get("code") for i in tts_language_issues})
+        recommendations.append(
+            "TTS 语言乒乓: " + "; ".join(codes)
+            + " — 相邻语言跳变须由 speaker 层变化解释（成块切换，禁止 ZH→JA→ZH→JA）"
+        )
 
     # Scene-adaptive recipes (from write-spec) or dry-run resolve
     routing = spec.get("_audio_routing") if isinstance(spec.get("_audio_routing"), dict) else None
@@ -254,6 +270,7 @@ def build_audio_plan(
         },
         "voice_cast": voice_cast,
         "tts_manifest": tts_manifest,
+        "tts_language_issues": tts_language_issues,
         "lipsync": {
             "env_backend": lipsync_info.get("env_backend"),
             "ready": lipsync_info.get("ready") or [],

@@ -11,6 +11,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
 from continuity_chain import (  # noqa: E402
     CODE_BYTE_MISMATCH,
+    CODE_COVERUP_DISSOLVE,
+    CODE_COVERUP_MOTION,
     CODE_MISSING_CHAIN_DOC,
     check_continuity_chain,
     init_chain_doc,
@@ -111,3 +113,68 @@ def test_byte_identical_ok():
         report = check_continuity_chain(root, _spec(6))
         assert CODE_BYTE_MISMATCH not in report["codes"]
         assert report["ok"] is True
+
+
+def _root_with_identical_join(n: int = 6) -> tuple:
+    """Return (root, spec) with continuity_chain.md + one byte-identical continue join."""
+    import tempfile
+
+    root = Path(tempfile.mkdtemp())
+    spec = _spec(n)
+    init_chain_doc(root, spec)
+    upsert_join(
+        root,
+        from_id=f"shot{n - 1:02d}",
+        to_id=f"shot{n:02d}",
+        mode="continue",
+        last_sha="same",
+        first_sha="same",
+        checklist={k: "pass" for k in (
+            "pose", "gaze", "hands_props", "travel", "axis",
+            "hair", "wardrobe", "weather", "lighting",
+        )},
+    )
+    return root, spec
+
+
+def test_coverup_dissolve_soft_by_default():
+    root, spec = _root_with_identical_join()
+    spec["transition_sec"] = 0.3
+    spec["transition_default"] = "soft"
+    report = check_continuity_chain(root, spec, strict=False)
+    assert CODE_COVERUP_DISSOLVE in report["codes"]
+    iss = next(i for i in report["issues"] if i["code"] == CODE_COVERUP_DISSOLVE)
+    assert iss["severity"] == "warning"
+    # soft advisory must not fail the report by itself
+    assert report["ok"] is True
+
+
+def test_coverup_dissolve_hard_under_strict():
+    root, spec = _root_with_identical_join()
+    spec["transition_sec"] = 0.3
+    spec["transition_default"] = "soft"
+    report = check_continuity_chain(root, spec, strict=True)
+    iss = next(i for i in report["issues"] if i["code"] == CODE_COVERUP_DISSOLVE)
+    assert iss["severity"] == "error"
+    assert report["ok"] is False
+
+
+def test_no_coverup_on_hard_match_cut():
+    root, spec = _root_with_identical_join()
+    spec["transition_sec"] = 0.3
+    spec["transition_default"] = "hard"
+    report = check_continuity_chain(root, spec, strict=True)
+    assert CODE_COVERUP_DISSOLVE not in report["codes"]
+    assert report["ok"] is True
+
+
+def test_coverup_motion_freeze_advisory():
+    root, spec = _root_with_identical_join()
+    # inject a forbidden motion token on the continue join's `to` shot
+    last = spec["scenes"][0]["shots"][-1]
+    last["dsl"] = dict(last.get("dsl", {}))
+    last["dsl"]["motion"] = "定格 hold end_pose to mask jump"
+    report = check_continuity_chain(root, spec, strict=True)
+    assert CODE_COVERUP_MOTION in report["codes"]
+    iss = next(i for i in report["issues"] if i["code"] == CODE_COVERUP_MOTION)
+    assert iss["severity"] == "warning"

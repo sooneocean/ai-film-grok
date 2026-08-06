@@ -935,3 +935,458 @@ def assert_no_loop_risk(
             "Emergency only: --allow-loop-risk or AIFILM_SKIP_LOOP_RISK_GATE=1"
         )
     return risk
+
+
+# --- Anti-boring variety hard gate (P0 · shot-variety-anti-boring) ---
+# Sedimented from references/lessons-2026-07-29-shot-variety-anti-boring.md:
+#   A1  forbid adjacent shots sharing the same dsl.motion (one motion language / shot)
+#   B1  shot_size / dsl.shot_size / dsl.camera.shot_size must agree (else rank is ambiguous)
+#   D1  main-beat plates must stay >= 4.5s (don't crush sustained beats into a PPT)
+#   景别序列去重: >=3 consecutive identical size rank reads as a slide, not a cut
+_ANTI_BORING_MAIN_BEAT_MIN_SEC = 4.5
+_ANTI_BORING_MAX_SAME_SIZE_RUN = 2  # run length > this => flat (>=3 same in a row)
+_ANTI_BORING_MAIN_BEAT_FUNCTIONS = frozenset(
+    {
+        "hook_strong",
+        "main",
+        "turn",
+        "action",
+        "setpiece",
+        "act",
+        "climax",
+        "union",
+        "rhythm",
+        "foreplay",
+        "meat",
+        "reveal",
+        "payoff",
+        "confrontation",
+        "resolution",
+    }
+)
+
+_SHOT_SIZE_RANK = {
+    "ews": 0,
+    "extreme_wide": 0,
+    "ws": 1,
+    "wide": 1,
+    "long": 1,
+    "mws": 2,
+    "medium_wide": 2,
+    "ms": 3,
+    "medium": 3,
+    "mcu": 4,
+    "medium_close_up": 4,
+    "cu": 5,
+    "close_up": 5,
+    "ecu": 6,
+    "extreme_close_up": 6,
+}
+
+
+def _shot_size_fields(shot: dict[str, Any]) -> list[tuple[str, str]]:
+    """Return (where, value) for every present size field on a shot."""
+    dsl = shot.get("dsl") if isinstance(shot.get("dsl"), dict) else {}
+    cam = dsl.get("camera") if isinstance(dsl.get("camera"), dict) else {}
+    fields: list[tuple[str, str]] = []
+    if shot.get("shot_size"):
+        fields.append(("shot_size", str(shot["shot_size"]).strip().lower()))
+    if dsl.get("shot_size"):
+        fields.append(("dsl.shot_size", str(dsl["shot_size"]).strip().lower()))
+    if cam.get("shot_size"):
+        fields.append(("dsl.camera.shot_size", str(cam["shot_size"]).strip().lower()))
+    return fields
+
+
+def _shot_size_rank(shot: dict[str, Any]) -> int | None:
+    fields = _shot_size_fields(shot)
+    if not fields:
+        return None
+    for _where, value in fields:
+        key = value.replace("-", "_").replace(" ", "_")
+        if key in _SHOT_SIZE_RANK:
+            return _SHOT_SIZE_RANK[key]
+    return None
+
+
+def _shot_motion(shot: dict[str, Any]) -> str:
+    dsl = shot.get("dsl") if isinstance(shot.get("dsl"), dict) else {}
+    return str(dsl.get("motion") or shot.get("motion") or "").strip().lower()
+
+
+def anti_boring_variety_report(spec: dict[str, Any]) -> dict[str, Any]:
+    """Detect the four anti-boring failure modes.
+
+    Returns {"ok", "checked", "codes", "issues"}. Does not raise; callers decide
+    whether to block (assert_anti_boring_variety flips to hard under anti_boring_strict).
+    """
+    issues: list[dict[str, Any]] = []
+    if not isinstance(spec, dict):
+        return {"ok": True, "checked": False, "codes": [], "issues": []}
+    shots = _flatten_shots(spec)
+    if not shots:
+        return {"ok": True, "checked": False, "codes": [], "issues": []}
+
+    # B1: size fields declared in multiple places must agree
+    for sh in shots:
+        sid = str(sh.get("id") or "?")
+        fields = _shot_size_fields(sh)
+        if len(fields) >= 2 and len({v for _w, v in fields}) > 1:
+            issues.append(
+                {
+                    "code": "ANTI_BORING_SIZE_FIELD_CONFLICT",
+                    "shot_id": sid,
+                    "fields": fields,
+                    "message": (
+                        f"{sid}: shot_size declared in multiple places that disagree: {fields}"
+                    ),
+                }
+            )
+
+    # D1: main-beat duration floor (don't crush sustained beats into a PPT)
+    for sh in shots:
+        sid = str(sh.get("id") or "?")
+        fn = str(
+            sh.get("dramatic_function") or sh.get("beat") or sh.get("function") or ""
+        ).strip().lower()
+        if fn not in _ANTI_BORING_MAIN_BEAT_FUNCTIONS:
+            continue
+        try:
+            dur = float(sh.get("duration_sec") or DEFAULT_DURATION_SEC)
+        except (TypeError, ValueError):
+            dur = float(DEFAULT_DURATION_SEC)
+        if dur + 1e-9 < _ANTI_BORING_MAIN_BEAT_MIN_SEC:
+            issues.append(
+                {
+                    "code": "ANTI_BORING_MAIN_BEAT_TOO_SHORT",
+                    "shot_id": sid,
+                    "duration_sec": dur,
+                    "min_sec": _ANTI_BORING_MAIN_BEAT_MIN_SEC,
+                    "message": (
+                        f"{sid}: main-beat plate {dur}s < min "
+                        f"{_ANTI_BORING_MAIN_BEAT_MIN_SEC}s (don't crush main beats to PPT)"
+                    ),
+                }
+            )
+
+    # A1: adjacent shots must not share the same motion language
+    prev_motion = None
+    prev_id = None
+    for sh in shots:
+        sid = str(sh.get("id") or "?")
+        motion = _shot_motion(sh)
+        if motion and motion == prev_motion:
+            issues.append(
+                {
+                    "code": "ANTI_BORING_MOTION_ADJACENT_DUP",
+                    "shot_id": sid,
+                    "prev_shot_id": prev_id,
+                    "motion": motion,
+                    "message": (
+                        f"{sid}: dsl.motion {motion!r} duplicates adjacent {prev_id} "
+                        "— one motion language per shot"
+                    ),
+                }
+            )
+        prev_motion = motion
+        prev_id = sid
+
+    # 景别序列去重: >=3 consecutive identical size rank reads as a slide
+    run = 0
+    run_rank: int | None = None
+    run_ids: list[str] = []
+    for sh in shots:
+        sid = str(sh.get("id") or "?")
+        rank = _shot_size_rank(sh)
+        if rank is None:
+            run, run_rank, run_ids = 0, None, []
+            continue
+        if rank == run_rank:
+            run += 1
+            run_ids.append(sid)
+        else:
+            run, run_rank, run_ids = 1, rank, [sid]
+        if run > _ANTI_BORING_MAX_SAME_SIZE_RUN and len(run_ids) >= 3:
+            issues.append(
+                {
+                    "code": "ANTI_BORING_SIZE_SEQUENCE_FLAT",
+                    "shot_ids": list(run_ids),
+                    "rank": rank,
+                    "message": (
+                        f"size stack flat: {len(run_ids)} consecutive shots at size rank "
+                        f"{rank} ({run_ids}) — vary camera size every <=2 shots"
+                    ),
+                }
+            )
+            run, run_rank, run_ids = 0, None, []  # report the run once
+
+    return {
+        "ok": len(issues) == 0,
+        "checked": True,
+        "codes": sorted({i["code"] for i in issues}),
+        "issues": issues,
+    }
+
+
+def assert_anti_boring_variety(
+    root: Path | None = None,
+    *,
+    spec: dict[str, Any] | None = None,
+    force: bool = False,
+    env_skip: bool = True,
+) -> dict[str, Any]:
+    """P0 anti-boring hard gate (lessons-2026-07-29-shot-variety-anti-boring).
+
+    HARD when film-spec ``anti_boring_strict`` is True. Otherwise it only surfaces the
+    variety debt as a soft advisory (so authors can see it before opting in), matching
+    the project's incremental ``xxx_strict`` rollout pattern.
+
+    Emergency escapes: ``force=True`` or ``AIFILM_SKIP_ANTI_BORING_GATE=1``.
+    """
+    if force:
+        return {"skipped": True, "reason": "force"}
+    if env_skip and os.environ.get("AIFILM_SKIP_ANTI_BORING_GATE", "").strip() in {
+        "1",
+        "true",
+        "yes",
+    }:
+        return {"skipped": True, "reason": "env"}
+    data = spec
+    if data is None and root is not None:
+        path = Path(root).expanduser().resolve() / "film-spec.json"
+        data = read_json(path) or {}
+    if not isinstance(data, dict) or not data:
+        return {"ok": True, "checked": False, "reason": "no_spec"}
+
+    strict = bool(data.get("anti_boring_strict") is True)
+    report = anti_boring_variety_report(data)
+    if not report["codes"]:
+        return {"ok": True, "checked": report.get("checked", False), "codes": []}
+    if not strict:
+        return {
+            "ok": True,
+            "checked": True,
+            "soft": True,
+            "codes": report["codes"],
+            "issues": report["issues"],
+        }
+    message = "; ".join(f"[{i['code']}] {i['message']}" for i in report["issues"][:6])
+    raise ProductionGateError(
+        f"anti-boring gate (strict): {message} "
+        "Fix variety debt: one motion language per shot (no adjacent dsl.motion dup); "
+        "vary camera size every <=2 shots; keep main-beat plates >= 4.5s; make shot_size "
+        "fields agree. "
+        "Emergency: --skip-anti-boring or AIFILM_SKIP_ANTI_BORING_GATE=1"
+    )
+
+
+# --- Face-identity post_audit gate (P0 · face-identity-pixel) ---
+# A post_audit that ran and found keyframe pixel drift means an approved clip would
+# carry a face-identity break; register-clip / final must reject until re-audited.
+_FACE_IDENTITY_RECEIPT = "face-identity.json"
+
+
+def _face_identity_report(root: Path) -> dict[str, Any]:
+    """Return {ok, checked, codes, issues, ...} for face-identity post_audit status."""
+    root = Path(root).expanduser().resolve()
+    bible_path = root / "style-bible.json"
+    cast_masters: dict[str, Any] = {}
+    if bible_path.is_file():
+        try:
+            bible = json.loads(bible_path.read_text(encoding="utf-8"))
+            cm = bible.get("cast_masters")
+            if isinstance(cm, dict):
+                cast_masters = cm
+        except Exception:  # noqa: BLE001
+            pass
+    if not cast_masters:
+        return {"ok": True, "checked": False, "codes": [], "issues": []}
+
+    receipt_path = root / "receipts" / _FACE_IDENTITY_RECEIPT
+    if not receipt_path.is_file():
+        return {
+            "ok": True,
+            "checked": True,
+            "codes": ["FACE_IDENTITY_NOT_AUDITED"],
+            "issues": [
+                {
+                    "code": "FACE_IDENTITY_NOT_AUDITED",
+                    "message": (
+                        "cast_masters present but no receipts/face-identity.json — "
+                        "run: aifilm face-identity enroll-bible && aifilm face-identity audit"
+                    ),
+                }
+            ],
+            "absent": True,
+        }
+
+    try:
+        from face_identity import load_receipt
+    except ImportError:  # pragma: no cover - flat layout fallback
+        from assets.face_identity import load_receipt  # type: ignore
+
+    receipt = load_receipt(root)
+    enrolled = receipt.get("enrolled") if isinstance(receipt.get("enrolled"), dict) else {}
+    audit = receipt.get("audit") if isinstance(receipt.get("audit"), dict) else {}
+    verified = bool(receipt.get("verified"))
+    n_fail = int(audit.get("n_fail") or 0)
+    issues: list[dict[str, Any]] = []
+    if verified is False and n_fail > 0:
+        issues.append(
+            {
+                "code": "FACE_IDENTITY_DRIFT",
+                "message": (
+                    f"face-identity post_audit failed on {n_fail} keyframe(s) — "
+                    "reject clip register/final until re-audited"
+                ),
+            }
+        )
+    missing = [c for c in cast_masters if c not in enrolled and c != "hero"]
+    if missing:
+        issues.append(
+            {
+                "code": "FACE_IDENTITY_ENROLL_GAP",
+                "message": f"cast_masters not enrolled: {', '.join(missing)}",
+            }
+        )
+    return {
+        "ok": len(issues) == 0,
+        "checked": True,
+        "codes": sorted({i["code"] for i in issues}),
+        "issues": issues,
+        "verified": verified,
+        "n_fail": n_fail,
+    }
+
+
+def assert_face_identity_passed(
+    root: Path,
+    *,
+    force: bool = False,
+    env_skip: bool = True,
+    proven_drift_only: bool = False,
+) -> dict[str, Any]:
+    """P0 face-identity post_audit gate (lessons face-identity-pixel).
+
+    Fail-closed on proven drift: a post_audit that ran and found n_fail>0 means the
+    approved clip would carry a face break, so it must be rejected. Enroll/audit gaps
+    are hard only when the film opts into ``face_identity_strict`` (or adult max heat);
+    otherwise they surface as soft advisory — matching the project's incremental rollout.
+
+    ``proven_drift_only=True`` (used by register-clip) blocks exclusively on a failed
+    post_audit, so normal approval flows are never surprised by a soft advisory.
+
+    Emergency escapes: ``force=True`` or ``AIFILM_SKIP_FACE_IDENTITY_GATE=1``.
+    """
+    if force:
+        return {"skipped": True, "reason": "force"}
+    if env_skip and os.environ.get("AIFILM_SKIP_FACE_IDENTITY_GATE", "").strip() in {
+        "1",
+        "true",
+        "yes",
+    }:
+        return {"skipped": True, "reason": "env"}
+    root = Path(root).expanduser().resolve()
+    spec = read_json(root / "film-spec.json") or {}
+    report = _face_identity_report(root)
+    if not report.get("codes"):
+        return {"ok": True, "checked": report.get("checked", False), "codes": []}
+    strict = bool(spec.get("face_identity_strict") is True) or (
+        str(spec.get("heat_scale") or "").lower() in {"max", "hot", "extreme"}
+    )
+    proven_drift = "FACE_IDENTITY_DRIFT" in report["codes"]
+    if proven_drift_only:
+        if not proven_drift:
+            return {
+                "ok": True,
+                "checked": True,
+                "soft": True,
+                "codes": report["codes"],
+                "issues": report["issues"],
+            }
+        message = "; ".join(
+            f"[{i['code']}] {i['message']}"
+            for i in report["issues"]
+            if i["code"] == "FACE_IDENTITY_DRIFT"
+        )
+        raise ProductionGateError(
+            f"face-identity gate (proven drift): {message} "
+            "Re-run aifilm face-identity enroll-bible && aifilm face-identity audit --root … "
+            "(re-shoot/re-edit drifting stills before approving). "
+            "Emergency: --skip-face-identity or AIFILM_SKIP_FACE_IDENTITY_GATE=1"
+        )
+    if not (proven_drift or strict):
+        return {
+            "ok": True,
+            "checked": True,
+            "soft": True,
+            "codes": report["codes"],
+            "issues": report["issues"],
+        }
+    message = "; ".join(f"[{i['code']}] {i['message']}" for i in report["issues"][:6])
+    raise ProductionGateError(
+        f"face-identity gate: {message} "
+        "Re-run aifilm face-identity enroll-bible && aifilm face-identity audit --root … "
+        "(re-shoot/re-edit drifting stills before approving). "
+        "Emergency: --skip-face-identity or AIFILM_SKIP_FACE_IDENTITY_GATE=1"
+    )
+
+
+# --- Continuity-chain gate (P0 · nine-item 接戏程序化校验) ---
+# Long-form films must keep a continuity_chain.md, byte-reuse the approved last frame
+# for continue joins, pass the nine-item checklist, and must NOT mask a break with a
+# long dissolve / freeze / reverse / unrelated insert. Fail-closed on hard issues;
+# soft advisory otherwise. See references/continuity_chain.md.
+def assert_continuity_chain_passed(
+    root: Path,
+    *,
+    force: bool = False,
+    env_skip: bool = True,
+) -> dict[str, Any]:
+    """P0 continuity-chain gate (lessons continuity_chain / P0-3).
+
+    Hard-fails on: long-form missing continuity_chain.md, continue-join byte mismatch,
+    nine-item checklist FAIL (under strict), or dissolve coverup on a byte-identical
+    match-cut join (under strict). Soft advisory for incomplete checklists / warnings.
+
+    Emergency escapes: ``force=True`` or ``AIFILM_SKIP_CONTINUITY_GATE=1``.
+    """
+    if force:
+        return {"skipped": True, "reason": "force"}
+    if env_skip and os.environ.get("AIFILM_SKIP_CONTINUITY_GATE", "").strip() in {
+        "1",
+        "true",
+        "yes",
+    }:
+        return {"skipped": True, "reason": "env"}
+    root = Path(root).expanduser().resolve()
+    spec = read_json(root / "film-spec.json") or {}
+    try:
+        from continuity_chain import check_continuity_chain
+    except ImportError:  # pragma: no cover - flat layout fallback
+        from assets.continuity_chain import check_continuity_chain  # type: ignore
+    strict = bool(spec.get("continuity_chain_strict") is True)
+    report = check_continuity_chain(root, spec, strict=strict, require_doc_if_long=True)
+    if report.get("ok"):
+        return {
+            "ok": True,
+            "checked": True,
+            "strict": strict,
+            "codes": report.get("codes", []),
+        }
+    hard = [i for i in (report.get("hard") or []) if i.get("severity") == "error"]
+    if hard:
+        message = "; ".join(f"[{i['code']}] {i['message']}" for i in hard[:6])
+        raise ProductionGateError(
+            f"continuity-chain gate: {message} "
+            "Fix: aifilm continuity-chain init + nine-item pass; extract-frame --promote-keyframe "
+            "for continue joins; hard match-cut (no long dissolve). "
+            "Emergency: --skip-continuity or AIFILM_SKIP_CONTINUITY_GATE=1"
+        )
+    return {
+        "ok": True,
+        "checked": True,
+        "soft": True,
+        "codes": report.get("codes", []),
+        "issues": report.get("soft"),
+    }

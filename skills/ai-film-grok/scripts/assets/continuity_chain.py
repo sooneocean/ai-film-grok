@@ -25,6 +25,115 @@ CHECKLIST_KEYS = (
 CODE_MISSING_CHAIN_DOC = "CONTINUITY_CHAIN_DOC_MISSING"
 CODE_BYTE_MISMATCH = "CONTINUITY_CHAIN_BYTE_MISMATCH"
 CODE_CHECKLIST_INCOMPLETE = "CONTINUITY_CHAIN_CHECKLIST_INCOMPLETE"
+# P0-3: forbidden coverup detection (references/continuity_chain.md §1.④)
+# A byte-identical continue join is already a match-cut; a long dissolve / freeze /
+# reverse / unrelated insert used to "smooth" it masks a break and is banned.
+CODE_COVERUP_DISSOLVE = "CONTINUITY_COVERUP_DISSOLVE"
+CODE_COVERUP_MOTION = "CONTINUITY_COVERUP_MOTION"
+
+# Dissolve-style intents that must not sit on a byte-identical match-cut join.
+_SOFT_DISSOLVE_INTENTS = frozenset(
+    {"soft", "xfade", "dissolve", "smooth", "fade", "blur", "smoothleft"}
+)
+# Motion tokens that signal a prohibited masking technique on a continue join.
+_COVERUP_MOTION_TOKENS = (
+    "定格",
+    "冻帧",
+    "freeze",
+    "倒放",
+    "reverse",
+    "插镜",
+    "无关空镜",
+    "unrelated insert",
+)
+_LONG_DISSOLVE_SEC = 0.28  # references/continuity_chain.md §1.④ "0.28+ dissolve" ban
+
+
+def _coverup_issues(
+    spec: dict[str, Any],
+    joins_by_pair: dict[str, dict[str, Any]],
+    shots_by_id: dict[str, dict[str, Any]],
+    *,
+    strict: bool = False,
+) -> list[dict[str, Any]]:
+    """Detect forbidden coverups over continue / byte-identical joins."""
+    issues: list[dict[str, Any]] = []
+    ordered = ordered_shot_ids(spec)
+    pos = {sid: i for i, sid in enumerate(ordered)}
+    n_shots = len(ordered)
+
+    # Resolve the per-join transition intent the same way render_final does.
+    story_intents = spec.get("transition_intents")
+    default_intent = str(spec.get("transition_default") or "soft")
+    try:
+        from narrative.edit_policy import normalize_transition_sec
+
+        transition_sec = normalize_transition_sec(spec.get("transition_sec"))
+    except Exception:  # noqa: BLE001
+        try:
+            transition_sec = float(spec.get("transition_sec", _LONG_DISSOLVE_SEC))
+        except (TypeError, ValueError):
+            transition_sec = _LONG_DISSOLVE_SEC
+    long_dissolve = transition_sec >= _LONG_DISSOLVE_SEC
+    full_intents: list[str] | None = None
+    if n_shots >= 1:
+        try:
+            from narrative.edit_policy import expand_story_join_intents
+
+            full_intents = expand_story_join_intents(
+                n_shots,
+                story_intents=list(story_intents) if isinstance(story_intents, list) else None,
+                default_intent=default_intent if transition_sec > 0 else "hard",
+                edge_intent=default_intent if transition_sec > 0 else "hard",
+            )
+        except Exception:  # noqa: BLE001
+            full_intents = None
+
+    for pair, j in joins_by_pair.items():
+        mode = str(j.get("mode") or "continue").lower()
+        if mode in {"cut", "hard"}:
+            continue
+        if j.get("byte_identical") is True and long_dissolve and full_intents is not None:
+            frm = j.get("from")
+            idx = pos.get(frm) if isinstance(frm, str) else None
+            if isinstance(idx, int) and 0 <= idx < n_shots - 1 and idx + 1 < len(full_intents):
+                intent = str(full_intents[idx + 1]).lower()
+                if intent in _SOFT_DISSOLVE_INTENTS:
+                    issues.append(
+                        {
+                            "code": CODE_COVERUP_DISSOLVE,
+                            "severity": "error" if strict else "warning",
+                            "message": (
+                                f"join {pair}: byte-identical continue (match-cut) must be hard; "
+                                f"found {intent} dissolve {transition_sec:g}s — "
+                                "移除 dissolve（用 hard match-cut）或改 cut 缝"
+                            ),
+                            "join": pair,
+                        }
+                    )
+        # Motion-token coverups are heuristic → soft-only advisory.
+        to_shot = shots_by_id.get(str(j.get("to") or ""))
+        if isinstance(to_shot, dict):
+            motion = " ".join(
+                str(to_shot.get(k, "")) for k in ("motion", "dsl_motion")
+            )
+            dsl = to_shot.get("dsl") if isinstance(to_shot.get("dsl"), dict) else {}
+            motion += " " + str(dsl.get("motion", ""))
+            low = motion.lower()
+            hit = next((t for t in _COVERUP_MOTION_TOKENS if t in low), None)
+            if hit:
+                issues.append(
+                    {
+                        "code": CODE_COVERUP_MOTION,
+                        "severity": "warning",
+                        "message": (
+                            f"join {pair}: continue 缝 motion 含「{hit}」— "
+                            "禁止用定格/倒放/插镜掩盖断裂，改 cut 或重做 byte-identical"
+                        ),
+                        "join": pair,
+                    }
+                )
+    return issues
 
 
 def flatten_shots(spec: dict[str, Any]) -> list[dict[str, Any]]:
@@ -392,6 +501,7 @@ def check_continuity_chain(
     for j in receipt.get("joins") or []:
         if isinstance(j, dict) and j.get("from") and j.get("to"):
             joins_by_pair[f"{j['from']}→{j['to']}"] = j
+    shots_by_id = {str(s.get("id") or ""): s for s in shots if isinstance(s, dict)}
 
     if require_doc_if_long and long_form and not doc.is_file():
         issues.append(
@@ -458,6 +568,9 @@ def check_continuity_chain(
                     "join": pair,
                 }
             )
+
+    # P0-3: forbidden coverups (references/continuity_chain.md §1.④)
+    issues.extend(_coverup_issues(spec, joins_by_pair, shots_by_id, strict=strict))
 
     # Long form soft: no promote receipts yet after stills started
     codes = sorted({i["code"] for i in issues})

@@ -13,6 +13,7 @@ import hashlib
 import json
 import os
 import shutil
+import signal
 import subprocess
 import sys
 import wave
@@ -144,7 +145,7 @@ from final.enhance import (  # noqa: E402, F401
     build_post_enhancement_vf_chain,
     resolve_subtitle_mode,
 )
-from final.errors import RenderError  # noqa: E402
+from final.errors import RenderError, RenderTimeoutError  # noqa: E402
 from final.media_ops import (  # noqa: E402, F401
     apply_dialogue_broll_visual,
     concat_audio_segments,
@@ -2592,6 +2593,56 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
     }
 
 
+def _run_with_watchdog(func, *, timeout: float):
+    """Run ``func`` under a total wall-clock watchdog.
+
+    Individual ffmpeg / TTS subprocesses already carry their own per-call timeouts
+    (AIFILM_FFMPEG_TIMEOUT, util.subprocess.run default). This guard caps the *total*
+    render so a stalled pipeline surfaces a clean error instead of hanging forever
+    (假死). On Unix we use SIGALRM (fires in the main thread, where render runs);
+    on other platforms with no SIGALRM we fall back to a daemon thread that raises on
+    breach. ``timeout <= 0`` disables the guard.
+    """
+    if timeout is None or timeout <= 0:
+        return func()
+
+    if hasattr(signal, "SIGALRM"):
+
+        def _alarm_handler(signum, frame):  # pragma: no cover - signal path
+            raise RenderTimeoutError(timeout)
+
+        prev = signal.signal(signal.SIGALRM, _alarm_handler)
+        try:
+            signal.alarm(max(1, int(timeout)))
+            return func()
+        finally:
+            signal.alarm(0)
+            signal.signal(signal.SIGALRM, prev)
+    else:  # pragma: no cover - non-Unix fallback
+        import threading
+
+        # Thread-based watchdog for platforms without SIGALRM.
+        holder: list[tuple[str, object] | None] = [None]
+
+        def _target() -> None:
+            try:
+                holder[0] = ("result", func())
+            except BaseException as exc:  # noqa: BLE001
+                holder[0] = ("error", exc)
+
+        t = threading.Thread(target=_target, daemon=True)
+        t.start()
+        t.join(timeout)
+        if t.is_alive():
+            raise RenderTimeoutError(timeout)
+        item = holder[0]
+        if item is None:
+            raise RenderTimeoutError(timeout)
+        if item[0] == "error":
+            raise item[1]
+        return item[1]
+
+
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(description="Render formal final film with VO + BGM + subs")
     p.add_argument("--root", required=True)
@@ -2733,6 +2784,16 @@ def main(argv: list[str] | None = None) -> int:
         help="Allow final even when VO would stream_loop short plates (discouraged)",
     )
     p.add_argument(
+        "--render-timeout",
+        type=float,
+        default=1800.0,
+        help=(
+            "Total wall-clock budget (seconds) for render_final. Exceeding it raises a clean "
+            "RenderTimeoutError instead of hanging (假死). 0 disables the guard. "
+            "Per-subprocess ffmpeg calls still honor AIFILM_FFMPEG_TIMEOUT."
+        ),
+    )
+    p.add_argument(
         "--skip-preflight",
         action="store_true",
         help="Record plate honesty only (CLI also skips preflight); marks OFFICIAL_FINAL_PLATE",
@@ -2796,7 +2857,7 @@ def main(argv: list[str] | None = None) -> int:
                     "--music requires --music-license (or a sidecar "
                     f"{p.stem}.license.txt next to the file)"
                 )
-        result = render_final(args)
+        result = _run_with_watchdog(lambda: render_final(args), timeout=args.render_timeout)
         try:
             from final.heartbeat import write_final_heartbeat
 
