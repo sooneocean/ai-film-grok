@@ -12,6 +12,13 @@
 - **顺带修复 Round 18/19 迁移遗留的测试 import 断点**（恢复 `tests/` 整套 CI 可收集）：`color_grade` 在 R18 迁到 `post/`、`golden_suite` 在 R19 迁到 `gates/`，但 `tests/test_closed_loop.py` 与 `tests/test_professional_golden.py` 仍在用旧顶层名，导致整套 `pytest tests/` 收集期 2 个 `ModuleNotFoundError` 中断。已分别改为 `from post.color_grade import plan_shot_grades` / `from gates.golden_suite import validate_golden_contract`（`tests/conftest.py` 已把 `scripts/` 注入 sys.path，包导入可解析）。修复后整套 `tests/` 收集恢复零错误。
 - **下一步 P4 候选**（仍零覆盖，`util/core/node/final`）：`util.spine_helpers`、`core.emit`、`node.backend_probe`/`latentsync_adapter`/`musetalk_adapter`/`stable_audio_probe`、`final.bgm_spotting`/`caption_text`/`enhance`/`io`/`tts_tracks`/`voice_mix_config`/`watchdog`。优先挑纯函数/确定性者。
 
+### Changed (code metabolism · P3-1 migrate + hard-compat shims + render_final peel)
+- **Inventory:** `docs/reports/2026-08-06-code-metabolism-inventory.md` (DELETE/TOMBSTONE/MIGRATE/PEEL).
+- **P3-1 migrate + thin top-level shims:** `vo_lint`→`narrative/`, `native_text_gate`→`gates/`, `seedance_bridge`→`media/`, `show_package`→`post/`, `gold_calibration`→`plan/`.
+- **Compat shims added** for earlier moves missing hard-compat: `golden_suite`, `color_grade` (fixes collection ImportError on `test_professional_golden` / `test_closed_loop`).
+- **Peel:** `resolve_plate_slot_sec` pure helper in `post/render_final` for silence/native caption-clock plate duration.
+- Iron: public CLI import names preserved via shims; no heat/i2v/pilot retune.
+
 ## [2.40.37] - 2026-08-06
 
 ### Added (Real-ESRGAN formal upscale · canary → CLI → hooks)

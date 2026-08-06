@@ -293,6 +293,32 @@ def resolve_render_dimension(*sources: object, default: int) -> int:
     return default
 
 
+
+def resolve_plate_slot_sec(
+    shot: object,
+    *,
+    default: float = 1.0,
+    min_sec: float = 0.05,
+) -> float:
+    """Resolve a plate clock duration from shot.duration_sec (pure helper).
+
+    Used for silence / native caption-clock VO stems that must match the plate
+    slot. Invalid or missing values degrade to ``default`` rather than raising
+    mid-render. Values at or below ``min_sec`` are treated as unusable.
+    """
+    try:
+        if isinstance(shot, dict):
+            raw = shot.get("duration_sec")
+        else:
+            raw = None
+        plate_slot = float(raw or 0.0)
+    except (TypeError, ValueError):
+        plate_slot = 0.0
+    if plate_slot <= min_sec:
+        return float(default)
+    return float(plate_slot)
+
+
 def render_final(args: argparse.Namespace) -> dict[str, Any]:
     root = Path(args.root).expanduser().resolve()
     bgm_source_receipt: dict[str, Any] | None = None
@@ -574,12 +600,7 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
         except SecurityPolicyError as exc:
             raise RenderError(str(exc)) from exc
         if non_vo_coverage or dialogue_audio_lane == "silence":
-            try:
-                plate_slot = float(shot.get("duration_sec") or 0.0)
-            except (TypeError, ValueError):
-                plate_slot = 0.0
-            if plate_slot <= 0.05:
-                plate_slot = 1.0
+            plate_slot = resolve_plate_slot_sec(shot)
             silent_wav = work / f"vo_silent_{i:02d}_{sid}.wav"
             silence_wav(silent_wav, plate_slot)
             # keep mp3 companion for downstream path expectations (empty AAC ok via ffmpeg)
@@ -618,12 +639,7 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
             color_gain = 0.0
         elif dialogue_audio_lane == "native":
             # Caption clock only: keep subtitle text, never synthesize Edge for mix.
-            try:
-                plate_slot = float(shot.get("duration_sec") or 0.0)
-            except (TypeError, ValueError):
-                plate_slot = 0.0
-            if plate_slot <= 0.05:
-                plate_slot = 1.0
+            plate_slot = resolve_plate_slot_sec(shot)
             silent_wav = work / f"vo_native_clock_{i:02d}_{sid}.wav"
             silence_wav(silent_wav, plate_slot)
             run(

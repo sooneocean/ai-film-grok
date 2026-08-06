@@ -47,3 +47,18 @@ def test_resolve_render_dimension_zero_is_falsy_source(render_final_mod) -> None
     assert (
         render_final_mod.resolve_render_dimension(0, 1280, default=720) == 1280
     )
+
+
+def test_resolve_plate_slot_sec_from_shot(render_final_mod) -> None:
+    assert render_final_mod.resolve_plate_slot_sec({"duration_sec": 5.0}) == 5.0
+    assert render_final_mod.resolve_plate_slot_sec({"duration_sec": 0.0}) == 1.0
+    assert render_final_mod.resolve_plate_slot_sec({"duration_sec": 0.01}) == 1.0
+    assert render_final_mod.resolve_plate_slot_sec({}) == 1.0
+    assert render_final_mod.resolve_plate_slot_sec({"duration_sec": "bad"}) == 1.0
+    assert (
+        render_final_mod.resolve_plate_slot_sec(
+            {"duration_sec": 0.0}, default=2.5
+        )
+        == 2.5
+    )
+
