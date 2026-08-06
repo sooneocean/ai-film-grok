@@ -7,20 +7,11 @@ This is the designed-post bridge: captions, title cards, overlays, preview Studi
 
 from __future__ import annotations
 
-from export_cues import expand_cues_phrase_split  # noqa: F401
-from export_helpers import (  # noqa: F401
-    caption_clock_offset_for,
-    parse_srt,
-    remotion_captions,
-    resolve_compose_preset,
-)
-
 import argparse
 import html
 import json
 import math
 import os
-import re
 import struct
 import tempfile
 import wave
@@ -33,6 +24,13 @@ from edit_policy import (
     film_segment_timeline,
     normalize_transition_sec,
     suggest_join_intent,
+)
+from export_cues import expand_cues_phrase_split  # noqa: F401
+from export_helpers import (  # noqa: F401
+    caption_clock_offset_for,
+    parse_srt,
+    remotion_captions,
+    resolve_compose_preset,
 )
 from film_spec import FilmSpecError, validate_film_spec
 from platform_package import PlatformPackageError, load_platform_package

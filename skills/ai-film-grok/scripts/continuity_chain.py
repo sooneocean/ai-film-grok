@@ -5,7 +5,8 @@ Keeps `import continuity_chain` / `from continuity_chain import …` working for
 
 from __future__ import annotations
 
-from assets import continuity_chain as _impl
 import sys as _sys
+
+from assets import continuity_chain as _impl
 
 _sys.modules[__name__] = _impl

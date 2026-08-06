@@ -2,7 +2,8 @@
 
 Keeps `import cli_still_challenge` / `from cli_still_challenge import …` working for hard-compat.
 """
-from cli import cli_still_challenge as _impl
 import sys as _sys
+
+from cli import cli_still_challenge as _impl
 
 _sys.modules[__name__] = _impl

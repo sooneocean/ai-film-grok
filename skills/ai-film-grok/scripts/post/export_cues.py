@@ -1,6 +1,8 @@
 """Caption cue phrase split (export closeout)."""
 from __future__ import annotations
+
 from typing import Any
+
 try:
     from final.caption_text import split_units
 except Exception:

@@ -29,6 +29,8 @@ except ImportError:  # pragma: no cover
 # Validate leaf (M1)
 try:
     from plan.film_spec_validate import (  # noqa: F401
+        DIRECTOR_BOARD_FIELDS,  # noqa: F401
+        PERFORMANCE_FIELDS,  # noqa: F401
         FilmSpecError,
         _is_unauthored,
         _required_text,
@@ -45,6 +47,8 @@ try:
     )
 except ImportError:  # pragma: no cover
     from film_spec_validate import (  # type: ignore  # noqa: F401
+        DIRECTOR_BOARD_FIELDS,  # noqa: F401
+        PERFORMANCE_FIELDS,  # noqa: F401
         FilmSpecError,
         _is_unauthored,
         _required_text,

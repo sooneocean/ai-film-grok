@@ -1,19 +1,42 @@
 """Heat arc orchestrator."""
 from __future__ import annotations
+
 from typing import Any
-from edit_policy_shared import PolicyError
-from heat_phase import (
-    ADVISORY_MAX_INTIMACY_RATIO, ADVISORY_MAX_SETUP_RATIO, ADVISORY_MAX_SEX_DURATION_RATIO,
-    DEFAULT_BARE_PEAK_REQUIRED, DEFAULT_SEX_DURATION_FLOOR, DEFAULT_SHOT_DURATION_SEC,
-    EXTREME_INTIMACY_FLOOR, EXTREME_SETUP_CEILING, HARDCORE_SEX_DURATION_TARGET,
-    HEAT_PHASES, HOT_SEX_DURATION_FLOOR, INTIMACY_PHASES, SEX_PHASES,
-    heat_phase_escalation_rank, infer_heat_phase, lint_heat_escalation_challenge,
-    normalize_heat_phase, normalize_heat_scale,
+
+from heat_coitus import (
+    lint_coitus_grammar,
+    lint_sex_arc,
+    lint_sex_pose_variety,
+    resolve_coitus_beat,
 )
-from heat_wardrobe import apply_wardrobe_continuity, lint_both_undress, lint_sex_wardrobe, resolve_wardrobe_state
-from heat_coitus import lint_coitus_grammar, lint_sex_arc, lint_sex_pose_variety, resolve_coitus_beat, resolve_sex_arc_beat, shot_coitus_readable
+from heat_impact import (
+    ECCHI_CHECKLIST_ITEMS,
+    lint_montage_craft,
+    lint_sex_detail_cu,
+    lint_size_ladder,
+    lint_vo_motion_align,
+)
+from heat_phase import (
+    ADVISORY_MAX_INTIMACY_RATIO,
+    ADVISORY_MAX_SETUP_RATIO,
+    ADVISORY_MAX_SEX_DURATION_RATIO,
+    DEFAULT_SEX_DURATION_FLOOR,
+    EXTREME_INTIMACY_FLOOR,
+    EXTREME_SETUP_CEILING,
+    HARDCORE_SEX_DURATION_TARGET,
+    HEAT_PHASES,
+    HOT_SEX_DURATION_FLOOR,
+    INTIMACY_PHASES,
+    SEX_PHASES,
+    infer_heat_phase,
+    lint_heat_escalation_challenge,
+)
 from heat_spice import lint_sex_vo_spice, lint_user_source_fidelity, normalize_spice_level
-from heat_impact import ECCHI_CHECKLIST_ITEMS, compute_erotic_impact_score, lint_ecchi_checklist, lint_montage_craft, lint_sex_detail_cu, lint_size_ladder, lint_vo_motion_align
+from heat_wardrobe import (
+    lint_both_undress,
+    lint_sex_wardrobe,
+)
+
 __all__ = ["_merge_sub_issues","_shot_duration_sec","lint_heat_arc","ECCHI_CHECKLIST_ITEMS"]
 def _shot_duration_sec(shot: dict[str, Any], default: float = 6.0) -> float:
     try:

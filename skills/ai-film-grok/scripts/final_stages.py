@@ -2,7 +2,8 @@
 
 Keeps `import final_stages` / `from final_stages import …` working for hard-compat.
 """
-from post import final_stages as _impl
 import sys as _sys
+
+from post import final_stages as _impl
 
 _sys.modules[__name__] = _impl

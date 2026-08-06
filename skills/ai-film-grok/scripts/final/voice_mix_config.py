@@ -1,10 +1,24 @@
 """VO/TTS/mix resolve for formal final (closeout)."""
 from __future__ import annotations
-import contextlib, os
+
+import contextlib
+import os
 from typing import Any
-from final.render_defaults import DEFAULT_VO_GAIN, DEFAULT_VO_PITCH, DEFAULT_VO_RATE, DEFAULT_VOCAL_COLOR_GAIN
+
 from final.native_audio import resolve_native_audio_volume
-from final.voice import DEFAULT_VOICE, STORYTELLER_VOICE, normalize_cast_tts_backends, normalize_cast_voices
+from final.render_defaults import (
+    DEFAULT_VO_GAIN,
+    DEFAULT_VO_PITCH,
+    DEFAULT_VO_RATE,
+    DEFAULT_VOCAL_COLOR_GAIN,
+)
+from final.voice import (
+    DEFAULT_VOICE,
+    STORYTELLER_VOICE,
+    normalize_cast_tts_backends,
+    normalize_cast_voices,
+)
+
 try:
     from voice_tracks import resolve_voice_tracks
 except ImportError:

@@ -7,7 +7,6 @@ Public entry remains ``film_spec.validate_film_spec`` via re-export.
 from __future__ import annotations
 
 import contextlib
-import re
 from typing import Any
 
 from audio_recipe import (
@@ -87,14 +86,24 @@ from film_spec_profile import (  # noqa: F401
     resolve_h3_config,
     resolve_i2v_profile,
 )
-
-
 from plan.film_spec_lints import (  # noqa: F401
-    DIRECTOR_BOARD_FIELDS, FilmSpecError, PERFORMANCE_FIELDS, _PERFORMANCE_PLACEHOLDERS,
-    _is_unauthored, _required_text, _validate_dialogue_drama_shot, estimate_nar_vo_sec,
-    iter_film_spec_shots, lint_director_board, lint_performance, validate_director_intent,
-    validate_dramatic_function, validate_nar_budget, zero_narration_gate,
+    _PERFORMANCE_PLACEHOLDERS,
+    DIRECTOR_BOARD_FIELDS,
+    PERFORMANCE_FIELDS,
+    FilmSpecError,
+    _is_unauthored,
+    _required_text,
+    _validate_dialogue_drama_shot,
+    estimate_nar_vo_sec,
+    iter_film_spec_shots,
+    lint_director_board,
+    lint_performance,
+    validate_director_intent,
+    validate_dramatic_function,
+    validate_nar_budget,
+    zero_narration_gate,
 )
+
 
 def validate_film_spec(
     spec: dict[str, Any],

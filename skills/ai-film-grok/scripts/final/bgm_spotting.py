@@ -1,10 +1,16 @@
 """BGM spotting stereo convert (closeout)."""
 from __future__ import annotations
-from typing import Any
+
 import numpy as np
 from final.errors import RenderError
 from final.render_defaults import SR
-from sound_plan import SoundPlanError, apply_mute_windows_to_samples, apply_sfx_accents_to_samples, expand_sound_events
+from sound_plan import (
+    SoundPlanError,
+    apply_mute_windows_to_samples,
+    apply_sfx_accents_to_samples,
+    expand_sound_events,
+)
+
 try:
     from music_cue import apply_music_timeline_to_samples
 except ImportError:

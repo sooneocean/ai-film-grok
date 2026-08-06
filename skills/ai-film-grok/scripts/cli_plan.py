@@ -2,7 +2,8 @@
 
 Keeps `import cli_plan` / `from cli_plan import …` working for hard-compat.
 """
-from cli import cli_plan as _impl
 import sys as _sys
+
+from cli import cli_plan as _impl
 
 _sys.modules[__name__] = _impl

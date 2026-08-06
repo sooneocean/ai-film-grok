@@ -2,7 +2,8 @@
 
 Keeps `import h3_media_pack` / `from h3_media_pack import …` working for hard-compat.
 """
-from media import h3_media_pack as _impl
 import sys as _sys
+
+from media import h3_media_pack as _impl
 
 _sys.modules[__name__] = _impl

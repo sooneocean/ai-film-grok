@@ -2,7 +2,8 @@
 
 Keeps `import h3_workflow` / `from h3_workflow import …` working for hard-compat.
 """
-from media import h3_workflow as _impl
 import sys as _sys
+
+from media import h3_workflow as _impl
 
 _sys.modules[__name__] = _impl

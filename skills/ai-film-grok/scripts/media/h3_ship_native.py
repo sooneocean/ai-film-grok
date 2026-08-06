@@ -275,8 +275,8 @@ def check_duration_vs_target(
     spec: dict[str, Any],
     parts: list[Path],
 ) -> dict[str, Any]:
-    from plan.duration_target import check_duration_target
     from media_duration import MediaDurationError, probe_duration_sec
+    from plan.duration_target import check_duration_target
 
     media_sum = 0.0
     for p in parts:

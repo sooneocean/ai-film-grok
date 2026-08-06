@@ -55,10 +55,7 @@ from security_policy import (
 )
 from sound_plan import (
     SoundPlanError,
-    apply_mute_windows_to_samples,
-    apply_sfx_accents_to_samples,
     build_mood_timeline,
-    expand_sound_events,
     inject_auto_sfx_if_empty,
     resolve_loudnorm,
     resolve_music_template,
@@ -144,21 +141,9 @@ from final.enhance import (  # noqa: E402, F401
     build_post_enhancement_vf_chain,
     resolve_subtitle_mode,
 )
-from final.errors import RenderError, RenderTimeoutError  # noqa: E402
-from final.watchdog import _run_with_watchdog  # noqa: E402, F401
-from final.render_defaults import (  # noqa: E402, F401
-    DEFAULT_BGM_GEN_AMP,
-    DEFAULT_MUSIC_VOLUME,
-    DEFAULT_SUB_MAX_CHARS,
-    DEFAULT_VO_GAIN,
-    DEFAULT_VO_PITCH,
-    DEFAULT_VO_RATE,
-    DEFAULT_VOCAL_COLOR_GAIN,
-    SR,
-)
+from final.errors import RenderError, RenderTimeoutError  # noqa: E402, F401
 from final.io import read_json  # noqa: E402, F401
 from final.manifest import build_final_film_manifest_entry  # noqa: E402, F401
-from final.voice_mix_config import resolve_final_voice_mix_config  # noqa: E402, F401
 from final.media_ops import (  # noqa: E402, F401
     apply_dialogue_broll_visual,
     concat_audio_segments,
@@ -182,6 +167,16 @@ from final.native_audio import (  # noqa: E402, F401
     resolve_native_audio_gain,
     resolve_native_audio_volume,
 )
+from final.render_defaults import (  # noqa: E402, F401
+    DEFAULT_BGM_GEN_AMP,
+    DEFAULT_MUSIC_VOLUME,
+    DEFAULT_SUB_MAX_CHARS,
+    DEFAULT_VO_GAIN,
+    DEFAULT_VO_PITCH,
+    DEFAULT_VO_RATE,
+    DEFAULT_VOCAL_COLOR_GAIN,
+    SR,
+)
 from final.voice import (  # noqa: E402, F401
     _HEROINE_SPEAKERS,
     _NARRATOR_SPEAKERS,
@@ -197,6 +192,8 @@ from final.voice import (  # noqa: E402, F401
     validate_voice_language_locks,
     voice_for_shot,
 )
+from final.voice_mix_config import resolve_final_voice_mix_config  # noqa: E402, F401
+from final.watchdog import _run_with_watchdog  # noqa: E402, F401
 
 
 def resolve_font() -> str:

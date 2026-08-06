@@ -2,7 +2,8 @@
 
 Keeps `import media_duration` / `from media_duration import …` working for hard-compat.
 """
-from media import media_duration as _impl
 import sys as _sys
+
+from media import media_duration as _impl
 
 _sys.modules[__name__] = _impl
