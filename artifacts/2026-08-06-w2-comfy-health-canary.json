@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "kind": "w2-comfy-health-capacity-canary",
+  "at": "2026-08-06T06:50:00+00:00",
+  "tunnel": {
+    "tunnel_18188": "up",
+    "http_code": 200,
+    "comfyui_version": "0.30.1",
+    "ram_free_gb": 0.01,
+    "note": "RAM free ~14MB at probe — unsafe to start long H3 drain"
+  },
+  "film_root": "/Users/dex/AI FILM SPACE/0805/suse-evolution-ep01",
+  "capacity": {
+    "ok": true,
+    "pending_jobs": 6,
+    "eta_minutes_total": 48.0,
+    "next_shot": "ep01_sc05_union_s16",
+    "default_safe": "run-next --max 5",
+    "until_empty_requires": "--i-own-the-gpu or AIFILM_I_OWN_THE_GPU=1"
+  },
+  "decision": {
+    "until_empty": "DEFERRED_SAFE",
+    "reason": "tunnel up but host RAM free ~14MB + multi-agent no-hog: default is run-next --max 5 when user owns exclusive overnight; not auto-started this closeout",
+    "next_when_ready": "AIFILM_I_OWN_THE_GPU=1 aifilm h3 cycle --root \"…/suse-evolution-ep01\" --until-empty --execute --free-first --i-own-the-gpu"
+  },
+  "stop": "tunnel_up_capacity_ready_drain_deferred_low_ram"
+}

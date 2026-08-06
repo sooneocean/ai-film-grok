@@ -529,7 +529,17 @@ class MediaQueue:
                     for s in validated:
                         known_ids.add(str(s["id"]))
                     known_ids.update(str(s.get("id")) for s in iter_dialogue_broll(raw_spec))
-                except Exception:
+                except Exception as exc:  # noqa: BLE001 — fallback scan; never silent
+                    note_queue_partial(
+                        self.root,
+                        stage="film_spec_validate_fallback",
+                        error=f"{type(exc).__name__}:{str(exc)[:200]}",
+                        shot_id=str(shot_id or ""),
+                        honest_limits=[
+                            "validate_film_spec failed — using raw scenes/shots id scan",
+                            "fix film-spec / narrative projection if ghost-queue false positives",
+                        ],
+                    )
                     for scene in raw_spec.get("scenes") or []:
                         if not isinstance(scene, dict):
                             continue
@@ -729,8 +739,17 @@ class MediaQueue:
                 from production_gates import load_pilot_approval, pilot_is_user_approved
 
                 pilot_bulk = pilot_is_user_approved(load_pilot_approval(self.root))
-            except Exception:
+            except Exception as exc:  # noqa: BLE001 — fail soft but leave receipt
                 pilot_bulk = False
+                note_queue_partial(
+                    self.root,
+                    stage="pilot_approval_load",
+                    error=f"{type(exc).__name__}:{str(exc)[:200]}",
+                    honest_limits=[
+                        "pilot approval unreadable → pilot_bulk=false (bulk preflight may skip)",
+                        "re-run pilot approval if bulk enqueue should be gated",
+                    ],
+                )
             want_pf = (force_pf or (pilot_bulk and not is_canary and not skip_pf)) and (
                 not allow_without_pilot
             )

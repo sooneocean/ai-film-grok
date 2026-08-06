@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.40.10] - 2026-08-06
+
+### Docs / honesty (next-optimization board closeout W0–W6)
+- **ACTIVE plan:** `docs/plans/2026-08-06-next-optimization-todoplan.md`; closed boards → `docs/plans/archive/`.
+- **W0.3:** CONTRIBUTING dual-checkout session open check (`git rev-parse`).
+- **W1.5:** `stages/deliver.md` true-film final checklist (1 screen); post stage pointer.
+- **W4:** `media_queue` silent `except Exception` paths now `note_queue_partial` (film-spec validate fallback + pilot approval load).
+- **W5:** `stages/agent.md` director discipline card (anti-hijack / design-go / GPU max5).
+- **W2 canary:** tunnel + capacity-plan honest status under `artifacts/`.
+
 ## [2.40.9] - 2026-08-06
 
 ### Added (quality closeout · auto-fix + auto multi-chapter + GPU safe ops)

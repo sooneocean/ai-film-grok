@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from pathlib import Path
 from typing import Any
 
@@ -686,7 +687,7 @@ def cmd_bgm_library(args: argparse.Namespace) -> int:
     from cli_bgm_library import cmd_bgm_library as run_bgm_library
 
     try:
-        return run_bgm_library(args, emit=emit)
+        return run_bgm_library(args, emit=_emit)
     except BGMLibraryError as exc:
         raise FilmError(str(exc)) from exc
 

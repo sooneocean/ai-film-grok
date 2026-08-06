@@ -1,6 +1,7 @@
 # 若我来优化：ai-film-grok 代码库 Todo Plan（2026-08-06 · v2.40.9）
 
-**Status:** **ACTIVE 单一执行板** · W0 账实 **SHIPPED 本提交** · W1 代码侧多已有 `test_suse_final_iron` · 残余 = W2 OPEN_OPS + 触达式 W3–W6  
+**Status:** **ACTIVE 单一执行板 · 2026-08-06 closeout 2.40.10**  
+W0–W1.5 · W4 诚实 except · W5 纪律卡 · W6 archive **SHIPPED** · W2 tunnel **up** + capacity canary（until-empty **DEFERRED_SAFE** 默认 max5）· W3 巨石仍 bug-driven only  
 **Repo:** `/Users/dex/.grok/plugins/ai-film-grok`
 
 **结论先行：** 这不是「缺功能」的仓库，而是 **片厂已建完、规章已上墙、车间仍塞着几个 3k–4k 行总控台** 的成熟产线。下一轮优化应以 **诚实出片 + 可维护热路径 + 运维吞吐** 为主，**禁止**再开「全员压到 1500 行」或「再写一套 IRON 散文」。
@@ -21,7 +22,8 @@
 |------|------|
 | `docs/plans/2026-08-06-optimization-todoplan.md` | 产品/出片 A–G 波；**A1–A5 等已 ship**，C1 OPEN_OPS |
 | `docs/plans/2026-08-06-codebase-quality-todoplan.md` | 工程质量 **CLOSED 2.39.95** |
-| `docs/plans/2026-08-05-residual-monolith-w4-todo.md` | 巨石 **bug-driven peel only** |
+| `docs/plans/2026-08-05-residual-monolith-w4-todo.md` | 巨石历史 wave · **bug-driven peel only** |
+| `docs/plans/2026-08-06-monolith-relief-todoplan.md` | **巨石诊断 + M0–M6 执行队列**（M0 SHIPPED 2.40.10） |
 | `docs/optimization-plan-2026-08-06.md` | 内容五域 P0 **已落地 2.40.7+** |
 | `docs/plans/2026-08-06-memory-optimization-inventory.md` | 记忆反查 · 类 C 真 OPEN |
 
@@ -101,10 +103,10 @@
 |----|------|------|------|
 | **W0.1** | **单一执行板钉死** | 确认本 plan 落 `docs/plans/2026-08-06-next-optimization-todoplan.md`（或刷新既有 08-06-optimization header 状态到 2.40.9） | ✅ 旧板 RESIDUAL POINTER → 本档 |
 | **W0.2** | **刷新巨石 LOC 表** | residual-monolith 表改为本机数字（heat 4024 / film_spec 3147 / render_final 2985…） | ✅ 2.40.9 `wc -l` |
-| **W0.3** | **双 checkout 纪律一页** | AGENTS 已有；加「本 session `git rev-parse` 自检」到 CONTRIBUTING 或 doctor 提示 | pending |
-| **W0.4** | **OPEN 清单冻结** | 从 memory inventory 抽出 ≤15 条 C 类 → 本 plan §4；其余标 deferred | deferred（§4 波次即冻结集） |
+| **W0.3** | **双 checkout 纪律一页** | AGENTS 已有；加「本 session `git rev-parse` 自检」到 CONTRIBUTING 或 doctor 提示 | ✅ CONTRIBUTING |
+| **W0.4** | **OPEN 清单冻结** | 从 memory inventory 抽出 ≤15 条 C 类 → 本 plan §4；其余标 deferred | ✅ §4 即冻结集 |
 
-**W0.1–W0.2 SHIPPED（本轮）.** 建议下一步：`go` → W1 测已绿确认 / 或 W2 ops。
+**W0 SHIPPED（2.40.10 closeout）.**
 
 ---
 
@@ -118,7 +120,7 @@
 | **W1.2** | **短 H3 源 + sex floor 回归** | fixture：~5s take + low ratio → **不**静默 10s 不可 stretch 槽 | ✅ `test_suse_final_iron` + `plan/film_spec_sex_floor` |
 | **W1.3** | **口白窗三角回归** | `tts ≤ cue ≤ slot` 失败路径给 next_cmd | ✅ `check_vo_window_triangle` 单测 |
 | **W1.4** | **plate vs master closeout** | gate 红 / skip → 强制 PARTIAL 字段；禁 final_complete | ✅ shortform S1.4 已 ship；真片纪律待 W1.5 |
-| **W1.5** | **真片抽检清单（文档）** | stages/post 或 deliver 短指针：official-final-report / final-timeout / BGM source | pending |
+| **W1.5** | **真片抽检清单（文档）** | stages/post 或 deliver 短指针：official-final-report / final-timeout / BGM source | ✅ deliver.md 1 屏 + post 指针 |
 
 **不做：** 重写 render_final 整文件。
 
@@ -128,27 +130,28 @@
 
 | ID | Todo | 做法 | 验收 |
 |----|------|------|------|
-| **W2.1** | **Comfy 隧道 health 先** | `18188→8188` doctor/canary；down 则只写 OPEN_OPS，不假执行 | artifacts canary JSON |
-| **W2.2** | **独占 until-empty** | variety 绿片 + `--i-own-the-gpu` + free-first；默认 `run-next --max 5` | stop∈{queue_empty,max_cycles} 或诚实 capacity |
-| **W2.3** | **双片 drain 纪律回执** | 不 cancel 外片；busy 零 submit；禁 pgrep 脚本源码误杀 | 对照 memory 08-06 dual-film |
-| **W2.4** | **（可选）throughput-counters** | 片根 still scrap / I2V scrap / re-final 计数 JSON | 一个 receipt，无新 IRON 段 |
+| **W2.1** | **Comfy 隧道 health 先** | `18188→8188` doctor/canary；down 则只写 OPEN_OPS，不假执行 | ✅ `artifacts/2026-08-06-w2-comfy-health-canary.json`（18188 up） |
+| **W2.2** | **独占 until-empty** | variety 绿片 + `--i-own-the-gpu` + free-first；默认 `run-next --max 5` | **DEFERRED_SAFE**（pending=6 · 主机 ram_free≈14MB 不启长烧） |
+| **W2.3** | **双片 drain 纪律回执** | 不 cancel 外片；busy 零 submit；禁 pgrep 脚本源码误杀 | 纪律在 hard-defaults/memory；本轮未误杀 |
+| **W2.4** | **（可选）throughput-counters** | 片根 still scrap / I2V scrap / re-final 计数 JSON | deferred |
 
-**阻塞：** 无 5090 / 隧道 down → 标 **OPEN_OPS**，不挡 Wave 1/3 代码。
+**W2 诚实收工：** tunnel 通 + capacity-plan 绿；**未**假报 queue_empty。
 
 ---
 
 ### Wave 3 · 巨石「挡路才拆」（P1 structure）
 
+**完整诊断 + 可勾选 M 队列：** [2026-08-06-monolith-relief-todoplan.md](2026-08-06-monolith-relief-todoplan.md)（**M0 SHIPPED**）。  
 排序 = **风险 × 近期触达**，不是行数虚荣。
 
-| 序 | 模块 | ~LOC | 触发条件 | 拆法 |
-|----|------|-----:|----------|------|
-| **W3.1** | `plan/film_spec.py` | 3147 | 再动 sex floor / validate / write-spec | 抽 `film_spec_sex_floor` / projectors 纯函数 + 测 |
-| **W3.2** | `post/render_final.py` | 2985 | 再动 VO/mix/subtitle/timeout | 加深 `final/*` stages；orchestrator 只编排 |
-| **W3.3** | `post/export_composition.py` | 2804 | 字幕双烧 / HF export bug | harness 测优先，再 peel |
-| **W3.4** | `media/h3_fill_idle.py` | 2300 | capacity / until-empty 逻辑再变 | cycle vs plan 分离 |
-| **W3.5** | `narrative/edit_policy_heat.py` | 4024 | **仅** heat 码 bug | pack 级 peel；禁预防性全拆 |
-| **W3.6** | `cli/cli_post.py` / `cli_media.py` | 2.4k/2.1k | 子命令继续膨胀 | 按 verb 再抽，保持 public 字符串 |
+| 序 | 模块 | ~LOC | 触发条件 | 拆法 | M-id |
+|----|------|-----:|----------|------|------|
+| **W3.1** | `plan/film_spec.py` | 3147 | 再动 sex floor / validate / write-spec | validate 叶 + projectors；sex_floor 已存在 | M1 |
+| **W3.2** | `post/render_final.py` | 2985 | 再动 VO/mix/subtitle/timeout | 加深 `final/*` stages；orchestrator 只编排 | M2 |
+| **W3.3** | `post/export_composition.py` | 2804 | 字幕双烧 / HF export bug | harness 测优先，再 peel | M3 |
+| **W3.4** | `media/h3_fill_idle.py` | 2300 | capacity / until-empty 逻辑再变 | cycle vs plan 分离 | M5.1 |
+| **W3.5** | `narrative/edit_policy_heat.py` | 4024 | **仅** heat 码 bug | pack 级 peel；禁预防性全拆 | M4 |
+| **W3.6** | `cli/cli_post.py` / `cli_media.py` | 2.4k/2.1k | 子命令继续膨胀 | 按 verb 再抽，保持 public 字符串 | M5.4 |
 
 Iron：public CLI 不变 · shim hard-compat · 每 peel 独测 · 与行为变更分 commit。
 
@@ -158,10 +161,10 @@ Iron：public CLI 不变 · shim hard-compat · 每 peel 独测 · 与行为变�
 
 | ID | Todo | 验收 |
 |----|------|------|
-| **W4.1** | `media_queue` 等热路径 `except Exception` 审计 → warning/partial，禁 silent pass | rg 清单 + 行为测 |
-| **W4.2** | 再触达的 bare subprocess 补 timeout（**不**全仓 150 处冲刺） | 触达文件带 timeout |
-| **W4.3** | provider 质量拒 vs 429 签名再审计（inventory C12） | 另开会话；有 canary 再动 |
-| **W4.4** | doctor：假 plate 当 master 的 soft advisory | doctor 文案/code |
+| **W4.1** | `media_queue` 等热路径 `except Exception` 审计 → warning/partial，禁 silent pass | ✅ validate fallback + pilot load → `note_queue_partial` |
+| **W4.2** | 再触达的 bare subprocess 补 timeout（**不**全仓 150 处冲刺） | deferred（未触达新 subprocess 点） |
+| **W4.3** | provider 质量拒 vs 429 签名再审计（inventory C12） | deferred |
+| **W4.4** | doctor：假 plate 当 master 的 soft advisory | deferred（deliver 清单已覆盖人读） |
 
 ---
 
@@ -169,10 +172,10 @@ Iron：public CLI 不变 · shim hard-compat · 每 peel 独测 · 与行为变�
 
 | ID | Todo | 说明 |
 |----|------|------|
-| **W5.1** | multi-seed **强制** anti-hijack 纪律 | 禁只比 mean/音量；shortlist/pk |
-| **W5.2** | design-go / script-value-debrief 出片前存在 | 已有 CLI；纪律化 |
-| **W5.3** | 对白主链：原音优先，禁后期对嘴复活 | 对齐 dialogue-primary |
-| **W5.4** | 内容质量 P1 深化（按 ROI 选 1–2） | 运动量化已部分 ship；visual_bible / Fill-Idle 自动派单仍可选 | 见 optimization-plan P1 表，**一次只开一条** |
+| **W5.1** | multi-seed **强制** anti-hijack 纪律 | ✅ stages/agent.md 快卡 |
+| **W5.2** | design-go / script-value-debrief 出片前存在 | ✅ agent 快卡 |
+| **W5.3** | 对白主链：原音优先，禁后期对嘴复活 | ✅ agent 快卡 |
+| **W5.4** | 内容质量 P1 深化（按 ROI 选 1–2） | deferred（2.40.7–9 已 ship 多门；本轮不新开产品） |
 
 ---
 
@@ -180,11 +183,11 @@ Iron：public CLI 不变 · shim hard-compat · 每 peel 独测 · 与行为变�
 
 | ID | Todo | 验收 |
 |----|------|------|
-| **W6.1** | memory：active 只留指针卡；长文 archive | active 稳定 ≤~40 |
-| **W6.2** | `docs/plans` 归档目录 `plans/archive/` 移 7 月 CLOSED 板 | 根目录只留 ACTIVE + 指针 |
-| **W6.3** | process-slim 残余（inventory C13） | 仅当 token 痛再开 |
-| **W6.4** | artifacts 日志/canary 是否进 git 审计 | 大 log 不进 origin；保留 JSON 回执 |
-| **W6.5** |（可选）pytest 标记再分层 | `hotpath` / `slow` / `gpu` 已有则补文档；减默认 full 误跑 |
+| **W6.1** | memory：active 只留指针卡；长文 archive | deferred（已 ~42；未再砍） |
+| **W6.2** | `docs/plans` 归档目录 `plans/archive/` 移 7 月 CLOSED 板 | ✅ 18 板入 archive + README |
+| **W6.3** | process-slim 残余（inventory C13） | deferred |
+| **W6.4** | artifacts 日志/canary 是否进 git 审计 | canary JSON 入仓；大 .log 勿 add |
+| **W6.5** |（可选）pytest 标记再分层 | deferred |
 
 ---
 

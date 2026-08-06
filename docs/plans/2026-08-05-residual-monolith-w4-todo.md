@@ -1,10 +1,11 @@
 # Residual 大石 / 大型模组拆分 Todo Plan — post-W4 (2026-08-05)
 
-**Status:** ACTIVE · pure-helper peels **SHIPPED** (R1/R1b/R1c + R3a) · residual = orchestrator / heat packs / export harness only
+**Status:** ACTIVE · pure-helper peels **SHIPPED** (R1/R1b/R1c + R3a) · residual = orchestrator / heat packs / export harness only  
+**Diagnosis + M-queue (2026-08-06):** [2026-08-06-monolith-relief-todoplan.md](2026-08-06-monolith-relief-todoplan.md) · M0 SHIPPED  
 **Kind:** structure plan (docs + ordered implementer queue; not a vanity LOC sprint)  
 **Owner tracker:** [2026-08-05-project-module-refactor.md](2026-08-05-project-module-refactor.md)  
 **Strategy pointer:** [2026-08-05-strategy-director-engineer-upgrade.md](2026-08-05-strategy-director-engineer-upgrade.md) · R-struct  
-**Baseline date:** 2026-08-05 worktree (plugin **2.39.51**) · LOC freeze `2026-08-05T03:49:08Z` · evidence commit `ef9c4c70` (W4 packages)
+**Baseline date:** 2026-08-05 worktree (plugin **2.39.51**) · LOC freeze `2026-08-05T03:49:08Z` · evidence commit `ef9c4c70` (W4 packages) · **LOC refresh 2.40.10**
 
 > **一句话：** W0–W3（hub ≤2500 · `core/*` · package dirs）+ **W4 包边界**（`post/render_final` · `narrative/edit_policy_heat` + top-level shims）+ W5 docs **已 ship**；本档只排 **仍 4k 的内部叶拆** 与 next-tier 领域巨石——按 **出片风险 × 改动频率**，禁止「全员 <1500 行」冲刺，禁止把「搬进包」误报成「内部 peel DONE」。
 
@@ -63,7 +64,7 @@
 
 ## 3. Residual monolith baseline (LOC)
 
-> **Refresh:** 2026-08-06 worktree · plugin **2.40.9** · `wc -l` on package paths.  
+> **Refresh:** 2026-08-06 worktree · plugin **2.40.10** · `wc -l` on package paths.  
 > **Next structure queue owner:** [2026-08-06-next-optimization-todoplan.md](2026-08-06-next-optimization-todoplan.md) Wave 3 (bug-driven peel only).
 
 | Priority | Module | ~LOC | Why residual (risk × touch) | Status |
@@ -81,8 +82,12 @@
 | **SHIPPED** | `scripts/core/*` | **~901** | shared I/O | W1 DONE |
 | **SHIPPED** | top-level shims `render_final.py` / `edit_policy_heat.py` | thin + main guard | hard-compat | W4 boundary DONE |
 
-**Ordering canon:**  
-internal `post/render_final` leaves → heat internal packs (bug-driven) → `film_spec` → export/compose harness → `story_plan` only if dual-path residue.
+**Ordering canon（风险 × 触达 · 与 monolith-relief M* 对齐）:**  
+1. `film_spec` validate peel **on touch**（最高 ROI 预防边界 · M1）  
+2. `post/render_final` stages **on final bug**（M2）  
+3. export/compose **harness first**（M3）  
+4. heat internal packs **bug-driven only**（M4 · 不预防性全拆）  
+5. `story_plan` / cli / h3_fill_idle 仅双路径或 thrash（M5）
 
 ---
 

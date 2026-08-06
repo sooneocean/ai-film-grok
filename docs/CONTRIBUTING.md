@@ -16,6 +16,26 @@
 | Memory / docs governance | [`MEMORY_GOVERNANCE.md`](./MEMORY_GOVERNANCE.md) |
 | IRON → test map | [`reports/2026-08-06-iron-gate-coverage.md`](./reports/2026-08-06-iron-gate-coverage.md) |
 
+### Dual checkout · session open check (W0.3)
+
+本机常有 **两个 git 树**，禁止跨树手拷：
+
+| 树 | 用途 |
+|----|------|
+| `~/.grok/plugins/ai-film-grok` | **插件加载 / 本会话常见工作树** |
+| `~/.grok/ai-film-grok` | 另一开发 checkout（可能分叉） |
+
+**每个改码 session 开场必须：**
+
+```bash
+git rev-parse --show-toplevel   # 唯一真相；只改这个路径下的文件
+git status -sb                  # 确认 branch / dirty 是否符合预期
+```
+
+- 只改 **当前** `rev-parse` 返回的 root。  
+- User skill 是 symlink → `plugins/.../skills/`；**不要**改 `installed-plugins/`。  
+- 同步两树用 **git**，不要 `cp` 单文件。
+
 ## Authoritative CLI
 
 - **Primary:** `skills/ai-film-grok/scripts/aifilm` (or `aifilm` after plugin enable)
@@ -77,6 +97,8 @@ make -C "$ROOT" install-hooks
 
 ## Where plans live
 
-- Product / ship: `docs/plans/2026-08-06-optimization-todoplan.md`
-- Engineering quality: `docs/plans/2026-08-06-codebase-quality-todoplan.md`
-- Module layout: `docs/plans/2026-08-05-project-module-refactor.md`
+- **ACTIVE 下一轮执行板：** [`docs/plans/2026-08-06-next-optimization-todoplan.md`](./plans/2026-08-06-next-optimization-todoplan.md)
+- 历史出片 A1–A5（已 ship）：`docs/plans/2026-08-06-optimization-todoplan.md`
+- Engineering quality（CLOSED）：`docs/plans/2026-08-06-codebase-quality-todoplan.md`
+- Module / residual monolith：`docs/plans/2026-08-05-project-module-refactor.md` · `…-residual-monolith-w4-todo.md`
+- 过期板：优先 `docs/plans/archive/`（W6）
