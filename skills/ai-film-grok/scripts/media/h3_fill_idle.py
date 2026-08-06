@@ -39,6 +39,26 @@ _DEFAULT_ETA_MINUTES = 9.0
 # Overnight loop safety (not an OS daemon): cycles × max_jobs_per_cycle.
 _UNTIL_EMPTY_MAX_CYCLES_HARD = 80
 _UNTIL_EMPTY_MAX_JOBS_PER_CYCLE = 20
+# P1 below-floor retries: after this many H3 takes, leave residual for human
+# (never silent heat drop — still in film; just stop burning 5090 forever).
+# Override with AIFILM_H3_FLOOR_RETRY_CAP (0 = unlimited).
+_H3_FLOOR_RETRY_CAP_DEFAULT = 5
+
+
+def _h3_floor_retry_cap() -> int:
+    import os
+
+    raw = (os.environ.get("AIFILM_H3_FLOOR_RETRY_CAP") or "").strip()
+    if raw == "":
+        return int(_H3_FLOOR_RETRY_CAP_DEFAULT)
+    try:
+        return max(0, int(raw))
+    except ValueError:
+        return int(_H3_FLOOR_RETRY_CAP_DEFAULT)
+
+
+def _count_h3_takes(takes: list[dict[str, Any]]) -> int:
+    return sum(1 for t in takes if isinstance(t, dict) and t.get("lane") == "h3")
 
 # Dual second leg sorts ahead of other same-rank pending (γ2 stickiness)
 _DUAL_STICKY_REASONS = frozenset(
@@ -405,6 +425,13 @@ def classify_fill_idle_shot(
             priority = "P1"
             status = "retry"
             reasons.append("h3_below_floor")
+            h3_n = _count_h3_takes(takes)
+            cap = _h3_floor_retry_cap()
+            if cap > 0 and h3_n >= cap:
+                # Residual: keep evidence, drop from pending so until-empty can finish.
+                priority, lane, status = "done", "primary_h3", "done"
+                reasons.append("h3_floor_retry_exhausted")
+                reasons.append(f"h3_takes={h3_n}>={cap}")
         elif has_h3 and not below and dual:
             # Dual: identity leg (I2V or FLF) + energy R2V for high-value PK
             has_i2v = (
@@ -445,6 +472,12 @@ def classify_fill_idle_shot(
     elif below and has_any:
         priority, lane, status = "P1", "challenge_weak", "retry"
         reasons.append("take_below_floor")
+        h3_n = _count_h3_takes(takes)
+        cap = _h3_floor_retry_cap()
+        if cap > 0 and h3_n >= cap:
+            priority, lane, status = "done", "challenge_weak", "done"
+            reasons.append("h3_floor_retry_exhausted")
+            reasons.append(f"h3_takes={h3_n}>={cap}")
     elif has_still and has_any:
         # soft challenge only after Grok/baseline take exists (main axis first)
         if has_h3 and not below:
