@@ -430,7 +430,8 @@ from cli_status import (  # noqa: E402, F401
     cmd_doctor,
     cmd_status,
 )
-from cli_write_spec import (  # noqa: E402
+from cli_write_spec import (  # noqa: E402, F401
+    _compatibility_vo_mode,
     cmd_write_spec,
 )
 
