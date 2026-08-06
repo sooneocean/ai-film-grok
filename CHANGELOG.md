@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.40.35] - 2026-08-06
+
+### Changed (senior-dev 代码质量把控 · Phase 3 迁移 & 去重 · P3-1 续 + 关键发现)
+- **关键发现 — 顶层"重复模块"实为硬兼容 shim**：重新扫描发现 19 个零 importer 顶层模块里，**16 个有同名 package 副本且顶部 0 个顶层 def**——实为 W6/W7 包化迁移留下的 `sys.modules[__name__] = _impl` 兼容 shim（`audio_node_service`/`burn_srt_pil`/`cli_hub_residual`/`comfy_broker_service`/`duration_target`/`face_identity_hash`/`film_spec_lints`/`lipsync_*`/`mmaudio_*`/`shot_package`/`story_normalize` 等）。它们**不是** P3-1 待迁债务，而是延后的"兼容清理"阶段对象（部分仍被 `final_stages.py`/`*.ps1`/`runtime_policy.py` 按字符串路径调用）。故 P3-1 零 importer 真实可迁模块已基本见底。
+- **P3-1 再迁 1 个真实模块**：`golden_suite.py`（零 importer、无 `__file__`/shell/跨脚本引用、非 shim）迁到 `gates/`（"golden contract" 校验语义归属校验门）。累计 **10/109+**（109 含 16 个 shim + 已包化的镜像计数，真实待迁远少于此）。
+- **P4 补缺 — `golden_suite` 首测**：该模块此前零覆盖，新增 `tests/test_golden_suite.py`（4 用例，纯函数、零依赖）：有效契约 `ok=True` 无 issues；`GOLDEN_FORMAT_INVALID`（9:16/45s 不符）、`HUMAN_APPROVAL_MISSING`、`KEY_DIALOGUE_CHECKSUM_INVALID` 三类违规正确报 issue。ruff 干净，4 passed。
+- **`runtime-lock.json` 再生**（`make lock-runtime`）：同步 `golden_suite` 路径变更。`make doctor` `runtime_lock.ok` 维持 `true`、0 errors，门禁全绿。
+- 下一步开放项：① 危险模块（`backend_lock`/`burn_srt_pil`/`comfy_broker_service`/`lipsync_*`/`mmaudio_*`/`seedance_bridge`）需先改字符串路径调用方再迁，单独规划；② 16 个 shim 的兼容清理阶段（确认无调用后删除 + 更新 invoker）；③ P4 续覆盖 util/core/node/final、P5-1 扩 mypy 扫描。
+
 ## [2.40.34] - 2026-08-06
 
 ### Changed (senior-dev 代码质量把控 · Phase 3 迁移 & 去重 · P3-1 续)

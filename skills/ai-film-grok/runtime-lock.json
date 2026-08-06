@@ -1353,6 +1353,10 @@
       "sha256": "d3a5db5c6391557975769b52020b4d799ceda1c209ec79a203aa108c4b7b2e1e"
     },
     {
+      "path": "scripts/gates/golden_suite.py",
+      "sha256": "8597c7b1c7f368a01c2195bf84c25d3f5a8178a78a933e8215cfb67018b58938"
+    },
+    {
       "path": "scripts/gates/manifest_truth.py",
       "sha256": "28ddaf95672fb6befa73d6f77c5860e931b49e45f5442cfd680b26377301abf5"
     },
@@ -1387,10 +1391,6 @@
     {
       "path": "scripts/gold_calibration.py",
       "sha256": "463fce062fc73795edb08354b6859ba46cfd5293d5aaec0d0873dd0965ed4fc9"
-    },
-    {
-      "path": "scripts/golden_suite.py",
-      "sha256": "8597c7b1c7f368a01c2195bf84c25d3f5a8178a78a933e8215cfb67018b58938"
     },
     {
       "path": "scripts/grok_oauth.py",
