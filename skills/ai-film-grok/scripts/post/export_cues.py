@@ -26,6 +26,10 @@ def expand_cues_phrase_split(
         from render_final import split_units
     except Exception:  # pragma: no cover
         split_units = None  # type: ignore
+    try:
+        from export_composition import format_caption_lines
+    except Exception:  # pragma: no cover
+        format_caption_lines = None  # type: ignore
 
     if not cues:
         return []
