@@ -341,6 +341,42 @@ def select_fill_idle_mode(
     return mode, added
 
 
+def decide_p2_challenge(
+    *,
+    has_h3: bool,
+    below: bool,
+    has_grok: bool,
+    best: float | None,
+    floor: float | None,
+) -> tuple[str, str, str, list[str]]:
+    """Decide priority/lane/status for a P2 soft challenge after a baseline take exists.
+
+    Pure function extracted from ``classify_fill_idle_shot`` (the
+    ``has_still and has_any`` branch) so the P2 idle-challenge auto-dispatch
+    policy — including the γ3 low-ROI-skip — is a single testable invariant
+    rather than inline branches (P2, v2.40.17).
+
+    Policy encoded:
+      - H3 take already ok (has_h3 and not below) -> done, no re-challenge.
+      - H3 take below floor (has_h3 and below) -> P1 retry of the weak take.
+      - No H3 take yet: γ3 skip when baseline is already strong
+        (``best >= floor + 6.0``) to avoid low-ROI P2 burn; otherwise enqueue a
+        P2 fill_idle_challenge (marking has_baseline_take when a Grok/unknown
+        baseline exists).
+    """
+    if has_h3 and not below:
+        return "done", "challenge_grok", "done", ["already_challenged_ok"]
+    if has_h3 and below:
+        return "P1", "challenge_weak", "retry", ["challenge_below_floor"]
+    # γ3: baseline already strong -> skip low-ROI P2 burn.
+    if floor is not None and best is not None and float(best) >= float(floor) + 6.0:
+        return "done", "challenge_grok", "done", ["skip_p2_baseline_strong"]
+    reasons = ["fill_idle_challenge"]
+    if has_grok:
+        reasons.append("has_baseline_take")
+    return "P2", "challenge_grok", "pending", reasons
+
+
 def _poison_blocked(root: Path, shot_id: str) -> bool:
     """Soft check: poison receipts or rejected stills skip the queue."""
     man = read_json(root / "manifest.json") or {}
@@ -524,22 +560,14 @@ def classify_fill_idle_shot(
             reasons.append(f"h3_takes={h3_n}>={cap}")
     elif has_still and has_any:
         # soft challenge only after Grok/baseline take exists (main axis first)
-        if has_h3 and not below:
-            priority, lane, status = "done", "challenge_grok", "done"
-            reasons.append("already_challenged_ok")
-        elif has_h3 and below:
-            priority, lane, status = "P1", "challenge_weak", "retry"
-            reasons.append("challenge_below_floor")
-        else:
-            # γ3: baseline already strong → skip low-ROI P2 burn
-            if floor is not None and best is not None and float(best) >= float(floor) + 6.0:
-                priority, lane, status = "done", "challenge_grok", "done"
-                reasons.append("skip_p2_baseline_strong")
-            else:
-                priority, lane, status = "P2", "challenge_grok", "pending"
-                reasons.append("fill_idle_challenge")
-                if has_grok or any(t.get("lane") == "unknown" for t in takes):
-                    reasons.append("has_baseline_take")
+        priority, lane, status, p2_added = decide_p2_challenge(
+            has_h3=has_h3,
+            below=below,
+            has_grok=has_grok,
+            best=best,
+            floor=floor,
+        )
+        reasons.extend(p2_added)
     elif has_still and not has_any and not primary:
         priority, lane, status = "P3", "skip", "wait_grok_baseline"
         reasons.append("wait_for_grok_baseline")

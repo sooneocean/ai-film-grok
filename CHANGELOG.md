@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.40.17] - 2026-08-06
+
+### Changed (quality P2 · H3 Fill-Idle 完整派单 · P2 空闲挑战自动派纯函数化)
+- **P2 idle-challenge auto-dispatch policy extracted to a pure, unit-tested function** (`media/h3_fill_idle.py::decide_p2_challenge`): the `has_still and has_any` branch of `classify_fill_idle_shot` — including the γ3 low-ROI-skip (`best >= floor + 6.0`) — was previously inline and untested as a unit. It is now an explicit, behavior-preserving function returning `(priority, lane, status, reasons)`, so the P2 soft-challenge decision is a CI-verifiable invariant. `classify_fill_idle_shot` calls it and extends its reasons — identical output.
+- Tests: `tests/test_fill_idle_p2_challenge.py` (9 cases — H3 ok no-rechallenge / H3 below-floor P1 retry / baseline strong skip / boundary exact / just-below enqueue / weak+grok mark / weak no-marker / missing best guard / missing floor guard).
+
 ## [2.40.16] - 2026-08-06
 
 ### Changed (quality P2 · H3 Fill-Idle 完整派单 · 模式/Lane 选取纯函数化)
