@@ -191,6 +191,21 @@ def add_workflow_parsers(sub: argparse._SubParsersAction[argparse.ArgumentParser
     )
     tp.add_argument("--port", type=int, default=18188)
     tp.add_argument("--timeout", type=float, default=3.0)
+    tp.add_argument(
+        "--ensure",
+        action="store_true",
+        help="If probe fails: kill stale ssh -L, start remote Comfy if needed, re-open 18188→8188",
+    )
+
+    te = sub.add_parser(
+        "tunnel-ensure",
+        help="Force-open Comfy tunnel 18188→8188 via Tailscale SSH (auto start remote Comfy)",
+    )
+    te.add_argument(
+        "--tunnel-only",
+        action="store_true",
+        help="Do not restart remote Comfy; only rebuild local SSH -L",
+    )
 
     # queue progress
     qp = sub.add_parser(
@@ -465,6 +480,40 @@ def run_workflow_cmd(args: argparse.Namespace) -> int:
                 port=int(getattr(args, "port", 18188) or 18188),
                 timeout=float(getattr(args, "timeout", 3.0) or 3.0),
             )
+            if not report.get("ok") and bool(getattr(args, "ensure", False)):
+                from comfy_recovery import ComfyRecoveryError, ensure_comfy_tunnel
+
+                try:
+                    ens = ensure_comfy_tunnel(confirm=True, restart_remote_if_down=True)
+                    report = {
+                        **tunnel_probe(
+                            port=int(getattr(args, "port", 18188) or 18188),
+                            timeout=float(getattr(args, "timeout", 5.0) or 5.0),
+                        ),
+                        "ensure": ens,
+                    }
+                except ComfyRecoveryError as exc:
+                    report = {**report, "ensure_error": str(exc)[:240], "ensure_ok": False}
+            _emit(report)
+            return 0 if report.get("ok") else 2
+
+        if cmd == "tunnel-ensure":
+            from comfy_recovery import ComfyRecoveryError, ensure_comfy_tunnel
+
+            try:
+                ens = ensure_comfy_tunnel(
+                    confirm=True,
+                    restart_remote_if_down=not bool(getattr(args, "tunnel_only", False)),
+                )
+                probe = tunnel_probe(port=int(ens.get("local_port") or 18188), timeout=5.0)
+                report = {**ens, "probe": probe, "ok": bool(ens.get("ok") and probe.get("ok"))}
+            except ComfyRecoveryError as exc:
+                report = {
+                    "schema_version": 1,
+                    "kind": "comfy-tunnel-ensure",
+                    "ok": False,
+                    "error": str(exc)[:300],
+                }
             _emit(report)
             return 0 if report.get("ok") else 2
 

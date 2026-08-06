@@ -9,8 +9,9 @@
 | **B 已 ship 工程** | 代码/CLI 已落地的优化 | 当基础，禁绿野重开 |
 | **C 仍 OPEN / PARTIAL** | 记忆或 canary 写明未闭合 | **真迭代队列** |
 
-**单一执行板（代码侧）：** [2026-08-06-optimization-todoplan.md](2026-08-06-optimization-todoplan.md)  
-**结构残余：** [2026-08-05-residual-monolith-w4-todo.md](2026-08-05-residual-monolith-w4-todo.md)  
+**单一执行板（下一轮）：** [2026-08-06-next-optimization-todoplan.md](2026-08-06-next-optimization-todoplan.md)  
+**历史出片板（A1–A5 SHIPPED）：** [2026-08-06-optimization-todoplan.md](2026-08-06-optimization-todoplan.md)  
+**结构残余：** [2026-08-05-residual-monolith-w4-todo.md](2026-08-05-residual-monolith-w4-todo.md)（LOC 已刷 2.40.9）  
 **反脆弱：** [2026-08-05-antifragility-todoplan.md](2026-08-05-antifragility-todoplan.md)（主项多已 ship）
 
 ---

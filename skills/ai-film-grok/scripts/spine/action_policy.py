@@ -65,6 +65,7 @@ COMMAND_POLICIES: dict[str, tuple[str, str]] = {
     "cinematic-gate": ("local", "none"),
     "queue-progress": ("local", "none"),
     "tunnel-probe": ("local", "none"),
+    "tunnel-ensure": ("local", "none"),
     "gpu-lease": ("local", "none"),
     "h3": ("local", "none"),
     "agent-review-final": ("local", "none"),

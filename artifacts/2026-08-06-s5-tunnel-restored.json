@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "kind": "s5-tunnel-restored",
+  "at": "2026-08-06T06:33:04+00:00",
+  "ok": true,
+  "host": "user@100.66.2.28",
+  "tailscale": "desktop-qfkiqd9",
+  "key": "~/.ssh/aifilm_5090_ed25519",
+  "tunnel": "ssh -fN -L 18188:127.0.0.1:8188",
+  "remote_comfy": "started via start_comfyui.ps1 -Port 8188",
+  "probes": {
+    "http://127.0.0.1:18188/system_stats": 200,
+    "queue_running": [],
+    "queue_pending": [],
+    "aifilm_tunnel_probe": true
+  },
+  "next": [
+    "aifilm h3 cycle --root <film> --until-empty --execute --i-own-the-gpu --free-first"
+  ]
+}

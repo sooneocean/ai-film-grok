@@ -15,3 +15,5 @@
 
 ## 归档
 - `memory/archive/` · 47 张（07-20 Seedance 时代 · session-wrap · 重复 canary 等）
+| **Comfy 隧道自动 ensure** | [comfy-tunnel-auto-ensure](2026-08-06-comfy-tunnel-auto-ensure.md) | Tailscale 100.66.2.28 · tunnel-ensure · LaunchAgent 5m |
+

@@ -63,19 +63,23 @@
 
 ## 3. Residual monolith baseline (LOC)
 
+> **Refresh:** 2026-08-06 worktree · plugin **2.40.9** · `wc -l` on package paths.  
+> **Next structure queue owner:** [2026-08-06-next-optimization-todoplan.md](2026-08-06-next-optimization-todoplan.md) Wave 3 (bug-driven peel only).
+
 | Priority | Module | ~LOC | Why residual (risk × touch) | Status |
 |----------|--------|-----:|-------------------------------|--------|
-| **P0** | `post/render_final.py` | **2745** | Ship path; package-moved but body still ~4.3k; coverage ~30% | package SHIPPED · **internal leaf residual** |
-| **P1** | `narrative/edit_policy_heat.py` | **4015** | Adult/heat IRON; 53 helpers; high blast radius | package SHIPPED · **internal packs residual** |
-| **P1** | `film_spec.py` | **3136** | write-spec / validate / projectors | still root monolith |
-| **P2** | `export_composition.py` | **2835** | HF/Remotion export; coverage-starved | harness first |
-| **P2** | `compose_render.py` | **1603** | Compose path; double-burn contracts exist | harness residual |
-| **P2** | `edit_policy.py` | **2667** | visual_fit / stretch / cut silk | peel if dual-owner pain |
-| **P3** | `story_plan.py` | **2858** | High coverage; peel only if dual-path residue | watch |
-| **CLI** | `cli_post` / `cli_media` | 2359 / 2048 | Hub-extracted; further only if growing | optional |
-| **SHIPPED** | hub `aifilm_grok.py` | **1462** | ≤2500 | W2 DONE |
-| **SHIPPED** | `scripts/core/*` | **795** | shared I/O | W1 DONE |
-| **SHIPPED** | top-level shims `render_final.py` / `edit_policy_heat.py` | **4** / **4** | hard-compat | W4 boundary DONE |
+| **P0** | `post/render_final.py` | **2985** | Ship path; orchestrator still thick after leaf peels | package SHIPPED · **internal leaf residual** |
+| **P1** | `narrative/edit_policy_heat.py` | **4024** | Adult/heat IRON; high blast radius | package SHIPPED · **bug-driven packs only** |
+| **P1** | `plan/film_spec.py` | **3147** | write-spec / validate / projectors; sex floor leaf exists | monolith · peel on touch |
+| **P2** | `post/export_composition.py` | **2804** | HF/Remotion export; coverage-starved | harness first |
+| **P2** | `post/compose_render.py` | **1579** | Compose path; double-burn contracts exist | harness residual |
+| **P2** | `narrative/edit_policy.py` | **2584** | visual_fit / stretch / cut silk | peel if dual-owner pain |
+| **P2** | `media/h3_fill_idle.py` | **2300** | capacity / until-empty | peel if logic thrash |
+| **P3** | `plan/story_plan.py` | **2948** | High coverage; peel only if dual-path residue | watch |
+| **CLI** | `cli/cli_post` / `cli_media` | 2476 / 2135 | Hub-extracted; further only if growing | optional |
+| **SHIPPED** | hub `aifilm_grok.py` | **993** | ≤2500 | W2 DONE |
+| **SHIPPED** | `scripts/core/*` | **~901** | shared I/O | W1 DONE |
+| **SHIPPED** | top-level shims `render_final.py` / `edit_policy_heat.py` | thin + main guard | hard-compat | W4 boundary DONE |
 
 **Ordering canon:**  
 internal `post/render_final` leaves → heat internal packs (bug-driven) → `film_spec` → export/compose harness → `story_plan` only if dual-path residue.

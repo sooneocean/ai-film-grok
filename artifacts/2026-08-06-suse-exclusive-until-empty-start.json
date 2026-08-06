@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "kind": "s5-exclusive-until-empty-start",
+  "at": "2026-08-06T06:34:32+00:00",
+  "ok": true,
+  "note": "user said go 独占 /path/to/film — treated as placeholder; chose suse-evolution-ep01",
+  "root": "/Users/dex/AI FILM SPACE/0805/suse-evolution-ep01",
+  "flags": [
+    "--until-empty",
+    "--execute",
+    "--i-own-the-gpu",
+    "--free-first",
+    "--capacity-wait-sec 120"
+  ],
+  "capacity_plan": {
+    "pending_jobs": 7,
+    "priority": "P1",
+    "eta_minutes": 56
+  },
+  "log": "/Users/dex/.grok/plugins/ai-film-grok/artifacts/2026-08-06-suse-exclusive-until-empty.log"
+}

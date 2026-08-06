@@ -965,6 +965,7 @@ def main(argv: list[str] | None = None) -> int:
             "ship-prep": cmd_workflow,
             "gpu-lease": cmd_workflow,
             "tunnel-probe": cmd_workflow,
+            "tunnel-ensure": cmd_workflow,
             "queue-progress": cmd_workflow,
             "agent-review-final": cmd_workflow,
             "fidelity": cmd_workflow,

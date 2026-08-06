@@ -461,16 +461,31 @@ def cmd_doctor(args: argparse.Namespace) -> int:
         )
     report["designed_post"] = designed
 
-    # Soft Comfy tunnel probe (C2) — advisory only; missing tunnel must not fail core doctor
+    # Soft Comfy tunnel probe (C2) — auto-ensure when AIFILM_COMFY_TUNNEL_AUTO≠0
     tunnel: dict[str, Any] = {"ok": None, "required_for": "5090 comfy bulk"}
     try:
         from workflow_pack import tunnel_probe
 
+        port = int(os.environ.get("AIFILM_COMFY_TUNNEL_PORT") or 18188)
         tunnel = {
-            **tunnel_probe(port=int(os.environ.get("AIFILM_COMFY_TUNNEL_PORT") or 18188)),
+            **tunnel_probe(port=port),
             "required_for": "5090 comfy bulk",
             "advisory": True,
         }
+        auto = str(os.environ.get("AIFILM_COMFY_TUNNEL_AUTO") or "1").strip().lower()
+        if tunnel.get("ok") is not True and auto not in {"0", "false", "no", "off"}:
+            try:
+                from comfy_recovery import ensure_comfy_tunnel
+
+                ens = ensure_comfy_tunnel(confirm=True, restart_remote_if_down=True)
+                tunnel = {
+                    **tunnel_probe(port=port, timeout=5.0),
+                    "required_for": "5090 comfy bulk",
+                    "advisory": True,
+                    "auto_ensure": ens,
+                }
+            except Exception as ens_exc:  # noqa: BLE001 — doctor soft
+                tunnel["auto_ensure_error"] = str(ens_exc)[:200]
     except Exception as exc:  # pragma: no cover
         tunnel = {"ok": None, "skipped": True, "error": str(exc)[:160], "advisory": True}
     report["comfy_tunnel"] = tunnel

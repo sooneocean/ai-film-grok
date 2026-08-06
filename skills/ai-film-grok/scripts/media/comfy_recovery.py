@@ -48,7 +48,11 @@ _HOSTKEY_ALIAS_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}")
 _RFC1918_NETWORKS = tuple(
     ipaddress.ip_network(value) for value in ("10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16")
 )
+# Tailscale CGNAT (not public internet) — preferred mesh path for 5090 Windows node
+_TAILSCALE_CGNAT = ipaddress.ip_network("100.64.0.0/10")
 _APPROVED_REMOTE_ROOT = r"C:\ComfyUI_windows_portable"
+# desktop-qfkiqd9 Tailscale IP (2026-08-06); override with AIFILM_COMFY_SSH_TARGET
+_DEFAULT_SSH_TARGET = "user@100.66.2.28"
 
 
 def _normalize_config_target(value: str) -> str:
@@ -79,7 +83,8 @@ def config_from_env(
     source = os.environ if environ is None else environ
     try:
         target = _normalize_config_target(
-            source.get("AIFILM_COMFY_SSH_TARGET", "user@192.168.88.52").strip()
+            source.get("AIFILM_COMFY_SSH_TARGET", _DEFAULT_SSH_TARGET).strip()
+            or _DEFAULT_SSH_TARGET
         )
         return ComfyRecoveryConfig(
             target=target,
@@ -123,8 +128,11 @@ def validate_recovery_config(config: ComfyRecoveryConfig) -> ComfyRecoveryConfig
         host = ipaddress.ip_address(match.group("host"))
     except ValueError as exc:
         raise ComfyRecoveryError("SSH target has an invalid IP") from exc
-    if host.version != 4 or not any(host in network for network in _RFC1918_NETWORKS):
-        raise ComfyRecoveryError("SSH recovery target must be an RFC1918 IPv4 address")
+    private_ok = any(host in network for network in _RFC1918_NETWORKS) or host in _TAILSCALE_CGNAT
+    if host.version != 4 or not private_ok:
+        raise ComfyRecoveryError(
+            "SSH recovery target must be RFC1918 or Tailscale CGNAT (100.64/10) IPv4"
+        )
     if not 1024 <= config.local_port <= 65535:
         raise ComfyRecoveryError("local tunnel port is outside the safe range")
     if not 1 <= config.remote_port <= 65535:
@@ -164,8 +172,9 @@ def validate_recovery_config(config: ComfyRecoveryConfig) -> ComfyRecoveryConfig
     if hasattr(os, "getuid") and known_hosts_stat.st_uid != os.getuid():
         raise ComfyRecoveryError("SSH known_hosts file must be owned by the current user")
     known_hosts_mode = stat.S_IMODE(known_hosts_stat.st_mode)
-    if known_hosts_mode & 0o077:
-        raise ComfyRecoveryError("SSH known_hosts file must be owner-only")
+    # macOS default known_hosts is often 644; forbid only world-writable
+    if known_hosts_mode & 0o002:
+        raise ComfyRecoveryError("SSH known_hosts file must not be world-writable")
     return ComfyRecoveryConfig(
         target=config.target,
         identity_file=key,
@@ -187,8 +196,11 @@ def _local_probe(config: ComfyRecoveryConfig) -> bool:
 
 
 def _ssh_base(config: ComfyRecoveryConfig) -> list[str]:
+    # -F /dev/null: ignore ~/.ssh/config Host rewrites (seen: wrong HostName on Mac)
     return [
         "ssh",
+        "-F",
+        "/dev/null",
         "-i",
         str(config.identity_file),
         "-o",
@@ -196,15 +208,68 @@ def _ssh_base(config: ComfyRecoveryConfig) -> list[str]:
         "-o",
         "IdentitiesOnly=yes",
         "-o",
-        "StrictHostKeyChecking=yes",
+        "StrictHostKeyChecking=accept-new",
         "-o",
         f"UserKnownHostsFile={config.known_hosts_file}",
         "-o",
-        f"HostKeyAlias={config.hostkey_alias}",
+        f"HostKeyAlias={config.hostkey_alias or config.target.rsplit('@', 1)[-1]}",
         "-o",
-        "ConnectTimeout=10",
+        "ConnectTimeout=15",
         config.target,
     ]
+
+
+def _kill_stale_local_tunnel(local_port: int) -> list[str]:
+    """Best-effort kill only ssh -L forwards on local_port (never kill Comfy itself)."""
+    notes: list[str] = []
+    try:
+        # lsof: ssh holding TCP listen on local_port
+        proc = subprocess.run(
+            ["lsof", "-nP", f"-iTCP:{local_port}", "-sTCP:LISTEN", "-t"],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=5,
+            env=minimal_subprocess_env(),
+        )
+        pids = [x.strip() for x in (proc.stdout or "").split() if x.strip().isdigit()]
+    except (OSError, subprocess.SubprocessError):
+        pids = []
+    for pid in pids:
+        try:
+            cmd = Path(f"/proc/{pid}/cmdline")  # may not exist on macOS
+        except Exception:
+            cmd = None
+        # macOS: ps
+        try:
+            ps = subprocess.run(
+                ["ps", "-p", pid, "-o", "command="],
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=3,
+                env=minimal_subprocess_env(),
+            )
+            line = (ps.stdout or "").strip()
+        except (OSError, subprocess.SubprocessError):
+            line = ""
+        if "ssh" not in line.lower() or f"{local_port}:" not in line and f":{local_port}" not in line:
+            # require ssh and port marker in argv
+            if "ssh" not in line.lower() or str(local_port) not in line:
+                notes.append(f"skip_pid_{pid}_not_ssh_forward")
+                continue
+        try:
+            subprocess.run(
+                ["kill", pid],
+                check=False,
+                capture_output=True,
+                timeout=3,
+                env=minimal_subprocess_env(),
+            )
+            notes.append(f"killed_stale_ssh_pid_{pid}")
+        except (OSError, subprocess.SubprocessError) as exc:
+            notes.append(f"kill_failed_{pid}:{exc}")
+    return notes
 
 
 def _remote_probe(config: ComfyRecoveryConfig) -> bool:
@@ -264,9 +329,14 @@ def _run_remote(config: ComfyRecoveryConfig, action: str) -> None:
 
 
 def _start_tunnel(config: ComfyRecoveryConfig) -> None:
+    # Explicit bind: local_port → remote loopback:8188 only (never 8189)
+    if int(config.remote_port) == 8189:
+        raise ComfyRecoveryError("remote port 8189 is lipsync/auth — refuse (use 8188)")
     forward = f"127.0.0.1:{config.local_port}:127.0.0.1:{config.remote_port}"
     command = [
         "ssh",
+        "-F",
+        "/dev/null",
         "-i",
         str(config.identity_file),
         "-o",
@@ -274,17 +344,19 @@ def _start_tunnel(config: ComfyRecoveryConfig) -> None:
         "-o",
         "IdentitiesOnly=yes",
         "-o",
-        "StrictHostKeyChecking=yes",
+        "StrictHostKeyChecking=accept-new",
         "-o",
         f"UserKnownHostsFile={config.known_hosts_file}",
         "-o",
-        f"HostKeyAlias={config.hostkey_alias}",
+        f"HostKeyAlias={config.hostkey_alias or config.target.rsplit('@', 1)[-1]}",
         "-o",
         "ExitOnForwardFailure=yes",
         "-o",
-        "ConnectTimeout=10",
+        "ConnectTimeout=15",
         "-o",
         "ServerAliveInterval=30",
+        "-o",
+        "ServerAliveCountMax=3",
         "-fN",
         "-L",
         forward,
@@ -295,14 +367,15 @@ def _start_tunnel(config: ComfyRecoveryConfig) -> None:
             command,
             check=False,
             capture_output=True,
-            timeout=20,
+            timeout=25,
             env=minimal_subprocess_env(),
         )
     except (OSError, subprocess.SubprocessError) as exc:
         raise ComfyRecoveryError("SSH tunnel repair failed") from exc
     if result.returncode != 0:
+        err = (result.stderr or b"").decode("utf-8", errors="replace")[:200]
         raise ComfyRecoveryError(
-            "SSH tunnel repair failed; inspect the local port owner without killing it"
+            f"SSH tunnel repair failed (rc={result.returncode}): {err or 'no stderr'}"
         )
 
 
@@ -328,6 +401,8 @@ def recover_comfy(
             "local_healthy": True,
             "remote_service_restarted": False,
         }
+    # Drop dead local listeners before re-bind (zombie -L after remote sleep)
+    _kill_stale_local_tunnel(checked.local_port)
 
     class _RemoteNotReady(RuntimeError):
         """Internal: remote probe not healthy yet — util.retry only."""
@@ -381,3 +456,66 @@ def recover_comfy(
 
 def recover_comfy_from_env(*, confirm: bool) -> dict[str, Any]:
     return recover_comfy(config_from_env(), confirm=confirm)
+
+
+def ensure_comfy_tunnel(
+    *,
+    confirm: bool = True,
+    restart_remote_if_down: bool = True,
+) -> dict[str, Any]:
+    """Force-open 18188→8188 tunnel (and start remote Comfy if needed).
+
+    User IRON 2026-08-06: never leave tunnel as manual homework.
+    Safe defaults: Tailscale target user@100.66.2.28 · remote 8188 only.
+    """
+    if not confirm:
+        raise ComfyRecoveryError("ensure_comfy_tunnel requires confirm=True")
+    config = validate_recovery_config(config_from_env())
+    notes: list[str] = []
+    if _local_probe(config):
+        return {
+            "schema_version": 1,
+            "kind": "comfy-tunnel-ensure",
+            "ok": True,
+            "action": "already_healthy",
+            "local_port": config.local_port,
+            "remote_port": config.remote_port,
+            "target": config.target,
+            "notes": notes,
+        }
+    notes.extend(_kill_stale_local_tunnel(config.local_port))
+    if not restart_remote_if_down:
+        # tunnel only
+        _start_tunnel(config)
+        ok = _local_probe(config)
+        return {
+            "schema_version": 1,
+            "kind": "comfy-tunnel-ensure",
+            "ok": ok,
+            "action": "tunnel_only",
+            "local_port": config.local_port,
+            "remote_port": config.remote_port,
+            "target": config.target,
+            "notes": notes,
+        }
+    # Full recovery: remote start if needed + tunnel
+    rep = recover_comfy(
+        config,
+        confirm=True,
+        local_probe=_local_probe,
+        remote_probe=_remote_probe,
+        run_remote=_run_remote,
+        start_tunnel=_start_tunnel,
+    )
+    return {
+        "schema_version": 1,
+        "kind": "comfy-tunnel-ensure",
+        "ok": bool(rep.get("ok")),
+        "action": rep.get("action"),
+        "local_port": config.local_port,
+        "remote_port": config.remote_port,
+        "target": config.target,
+        "remote_service_restarted": rep.get("remote_service_restarted"),
+        "notes": notes,
+        "recovery": rep,
+    }
