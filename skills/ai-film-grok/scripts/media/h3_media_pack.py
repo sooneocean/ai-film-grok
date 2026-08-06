@@ -411,3 +411,57 @@ def r2v_ref_prompt_clause(refs: list[dict[str, Any]]) -> str:
 def end_still_dest(root: Path | str, shot_id: str) -> Path:
     """Canonical end-still path for Phase 4 production."""
     return _root(root) / "stills" / f"{shot_id}_end.png"
+
+
+def enrich_h3_last_frames(root: Path | str) -> dict[str, Any]:
+    """Scan continue handoffs and auto-derive candidate end stills for FLF chains."""
+    import shutil
+    from util import read_json, utc_now
+
+    base = _root(root)
+    spec_path = base / "film-spec.json"
+    if not spec_path.is_file():
+        return {"ok": False, "error": "film-spec.json missing"}
+
+    spec = read_json(spec_path) or {}
+    from continue_handoff import iter_shot_ids, previous_shot_id
+
+    shot_ids = iter_shot_ids(spec)
+    stills_dir = base / "stills"
+    stills_dir.mkdir(parents=True, exist_ok=True)
+    handoff_dir = base / "receipts" / "continue-handoff"
+
+    derived: list[dict[str, Any]] = []
+    for sid in shot_ids:
+        prev_id = previous_shot_id(spec, sid)
+        if not prev_id:
+            continue
+
+        # Check if previous shot produced a continue handoff endframe
+        end_png = handoff_dir / f"{prev_id}_end.png"
+        last_png = base / "keyframes" / f"_last_{prev_id}.png"
+        source_frame = end_png if end_png.is_file() else (last_png if last_png.is_file() else None)
+
+        if not source_frame:
+            continue
+
+        target_end_still = stills_dir / f"{prev_id}_end.png"
+        if not target_end_still.is_file():
+            shutil.copy2(source_frame, target_end_still)
+            derived.append(
+                {
+                    "prev_shot_id": prev_id,
+                    "target_shot_id": sid,
+                    "source_frame": str(source_frame),
+                    "derived_end_still": str(target_end_still),
+                    "mode_enabled": "flf",
+                }
+            )
+
+    return {
+        "ok": True,
+        "kind": "h3-enrich-last-frames",
+        "derived_count": len(derived),
+        "derived": derived,
+        "created_at": utc_now(),
+    }
