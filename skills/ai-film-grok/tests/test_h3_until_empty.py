@@ -447,6 +447,20 @@ class CapacityWaitTests(unittest.TestCase):
             self.assertEqual(rep["stop_reason"], "capacity_not_ready")
             self.assertFalse((rep.get("capacity_waits") or [{}])[0].get("ready"))
 
+    def test_capacity_wait_hard_max_allows_overnight(self) -> None:
+        """--capacity-wait-sec 7200 must not be silently clamped to 600s."""
+        from h3_fill_idle import _CAPACITY_WAIT_SEC_HARD_MAX, wait_for_comfy_capacity
+
+        self.assertGreaterEqual(_CAPACITY_WAIT_SEC_HARD_MAX, 7200.0)
+        # Instant ready path still records the requested max after clamp.
+        with mock.patch(
+            "h3_fill_idle.probe_comfy_capacity_soft",
+            return_value={"ok": True, "ready": True, "status": "ready", "blockers": []},
+        ):
+            rep = wait_for_comfy_capacity(max_wait_sec=7200.0, poll_sec=1.0, sleep_fn=lambda _s: None)
+        self.assertEqual(rep.get("max_wait_sec"), 7200.0)
+        self.assertTrue(rep.get("ready"))
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -875,7 +875,9 @@ def prepare_capacity_free_first(
     return report
 
 
-_CAPACITY_WAIT_SEC_HARD_MAX = 600.0
+# Overnight drain: foreign H3 jobs often run 10–20+ min; 600s was silently
+# clamping --capacity-wait-sec 7200 and stopping with capacity_not_ready.
+_CAPACITY_WAIT_SEC_HARD_MAX = 28800.0  # 8h ceiling (CLI still owns the request)
 _CAPACITY_WAIT_POLL_DEFAULT = 5.0
 
 

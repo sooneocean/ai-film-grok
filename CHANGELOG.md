@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.39.84] - 2026-08-06
+
+### Fixed (C1 capacity wait clamp)
+- **`_CAPACITY_WAIT_SEC_HARD_MAX`**: 600s → **28800s (8h)** so `--capacity-wait-sec 7200` is not silently clamped; foreign H3 jobs no longer force premature `capacity_not_ready` stop every 10 minutes.
+- Test: `test_capacity_wait_hard_max_allows_overnight` in `test_h3_until_empty.py`.
+
 ## [2.39.83] - 2026-08-06
 
 ### Fixed (savani media honesty)
