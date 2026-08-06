@@ -101,7 +101,8 @@ def note_queue_partial(
 
 # Typed fail reasons — agents must use these instead of hand-editing queue JSON
 FAIL_REASONS = frozenset({"moderation", "motion", "rate_limit", "decode", "other"})
-# Default backoff seconds by reason when retryable
+# Default backoff seconds by reason when retryable (job-level next_attempt_at,
+# not process sleep — media_queue requeues; see util.retry for process loops).
 REASON_BACKOFF_SEC = {
     "moderation": 0,  # do not auto-spin; requeue after soft still
     "motion": 5,
@@ -109,6 +110,14 @@ REASON_BACKOFF_SEC = {
     "decode": 10,
     "other": 15,
 }
+
+
+def scheduled_backoff_sec(reason: str) -> float:
+    """Single lookup for job-level retry delay (seconds until next_attempt_at)."""
+    key = str(reason or "other").strip().lower() or "other"
+    if key not in REASON_BACKOFF_SEC:
+        key = "other"
+    return float(REASON_BACKOFF_SEC[key])
 
 
 class QueueError(RuntimeError):
@@ -938,7 +947,7 @@ class MediaQueue:
                 # stay failed until agent requeues after soft still / new inputs
                 auto_retry = False
             if auto_retry:
-                base = REASON_BACKOFF_SEC.get(reason_norm, 15)
+                base = scheduled_backoff_sec(reason_norm)
                 if reason_norm == "rate_limit":
                     delay = max(base, min(60 * (2 ** (attempts - 1)), 1800))
                 else:

@@ -51,6 +51,28 @@ def test_read_json_source_rejects_non_object_array(tmp_path: Path) -> None:
         read_json_source(path)
 
 
+def test_poll_until_success() -> None:
+    from util.retry import poll_until
+
+    state = {"n": 0}
+
+    def tick() -> str | None:
+        state["n"] += 1
+        return "ok" if state["n"] >= 3 else None
+
+    sleeps: list[float] = []
+    assert poll_until(tick, timeout_sec=10.0, interval_sec=0.01, sleep=sleeps.append) == "ok"
+    assert state["n"] == 3
+    assert len(sleeps) == 2
+
+
+def test_poll_until_timeout() -> None:
+    from util.retry import poll_until
+
+    with pytest.raises(TimeoutError):
+        poll_until(lambda: None, timeout_sec=0.05, interval_sec=0.01, sleep=lambda _: None)
+
+
 def test_parse_mean_volume_db() -> None:
     from core.media_ops import parse_mean_volume_db, parse_max_volume_db, parse_volume_stats
 

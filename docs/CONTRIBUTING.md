@@ -12,6 +12,8 @@
 | Agent rules | [`AGENTS.md`](../AGENTS.md) |
 | Hard product rules | [`skills/ai-film-grok/references/hard-defaults.md`](../skills/ai-film-grok/references/hard-defaults.md) |
 | Review checklist | [`REVIEW_CHECKLIST.md`](./REVIEW_CHECKLIST.md) |
+| Shim policy | [`SHIM_POLICY.md`](./SHIM_POLICY.md) |
+| Memory / docs governance | [`MEMORY_GOVERNANCE.md`](./MEMORY_GOVERNANCE.md) |
 | IRON → test map | [`reports/2026-08-06-iron-gate-coverage.md`](./reports/2026-08-06-iron-gate-coverage.md) |
 
 ## Authoritative CLI

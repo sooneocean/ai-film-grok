@@ -37,3 +37,32 @@ def retry_call(
             wait *= backoff
     assert last is not None
     raise last
+
+
+def poll_until(
+    fn: Callable[[], T | None],
+    *,
+    timeout_sec: float,
+    interval_sec: float = 1.0,
+    sleep: Callable[[float], None] = time.sleep,
+    clock: Callable[[], float] = time.time,
+) -> T:
+    """Call ``fn`` until it returns a non-``None`` value or ``timeout_sec`` elapses.
+
+    ``fn`` should return ``None`` to mean "not ready yet". On timeout raises
+    ``TimeoutError`` (last non-ready poll is not retained as a success value).
+    """
+    if timeout_sec <= 0:
+        raise ValueError("timeout_sec must be > 0")
+    if interval_sec < 0:
+        raise ValueError("interval_sec must be >= 0")
+    deadline = clock() + float(timeout_sec)
+    while True:
+        value = fn()
+        if value is not None:
+            return value
+        now = clock()
+        if now >= deadline:
+            raise TimeoutError(f"poll_until timed out after {timeout_sec}s")
+        remaining = deadline - now
+        sleep(min(float(interval_sec), max(0.0, remaining)))

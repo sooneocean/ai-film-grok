@@ -227,9 +227,13 @@ def probe_lipsync_models(*, host: str = DEFAULT_HOST) -> dict[str, Any]:
 def poll_task(
     task_id: str, *, api_key: str, host: str = DEFAULT_HOST, timeout_s: float = 300
 ) -> dict[str, Any]:
-    deadline = time.time() + timeout_s
+    """Poll FRW task until completed/failed or timeout (util.retry.poll_until)."""
+    from util.retry import poll_until
+
     last: dict[str, Any] = {}
-    while time.time() < deadline:
+
+    def _once() -> dict[str, Any] | None:
+        nonlocal last
         st, body = _http_json(
             "GET",
             f"{host.rstrip('/')}/api/frwapi/v1/tasks/{task_id}",
@@ -237,8 +241,7 @@ def poll_task(
             timeout=30,
         )
         if st != 200 or not isinstance(body, dict):
-            time.sleep(5)
-            continue
+            return None
         data = body.get("data") or {}
         status = data.get("status")
         url = None
@@ -253,9 +256,13 @@ def poll_task(
         }
         if status in {"completed", "failed"}:
             return last
-        time.sleep(6)
-    last["status"] = last.get("status") or "timeout"
-    return last
+        return None
+
+    try:
+        return poll_until(_once, timeout_sec=float(timeout_s), interval_sec=6.0, sleep=time.sleep)
+    except TimeoutError:
+        last["status"] = last.get("status") or "timeout"
+        return last
 
 
 def _download(url: str, dest: Path) -> Path:

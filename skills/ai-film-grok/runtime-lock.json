@@ -1470,7 +1470,7 @@
     },
     {
       "path": "scripts/media/frw_lipsync.py",
-      "sha256": "3913154fc1617b2aca3d20e44a9863ab865ec9ce95a27c3eead52f91463f055c"
+      "sha256": "5775260ca6bcc6159d312343ab9a3cb154df78eb5f736d9366d148402a109765"
     },
     {
       "path": "scripts/media/frw_rate_limit.py",
@@ -1542,7 +1542,7 @@
     },
     {
       "path": "scripts/media/media_queue.py",
-      "sha256": "55ead58dc9f9677283a639f1723fedc7172f2dd175094fdfa3b54f49c0544c73"
+      "sha256": "057acb025d8aebf8a76cf76d08c1a39f8c7b3f50359c311f34c1041a91011db9"
     },
     {
       "path": "scripts/media/pilot_pack.py",
@@ -2474,7 +2474,7 @@
     },
     {
       "path": "scripts/util/retry.py",
-      "sha256": "ba0c93d9e2d047bf59ff19c8877faa6f66ad17820f67be71835d63bf926a4185"
+      "sha256": "6e3027c776df405fa4e336f642dd248cec28a49f629c506c7c75042558c45421"
     },
     {
       "path": "scripts/util/spine_helpers.py",

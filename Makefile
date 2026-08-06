@@ -17,11 +17,12 @@ SKILL := $(ROOT)/skills/ai-film-grok
 AIFILM := $(SKILL)/scripts/aifilm
 RUNTIME_PYTHON := $(SKILL)/scripts/runtime-python
 
-.PHONY: help setup dev test test-fast test-hotpath check-all clean validate doctor coverage audit audit-full lessons-audit release-check release-light update inspect version sync-docs sync install-hooks lock-runtime
+.PHONY: help setup dev test test-fast test-hotpath check-all review clean validate doctor coverage audit audit-full lessons-audit release-check release-light update inspect version sync-docs sync install-hooks lock-runtime
 
 help:
 	@echo "ai-film-grok make targets"
 	@echo "  check-all       secret-scan + validate + ruff + doctor + pytest not slow + hotpath"
+	@echo "  review          pre-PR: secret-scan + hotpath (fail-closed contracts)"
 	@echo "  test-fast       same fast pytest as agents (not slow)"
 	@echo "  test-hotpath    final/compose/gates fail-mode contracts only"
 	@echo "  test            full pytest (includes slow)"
@@ -40,6 +41,11 @@ dev:
 
 check-all:
 	@bash "$(ROOT)/scripts/check-all.sh"
+
+# Pre-PR / agent self-review: secrets + fail-closed hotpath only (fast).
+review:
+	@python3 "$(ROOT)/scripts/secret_scan.py"
+	@$(MAKE) test-hotpath
 
 clean:
 	@rm -rf "$(SKILL)/.pytest_cache" "$(SKILL)/.ruff_cache" "$(SKILL)/coverage.json" "$(SKILL)/.coverage"

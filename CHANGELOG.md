@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.39.95] - 2026-08-06
+
+### Added / Fixed (quality closeout)
+- **pre-push always runs** `scripts/secret_scan.py` (no silent skip when gitea-publish missing).
+- **`make review`**: secret-scan + hotpath fail-closed contracts.
+- **MEMORY_GOVERNANCE** + CONTRIBUTING links; quality plan marked **CLOSED**.
+- **`util.retry.poll_until`**: frw_lipsync `poll_task` uses it; tests for timeout/success.
+- **media_queue `scheduled_backoff_sec`**: single job-level backoff lookup (process sleep remains out of scope).
+
 ## [2.39.94] - 2026-08-06
 
 ### Added / Refactored (quality round 4)
