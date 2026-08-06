@@ -1739,6 +1739,37 @@ def fill_idle_until_empty(
     )
     if bool(execute) and not own:
         plan_before = capacity_plan(base, include_challenge=include_challenge)
+        halt_code = "RUN_EXCLUSIVE_GPU_REQUIRED"
+        halt_group = "ownership"
+        decision_trace = {
+            "kind": "ai-film-h3-run-next-decision-tree",
+            "at": utc_now(),
+            "request": {
+                "root": str(base),
+                "include_challenge": bool(include_challenge),
+                "execute": True,
+                "register": True,
+                "require_capacity": True,
+                "seed": 20260804,
+                "timeout_sec": 1800,
+                "max_jobs": max_jobs_per_cycle,
+                "free_memory_on_mode_switch": True,
+            },
+            "next_report": None,
+            "skipped_reason": "exclusive_gpu_required",
+        }
+        open_op = {
+            "schema_version": 1,
+            "kind": "ai-film-h3-run-next-open-op",
+            "at": utc_now(),
+            "reason": "exclusive_gpu_required",
+            "halt_reason_code": halt_code,
+            "halt_reason_group": halt_group,
+            "command": None,
+            "next_after": None,
+            "pending_after": plan_before.get("pending_jobs"),
+            "decision_tree": decision_trace,
+        }
         report = {
             "schema_version": 1,
             "kind": "ai-film-fill-idle-until-empty",
@@ -1748,12 +1779,31 @@ def fill_idle_until_empty(
             "until_empty": True,
             "i_own_the_gpu": False,
             "stop_reason": "exclusive_gpu_required",
+            "halt_reason_code": halt_code,
+            "halt_reason_group": halt_group,
+            "skipped_reason": "exclusive_gpu_required",
+            "decision_tree": decision_trace,
+            "open_ops": [open_op],
             "cycles_run": 0,
             "jobs_ran_total": 0,
             "takes_count_before": takes_before,
             "takes_count_after": takes_before,
             "takes_count_delta": 0,
             "pending_reason_breakdown": pending_breakdown_before,
+            "cycles": [
+                {
+                    "cycle": 1,
+                    "jobs_ran": 0,
+                    "skipped_reason": "exclusive_gpu_required",
+                    "halt_reason_code": halt_code,
+                    "halt_reason_group": halt_group,
+                    "decision_tree": decision_trace,
+                    "ok": False,
+                    "pending_after": plan_before.get("pending_jobs"),
+                    "next_after": None,
+                    "open_ops": [open_op],
+                }
+            ],
             "plan_before": {
                 "pending_jobs": plan_before.get("pending_jobs"),
                 "eta_minutes_total": plan_before.get("eta_minutes_total"),
