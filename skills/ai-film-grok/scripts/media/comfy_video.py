@@ -1099,6 +1099,19 @@ def probe(base_url: str) -> dict[str, Any]:
     }
 
 
+def _safe_comfy_upload_filename(path: Path, content: bytes) -> str:
+    """Stable ASCII name for Comfy input slot (no spaces/parens from collision renames).
+
+    ComfyUI renames duplicate uploads to ``name (1).ext`` which fails armory
+    ``_SAFE_PREFIX`` and breaks H3 continue-handoff chains (C1 · 2026-08-06).
+    """
+    ext = path.suffix.lower() if path.suffix else ".png"
+    if ext not in {".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp"}:
+        ext = ".png"
+    digest = hashlib.sha256(content).hexdigest()[:16]
+    return f"aifilm_{digest}{ext}"
+
+
 def upload_image(base_url: str, image_path: Path) -> dict[str, str]:
     path = Path(image_path).expanduser().resolve()
     if not path.is_file():
@@ -1111,11 +1124,12 @@ def upload_image(base_url: str, image_path: Path) -> dict[str, str]:
     ):
         raise ComfyVideoError("unsafe upload filename")
     boundary = f"aifilm-{secrets.token_hex(12)}"
-    content_type = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
     content = path.read_bytes()
+    upload_name = _safe_comfy_upload_filename(path, content)
+    content_type = mimetypes.guess_type(upload_name)[0] or "application/octet-stream"
     parts = [
         f"--{boundary}\r\n"
-        f'Content-Disposition: form-data; name="image"; filename="{path.name}"\r\n'
+        f'Content-Disposition: form-data; name="image"; filename="{upload_name}"\r\n'
         f"Content-Type: {content_type}\r\n\r\n".encode(),
         content,
         (
@@ -1124,7 +1138,7 @@ def upload_image(base_url: str, image_path: Path) -> dict[str, str]:
             "input\r\n"
             f"--{boundary}\r\n"
             'Content-Disposition: form-data; name="overwrite"\r\n\r\n'
-            "false\r\n"
+            "true\r\n"
             f"--{boundary}--\r\n"
         ).encode(),
     ]
