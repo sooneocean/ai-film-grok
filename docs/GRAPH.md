@@ -208,6 +208,9 @@ flowchart TD
 - `skills/ai-film-grok/tests/test_external_review.py`
 - `skills/ai-film-grok/tests/test_face_identity.py`
 - `skills/ai-film-grok/tests/test_fill_idle.py`
+- `skills/ai-film-grok/tests/test_fill_idle_dispatch_order.py`
+- `skills/ai-film-grok/tests/test_fill_idle_mode_select.py`
+- `skills/ai-film-grok/tests/test_fill_idle_p2_challenge.py`
 - `skills/ai-film-grok/tests/test_fill_idle_run_next_ledger.py`
 - `skills/ai-film-grok/tests/test_final_editorial_review.py`
 - `skills/ai-film-grok/tests/test_final_heartbeat.py`
@@ -235,6 +238,7 @@ flowchart TD
 - `skills/ai-film-grok/tests/test_generation_request.py`
 - `skills/ai-film-grok/tests/test_generation_usage.py`
 - `skills/ai-film-grok/tests/test_genre_beat_spines.py`
+- `skills/ai-film-grok/tests/test_gpu_no_hog.py`
 - `skills/ai-film-grok/tests/test_grok_oauth_pack.py`
 - `skills/ai-film-grok/tests/test_grok_reference_video_adapter.py`
 - `skills/ai-film-grok/tests/test_h3_combo_eval.py`
@@ -248,6 +252,7 @@ flowchart TD
 - `skills/ai-film-grok/tests/test_h3_workflow.py`
 - `skills/ai-film-grok/tests/test_hard_defaults.py`
 - `skills/ai-film-grok/tests/test_hardcore_extreme.py`
+- `skills/ai-film-grok/tests/test_headroom.py`
 - `skills/ai-film-grok/tests/test_heat_arc_multi.py`
 - `skills/ai-film-grok/tests/test_heat_check.py`
 - `skills/ai-film-grok/tests/test_higgs_performance_adapter.py`
@@ -410,6 +415,7 @@ flowchart TD
 - `skills/ai-film-grok/tests/test_story_plan.py`
 - `skills/ai-film-grok/tests/test_story_reception.py`
 - `skills/ai-film-grok/tests/test_strict_gate_paths.py`
+- `skills/ai-film-grok/tests/test_style_bible_consistency.py`
 - `skills/ai-film-grok/tests/test_style_lock.py`
 - `skills/ai-film-grok/tests/test_style_lock_hair.py`
 - `skills/ai-film-grok/tests/test_style_neg_merge.py`
@@ -421,7 +427,9 @@ flowchart TD
 - `skills/ai-film-grok/tests/test_temporal_denoising_cas.py`
 - `skills/ai-film-grok/tests/test_title_double_burn_docs.py`
 - `skills/ai-film-grok/tests/test_title_end_procedural.py`
+- `skills/ai-film-grok/tests/test_transition_export_readback.py`
 - `skills/ai-film-grok/tests/test_transition_frame_audit.py`
+- `skills/ai-film-grok/tests/test_transition_policy.py`
 - `skills/ai-film-grok/tests/test_true_video_policy.py`
 - `skills/ai-film-grok/tests/test_tts_ab.py`
 - `skills/ai-film-grok/tests/test_tts_audio_node_probe.py`
