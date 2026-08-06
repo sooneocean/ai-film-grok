@@ -18,57 +18,23 @@ import lipsync_backend  # noqa: E402
 import tts_backend  # noqa: E402
 
 
-@pytest.mark.slow
 class ExternalLipSyncTests(unittest.TestCase):
-    @pytest.mark.slow
+    """v2.40: external lipsync argv path removed — only frozen probe/raise remains."""
+
     def test_legacy_shell_template_is_rejected(self) -> None:
-        env = {
-            "AIFILM_LIPSYNC_CMD": "python tool.py --face {video} --audio {audio} --out {out}",
-        }
-        with mock.patch.dict(os.environ, env, clear=True):
-            with self.assertRaises(lipsync_backend.LipSyncError):
-                lipsync_backend.external_argv_template()
+        with self.assertRaises(lipsync_backend.LipSyncError):
+            lipsync_backend.lipsync_one(
+                video="/tmp/a.mp4", audio="/tmp/a.wav", out="/tmp/o.mp4", backend="external"
+            )
 
-    @pytest.mark.slow
     def test_external_backend_executes_structured_argv_without_shell(self) -> None:
-        raw = json.dumps(
-            [
-                "python3",
-                "/opt/lipsync.py",
-                "--face",
-                "{video}",
-                "--audio",
-                "{audio}",
-                "--out",
-                "{out}",
-            ]
-        )
-        with tempfile.TemporaryDirectory() as tmp:
-            tmp_path = Path(tmp)
-            video = tmp_path / "face; touch PWNED.mp4"
-            audio = tmp_path / "voice.wav"
-            out = tmp_path / "out.mp4"
-            video.write_bytes(b"video")
-            audio.write_bytes(b"audio")
-
-            def completed(argv: list[str], **_: object) -> subprocess.CompletedProcess[str]:
-                out.write_bytes(b"result")
-                return subprocess.CompletedProcess(argv, 0, "", "")
-
-            with mock.patch.dict(os.environ, {"AIFILM_LIPSYNC_ARGV": raw}, clear=True):
-                template = lipsync_backend.external_argv_template()
-                with mock.patch.object(
-                    lipsync_backend.subprocess, "run", side_effect=completed
-                ) as run:
-                    lipsync_backend.run_external(video, audio, out, template)
-
-            argv = run.call_args.args[0]
-            self.assertIsInstance(argv, list)
-            self.assertEqual(argv[3], str(video))
-            self.assertFalse(run.call_args.kwargs.get("shell", False))
-            self.assertEqual(run.call_args.kwargs["timeout"], 300)
-            self.assertNotIn("FISH_API_KEY", run.call_args.kwargs["env"])
-
+        probe = lipsync_backend.probe()
+        self.assertTrue(probe.get("frozen"))
+        self.assertEqual(probe.get("ready"), [])
+        with self.assertRaises(lipsync_backend.LipSyncError):
+            lipsync_backend.enforce_dialogue_lipsync(
+                vo_mode="hybrid", shots=[], requested="external"
+            )
 
 @pytest.mark.slow
 class ExternalTTSTests(unittest.TestCase):

@@ -310,6 +310,10 @@ class ScaleFallbackTests(unittest.TestCase):
         self.assertEqual(rep["achieved_wardrobe_tier"], "soft-max")
         self.assertTrue(rep["partial"])
         self.assertIn("SCALE_SOFT_MAX", rep["codes"])
+        # S3 · ambition vs honest cap
+        self.assertEqual(rep.get("wardrobe_ambition"), "bare")
+        self.assertEqual(rep.get("wardrobe_honest_cap"), "soft-max")
+        self.assertFalse(rep.get("ambition_met"))
 
     def test_wardrobe_re_dress_still_hard_in_heat(self) -> None:
         """B3: re-dress still machine-blocked (existing heat code)."""
