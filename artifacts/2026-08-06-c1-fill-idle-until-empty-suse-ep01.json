@@ -1,0 +1,1235 @@
+{
+  "schema_version": 1,
+  "kind": "ai-film-fill-idle-until-empty",
+  "ok": true,
+  "root": "/Users/dex/AI FILM SPACE/0805/suse-evolution-ep01",
+  "execute": true,
+  "until_empty": true,
+  "i_own_the_gpu": true,
+  "free_first": true,
+  "capacity_wait_sec": 1800.0,
+  "capacity_waits": [
+    {
+      "schema_version": 1,
+      "kind": "ai-film-capacity-recover",
+      "free_first": true,
+      "capacity_wait_sec": 1800.0,
+      "free_prep": {
+        "schema_version": 1,
+        "kind": "ai-film-capacity-free-first",
+        "free_first": true,
+        "attempted": true,
+        "freed": true,
+        "would_free": true,
+        "skipped_reason": "still_blocked_after_free",
+        "outcome": "still_blocked_after_free",
+        "before": {
+          "ready": false,
+          "status": "blocked",
+          "blockers": [
+            {
+              "code": "RAM_BELOW_FLOOR",
+              "message": "free system memory is below the 12 GiB submission floor"
+            },
+            {
+              "code": "VRAM_BELOW_FLOOR",
+              "message": "free GPU memory is below the 24 GiB submission floor"
+            }
+          ],
+          "vram_free_bytes": 9194382279,
+          "error": null
+        },
+        "after": {
+          "ready": false,
+          "status": "blocked",
+          "blockers": [
+            {
+              "code": "RAM_BELOW_FLOOR",
+              "message": "free system memory is below the 12 GiB submission floor"
+            },
+            {
+              "code": "VRAM_BELOW_FLOOR",
+              "message": "free GPU memory is below the 24 GiB submission floor"
+            }
+          ],
+          "vram_free_bytes": 9194382279,
+          "error": null
+        },
+        "free_result": {
+          "ok": true,
+          "action": "free_memory"
+        }
+      },
+      "wait": {
+        "schema_version": 1,
+        "kind": "ai-film-capacity-wait",
+        "ok": true,
+        "ready": true,
+        "waited_sec": 5.24,
+        "max_wait_sec": 1800.0,
+        "poll_sec": 5.0,
+        "probes": 2,
+        "last": {
+          "ready": true,
+          "status": "ready",
+          "blockers": [],
+          "vram_free_bytes": 32277004288,
+          "error": null
+        },
+        "free_attempts": [],
+        "outcome": "ready_after_wait"
+      },
+      "ready": true,
+      "outcome": "ready_after_wait"
+    },
+    {
+      "schema_version": 1,
+      "kind": "ai-film-capacity-recover",
+      "free_first": true,
+      "capacity_wait_sec": 1800.0,
+      "free_prep": {
+        "schema_version": 1,
+        "kind": "ai-film-capacity-free-first",
+        "free_first": true,
+        "attempted": true,
+        "freed": true,
+        "would_free": true,
+        "skipped_reason": "still_blocked_after_free",
+        "outcome": "still_blocked_after_free",
+        "before": {
+          "ready": false,
+          "status": "blocked",
+          "blockers": [
+            {
+              "code": "RAM_BELOW_FLOOR",
+              "message": "free system memory is below the 12 GiB submission floor"
+            },
+            {
+              "code": "VRAM_BELOW_FLOOR",
+              "message": "free GPU memory is below the 24 GiB submission floor"
+            }
+          ],
+          "vram_free_bytes": 9309049799,
+          "error": null
+        },
+        "after": {
+          "ready": false,
+          "status": "blocked",
+          "blockers": [
+            {
+              "code": "RAM_BELOW_FLOOR",
+              "message": "free system memory is below the 12 GiB submission floor"
+            },
+            {
+              "code": "VRAM_BELOW_FLOOR",
+              "message": "free GPU memory is below the 24 GiB submission floor"
+            }
+          ],
+          "vram_free_bytes": 9309049799,
+          "error": null
+        },
+        "free_result": {
+          "ok": true,
+          "action": "free_memory"
+        }
+      },
+      "wait": {
+        "schema_version": 1,
+        "kind": "ai-film-capacity-wait",
+        "ok": true,
+        "ready": true,
+        "waited_sec": 5.22,
+        "max_wait_sec": 1800.0,
+        "poll_sec": 5.0,
+        "probes": 2,
+        "last": {
+          "ready": true,
+          "status": "ready",
+          "blockers": [],
+          "vram_free_bytes": 32277004288,
+          "error": null
+        },
+        "free_attempts": [],
+        "outcome": "ready_after_wait"
+      },
+      "ready": true,
+      "outcome": "ready_after_wait"
+    },
+    {
+      "schema_version": 1,
+      "kind": "ai-film-capacity-recover",
+      "free_first": true,
+      "capacity_wait_sec": 1800.0,
+      "free_prep": {
+        "schema_version": 1,
+        "kind": "ai-film-capacity-free-first",
+        "free_first": true,
+        "attempted": true,
+        "freed": true,
+        "would_free": true,
+        "skipped_reason": "still_blocked_after_free",
+        "outcome": "still_blocked_after_free",
+        "before": {
+          "ready": false,
+          "status": "blocked",
+          "blockers": [
+            {
+              "code": "RAM_BELOW_FLOOR",
+              "message": "free system memory is below the 12 GiB submission floor"
+            },
+            {
+              "code": "VRAM_BELOW_FLOOR",
+              "message": "free GPU memory is below the 24 GiB submission floor"
+            }
+          ],
+          "vram_free_bytes": 10129830855,
+          "error": null
+        },
+        "after": {
+          "ready": false,
+          "status": "blocked",
+          "blockers": [
+            {
+              "code": "RAM_BELOW_FLOOR",
+              "message": "free system memory is below the 12 GiB submission floor"
+            },
+            {
+              "code": "VRAM_BELOW_FLOOR",
+              "message": "free GPU memory is below the 24 GiB submission floor"
+            }
+          ],
+          "vram_free_bytes": 10129830855,
+          "error": null
+        },
+        "free_result": {
+          "ok": true,
+          "action": "free_memory"
+        }
+      },
+      "wait": {
+        "schema_version": 1,
+        "kind": "ai-film-capacity-wait",
+        "ok": true,
+        "ready": true,
+        "waited_sec": 5.09,
+        "max_wait_sec": 1800.0,
+        "poll_sec": 5.0,
+        "probes": 2,
+        "last": {
+          "ready": true,
+          "status": "ready",
+          "blockers": [],
+          "vram_free_bytes": 32277004288,
+          "error": null
+        },
+        "free_attempts": [],
+        "outcome": "ready_after_wait"
+      },
+      "ready": true,
+      "outcome": "ready_after_wait"
+    },
+    {
+      "schema_version": 1,
+      "kind": "ai-film-capacity-recover",
+      "free_first": true,
+      "capacity_wait_sec": 1800.0,
+      "free_prep": {
+        "schema_version": 1,
+        "kind": "ai-film-capacity-free-first",
+        "free_first": true,
+        "attempted": true,
+        "freed": true,
+        "would_free": true,
+        "skipped_reason": "still_blocked_after_free",
+        "outcome": "still_blocked_after_free",
+        "before": {
+          "ready": false,
+          "status": "blocked",
+          "blockers": [
+            {
+              "code": "RAM_BELOW_FLOOR",
+              "message": "free system memory is below the 12 GiB submission floor"
+            },
+            {
+              "code": "VRAM_BELOW_FLOOR",
+              "message": "free GPU memory is below the 24 GiB submission floor"
+            }
+          ],
+          "vram_free_bytes": 9564099527,
+          "error": null
+        },
+        "after": {
+          "ready": false,
+          "status": "blocked",
+          "blockers": [
+            {
+              "code": "RAM_BELOW_FLOOR",
+              "message": "free system memory is below the 12 GiB submission floor"
+            },
+            {
+              "code": "VRAM_BELOW_FLOOR",
+              "message": "free GPU memory is below the 24 GiB submission floor"
+            }
+          ],
+          "vram_free_bytes": 9564099527,
+          "error": null
+        },
+        "free_result": {
+          "ok": true,
+          "action": "free_memory"
+        }
+      },
+      "wait": {
+        "schema_version": 1,
+        "kind": "ai-film-capacity-wait",
+        "ok": true,
+        "ready": true,
+        "waited_sec": 5.1,
+        "max_wait_sec": 1800.0,
+        "poll_sec": 5.0,
+        "probes": 2,
+        "last": {
+          "ready": true,
+          "status": "ready",
+          "blockers": [],
+          "vram_free_bytes": 32277004288,
+          "error": null
+        },
+        "free_attempts": [],
+        "outcome": "ready_after_wait"
+      },
+      "ready": true,
+      "outcome": "ready_after_wait"
+    }
+  ],
+  "free_prep": {
+    "schema_version": 1,
+    "kind": "ai-film-capacity-free-first",
+    "free_first": true,
+    "attempted": true,
+    "freed": true,
+    "would_free": true,
+    "skipped_reason": "still_blocked_after_free",
+    "outcome": "still_blocked_after_free",
+    "before": {
+      "ready": false,
+      "status": "blocked",
+      "blockers": [
+        {
+          "code": "RAM_BELOW_FLOOR",
+          "message": "free system memory is below the 12 GiB submission floor"
+        },
+        {
+          "code": "VRAM_BELOW_FLOOR",
+          "message": "free GPU memory is below the 24 GiB submission floor"
+        }
+      ],
+      "vram_free_bytes": 8763855815,
+      "error": null
+    },
+    "after": {
+      "ready": false,
+      "status": "blocked",
+      "blockers": [
+        {
+          "code": "RAM_BELOW_FLOOR",
+          "message": "free system memory is below the 12 GiB submission floor"
+        },
+        {
+          "code": "VRAM_BELOW_FLOOR",
+          "message": "free GPU memory is below the 24 GiB submission floor"
+        }
+      ],
+      "vram_free_bytes": 8763855815,
+      "error": null
+    },
+    "free_result": {
+      "ok": true,
+      "action": "free_memory"
+    }
+  },
+  "stop_reason": "queue_empty",
+  "halt_reason_code": "RUN_QUEUE_EMPTY",
+  "halt_reason_group": "queue",
+  "skipped_reason": "queue_empty",
+  "cycles_run": 5,
+  "max_cycles": 40,
+  "max_jobs_per_cycle": 5,
+  "jobs_ran_total": 5,
+  "takes_count_before": 93,
+  "takes_count_after": 103,
+  "takes_count_delta": 10,
+  "pending_reason_breakdown": {},
+  "pending_reason_breakdown_before": {
+    "h3_below_floor": 5
+  },
+  "plan_before": {
+    "pending_jobs": 5,
+    "eta_minutes_total": 40.0,
+    "p0_jobs": 0
+  },
+  "plan_after": {
+    "pending_jobs": 0,
+    "eta_minutes_total": 0.0,
+    "p0_jobs": 0
+  },
+  "before": {
+    "p0_pending": 10,
+    "p1_pending": 5,
+    "p2_pending": 0,
+    "pending_jobs": 5,
+    "multi_take_shots": 26,
+    "by_priority": {
+      "P0c": 10,
+      "P1": 5,
+      "done": 11
+    },
+    "by_mode": {
+      "i2v": 5
+    },
+    "priority_ok": true,
+    "eta_minutes_total": 40.0
+  },
+  "after": {
+    "p0_pending": 13,
+    "p1_pending": 0,
+    "p2_pending": 0,
+    "pending_jobs": 0,
+    "multi_take_shots": 26,
+    "by_priority": {
+      "P0c": 13,
+      "done": 13
+    },
+    "by_mode": {},
+    "priority_ok": true,
+    "eta_minutes_total": 0.0
+  },
+  "cycles": [
+    {
+      "cycle": 1,
+      "jobs_ran": 1,
+      "skipped_reason": "capacity_not_ready",
+      "halt_reason_code": "RUN_NOT_EXECUTED_CAPACITY",
+      "halt_reason_group": "capacity",
+      "decision_tree": {
+        "kind": "ai-film-h3-run-next-decision-tree",
+        "at": "2026-08-06T07:35:22+00:00",
+        "request": {
+          "root": "/Users/dex/AI FILM SPACE/0805/suse-evolution-ep01",
+          "include_challenge": true,
+          "execute": true,
+          "register": true,
+          "require_capacity": true,
+          "seed": 20260804,
+          "timeout_sec": 1800,
+          "max_jobs": 5,
+          "free_memory_on_mode_switch": true
+        },
+        "next_report": {
+          "schema_version": 1,
+          "kind": "ai-film-h3-fill-idle-next",
+          "ok": true,
+          "root": "/Users/dex/AI FILM SPACE/0805/suse-evolution-ep01",
+          "pending_count": 4,
+          "by_priority": {
+            "P1": 4
+          },
+          "priority_ok": true,
+          "priority_violations": [],
+          "next": {
+            "shot_id": "ep01_sc03_door_s07",
+            "priority": "P1",
+            "lane": "primary_h3",
+            "mode": "i2v",
+            "command": "aifilm h3 run --root \"/Users/dex/AI FILM SPACE/0805/suse-evolution-ep01\" --shot-id ep01_sc03_door_s07 --mode i2v --register",
+            "best_mean": 2.9539,
+            "reasons": [
+              "continue_endframe",
+              "h3_below_floor"
+            ]
+          },
+          "command": "aifilm h3 run --root \"/Users/dex/AI FILM SPACE/0805/suse-evolution-ep01\" --shot-id ep01_sc03_door_s07 --mode i2v --register",
+          "capacity": {
+            "ok": true,
+            "ready": false,
+            "status": "blocked",
+            "vram_free_bytes": 9194382279,
+            "blockers": [
+              {
+                "code": "RAM_BELOW_FLOOR",
+                "message": "free system memory is below the 12 GiB submission floor"
+              },
+              {
+                "code": "VRAM_BELOW_FLOOR",
+                "message": "free GPU memory is below the 24 GiB submission floor"
+              }
+            ],
+            "base_url": "http://127.0.0.1:18188",
+            "source": "submission_capacity"
+          },
+          "capacity_ready": false,
+          "still_challenge_hint": null,
+          "note": "Comfy capacity not ready (VRAM/queue) — free-memory or wait; command is still the next Fill-Idle job"
+        },
+        "skipped_reason": null
+      },
+      "ok": true,
+      "pending_after": 4,
+      "next_after": {
+        "shot_id": "ep01_sc03_door_s07",
+        "priority": "P1",
+        "lane": "primary_h3",
+        "mode": "i2v",
+        "command": "aifilm h3 run --root \"/Users/dex/AI FILM SPACE/0805/suse-evolution-ep01\" --shot-id ep01_sc03_door_s07 --mode i2v --register",
+        "best_mean": 2.9539,
+        "reasons": [
+          "continue_endframe",
+          "h3_below_floor"
+        ]
+      },
+      "open_ops": [
+        {
+          "schema_version": 1,
+          "kind": "ai-film-h3-run-next-open-op",
+          "at": "2026-08-06T07:35:22+00:00",
+          "reason": "capacity_not_ready",
+          "halt_reason_code": "RUN_NOT_EXECUTED_CAPACITY",
+          "halt_reason_group": "capacity",
+          "command": "aifilm h3 run --root \"/Users/dex/AI FILM SPACE/0805/suse-evolution-ep01\" --shot-id ep01_sc03_door_s07 --mode i2v --register",
+          "next_after": {
+            "shot_id": "ep01_sc03_door_s07",
+            "priority": "P1",
+            "lane": "primary_h3",
+            "mode": "i2v",
+            "command": "aifilm h3 run --root \"/Users/dex/AI FILM SPACE/0805/suse-evolution-ep01\" --shot-id ep01_sc03_door_s07 --mode i2v --register",
+            "best_mean": 2.9539,
+            "reasons": [
+              "continue_endframe",
+              "h3_below_floor"
+            ]
+          },
+          "pending_after": 4,
+          "decision_tree": {
+            "kind": "ai-film-h3-run-next-decision-tree",
+            "at": "2026-08-06T07:35:22+00:00",
+            "request": {
+              "root": "/Users/dex/AI FILM SPACE/0805/suse-evolution-ep01",
+              "include_challenge": true,
+              "execute": true,
+              "register": true,
+              "require_capacity": true,
+              "seed": 20260804,
+              "timeout_sec": 1800,
+              "max_jobs": 5,
+              "free_memory_on_mode_switch": true
+            },
+            "next_report": {
+              "schema_version": 1,
+              "kind": "ai-film-h3-fill-idle-next",
+              "ok": true,
+              "root": "/Users/dex/AI FILM SPACE/0805/suse-evolution-ep01",
+              "pending_count": 4,
+              "by_priority": {
+                "P1": 4
+              },
+              "priority_ok": true,
+              "priority_violations": [],
+              "next": {
+                "shot_id": "ep01_sc03_door_s07",
+                "priority": "P1",
+                "lane": "primary_h3",
+                "mode": "i2v",
+                "command": "aifilm h3 run --root \"/Users/dex/AI FILM SPACE/0805/suse-evolution-ep01\" --shot-id ep01_sc03_door_s07 --mode i2v --register",
+                "best_mean": 2.9539,
+                "reasons": [
+                  "continue_endframe",
+                  "h3_below_floor"
+                ]
+              },
+              "command": "aifilm h3 run --root \"/Users/dex/AI FILM SPACE/0805/suse-evolution-ep01\" --shot-id ep01_sc03_door_s07 --mode i2v --register",
+              "capacity": {
+                "ok": true,
+                "ready": false,
+                "status": "blocked",
+                "vram_free_bytes": 9194382279,
+                "blockers": [
+                  {
+                    "code": "RAM_BELOW_FLOOR",
+                    "message": "free system memory is below the 12 GiB submission floor"
+                  },
+                  {
+                    "code": "VRAM_BELOW_FLOOR",
+                    "message": "free GPU memory is below the 24 GiB submission floor"
+                  }
+                ],
+                "base_url": "http://127.0.0.1:18188",
+                "source": "submission_capacity"
+              },
+              "capacity_ready": false,
+              "still_challenge_hint": null,
+              "note": "Comfy capacity not ready (VRAM/queue) — free-memory or wait; command is still the next Fill-Idle job"
+            },
+            "skipped_reason": null
+          }
+        }
+      ],
+      "capacity_recover": {
+        "outcome": "ready_after_wait",
+        "ready": true,
+        "waited_sec": 5.24
+      }
+    },
+    {
+      "cycle": 2,
+      "jobs_ran": 1,
+      "skipped_reason": "capacity_not_ready",
+      "halt_reason_code": "RUN_NOT_EXECUTED_CAPACITY",
+      "halt_reason_group": "capacity",
+      "decision_tree": {
+        "kind": "ai-film-h3-run-next-decision-tree",
+        "at": "2026-08-06T07:36:34+00:00",
+        "request": {
+          "root": "/Users/dex/AI FILM SPACE/0805/suse-evolution-ep01",
+          "include_challenge": true,
+          "execute": true,
+          "register": true,
+          "require_capacity": true,
+          "seed": 20260804,
+          "timeout_sec": 1800,
+          "max_jobs": 5,
+          "free_memory_on_mode_switch": true
+        },
+        "next_report": {
+          "schema_version": 1,
+          "kind": "ai-film-h3-fill-idle-next",
+          "ok": true,
+          "root": "/Users/dex/AI FILM SPACE/0805/suse-evolution-ep01",
+          "pending_count": 3,
+          "by_priority": {
+            "P1": 3
+          },
+          "priority_ok": true,
+          "priority_violations": [],
+          "next": {
+            "shot_id": "ep01_sc03_door_s08",
+            "priority": "P1",
+            "lane": "primary_h3",
+            "mode": "i2v",
+            "command": "aifilm h3 run --root \"/Users/dex/AI FILM SPACE/0805/suse-evolution-ep01\" --shot-id ep01_sc03_door_s08 --mode i2v --register",
+            "best_mean": 3.0041,
+            "reasons": [
+              "continue_endframe",
+              "h3_below_floor"
+            ]
+          },
+          "command": "aifilm h3 run --root \"/Users/dex/AI FILM SPACE/0805/suse-evolution-ep01\" --shot-id ep01_sc03_door_s08 --mode i2v --register",
+          "capacity": {
+            "ok": true,
+            "ready": false,
+            "status": "blocked",
+            "vram_free_bytes": 9309049799,
+            "blockers": [
+              {
+                "code": "RAM_BELOW_FLOOR",
+                "message": "free system memory is below the 12 GiB submission floor"
+              },
+              {
+                "code": "VRAM_BELOW_FLOOR",
+                "message": "free GPU memory is below the 24 GiB submission floor"
+              }
+            ],
+            "base_url": "http://127.0.0.1:18188",
+            "source": "submission_capacity"
+          },
+          "capacity_ready": false,
+          "still_challenge_hint": null,
+          "note": "Comfy capacity not ready (VRAM/queue) — free-memory or wait; command is still the next Fill-Idle job"
+        },
+        "skipped_reason": null
+      },
+      "ok": true,
+      "pending_after": 3,
+      "next_after": {
+        "shot_id": "ep01_sc03_door_s08",
+        "priority": "P1",
+        "lane": "primary_h3",
+        "mode": "i2v",
+        "command": "aifilm h3 run --root \"/Users/dex/AI FILM SPACE/0805/suse-evolution-ep01\" --shot-id ep01_sc03_door_s08 --mode i2v --register",
+        "best_mean": 3.0041,
+        "reasons": [
+          "continue_endframe",
+          "h3_below_floor"
+        ]
+      },
+      "open_ops": [
+        {
+          "schema_version": 1,
+          "kind": "ai-film-h3-run-next-open-op",
+          "at": "2026-08-06T07:36:34+00:00",
+          "reason": "capacity_not_ready",
+          "halt_reason_code": "RUN_NOT_EXECUTED_CAPACITY",
+          "halt_reason_group": "capacity",
+          "command": "aifilm h3 run --root \"/Users/dex/AI FILM SPACE/0805/suse-evolution-ep01\" --shot-id ep01_sc03_door_s08 --mode i2v --register",
+          "next_after": {
+            "shot_id": "ep01_sc03_door_s08",
+            "priority": "P1",
+            "lane": "primary_h3",
+            "mode": "i2v",
+            "command": "aifilm h3 run --root \"/Users/dex/AI FILM SPACE/0805/suse-evolution-ep01\" --shot-id ep01_sc03_door_s08 --mode i2v --register",
+            "best_mean": 3.0041,
+            "reasons": [
+              "continue_endframe",
+              "h3_below_floor"
+            ]
+          },
+          "pending_after": 3,
+          "decision_tree": {
+            "kind": "ai-film-h3-run-next-decision-tree",
+            "at": "2026-08-06T07:36:34+00:00",
+            "request": {
+              "root": "/Users/dex/AI FILM SPACE/0805/suse-evolution-ep01",
+              "include_challenge": true,
+              "execute": true,
+              "register": true,
+              "require_capacity": true,
+              "seed": 20260804,
+              "timeout_sec": 1800,
+              "max_jobs": 5,
+              "free_memory_on_mode_switch": true
+            },
+            "next_report": {
+              "schema_version": 1,
+              "kind": "ai-film-h3-fill-idle-next",
+              "ok": true,
+              "root": "/Users/dex/AI FILM SPACE/0805/suse-evolution-ep01",
+              "pending_count": 3,
+              "by_priority": {
+                "P1": 3
+              },
+              "priority_ok": true,
+              "priority_violations": [],
+              "next": {
+                "shot_id": "ep01_sc03_door_s08",
+                "priority": "P1",
+                "lane": "primary_h3",
+                "mode": "i2v",
+                "command": "aifilm h3 run --root \"/Users/dex/AI FILM SPACE/0805/suse-evolution-ep01\" --shot-id ep01_sc03_door_s08 --mode i2v --register",
+                "best_mean": 3.0041,
+                "reasons": [
+                  "continue_endframe",
+                  "h3_below_floor"
+                ]
+              },
+              "command": "aifilm h3 run --root \"/Users/dex/AI FILM SPACE/0805/suse-evolution-ep01\" --shot-id ep01_sc03_door_s08 --mode i2v --register",
+              "capacity": {
+                "ok": true,
+                "ready": false,
+                "status": "blocked",
+                "vram_free_bytes": 9309049799,
+                "blockers": [
+                  {
+                    "code": "RAM_BELOW_FLOOR",
+                    "message": "free system memory is below the 12 GiB submission floor"
+                  },
+                  {
+                    "code": "VRAM_BELOW_FLOOR",
+                    "message": "free GPU memory is below the 24 GiB submission floor"
+                  }
+                ],
+                "base_url": "http://127.0.0.1:18188",
+                "source": "submission_capacity"
+              },
+              "capacity_ready": false,
+              "still_challenge_hint": null,
+              "note": "Comfy capacity not ready (VRAM/queue) — free-memory or wait; command is still the next Fill-Idle job"
+            },
+            "skipped_reason": null
+          }
+        }
+      ],
+      "capacity_recover": {
+        "outcome": "ready_after_wait",
+        "ready": true,
+        "waited_sec": 5.22
+      }
+    },
+    {
+      "cycle": 3,
+      "jobs_ran": 1,
+      "skipped_reason": "capacity_not_ready",
+      "halt_reason_code": "RUN_NOT_EXECUTED_CAPACITY",
+      "halt_reason_group": "capacity",
+      "decision_tree": {
+        "kind": "ai-film-h3-run-next-decision-tree",
+        "at": "2026-08-06T07:37:50+00:00",
+        "request": {
+          "root": "/Users/dex/AI FILM SPACE/0805/suse-evolution-ep01",
+          "include_challenge": true,
+          "execute": true,
+          "register": true,
+          "require_capacity": true,
+          "seed": 20260804,
+          "timeout_sec": 1800,
+          "max_jobs": 5,
+          "free_memory_on_mode_switch": true
+        },
+        "next_report": {
+          "schema_version": 1,
+          "kind": "ai-film-h3-fill-idle-next",
+          "ok": true,
+          "root": "/Users/dex/AI FILM SPACE/0805/suse-evolution-ep01",
+          "pending_count": 2,
+          "by_priority": {
+            "P1": 2
+          },
+          "priority_ok": true,
+          "priority_violations": [],
+          "next": {
+            "shot_id": "ep01_sc03_door_s06",
+            "priority": "P1",
+            "lane": "primary_h3",
+            "mode": "i2v",
+            "command": "aifilm h3 run --root \"/Users/dex/AI FILM SPACE/0805/suse-evolution-ep01\" --shot-id ep01_sc03_door_s06 --mode i2v --register",
+            "best_mean": 3.5064,
+            "reasons": [
+              "continue_endframe",
+              "h3_below_floor"
+            ]
+          },
+          "command": "aifilm h3 run --root \"/Users/dex/AI FILM SPACE/0805/suse-evolution-ep01\" --shot-id ep01_sc03_door_s06 --mode i2v --register",
+          "capacity": {
+            "ok": true,
+            "ready": false,
+            "status": "blocked",
+            "vram_free_bytes": 10129830855,
+            "blockers": [
+              {
+                "code": "RAM_BELOW_FLOOR",
+                "message": "free system memory is below the 12 GiB submission floor"
+              },
+              {
+                "code": "VRAM_BELOW_FLOOR",
+                "message": "free GPU memory is below the 24 GiB submission floor"
+              }
+            ],
+            "base_url": "http://127.0.0.1:18188",
+            "source": "submission_capacity"
+          },
+          "capacity_ready": false,
+          "still_challenge_hint": null,
+          "note": "Comfy capacity not ready (VRAM/queue) — free-memory or wait; command is still the next Fill-Idle job"
+        },
+        "skipped_reason": null
+      },
+      "ok": true,
+      "pending_after": 2,
+      "next_after": {
+        "shot_id": "ep01_sc03_door_s06",
+        "priority": "P1",
+        "lane": "primary_h3",
+        "mode": "i2v",
+        "command": "aifilm h3 run --root \"/Users/dex/AI FILM SPACE/0805/suse-evolution-ep01\" --shot-id ep01_sc03_door_s06 --mode i2v --register",
+        "best_mean": 3.5064,
+        "reasons": [
+          "continue_endframe",
+          "h3_below_floor"
+        ]
+      },
+      "open_ops": [
+        {
+          "schema_version": 1,
+          "kind": "ai-film-h3-run-next-open-op",
+          "at": "2026-08-06T07:37:50+00:00",
+          "reason": "capacity_not_ready",
+          "halt_reason_code": "RUN_NOT_EXECUTED_CAPACITY",
+          "halt_reason_group": "capacity",
+          "command": "aifilm h3 run --root \"/Users/dex/AI FILM SPACE/0805/suse-evolution-ep01\" --shot-id ep01_sc03_door_s06 --mode i2v --register",
+          "next_after": {
+            "shot_id": "ep01_sc03_door_s06",
+            "priority": "P1",
+            "lane": "primary_h3",
+            "mode": "i2v",
+            "command": "aifilm h3 run --root \"/Users/dex/AI FILM SPACE/0805/suse-evolution-ep01\" --shot-id ep01_sc03_door_s06 --mode i2v --register",
+            "best_mean": 3.5064,
+            "reasons": [
+              "continue_endframe",
+              "h3_below_floor"
+            ]
+          },
+          "pending_after": 2,
+          "decision_tree": {
+            "kind": "ai-film-h3-run-next-decision-tree",
+            "at": "2026-08-06T07:37:50+00:00",
+            "request": {
+              "root": "/Users/dex/AI FILM SPACE/0805/suse-evolution-ep01",
+              "include_challenge": true,
+              "execute": true,
+              "register": true,
+              "require_capacity": true,
+              "seed": 20260804,
+              "timeout_sec": 1800,
+              "max_jobs": 5,
+              "free_memory_on_mode_switch": true
+            },
+            "next_report": {
+              "schema_version": 1,
+              "kind": "ai-film-h3-fill-idle-next",
+              "ok": true,
+              "root": "/Users/dex/AI FILM SPACE/0805/suse-evolution-ep01",
+              "pending_count": 2,
+              "by_priority": {
+                "P1": 2
+              },
+              "priority_ok": true,
+              "priority_violations": [],
+              "next": {
+                "shot_id": "ep01_sc03_door_s06",
+                "priority": "P1",
+                "lane": "primary_h3",
+                "mode": "i2v",
+                "command": "aifilm h3 run --root \"/Users/dex/AI FILM SPACE/0805/suse-evolution-ep01\" --shot-id ep01_sc03_door_s06 --mode i2v --register",
+                "best_mean": 3.5064,
+                "reasons": [
+                  "continue_endframe",
+                  "h3_below_floor"
+                ]
+              },
+              "command": "aifilm h3 run --root \"/Users/dex/AI FILM SPACE/0805/suse-evolution-ep01\" --shot-id ep01_sc03_door_s06 --mode i2v --register",
+              "capacity": {
+                "ok": true,
+                "ready": false,
+                "status": "blocked",
+                "vram_free_bytes": 10129830855,
+                "blockers": [
+                  {
+                    "code": "RAM_BELOW_FLOOR",
+                    "message": "free system memory is below the 12 GiB submission floor"
+                  },
+                  {
+                    "code": "VRAM_BELOW_FLOOR",
+                    "message": "free GPU memory is below the 24 GiB submission floor"
+                  }
+                ],
+                "base_url": "http://127.0.0.1:18188",
+                "source": "submission_capacity"
+              },
+              "capacity_ready": false,
+              "still_challenge_hint": null,
+              "note": "Comfy capacity not ready (VRAM/queue) — free-memory or wait; command is still the next Fill-Idle job"
+            },
+            "skipped_reason": null
+          }
+        }
+      ],
+      "capacity_recover": {
+        "outcome": "ready_after_wait",
+        "ready": true,
+        "waited_sec": 5.09
+      }
+    },
+    {
+      "cycle": 4,
+      "jobs_ran": 1,
+      "skipped_reason": "capacity_not_ready",
+      "halt_reason_code": "RUN_NOT_EXECUTED_CAPACITY",
+      "halt_reason_group": "capacity",
+      "decision_tree": {
+        "kind": "ai-film-h3-run-next-decision-tree",
+        "at": "2026-08-06T07:38:55+00:00",
+        "request": {
+          "root": "/Users/dex/AI FILM SPACE/0805/suse-evolution-ep01",
+          "include_challenge": true,
+          "execute": true,
+          "register": true,
+          "require_capacity": true,
+          "seed": 20260804,
+          "timeout_sec": 1800,
+          "max_jobs": 5,
+          "free_memory_on_mode_switch": true
+        },
+        "next_report": {
+          "schema_version": 1,
+          "kind": "ai-film-h3-fill-idle-next",
+          "ok": true,
+          "root": "/Users/dex/AI FILM SPACE/0805/suse-evolution-ep01",
+          "pending_count": 1,
+          "by_priority": {
+            "P1": 1
+          },
+          "priority_ok": true,
+          "priority_violations": [],
+          "next": {
+            "shot_id": "ep01_sc04_undress_s12",
+            "priority": "P1",
+            "lane": "primary_h3",
+            "mode": "i2v",
+            "command": "aifilm h3 run --root \"/Users/dex/AI FILM SPACE/0805/suse-evolution-ep01\" --shot-id ep01_sc04_undress_s12 --mode i2v --register",
+            "best_mean": 4.0641,
+            "reasons": [
+              "continue_endframe",
+              "h3_below_floor"
+            ]
+          },
+          "command": "aifilm h3 run --root \"/Users/dex/AI FILM SPACE/0805/suse-evolution-ep01\" --shot-id ep01_sc04_undress_s12 --mode i2v --register",
+          "capacity": {
+            "ok": true,
+            "ready": false,
+            "status": "blocked",
+            "vram_free_bytes": 9564099527,
+            "blockers": [
+              {
+                "code": "RAM_BELOW_FLOOR",
+                "message": "free system memory is below the 12 GiB submission floor"
+              },
+              {
+                "code": "VRAM_BELOW_FLOOR",
+                "message": "free GPU memory is below the 24 GiB submission floor"
+              }
+            ],
+            "base_url": "http://127.0.0.1:18188",
+            "source": "submission_capacity"
+          },
+          "capacity_ready": false,
+          "still_challenge_hint": null,
+          "note": "Comfy capacity not ready (VRAM/queue) — free-memory or wait; command is still the next Fill-Idle job"
+        },
+        "skipped_reason": null
+      },
+      "ok": true,
+      "pending_after": 1,
+      "next_after": {
+        "shot_id": "ep01_sc04_undress_s12",
+        "priority": "P1",
+        "lane": "primary_h3",
+        "mode": "i2v",
+        "command": "aifilm h3 run --root \"/Users/dex/AI FILM SPACE/0805/suse-evolution-ep01\" --shot-id ep01_sc04_undress_s12 --mode i2v --register",
+        "best_mean": 4.0641,
+        "reasons": [
+          "continue_endframe",
+          "h3_below_floor"
+        ]
+      },
+      "open_ops": [
+        {
+          "schema_version": 1,
+          "kind": "ai-film-h3-run-next-open-op",
+          "at": "2026-08-06T07:38:55+00:00",
+          "reason": "capacity_not_ready",
+          "halt_reason_code": "RUN_NOT_EXECUTED_CAPACITY",
+          "halt_reason_group": "capacity",
+          "command": "aifilm h3 run --root \"/Users/dex/AI FILM SPACE/0805/suse-evolution-ep01\" --shot-id ep01_sc04_undress_s12 --mode i2v --register",
+          "next_after": {
+            "shot_id": "ep01_sc04_undress_s12",
+            "priority": "P1",
+            "lane": "primary_h3",
+            "mode": "i2v",
+            "command": "aifilm h3 run --root \"/Users/dex/AI FILM SPACE/0805/suse-evolution-ep01\" --shot-id ep01_sc04_undress_s12 --mode i2v --register",
+            "best_mean": 4.0641,
+            "reasons": [
+              "continue_endframe",
+              "h3_below_floor"
+            ]
+          },
+          "pending_after": 1,
+          "decision_tree": {
+            "kind": "ai-film-h3-run-next-decision-tree",
+            "at": "2026-08-06T07:38:55+00:00",
+            "request": {
+              "root": "/Users/dex/AI FILM SPACE/0805/suse-evolution-ep01",
+              "include_challenge": true,
+              "execute": true,
+              "register": true,
+              "require_capacity": true,
+              "seed": 20260804,
+              "timeout_sec": 1800,
+              "max_jobs": 5,
+              "free_memory_on_mode_switch": true
+            },
+            "next_report": {
+              "schema_version": 1,
+              "kind": "ai-film-h3-fill-idle-next",
+              "ok": true,
+              "root": "/Users/dex/AI FILM SPACE/0805/suse-evolution-ep01",
+              "pending_count": 1,
+              "by_priority": {
+                "P1": 1
+              },
+              "priority_ok": true,
+              "priority_violations": [],
+              "next": {
+                "shot_id": "ep01_sc04_undress_s12",
+                "priority": "P1",
+                "lane": "primary_h3",
+                "mode": "i2v",
+                "command": "aifilm h3 run --root \"/Users/dex/AI FILM SPACE/0805/suse-evolution-ep01\" --shot-id ep01_sc04_undress_s12 --mode i2v --register",
+                "best_mean": 4.0641,
+                "reasons": [
+                  "continue_endframe",
+                  "h3_below_floor"
+                ]
+              },
+              "command": "aifilm h3 run --root \"/Users/dex/AI FILM SPACE/0805/suse-evolution-ep01\" --shot-id ep01_sc04_undress_s12 --mode i2v --register",
+              "capacity": {
+                "ok": true,
+                "ready": false,
+                "status": "blocked",
+                "vram_free_bytes": 9564099527,
+                "blockers": [
+                  {
+                    "code": "RAM_BELOW_FLOOR",
+                    "message": "free system memory is below the 12 GiB submission floor"
+                  },
+                  {
+                    "code": "VRAM_BELOW_FLOOR",
+                    "message": "free GPU memory is below the 24 GiB submission floor"
+                  }
+                ],
+                "base_url": "http://127.0.0.1:18188",
+                "source": "submission_capacity"
+              },
+              "capacity_ready": false,
+              "still_challenge_hint": null,
+              "note": "Comfy capacity not ready (VRAM/queue) — free-memory or wait; command is still the next Fill-Idle job"
+            },
+            "skipped_reason": null
+          }
+        }
+      ],
+      "capacity_recover": {
+        "outcome": "ready_after_wait",
+        "ready": true,
+        "waited_sec": 5.1
+      }
+    },
+    {
+      "cycle": 5,
+      "jobs_ran": 1,
+      "skipped_reason": "queue_empty_after_runs",
+      "halt_reason_code": "RUN_QUEUE_EMPTY",
+      "halt_reason_group": "queue",
+      "decision_tree": {
+        "kind": "ai-film-h3-run-next-decision-tree",
+        "at": "2026-08-06T07:40:02+00:00",
+        "request": {
+          "root": "/Users/dex/AI FILM SPACE/0805/suse-evolution-ep01",
+          "include_challenge": true,
+          "execute": true,
+          "register": true,
+          "require_capacity": true,
+          "seed": 20260804,
+          "timeout_sec": 1800,
+          "max_jobs": 5,
+          "free_memory_on_mode_switch": true
+        },
+        "next_report": {
+          "schema_version": 1,
+          "kind": "ai-film-h3-fill-idle-next",
+          "ok": true,
+          "root": "/Users/dex/AI FILM SPACE/0805/suse-evolution-ep01",
+          "pending_count": 0,
+          "by_priority": {},
+          "priority_ok": true,
+          "priority_violations": [],
+          "next": null,
+          "command": null,
+          "capacity": {
+            "ok": true,
+            "ready": false,
+            "status": "blocked",
+            "vram_free_bytes": 10546779079,
+            "blockers": [
+              {
+                "code": "RAM_BELOW_FLOOR",
+                "message": "free system memory is below the 12 GiB submission floor"
+              },
+              {
+                "code": "VRAM_BELOW_FLOOR",
+                "message": "free GPU memory is below the 24 GiB submission floor"
+              }
+            ],
+            "base_url": "http://127.0.0.1:18188",
+            "source": "submission_capacity"
+          },
+          "capacity_ready": false,
+          "still_challenge_hint": null,
+          "note": "Queue empty — P0/P1/P2 all clear or nothing eligible"
+        },
+        "skipped_reason": null
+      },
+      "ok": true,
+      "pending_after": 0,
+      "next_after": null,
+      "open_ops": [
+        {
+          "schema_version": 1,
+          "kind": "ai-film-h3-run-next-open-op",
+          "at": "2026-08-06T07:40:02+00:00",
+          "reason": "queue_empty_after_runs",
+          "halt_reason_code": "RUN_QUEUE_EMPTY",
+          "halt_reason_group": "queue",
+          "command": null,
+          "next_after": null,
+          "pending_after": 0,
+          "decision_tree": {
+            "kind": "ai-film-h3-run-next-decision-tree",
+            "at": "2026-08-06T07:40:02+00:00",
+            "request": {
+              "root": "/Users/dex/AI FILM SPACE/0805/suse-evolution-ep01",
+              "include_challenge": true,
+              "execute": true,
+              "register": true,
+              "require_capacity": true,
+              "seed": 20260804,
+              "timeout_sec": 1800,
+              "max_jobs": 5,
+              "free_memory_on_mode_switch": true
+            },
+            "next_report": {
+              "schema_version": 1,
+              "kind": "ai-film-h3-fill-idle-next",
+              "ok": true,
+              "root": "/Users/dex/AI FILM SPACE/0805/suse-evolution-ep01",
+              "pending_count": 0,
+              "by_priority": {},
+              "priority_ok": true,
+              "priority_violations": [],
+              "next": null,
+              "command": null,
+              "capacity": {
+                "ok": true,
+                "ready": false,
+                "status": "blocked",
+                "vram_free_bytes": 10546779079,
+                "blockers": [
+                  {
+                    "code": "RAM_BELOW_FLOOR",
+                    "message": "free system memory is below the 12 GiB submission floor"
+                  },
+                  {
+                    "code": "VRAM_BELOW_FLOOR",
+                    "message": "free GPU memory is below the 24 GiB submission floor"
+                  }
+                ],
+                "base_url": "http://127.0.0.1:18188",
+                "source": "submission_capacity"
+              },
+              "capacity_ready": false,
+              "still_challenge_hint": null,
+              "note": "Queue empty — P0/P1/P2 all clear or nothing eligible"
+            },
+            "skipped_reason": null
+          }
+        }
+      ]
+    }
+  ],
+  "pk_multi_take": 26,
+  "dailies_path": "/Users/dex/AI FILM SPACE/0805/suse-evolution-ep01/receipts/pk-dailies.md",
+  "human_next": [
+    "aifilm h3 pk-compare --root \"/Users/dex/AI FILM SPACE/0805/suse-evolution-ep01\"",
+    "aifilm select-shortlist --root \"/Users/dex/AI FILM SPACE/0805/suse-evolution-ep01\" --promote  # only after human OK",
+    "aifilm ship-prep --root \"/Users/dex/AI FILM SPACE/0805/suse-evolution-ep01\""
+  ],
+  "note": "until-empty owns process until stop; never auto-promote; free_first never cancels foreign; capacity_wait polls without cancel; progress = takes_count_delta (not pending alone)",
+  "path": "/Users/dex/AI FILM SPACE/0805/suse-evolution-ep01/receipts/fill-idle-until-empty.json"
+}

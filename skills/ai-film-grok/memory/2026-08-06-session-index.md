@@ -13,11 +13,13 @@
 | 养分对账 | [nutrient-matrix](../../../docs/plans/2026-08-06-nutrient-matrix.md) | L3/L4 守门 · L5 废文 |
 | Memory 契约 | [README](README.md) · `archive/` | active ~37；canary/session-wrap 归档 |
 
-## OPEN（非代码假完成）
+## OPEN / 本轮闭合
 
-- **C1** until-empty → `queue_empty`：用户独占 + variety 绿 + `--i-own-the-gpu`
-- **N1** 半吞吐：plate 结案肌肉 · SCALE promote · anti-hijack 默认
-- 巨石 residual：final stages · heat wardrobe · export builder（挡路才拆）
+- **C1 until-empty → queue_empty** ✅ 2026-08-06 suse-evolution-ep01  
+  canary: `artifacts/2026-08-06-c1-until-empty-suse-ep01-canary.json`  
+  takes 91→103 · jobs 6（1 prove + 5 cycle）· `stop_reason=queue_empty` · `--i-own-the-gpu --free-first`
+- **N1** 半吞吐机读 ✅ 2.40.14
+- 巨石 residual：final stages · heat packs · export builder（挡路才拆）
 
 ## 本轮 L5 归档
 

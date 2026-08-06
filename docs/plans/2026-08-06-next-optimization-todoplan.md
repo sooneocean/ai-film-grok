@@ -215,7 +215,7 @@ Iron：public CLI 不变 · shim hard-compat · 每 peel 独测 · 与行为变�
 | **N1.2** | promote/register：SCALE_* fail-closed（含 nested decision） | ✅ 2.40.14 |
 | **N1.3** | multi-seed 无 anti-hijack → promote fail-closed + next_cmd | ✅ 2.40.14 |
 | **N1.4** | doctor `--root` plate≠master soft advisory | ✅ 2.40.14 |
-| **N2** | C1 until-empty OPEN_OPS 真烧 | 等人+GPU |
+| **N2** | C1 until-empty → **queue_empty** | ✅ 2026-08-06 suse · canary `artifacts/2026-08-06-c1-until-empty-suse-ep01-canary.json` |
 | **N3** | 挡路 peel only（=W3 residual） | 触达 |
 
 ---

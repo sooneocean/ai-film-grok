@@ -1,0 +1,61 @@
+{
+  "kind": "c1-until-empty-canary",
+  "schema_version": 1,
+  "status": "queue_empty",
+  "ok": true,
+  "at": "2026-08-06T07:46:06.973365+00:00",
+  "film_root": "/Users/dex/AI FILM SPACE/0805/suse-evolution-ep01",
+  "exclusive": true,
+  "flags": {
+    "execute": true,
+    "until_empty": true,
+    "free_first": true,
+    "i_own_the_gpu": true,
+    "max_cycles": 40,
+    "capacity_wait_sec": 1800
+  },
+  "preflight": {
+    "tunnel_18188": "up",
+    "variety_precheck": "ok",
+    "pending_jobs_session_start": 6,
+    "takes_session_start": 91
+  },
+  "prove_shot": {
+    "run_next_max_1": true,
+    "shot": "ep01_sc05_union_s16",
+    "takes_after_prove": 93,
+    "pending_after_prove": 5
+  },
+  "until_empty": {
+    "stop_reason": "queue_empty",
+    "ok": true,
+    "cycles_run": 5,
+    "jobs_ran_total": 5,
+    "takes_count_before": 93,
+    "takes_count_after": 103,
+    "takes_count_delta": 10,
+    "i_own_the_gpu": true,
+    "free_first": true,
+    "execute": true,
+    "receipt": "/Users/dex/AI FILM SPACE/0805/suse-evolution-ep01/receipts/fill-idle-until-empty.json",
+    "artifact_copy": "artifacts/2026-08-06-c1-fill-idle-until-empty-suse-ep01.json"
+  },
+  "session_totals": {
+    "takes_now": 103,
+    "takes_delta_from_91": 12,
+    "pending_jobs_now": 0,
+    "capacity_plan_next": null
+  },
+  "human_next": [
+    "aifilm h3 pk-compare --root \"/Users/dex/AI FILM SPACE/0805/suse-evolution-ep01\"",
+    "aifilm select-shortlist --root \"/Users/dex/AI FILM SPACE/0805/suse-evolution-ep01\" --promote  # only after human OK",
+    "aifilm ship-prep --root \"/Users/dex/AI FILM SPACE/0805/suse-evolution-ep01\""
+  ],
+  "honest_notes": [
+    "stop_reason=queue_empty is real; pending_after=0",
+    "end capacity may still show RAM/VRAM floors (models loaded) but queue empty",
+    "free-first never cancelled foreign prompts",
+    "progress measured by takes file count",
+    "concurrent savani final was local ffmpeg, not Comfy drain"
+  ]
+}

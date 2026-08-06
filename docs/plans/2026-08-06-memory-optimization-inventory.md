@@ -29,7 +29,7 @@
 
 | ID | 优化点 | 记忆/证据 | 状态 | 下一步 |
 |----|--------|-----------|------|--------|
-| **C1** | until-empty 真烧到 `queue_empty` | `2026-08-06-c1-*` · AF7 | **OPEN_OPS** | 用户独占 + `--i-own-the-gpu` + variety 绿片 |
+| **C1** | until-empty 真烧到 `queue_empty` | `2026-08-06-c1-*` · AF7 | **SHIPPED 2026-08-06** suse-ep01 canary | 独占 + `--i-own-the-gpu` + variety 绿 · takes 91→103 |
 | **C2** | free-first 不杀 foreign + 禁默认 hog | multi-agent-gpu-no-hog | **机读 ship 2.39.98**；真片仍纪律 | exclusive flag + 回执 |
 | **C3** | 正牌 final plate vs master 在交付文案 | `2026-08-06-suse-ep01-official-final-iron` | **ship 2.40.12** | 新片强制看 `official-final-report.json` + `test_suse_final_iron.py` 回归 |
 | **C4** | rnb 仅 license 无 wav → procedural 诚实 | 同上 · A4 | ship | 有 wav 再换库 |
@@ -223,4 +223,4 @@ P3  C11–C14 deferred / optional
 
 ---
 
-_Generated 2026-08-06 from ~80 memory cards + session indexes + active plans. Status of C1 row: OPEN_OPS (L4_INSERT_LOW / capacity-safe); C3 now ship-aligned with `test_suse_final_iron.py` checks._
+_Generated 2026-08-06 from ~80 memory cards + session indexes + active plans. C1 **queue_empty SHIPPED** on suse-evolution-ep01 (canary artifacts/2026-08-06-c1-until-empty-suse-ep01-canary.json). C3 ship-aligned with `test_suse_final_iron.py`._

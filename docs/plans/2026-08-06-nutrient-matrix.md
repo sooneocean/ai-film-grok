@@ -61,7 +61,7 @@
 
 | ID | 项 | 类型 |
 |----|-----|------|
-| C1 | until-empty → queue_empty | OPEN_OPS |
+| C1 | until-empty → queue_empty | **SHIPPED** suse canary 2026-08-06 |
 | C9 | final/export/heat residual peel | structure · 挡路 |
 | C3/C5 | 真片 final 诚实 / soft-max 压 | eng+ops |
 | C10 | bare subprocess 触达 timeout | eng |
