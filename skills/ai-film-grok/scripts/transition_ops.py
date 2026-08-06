@@ -22,6 +22,7 @@ _CRAFT_OVERLAYS = {
     "scene_bridge": "light_leak",
     "mood_hold": "color_wash",
     "soft_glue": "subtle_dissolve",
+    "speed_ramp": "motion_blur",
 }
 
 
