@@ -640,16 +640,27 @@ def build_fill_idle_queue(
             continue
         rows.append(row)
 
-    # P0 dual sticky first within rank; P2 lowest mean first
+    # P0 dual sticky first within rank; P1 rotate fewest H3 takes first (avoid
+    # shot09 monopolizing the 5090 when mean never clears floor); P2 lowest mean.
     def sort_key(r: dict[str, Any]) -> tuple:
         rank = int(r.get("priority_rank") or 99)
         sticky = 0 if r.get("dual_sticky") else 1
         mean = r.get("best_mean")
+        h3_n = 0
+        for t in r.get("takes") or []:
+            if isinstance(t, dict) and t.get("lane") == "h3":
+                h3_n += 1
         if r.get("priority") == "P2":
+            mean_key = float(mean) if mean is not None else 1e9
+            take_key = 0
+        elif r.get("priority") == "P1":
+            # fewest H3 takes first, then lowest mean (hardest still gets more later)
+            take_key = h3_n
             mean_key = float(mean) if mean is not None else 1e9
         else:
             mean_key = 0.0
-        return (rank, sticky, mean_key, str(r.get("shot_id") or ""))
+            take_key = 0
+        return (rank, sticky, take_key, mean_key, str(r.get("shot_id") or ""))
 
     rows.sort(key=sort_key)
 

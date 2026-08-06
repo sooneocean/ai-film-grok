@@ -1,5 +1,10 @@
 # Changelog
 
+## [2.39.87] - 2026-08-06
+
+### Fixed
+- heat_agent queue: soft codes no longer hard_fail media-queue; lengthen_meat cap 5.9s; pilot 批准 phrases.
+
 ## [2.39.86] - 2026-08-06
 
 ### Fixed (C1 free-after-idle)
