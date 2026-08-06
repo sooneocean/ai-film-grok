@@ -1,8 +1,13 @@
 # 若我来优化：ai-film-grok 代码库 Todo Plan（2026-08-06 · v2.40.12）
 
-**Status:** **ACTIVE 单一执行板 · 2026-08-06 closeout 2.40.12（执行中）**  
+> **SUPERSEDED / RESIDUAL POINTER** → 单一执行板请用  
+> **[2026-08-06-cto-optimization-todoplan.md](2026-08-06-cto-optimization-todoplan.md)**（CTO 全面优化 · G0–Wave9）。  
+> 本档 W0–N 多数 SHIPPED；勿按本表重开 A1–A5 / 包边界 / 专家团 P0。
+
+**Status:** **CLOSED → CTO plan** · 历史 closeout 2.40.12 证据保留  
 W0–W1.5 · W4 诚实 except · W5 纪律卡 · W6 archive **SHIPPED** · W2 tunnel **up** + capacity canary（until-empty **DEFERRED_SAFE** 默认 max5）· W3 巨石仍 bug-driven only  
 **副导演工序板：** [2026-08-06-ad-process-optimization-todoplan.md](2026-08-06-ad-process-optimization-todoplan.md)（Wave A–D 2.40.11）  
+**H3 日课工作流板（5090 核心 · 辅武器）：** [2026-08-06-h3-core-workflow-todoplan.md](2026-08-06-h3-core-workflow-todoplan.md)  
 **Repo:** `/Users/dex/.grok/plugins/ai-film-grok`
 
 **结论先行：** 这不是「缺功能」的仓库，而是 **片厂已建完、规章已上墙、车间仍塞着几个 3k–4k 行总控台** 的成熟产线。下一轮优化应以 **诚实出片 + 可维护热路径 + 运维吞吐** 为主，**禁止**再开「全员压到 1500 行」或「再写一套 IRON 散文」。

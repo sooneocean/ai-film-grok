@@ -1993,8 +1993,21 @@ def _face_identity_report(root: Path) -> dict[str, Any]:
             cm = bible.get("cast_masters")
             if isinstance(cm, dict):
                 cast_masters = cm
-        except Exception:  # noqa: BLE001
-            pass
+        except Exception as exc:  # noqa: BLE001 — fail-closed: corrupt bible ≠ skip gate
+            return {
+                "ok": False,
+                "checked": True,
+                "codes": ["STYLE_BIBLE_PARSE_FAILED"],
+                "issues": [
+                    {
+                        "code": "STYLE_BIBLE_PARSE_FAILED",
+                        "message": (
+                            f"style-bible.json present but unreadable ({exc!s:.120}); "
+                            "fix JSON before face-identity / promote"
+                        ),
+                    }
+                ],
+            }
     if not cast_masters:
         return {"ok": True, "checked": False, "codes": [], "issues": []}
 
@@ -2091,8 +2104,10 @@ def assert_face_identity_passed(
         str(spec.get("heat_scale") or "").lower() in {"max", "hot", "extreme"}
     )
     proven_drift = "FACE_IDENTITY_DRIFT" in report["codes"]
+    # Infrastructure failures (corrupt bible) are always hard — never soft-skip.
+    infra_fail = "STYLE_BIBLE_PARSE_FAILED" in (report.get("codes") or [])
     if proven_drift_only:
-        if not proven_drift:
+        if not proven_drift and not infra_fail:
             return {
                 "ok": True,
                 "checked": True,
@@ -2100,18 +2115,20 @@ def assert_face_identity_passed(
                 "codes": report["codes"],
                 "issues": report["issues"],
             }
-        message = "; ".join(
-            f"[{i['code']}] {i['message']}"
-            for i in report["issues"]
-            if i["code"] == "FACE_IDENTITY_DRIFT"
-        )
-        raise ProductionGateError(
-            f"face-identity gate (proven drift): {message} "
-            "Re-run aifilm face-identity enroll-bible && aifilm face-identity audit --root … "
-            "(re-shoot/re-edit drifting stills before approving). "
-            "Emergency: --skip-face-identity or AIFILM_SKIP_FACE_IDENTITY_GATE=1"
-        )
-    if not (proven_drift or strict):
+        if proven_drift:
+            message = "; ".join(
+                f"[{i['code']}] {i['message']}"
+                for i in report["issues"]
+                if i["code"] == "FACE_IDENTITY_DRIFT"
+            )
+            raise ProductionGateError(
+                f"face-identity gate (proven drift): {message} "
+                "Re-run aifilm face-identity enroll-bible && aifilm face-identity audit --root … "
+                "(re-shoot/re-edit drifting stills before approving). "
+                "Emergency: --skip-face-identity or AIFILM_SKIP_FACE_IDENTITY_GATE=1"
+            )
+        # infra_fail falls through to hard raise below
+    if not (proven_drift or strict or infra_fail):
         return {
             "ok": True,
             "checked": True,

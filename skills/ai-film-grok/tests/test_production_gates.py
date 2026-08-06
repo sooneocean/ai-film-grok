@@ -605,6 +605,14 @@ class FaceIdentityGateTests(unittest.TestCase):
             self.assertTrue(out.get("ok"))
             self.assertTrue(out.get("soft"))
 
+    def test_corrupt_style_bible_is_fail_closed(self) -> None:
+        """CTO A1: unreadable style-bible.json must not skip face-identity as ok."""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "style-bible.json").write_text("{not-json", encoding="utf-8")
+            with self.assertRaisesRegex(ProductionGateError, "STYLE_BIBLE_PARSE_FAILED"):
+                assert_face_identity_passed(root)
+
 
 class ContinuityChainGateTests(unittest.TestCase):
     def _root(self, *, strict: bool) -> Path:

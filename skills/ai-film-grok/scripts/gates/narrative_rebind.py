@@ -99,8 +99,14 @@ def check_narrative_rebind(root: Path | str, *, write: bool = True) -> dict[str,
                         "message": "graph_status reports projection_stale",
                     }
                 )
-        except Exception:
-            pass
+        except Exception as exc:  # noqa: BLE001 — soft: graph probe optional, never silent
+            issues.append(
+                {
+                    "code": "NARRATIVE_GRAPH_STATUS_UNAVAILABLE",
+                    "severity": "soft",
+                    "message": f"graph_status probe failed: {exc!s:.160}",
+                }
+            )
 
     # Adult max: re-assert sex arc at closeout (receipt for evidence)
     sex_arc: dict[str, Any] = {}

@@ -428,17 +428,27 @@ def assert_cinematic_gate_for_export(root: Path | str) -> dict[str, Any]:
     if isinstance(report, dict) and report.get("ok") is True:
         return {"ok": True, "gate": report, "path": str(path)}
 
-    # One machine-lane ensure (writes cinematic when needed) — no double auto_i2v pass
+    # One machine-lane ensure (writes cinematic when needed) — no double auto_i2v pass.
+    # Failures fall through to direct cinematic; do not swallow without a final ok check.
+    ensure_err: str | None = None
     try:
         from gate_auto import ensure_machine_lane
 
         ensure_machine_lane(base, force=False, write=True)
-    except Exception:
-        pass
+    except Exception as exc:  # noqa: BLE001
+        ensure_err = str(exc)[:200]
     report = read_json(path) if path.is_file() else None
     if not isinstance(report, dict) or report.get("ok") is not True:
         # last resort: direct cinematic with auto_i2v (legacy films)
         report = run_cinematic_gate(base, write=True, auto_i2v=True)
+    if (
+        isinstance(report, dict)
+        and report.get("ok") is True
+        and ensure_err
+        and not report.get("ensure_machine_lane_error")
+    ):
+        # Honest receipt: gate-auto failed but direct cinematic recovered.
+        report = {**report, "ensure_machine_lane_error": ensure_err, "via": "direct_cinematic"}
     if not isinstance(report, dict) or report.get("ok") is not True:
         raise CinematicGateError(
             "Desktop export blocked by cinematic-gate (ok!=true); "
@@ -446,4 +456,7 @@ def assert_cinematic_gate_for_export(root: Path | str) -> dict[str, Any]:
             f"blocked_by={report.get('blocked_by') if isinstance(report, dict) else None}. "
             "Escape: AIFILM_SKIP_CINEMATIC_GATE=1"
         )
-    return {"ok": True, "gate": report, "path": str(path), "via": "ensure_machine_lane"}
+    via = "direct_cinematic" if ensure_err else "ensure_machine_lane"
+    if isinstance(report, dict) and report.get("via"):
+        via = str(report.get("via"))
+    return {"ok": True, "gate": report, "path": str(path), "via": via}

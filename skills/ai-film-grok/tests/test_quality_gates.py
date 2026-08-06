@@ -154,3 +154,41 @@ def test_quality_summary_empty_root_is_actionable_but_not_blocked(tmp_path: Path
     assert report["status"] == "no_receipts"
     assert report["ok"] is True
     assert report["receipt_count"] == 0
+
+
+def test_true_video_check_failure_is_fail_closed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """CTO A1: unexpected true-video errors must not claim ok:True (was silent skip)."""
+    root = _root(tmp_path)
+
+    def _boom(*_a, **_k):  # noqa: ANN001
+        raise RuntimeError("probe infrastructure down")
+
+    import true_video_policy as tvp  # type: ignore
+
+    monkeypatch.setattr(tvp, "assert_hero_clip_source", _boom)
+
+    report = evaluate_clip(
+        root,
+        shot_id="shot01",
+        qa={"ok": True, "decode_ok": True, "motion_ok": True, "path": str(root / "take.mp4")},
+        endpoint="image_to_video",
+        identity_approved=True,
+        motion_approved=True,
+        review={
+            "approved": True,
+            "scorecard": {
+                "dimensions": {
+                    "identity": 4,
+                    "continuity": 4,
+                    "composition": 4,
+                    "motion": 4,
+                    "narrative": 4,
+                }
+            },
+        },
+    )
+    assert report["ok"] is False
+    assert "TRUE_VIDEO_POLICY_CHECK_FAILED" in report["codes"]
+    assert report["true_video"].get("ok") is False

@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.40.42] - 2026-08-06
+
+### Changed (CTO optimization · G0 + A1 fail-closed gates)
+- **Single execution board:** `docs/plans/2026-08-06-cto-optimization-todoplan.md` (G0–Wave9). Old `next-optimization` / `optimization-todoplan` headers → RESIDUAL POINTER.
+- **A1 fail-closed (gates):**
+  - `quality_gates.evaluate_clip`: true-video infrastructure errors → `TRUE_VIDEO_POLICY_CHECK_FAILED` (no silent `ok:True` skip).
+  - `production_gates` face-identity: corrupt `style-bible.json` → hard `STYLE_BIBLE_PARSE_FAILED` (never soft-skip).
+  - `narrative_rebind`: graph_status probe failure → soft issue (not silent `pass`).
+  - `cinematic_gate.assert_cinematic_gate_for_export`: record `ensure_machine_lane_error` when recovering via direct cinematic.
+- **Tests:** `test_true_video_check_failure_is_fail_closed`, `test_corrupt_style_bible_is_fail_closed`.
+- Iron: no heat/i2v/pilot retune; public CLI unchanged.
+
 ## [2.40.41] - 2026-08-06
 
 ### Changed (code metabolism round 3 · P3-1×10 + coerce_optional_float + core.constants tests)

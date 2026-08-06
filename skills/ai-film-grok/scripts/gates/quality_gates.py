@@ -224,7 +224,8 @@ def evaluate_clip(
                 "clip requires a keyframe approved against the same uploaded style reference"
             )
             codes.append("STYLE_REFERENCE_KEYFRAME_EVIDENCE_MISSING")
-    # True-video-only (still / Ken Burns never pass hero or env timeline)
+    # True-video-only (still / Ken Burns never pass hero or env timeline).
+    # Fail-closed: unexpected errors must not claim ok:True (CTO A1 · 2026-08-06).
     true_video: dict[str, Any] = {"ok": True, "codes": []}
     try:
         from true_video_policy import TrueVideoPolicyError, assert_hero_clip_source
@@ -242,8 +243,16 @@ def evaluate_clip(
         errors.append(str(exc))
         codes.append("TRUE_VIDEO_POLICY")
         true_video = {"ok": False, "error": str(exc)}
-    except Exception:
-        true_video = {"ok": True, "skipped": True}
+    except Exception as exc:  # noqa: BLE001 — import/IO/assert infrastructure
+        msg = f"true-video policy check failed: {exc}"[:200]
+        errors.append(msg)
+        codes.append("TRUE_VIDEO_POLICY_CHECK_FAILED")
+        true_video = {
+            "ok": False,
+            "skipped": False,
+            "error": msg,
+            "codes": ["TRUE_VIDEO_POLICY_CHECK_FAILED"],
+        }
 
     if role == "environment":
         return {

@@ -2,9 +2,10 @@
 
 **结论先行：** 产线「规则硬 + 包边界拆完」阶段已过；下一轮不该再开绿地 IRON / 虚荣 LOC 冲刺，而应 **(1) 锁死 08-06 正牌 final 实坑 (2) 运维把 5090 until-empty 烧穿 (3) 按出片风险做叶拆与热路径诚实**。
 
-**Status:** **RESIDUAL POINTER** · code A1–A5 + multi-agent GPU gate + quality P0 (2.40.7–2.40.9) **SHIPPED** · **C1 GPU** still OPEN_OPS  
+**Status:** **RESIDUAL POINTER** · code A1–A5 + multi-agent GPU gate + quality P0 (2.40.7–2.40.9) **SHIPPED** · C1 GPU canary 已有证据  
 **Repo:** `/Users/dex/.grok/plugins/ai-film-grok` · plugin **2.40.9+**  
-**下一轮单一执行板：** [2026-08-06-next-optimization-todoplan.md](2026-08-06-next-optimization-todoplan.md)（W0–W6 · 勿按本档 A 波重做）  
+**CTO 单一执行板：** [2026-08-06-cto-optimization-todoplan.md](2026-08-06-cto-optimization-todoplan.md)  
+**历史下一轮板：** [2026-08-06-next-optimization-todoplan.md](2026-08-06-next-optimization-todoplan.md)（CLOSED · 勿按本档 A 波重做）  
 **短版残余：** [2026-08-06-shortform-optimization-todoplan.md](2026-08-06-shortform-optimization-todoplan.md)（CODE CLOSED · S5 OPEN_OPS）  
 **依据：** memory 08-06 · savani H3 native · suse final · inventory C
 
