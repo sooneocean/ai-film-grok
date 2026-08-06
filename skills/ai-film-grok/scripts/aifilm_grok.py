@@ -970,13 +970,18 @@ def main(argv: list[str] | None = None) -> int:
             "agent-review-final": cmd_workflow,
             "fidelity": cmd_workflow,
             "design-go": cmd_workflow,
+            # 2026-08-06 打通: parsers exist in cli_workflow but were missing from dispatch
+            "gate-auto": cmd_workflow,
+            "cinematic-gate": cmd_workflow,
+            "five-track": cmd_workflow,
         }
         handler = _SIMPLE_DISPATCH.get(args.cmd)
         if handler is not None:
             return handler(args)
 
         # R3: residual cmds formerly inlined as if-ladder (see cli/cli_hub_residual.py)
-        from cli.cli_hub_residual import RESIDUAL_CMDS, run as run_hub_residual
+        from cli.cli_hub_residual import RESIDUAL_CMDS
+        from cli.cli_hub_residual import run as run_hub_residual
 
         if args.cmd in RESIDUAL_CMDS:
             return run_hub_residual(args)

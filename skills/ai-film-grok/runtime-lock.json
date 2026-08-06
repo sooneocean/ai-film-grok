@@ -122,7 +122,7 @@
     },
     {
       "path": "scripts/aifilm_grok.py",
-      "sha256": "fcfc01184df70daef2ea450734d6fe588bb086eea0a6e88277c9a0908c3ac6f4"
+      "sha256": "d0efd1c37575f76c24430ad305c3f16c752e45998340e80522c4cf24bbf1f54f"
     },
     {
       "path": "scripts/ambience_candidates.py",
@@ -1838,7 +1838,7 @@
     },
     {
       "path": "scripts/plan/film_spec.py",
-      "sha256": "84b9e4d9c8abc917645334d5723b23d36f8e603064a4a09a5bf393991f602c63"
+      "sha256": "0dcef7b50d7ec13a98ac00f4c23023953246630dd7c5749be66c38dbd52fbd36"
     },
     {
       "path": "scripts/plan/film_spec_sex_floor.py",
