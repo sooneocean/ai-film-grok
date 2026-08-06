@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.40.36] - 2026-08-06
+
+### Changed (senior-dev 代码质量把控 · Phase 4 测试缺口补漏 · P4-1 续)
+- **P4-1 补 `core/paths.py` 首测**（安全边界模块，此前零覆盖）：新增 `tests/test_core_paths.py`（11 用例，纯函数、零依赖、确定性）。覆盖三类对外契约：
+  - `valid_shot_id`：合法模式（`s01`/`Shot-1_a`/64 长边界）返回原值；非法（`""`/`..`/`../x`/`/etc/passwd`/`a b`/`a.b`/65 长）抛 `FilmError`。
+  - `film_output_path`：返回 `root/out/<name>.mp4` 且后缀为 `.mp4`；非法后缀（`.exe`）/路径穿越（`../escape.mp4`）/绝对路径（`/tmp/...`）均抛 `FilmError`。
+  - `record_file_matches`：文件存在且 sha256 匹配→`True`；sha 不符/文件缺失/空 sha/缺 sha/非 dict 记录/无 path 字段→`False`（含 `field` 必填 kw 的调用修正）。
+- ruff 干净，11 passed。未动模块本体，`runtime-lock.json` 无需再生；`make doctor` 不受影响（仍全绿）。
+- **下一步 P4 候选**（仍零覆盖，`util/core/node/final`）：`util.spine_helpers`、`core.emit`/`core.film_io`、`node.backend_probe`/`latentsync_adapter`/`musetalk_adapter`/`stable_audio_probe`、`final.bgm_spotting`/`caption_text`/`enhance`/`io`/`render_defaults`/`tts_tracks`/`voice_mix_config`/`watchdog`。优先挑纯函数/确定性者。
+
 ## [2.40.35] - 2026-08-06
 
 ### Changed (senior-dev 代码质量把控 · Phase 3 迁移 & 去重 · P3-1 续 + 关键发现)
