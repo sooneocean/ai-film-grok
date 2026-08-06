@@ -6,7 +6,7 @@
 #   git root above, then `grok plugin update` to sync the runtime mirror.
 #
 # Optimization loop (default agent path):
-#   make check-all          # secret-scan + validate + ruff + doctor + pytest not slow + hotpath
+#   make check-all          # secret-scan + validate + ruff + doctor + pytest not slow + hotpath + coverage 58%
 #   make release-light      # docs + doctor core (light gate; CI is the real gate)
 #   git push                # CI gates run on the server and are the final authority
 # Full suite before a heavy release:
@@ -21,7 +21,7 @@ RUNTIME_PYTHON := $(SKILL)/scripts/runtime-python
 
 help:
 	@echo "ai-film-grok make targets"
-	@echo "  check-all       secret-scan + validate + ruff + doctor + pytest not slow + hotpath"
+	@echo "  check-all       secret-scan + validate + ruff + doctor + pytest not slow + hotpath + coverage 58%"
 	@echo "  review          pre-PR: secret-scan + hotpath (fail-closed contracts)"
 	@echo "  test-fast       same fast pytest as agents (not slow)"
 	@echo "  test-hotpath    final/compose/gates fail-mode contracts only"

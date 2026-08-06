@@ -8,6 +8,10 @@
 - **MEMORY_GOVERNANCE** + CONTRIBUTING links; quality plan marked **CLOSED**.
 - **`util.retry.poll_until`**: frw_lipsync `poll_task` uses it; tests for timeout/success.
 - **media_queue `scheduled_backoff_sec`**: single job-level backoff lookup (process sleep remains out of scope).
+- `scripts/check-all.sh` **step 7 coverage gate** (58% + per-file floors), local check-all fully ≡ CI.
+
+### Quality / tooling (close the local gate-trust gap, cont.)
+- Coverage step mirrors CI `validate-core`; Makefile help documents coverage 58%.
 
 ## [2.39.94] - 2026-08-06
 
