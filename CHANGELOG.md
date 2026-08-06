@@ -1,5 +1,10 @@
 # Changelog
 
+## [2.39.88] - 2026-08-06
+
+### Fixed (C1 floor-retry residual)
+- Fill-Idle P1 `h3_below_floor`: after **N H3 takes** (default 5, env `AIFILM_H3_FLOOR_RETRY_CAP`, 0=unlimited) still under motion floor → **residual done** (`h3_floor_retry_exhausted`), drop command so until-empty can reach `queue_empty` without infinite 5090 burn. No silent promote.
+
 ## [2.39.87] - 2026-08-06
 
 ### Fixed

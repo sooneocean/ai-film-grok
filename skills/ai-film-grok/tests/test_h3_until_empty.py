@@ -461,6 +461,39 @@ class CapacityWaitTests(unittest.TestCase):
         self.assertEqual(rep.get("max_wait_sec"), 7200.0)
         self.assertTrue(rep.get("ready"))
 
+    def test_h3_floor_retry_exhausted_drops_from_pending(self) -> None:
+        """After cap H3 takes still below floor → residual done, no infinite P1."""
+        from h3_fill_idle import classify_fill_idle_shot, _h3_floor_retry_cap
+
+        self.assertGreaterEqual(_h3_floor_retry_cap(), 1)
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _film(root)
+            # meat1: many low-mean H3 takes → exhaust
+            tdir = root / "takes" / "meat1"
+            tdir.mkdir(parents=True, exist_ok=True)
+            for i in range(6):
+                p = tdir / f"meat1_h3_i2v_{i}_704x1280.mp4"
+                p.write_bytes(b"\x00" * 50_000)
+                write_json(
+                    Path(str(p) + ".json"),
+                    {"kind": "mean-absdiff-sidecar", "mean": 2.0, "mean_absdiff": 2.0},
+                )
+            from util.film_spec import _load_spec, _iter_shots
+
+            spec = _load_spec(root)
+            meat = next(s for s in _iter_shots(spec) if s.get("id") == "meat1")
+            with mock.patch.dict("os.environ", {"AIFILM_H3_FLOOR_RETRY_CAP": "5"}):
+                row = classify_fill_idle_shot(
+                    root,
+                    meat,
+                    has_still=True,
+                    wants_continue=False,
+                )
+            self.assertIn("h3_floor_retry_exhausted", row.get("reasons") or [])
+            self.assertEqual(row.get("status"), "done")
+            self.assertIsNone(row.get("command"))
+
     def test_capacity_wait_frees_when_queue_idle_memory_floor(self) -> None:
         """After foreign queue drains, free-memory once so VRAM floor can clear."""
         from h3_fill_idle import wait_for_comfy_capacity
