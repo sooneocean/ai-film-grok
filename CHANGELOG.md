@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.40.27] - 2026-08-06
+
+### Changed (senior-dev 代码质量把控 · Phase 3 迁移 & 去重 · P3-1 起手模板)
+- **首个 legacy 模块迁移（P3-1 模板）**：`scripts/ltx23_audio_canary.py`（66 行、零 importer）迁入 `audio/ltx23_audio_canary.py`。`_ROOT` 深度由 `parent.parent` 调为 `parent.parent.parent`（文件下沉一层到 `audio/`，仍指向 skill package 根，模板路径 `templates/comfy/ltx23-native-i2v-pilot-api.json` 解析结果与迁移前逐字节一致）。全仓 0 处引用该模块（无 importer、无动态按名加载），删除旧顶层文件零回退风险。
+- **1:1 测试**：`tests/test_ltx23_audio_canary.py`（4 用例，锁定 `compile_audio_conditioned_workflow` 公共契约：缺参/帧越界/非 8n+1 抛 `ValueError`；合法调用注入 `source.image`/`audio_source`/`audio_encode`/`318.audio_latent` 链）。这是 P3-1 "每移一个补 1:1 测试" 的示范。
+- **迁移配方（供团队复刻剩余 ~108 模块）**：见 `docs/senior-dev-code-quality-plan-2026-08-06.md` §P3-1 末尾「迁移配方」。核心：① `ast` 扫 top-level 模块按 importer 数排序，优先挑 **0–1 importer** 的低风险模块；② 按职责归入 `audio/gates/media/plan/util` 等 package；③ 调整一切 `__file__` 相对深度；④ 全仓 grep 旧模块名确认无 dangling 引用；⑤ 加 1:1 契约测试；⑥ 单 PR 单模块、测试不降绿、双远端 `fetch --all` 后收敛推送。
+
 ## [2.40.26] - 2026-08-06
 
 ### Changed (senior-dev 代码质量把控 · Phase 3 迁移 & 去重 · P3-2 路径外部化)

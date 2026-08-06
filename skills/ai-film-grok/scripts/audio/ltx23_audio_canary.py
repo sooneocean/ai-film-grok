@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""Compile the experimental LTX-2.3 audio-conditioned I2V pilot workflow."""
+"""Compile the experimental LTX-2.3 audio-conditioned I2V pilot workflow.
+
+Migrated from scripts/ltx23_audio_canary.py into the audio package (P3-1).
+_ROOT depth adjusted: this file now lives at scripts/audio/, so three .parent
+steps reach the skill package root that owns templates/.
+"""
 
 from __future__ import annotations
 
@@ -7,7 +12,7 @@ import argparse
 import json
 from pathlib import Path
 
-_ROOT = Path(__file__).resolve().parent.parent
+_ROOT = Path(__file__).resolve().parent.parent.parent
 _TEMPLATE = _ROOT / "templates" / "comfy" / "ltx23-native-i2v-pilot-api.json"
 
 

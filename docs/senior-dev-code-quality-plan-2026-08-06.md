@@ -71,6 +71,17 @@
 - **[P3-1] 收口 109 个顶层 legacy 模块**：按职责移入对应 package（workflow_pack→spine/post；input_fidelity→gates；prompt_injector→spine；state_index_gate→gates；shortform_director→plan；config_loader→util）。每移一个补 1:1 测试。
 - **[P3-2] 外部化硬编码路径**：`/Users/dex`、`/opt/homebrew` 改为从 config/env 解析（已有 `config_loader`/`runtime-python` 机制）。消除"仅本机可跑"陷阱，让 CI/Linux 可复现。
 
+#### P3-1 迁移配方（repeatable template · 首个落地见 v2.40.27 `ltx23_audio_canary`）
+对 109 个模块的迁移是迭代工程，不是一次性重写。每模块一个 PR，按以下 6 步：
+1. **选模块**：`ast` 扫 `scripts/*.py`（顶层），统计每个模块的 importer 数（`from X import` / `import X` 命中），**优先挑 0–1 importer** 的低风险模块（如 `*_canary`、`*_probe` 系列）。零 importer = 删除旧位置零回退风险。
+2. **定归属**：按职责选 package——`*_canary`/`*_adapter`/`tts*`→`audio/`；`*_gate`/`*_fidelity`→`gates/`；`i2v`/`h3`/`media_*`→`media/`；`shortform`/`story*`→`plan/`；`config_loader`/`paths`/`retry`→`util/`。
+3. **调深度**：任何 `__file__` 相对路径（`parent.parent`、模板/资源加载）在下沉一层后必须 +1 个 `.parent`。用真实资源路径做断言测试锁死（参考 `test_ltx23_audio_canary` 加载真实模板）。
+4. **查 dangling**：全仓 grep 旧模块名（`scripts/X.py` / `from X import` / 动态按名加载），确认无引用；若有，先改引用再删旧文件。
+5. **锁契约**：写 1:1 测试覆盖公共函数的正常 + 异常边界（ValueError 条件、返回值结构）。这是"迁移不引入回归"的硬保障。
+6. **收敛推送**：单 PR 单模块；测试不降绿；双远端 `git fetch --all` 后 merge（禁强推）再 push。并发分叉时重复 fetch→merge→push 直到三端一致。
+
+> 进度（v2.40.27 起）：已迁 1/109。剩余按 importer 升序批量推进，建议每周 5–10 个，配合 code-review 轮值。
+
 ### Phase 4 — 测试缺口补漏
 - **[P4-1] 零覆盖基座优先**：`core`(film_io/paths/constants/media_ops/emit)、`util`(retry/validators/subprocess/errors/json_io)、`node`(各 GPU 适配)、`final`(单元层)。这些是全局地基，漏测=全局风险。
 - **[P4-2] 校验类模块加测**：`film_spec*`、`story_contract`、`subtitle_typesetter`、`edit_policy_*`——最易回归处，补契约测试。
