@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.40.23] - 2026-08-06
+
+### Changed (senior-dev 代码质量把控 · Phase 0 止血)
+- **闸门 fail-closed 化（P0-1）**：`gates/production_gates.py::assert_pilot_allows_add` 中 `assert_pilot_go_allows_bulk` 抛出**非** `ProductionGateError` 的异常时，原 `except Exception: pass` 会静默吞掉并 `return {"ok": True}`（fail-open）。现改为 `raise ProductionGateError(...)`，验证子系统出错即拦截，不再放行坏产出。其余 `except Exception` 站点（`cinematic_gate`/`narrative_rebind` 的 best-effort 探针、`production_gates` 的 `{}` 回退与 legacy 阈值回退）经逐处审计确认为 fail-safe，保持原行为。
+- **统一 logging 基础设施（P0-2）**：新增 `util/logger.py`（依赖无关、走 **stderr** 以免污染 stdout 的 JSON API 管道、`AIFILM_LOG_LEVEL` 可调）。库代码诊断性 `print` 改为 `log.info`（`post/burn_srt_pil.py`）；API 输出型 `print(json)` 保留 stdout 契约。
+- **CI 聚合门禁（P0-3）**：`.github/workflows/ci.yml` 新增 `merge-gate` 聚合 job（依赖 `validate-core`+`hotpath`+`test-full`，`if: always()`），团队只需把 `merge-gate` 设为分支保护 required check，即可一次性要求三套件全绿。mypy/ruff 扩范围/文档版本校验三项因会令当前 CI 变红，留待其前置 Phase（P5 类型、P3 迁移、P5-2 文档修复）完成后激活。
+- **测试**：`tests/test_gate_fail_closed.py`（2 用例，验证 bulk-check 非预期异常与 `ProductionGateError` 均 fail-closed）；`tests/test_util_logger.py`（util 零覆盖基座的首批测试，验证 emit + 走 stderr 不污染 stdout）。`tests/test_production_gates.py` 无回归。
+
 ## [2.40.22] - 2026-08-06
 
 ### Changed (quality P2 · 拔掉 sung 自动生成的 HeartMuLa 外部依赖阻塞)

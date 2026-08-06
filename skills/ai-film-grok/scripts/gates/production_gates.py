@@ -515,8 +515,13 @@ def assert_pilot_allows_add(
             assert_pilot_go_allows_bulk(root, force=force)
         except ProductionGateError:
             raise
-        except Exception:
-            pass
+        except Exception as exc:
+            # Fail-closed: if the bulk allow-check cannot be verified for any
+            # reason (import error, unexpected exception, ...), the gate MUST
+            # block — never silently swallow and return {"ok": True}.
+            raise ProductionGateError(
+                f"pilot-go bulk allow-check failed (cannot verify): {exc}"
+            ) from exc
         return {"ok": True, "pilot": pilot}
     known = set(existing_shot_ids) | {shot_id}
     if len(known) <= PILOT_MAX_SHOTS_WITHOUT_APPROVAL:

@@ -19,6 +19,7 @@ import sys
 from pathlib import Path
 
 from security_policy import minimal_subprocess_env
+from util.logger import log
 
 
 def _parse_ts(s: str) -> float:
@@ -137,7 +138,7 @@ def main() -> int:
 
     args.out.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(tmp, args.out)
-    print(f"ok burned {len(cues)} cues → {args.out}")
+    log.info(f"ok burned {len(cues)} cues → {args.out}")
     return 0
 
 

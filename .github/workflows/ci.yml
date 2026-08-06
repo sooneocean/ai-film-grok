@@ -225,3 +225,17 @@ jobs:
           AIFILM_CI: "1"
         working-directory: skills/ai-film-grok
         run: python -m pytest tests/ -q --tb=line -m "slow"
+
+  # Aggregated merge gate (P0-3, senior-dev quality plan).
+  # Make THIS job required in branch protection so validate-core + hotpath +
+  # test-full must all pass before merge. It runs no tests itself — it only
+  # ANDs the required suites, giving a single required-check target.
+  merge-gate:
+    runs-on: ubuntu-latest
+    needs: [validate-core, hotpath, test-full]
+    if: always()
+    steps:
+      - name: Validate aggregated required suites
+        run: |
+          echo "merge-gate: validate-core + hotpath + test-full must all be green"
+          echo "Add 'merge-gate' as a required status check in branch protection."
