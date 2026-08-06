@@ -502,8 +502,8 @@ def bulk_preflight(
         except Exception as exc:  # noqa: BLE001
             add("variety", False, error=str(exc)[:240])
 
-    # Q4.1 duration target honesty (planned sum vs target; H3 ~5.2s advice)
-    # Soft by default; hard only when DURATION_*_HARD or duration_target_strict.
+    # Q4.1 duration target honesty (planned + optional media sum vs target)
+    # Soft by default; hard when DURATION_*_HARD (planned or media gap >20%).
     skip_dur = os.environ.get("AIFILM_SKIP_DURATION_TARGET", "").strip().lower() in {
         "1",
         "true",
@@ -519,15 +519,51 @@ def bulk_preflight(
                 write_duration_target_receipt,
             )
 
-            dur_rep = check_duration_target(spec)
+            media_sum: float | None = None
+            try:
+                from media_duration import MediaDurationError, probe_duration_sec
+
+                clips_map = man.get("clips") if isinstance(man.get("clips"), dict) else {}
+                acc = 0.0
+                measured = 0
+                for sid in shot_ids:
+                    rec = clips_map.get(sid)
+                    if not isinstance(rec, dict):
+                        continue
+                    st = str(rec.get("status") or "").lower()
+                    if st not in {"approved", "candidate"}:
+                        continue
+                    raw = str(rec.get("path") or "").strip()
+                    if not raw:
+                        continue
+                    p = Path(raw)
+                    candidates = [
+                        p if p.is_absolute() else root / p,
+                        root / "clips" / Path(raw).name,
+                    ]
+                    path = next((c for c in candidates if c.is_file()), None)
+                    if path is None:
+                        continue
+                    try:
+                        acc += float(probe_duration_sec(path, label=sid))
+                        measured += 1
+                    except (MediaDurationError, OSError, ValueError):
+                        continue
+                # Only trust media sum when most timeline shots have measurable clips
+                if measured >= max(3, int(0.5 * max(len(shot_ids), 1))):
+                    media_sum = acc
+            except Exception:
+                media_sum = None
+
+            dur_rep = check_duration_target(spec, media_sum_sec=media_sum)
             write_duration_target_receipt(root, dur_rep)
-            # Soft shortfalls do not block bulk; hard (gap>20%) does.
             add(
                 "duration_target",
                 bool(dur_rep.get("ok")),
                 severity=dur_rep.get("severity"),
                 codes=dur_rep.get("codes"),
                 planned_sum_sec=dur_rep.get("planned_sum_sec"),
+                media_sum_sec=dur_rep.get("media_sum_sec"),
                 target_duration_sec=dur_rep.get("target_duration_sec"),
                 suggested_min_shots_h3=dur_rep.get("suggested_min_shots_h3"),
                 message=dur_rep.get("message"),

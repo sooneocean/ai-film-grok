@@ -212,13 +212,24 @@ def check_duration_target(
     report["codes"] = codes
     report["next"] = nexts
     if not codes:
-        report["message"] = (
-            f"planned {planned:.1f}s vs target {target:.1f}s (gap {gap:+.1f}s) ok"
+        media_bit = (
+            f"; media {media_sum_sec:.1f}s"
+            if media_sum_sec is not None
+            else ""
         )
-    else:
         report["message"] = (
             f"planned {planned:.1f}s vs target {target:.1f}s "
-            f"(gap {gap:+.1f}s / {ratio * 100:.0f}%) codes={codes}"
+            f"(gap {gap:+.1f}s){media_bit} ok"
+        )
+    else:
+        media_bit = (
+            f"; media {media_sum_sec:.1f}s"
+            if media_sum_sec is not None
+            else ""
+        )
+        report["message"] = (
+            f"planned {planned:.1f}s vs target {target:.1f}s "
+            f"(gap {gap:+.1f}s / {ratio * 100:.0f}%){media_bit} codes={codes}"
         )
     return report
 

@@ -68,6 +68,18 @@ class TestDurationTarget(unittest.TestCase):
         self.assertFalse(r["ok"])
         self.assertEqual(r["severity"], "hard")
 
+    def test_media_short_hard_even_if_planned_ok(self) -> None:
+        """Savani pattern: duration_sec padded to target but real clips ~5.2s."""
+        from plan.duration_target import check_duration_target
+
+        # planned 41 * ~7.3 ≈ 300; media only 212
+        r = check_duration_target(
+            _spec(41, 300.0 / 41, 300.0),
+            media_sum_sec=211.8,
+        )
+        self.assertFalse(r["ok"])
+        self.assertIn("DURATION_MEDIA_SHORT_HARD", r["codes"])
+
 
 class TestCropMasterStill(unittest.TestCase):
     def test_clean_stills_ok(self) -> None:

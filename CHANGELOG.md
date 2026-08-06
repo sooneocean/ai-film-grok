@@ -1,5 +1,10 @@
 # Changelog
 
+## [2.39.83] - 2026-08-06
+
+### Fixed (savani media honesty)
+- **Q4.1b** bulk-preflight `duration_target` now probes **approved/candidate clip media sum** when ≥50% shots measurable; catches planned `duration_sec` padded to target while real H3 clips ~5.2s (`DURATION_MEDIA_SHORT_HARD`). Film canary: `artifacts/2026-08-06-effect-board-film-canary.json` (suse + savani ep01–03).
+
 ## [2.39.82] - 2026-08-06
 
 ### Added (effect board Q1.4 + Q5.2 closeout)

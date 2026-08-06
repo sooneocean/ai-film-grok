@@ -1,0 +1,112 @@
+{
+  "schema_version": 1,
+  "kind": "effect-board-film-canary",
+  "at": "2026-08-06T03:21:20.353996+00:00",
+  "push_blocked": "github account suspended 403",
+  "gpu_drain": {
+    "alive": true,
+    "pid": 32507,
+    "root": "/Users/dex/AI FILM SPACE/0721/velvet-stage-dual",
+    "cmd": "h3 cycle --until-empty --execute --free-first --capacity-wait-sec 7200",
+    "note": "do not start second comfy client on suse while this owns 5090"
+  },
+  "films": [
+    {
+      "film": "suse-evolution-ep01",
+      "duration": {
+        "severity": "hard",
+        "ok": false,
+        "codes": [
+          "DURATION_TARGET_SHORT_HARD",
+          "DURATION_MEDIA_SHORT_HARD"
+        ],
+        "planned": 153.4,
+        "media": 134.342,
+        "target": 600.0,
+        "shots": 26,
+        "suggest_h3": 116,
+        "message": "planned 153.4s vs target 600.0s (gap +446.6s / 74%); media 134.3s codes=['DURATION_TARGET_SHORT_HARD', 'DURATION_MEDIA_SHORT_HARD']"
+      },
+      "crop_master": {
+        "severity": "ok",
+        "ok": true,
+        "codes": [],
+        "approved": 16,
+        "eff": 0.0
+      },
+      "clips_measured": 26
+    },
+    {
+      "film": "savani-ep01-5m",
+      "duration": {
+        "severity": "hard",
+        "ok": false,
+        "codes": [
+          "DURATION_MEDIA_SHORT_HARD"
+        ],
+        "planned": 300.0,
+        "media": 211.847,
+        "target": 300.0,
+        "shots": 41,
+        "suggest_h3": 58,
+        "message": "planned 300.0s vs target 300.0s (gap +0.0s / 0%); media 211.8s codes=['DURATION_MEDIA_SHORT_HARD']"
+      },
+      "crop_master": {
+        "severity": "ok",
+        "ok": true,
+        "codes": [],
+        "approved": 0,
+        "eff": 0.0
+      },
+      "clips_measured": 41
+    },
+    {
+      "film": "savani-ep02-5m",
+      "duration": {
+        "severity": "hard",
+        "ok": false,
+        "codes": [
+          "DURATION_MEDIA_SHORT_HARD"
+        ],
+        "planned": 300.0,
+        "media": 211.847,
+        "target": 300.0,
+        "shots": 41,
+        "suggest_h3": 58,
+        "message": "planned 300.0s vs target 300.0s (gap +0.0s / 0%); media 211.8s codes=['DURATION_MEDIA_SHORT_HARD']"
+      },
+      "crop_master": {
+        "severity": "ok",
+        "ok": true,
+        "codes": [],
+        "approved": 0,
+        "eff": 0.0
+      },
+      "clips_measured": 41
+    },
+    {
+      "film": "savani-ep03-5m",
+      "duration": {
+        "severity": "hard",
+        "ok": false,
+        "codes": [
+          "DURATION_MEDIA_SHORT_HARD"
+        ],
+        "planned": 300.0,
+        "media": 108.507,
+        "target": 300.0,
+        "shots": 41,
+        "suggest_h3": 58,
+        "message": "planned 300.0s vs target 300.0s (gap +0.0s / 0%); media 108.5s codes=['DURATION_MEDIA_SHORT_HARD']"
+      },
+      "crop_master": {
+        "severity": "ok",
+        "ok": true,
+        "codes": [],
+        "approved": 0,
+        "eff": 0.0
+      },
+      "clips_measured": 21
+    }
+  ]
+}
