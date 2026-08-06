@@ -277,6 +277,24 @@ def write_final_mix_partial_receipt(
     )
 
 
+def resolve_render_dimension(*sources: object, default: int) -> int:
+    """Resolve a render dimension with CLI > timeline > manifest > default fallback.
+
+    Pure helper extracted from ``render_final`` (P1, senior-dev quality plan):
+    previously the width/height/fps fallback chains were inlined three times.
+    Every source is coerced defensively so a non-numeric value degrades to the
+    next fallback instead of raising mid-render.
+    """
+    for src in sources:
+        if src in (None, "", 0):
+            continue
+        try:
+            return int(src)  # type: ignore[arg-type]
+        except (TypeError, ValueError):
+            continue
+    return default
+
+
 def render_final(args: argparse.Namespace) -> dict[str, Any]:
     root = Path(args.root).expanduser().resolve()
     bgm_source_receipt: dict[str, Any] | None = None
@@ -330,9 +348,9 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
     except ProductionGateError as exc:
         raise RenderError(str(exc)) from exc
     timeline = read_json(root / "timeline.json") if (root / "timeline.json").is_file() else {}
-    width = int(args.width or timeline.get("width") or manifest.get("width") or 720)
-    height = int(args.height or timeline.get("height") or manifest.get("height") or 1280)
-    fps = int(args.fps or timeline.get("fps") or 30)
+    width = resolve_render_dimension(args.width, timeline.get("width"), manifest.get("width"), default=720)
+    height = resolve_render_dimension(args.height, timeline.get("height"), manifest.get("height"), default=1280)
+    fps = resolve_render_dimension(args.fps, timeline.get("fps"), default=30)
     # Film-spec / CLI → VO strategy (peeled leaf)
     _vm = resolve_final_voice_mix_config(args, spec)
     vo_mode = _vm["vo_mode"]

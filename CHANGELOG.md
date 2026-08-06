@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.40.24] - 2026-08-06
+
+### Changed (senior-dev 代码质量把控 · Phase 1 拆解巨型函数 · 参考模式)
+- **`render_final` 首抽纯函数（P1 起手）**：从 2,454 行的 `render_final` 单体函数中抽出无副作用的 `resolve_render_dimension(*sources, default)`（CLI > timeline > manifest > default 回退，逐源防御性 `int()` 转换，非数值降级而非中途抛错）。原 width/height/fps 三处内联回退链统一走该函数，去重且可单测。
+- **测试**：`tests/test_render_final_dimension.py`（4 用例，纯函数验证 CLI 优先 / 逐级回退 / 非数值降级 / 0 视为未提供）。这是"抽纯函数 + 单测"参考模式的第一个落地，后续 74 个 ≥200 行函数按此模式逐个拆解（每 PR 一个、伴生测试不降绿）。
+
 ## [2.40.23] - 2026-08-06
 
 ### Changed (senior-dev 代码质量把控 · Phase 0 止血)
