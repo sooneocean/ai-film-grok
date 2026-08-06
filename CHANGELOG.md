@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.40.46] - 2026-08-06
+
+### Changed (code metabolism round 5 · P3-1×19 expanded residual)
+- **19 domain modules** (no `__file__` depth risk) moved with hard-compat shims into `gates/` / `plan/` / `media/` / `post/` / `narrative/` / `spine/` (incl. `input_fidelity`, `state_index_gate`, `director_cli`/`review`, `true_video_policy`, `dailies`, `rhythm`, `pipeline_events`, …).
+- **Inventory** refreshed (non-shim residual ~17).
+- **Verify:** related suite 146 passed (+8 subtests).
+- Iron: public `import name` preserved; path-depth hubs still residual.
+
 ## [2.40.45] - 2026-08-06
 
 ### Fixed (metabolism follow-up · antifragility source-path tests)
