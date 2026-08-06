@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.40.40] - 2026-08-06
+
+### Changed (senior-dev 代码质量把控 · Phase 4 测试缺口补漏 · P4-3)
+- **P4-3 补 `core/emit.py` 测试（合并两名 agent 的并行实现）**：最终 `tests/test_core_emit.py` 共 11 用例，确定性、`capsys` 捕获、零依赖。覆盖：默认 compact（非 TTY 且无 env → `separators=(",",":")` 单行无空格）、`AIFILM_PRETTY_JSON` 取 `1/true/yes/on` 四态均 pretty（`indent=2` 且 `json.loads` round-trip）、`isatty()` 直测 TTY 分支、env=`0` 仍 compact（仅 1/true/yes/on 计入）、`ensure_ascii=False` 保留中文、嵌套/空 dict round-trip。ruff 干净，11 passed。（另一 agent 的 `c128dd3` 也独立加了 3 用例版，rebase add/add 冲突后取并集。）
+- **顺带修复 `runtime-lock.json` 脚本指纹漂移**（恢复 `doctor` 全绿）：`d87fa36` 包化 5 个模块时改了 `scripts/spine/dispatch.py` 却未再生 lock（`doctor` 报 `script fingerprint drift`、CI 硬失败）；`c128dd3` 又包化 8 模块并再生了完整 lock（52 行）。最终 lock 采用 `c128dd3` 的完整再生版，`make lock-runtime` 复核 `doctor.ok=true`、`core_readiness.ok=true`、`failed=[]`。
+- **下一步 P4 候选**（仍零覆盖，`util/core/node/final`）：`util.spine_helpers`、`core.constants`、`final.render_defaults`/`voice_mix_config`/`caption_text`、`node.backend_probe`/`latentsync_adapter`/`musetalk_adapter`/`stable_audio_probe`、`final.bgm_spotting`/`enhance`/`io`/`tts_tracks`/`watchdog`。另：23 个既有测试失败 + 75 个 `scripts/` ruff 违规可立项为独立稳定化/清理 phase。
+
 ## [2.40.39] - 2026-08-06
 
 ### Changed (code metabolism round 2 · P3-1×8 + plate-slot peel + core.emit tests)
