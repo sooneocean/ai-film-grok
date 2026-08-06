@@ -131,17 +131,23 @@ def heat_check(root: Path) -> dict[str, Any]:
         "sound_plan_accents": plan_sfx,
         "sex_sfx_accents": sex_sfx,
     }
+    # Queue/final hard_fail must not treat HEAT_ADVISORY_* as hard (advisory = soft).
     hard_codes = [
         c
         for c in (rep.get("codes") or [])
-        if c.startswith("HEAT_")
-        or c.startswith("COITUS_")
-        or c.startswith("SIZE_")
-        or c.startswith("SEX_ARC_")
-        or c.startswith("SEX_DETAIL_")
-        or c.startswith("SEX_BOTH_")
-        or c.startswith("MONTAGE_")
-        or c == "SEX_POSE_STALE"
+        if (
+            (
+                c.startswith("HEAT_")
+                and not c.startswith("HEAT_ADVISORY_")
+            )
+            or c.startswith("COITUS_")
+            or c.startswith("SIZE_")
+            or c.startswith("SEX_ARC_")
+            or c.startswith("SEX_DETAIL_")
+            or c.startswith("SEX_BOTH_")
+            or c.startswith("MONTAGE_")
+            or c == "SEX_POSE_STALE"
+        )
     ]
     if sensory and not sensory.get("ok"):
         hard_codes.extend(str(code) for code in sensory.get("codes") or [])
@@ -359,12 +365,30 @@ def heat_agent_status(root: Path) -> dict[str, Any]:
     raw_codes = list(full.get("hard_relevant_codes") or full.get("codes") or [])
     # Ignore media-only adult_max evidence until clips exist
     codes = [c for c in raw_codes if not str(c).startswith("ADULT_MAX_")]
+    # Soft / warning-class codes must not block media-queue (Wave 5 hard_fail).
+    # Advisories, VO mildness, escalation plateau warnings, ratio warnings stay visible
+    # in codes but only true scale fails hard-block bulk.
+    _queue_soft = {
+        "HEAT_ESCALATION_STALL",
+        "HEAT_VO_SEX_VERB_WEAK",
+        "HEAT_VO_SPICE_TOO_MILD",
+        "HEAT_VO_SPICE_MISSING",
+        "HEAT_VO_SPICE_RATIO_LOW",
+        "HEAT_INTIMACY_RATIO_LOW",
+        "HEAT_SETUP_RATIO_HIGH",
+        "SIZE_STACK_FLAT",
+    }
+    queue_hard_codes = [
+        c
+        for c in codes
+        if c not in _queue_soft and not str(c).startswith("HEAT_ADVISORY_")
+    ]
     needs_boost = bool(boost.get("needed")) or score + 1e-9 < target_s
     below_a = score + 1e-9 < floor
     field_ok = bool((full.get("gates") or {}).get("sex_duration", {}).get("ok", True))
     heat_arc_ok = bool((heat_arc or (full.get("gates") or {}).get("sex_arc") or {}).get("ok", True))
-    # hard when below A or field heat codes remain (not media-only)
-    hard_fail = below_a or bool(codes)
+    # hard when below A or true hard field codes remain (not media-only, not soft warnings)
+    hard_fail = below_a or bool(queue_hard_codes)
     # Wave 6: final needs S-grade scale (not only A) + field/arc ok
     final_ok = (not hard_fail) and (not needs_boost) and field_ok and heat_arc_ok
     next_cmd = None
@@ -395,6 +419,7 @@ def heat_agent_status(root: Path) -> dict[str, Any]:
         "ecchi_need": ecchi.get("need"),
         "boost_actions": len(boost.get("actions") or []),
         "codes": codes[:12],
+        "queue_hard_codes": queue_hard_codes[:12],
         "heat_arc_ok": heat_arc_ok,
         "field_ok": field_ok,
         "next_cmd": next_cmd,

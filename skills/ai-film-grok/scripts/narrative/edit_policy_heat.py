@@ -2530,7 +2530,10 @@ def apply_impact_boost_patches(
     for act in actions:
         kind = str(act.get("kind") or "")
         if kind == "lengthen_meat":
+            # H3 native clips are ~5.2s; stretch hard-cap ~5.9 (suse final IRON).
+            # Prefer shrinking non-meat elsewhere over inventing unstretchable 9–10s slots.
             boost = float(act.get("boost_sec") or 4.0)
+            cap = float(act.get("max_duration_sec") or 5.9)
             for sh in shots:
                 if not isinstance(sh, dict):
                     continue
@@ -2539,8 +2542,13 @@ def apply_impact_boost_patches(
                         d = float(sh.get("duration_sec") or 6.0)
                     except (TypeError, ValueError):
                         d = 6.0
-                    sh["duration_sec"] = round(d + boost, 1)
-                    changed.append(f"len:{sh.get('id')}")
+                    new_d = min(cap, round(d + boost, 1))
+                    if new_d > d + 1e-9:
+                        sh["duration_sec"] = new_d
+                        changed.append(f"len:{sh.get('id')}")
+                    elif d > cap:
+                        sh["duration_sec"] = cap
+                        changed.append(f"cap:{sh.get('id')}")
         elif kind == "set_bare_peak":
             for sh in shots:
                 if not isinstance(sh, dict):
