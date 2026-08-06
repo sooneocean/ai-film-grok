@@ -10,17 +10,26 @@ ROOT = Path(__file__).resolve().parents[1]
 
 class CutSilkBilingualDocsTests(unittest.TestCase):
     def test_docs_exist(self) -> None:
+        # memory/* short cards may live under memory/archive/ after slim (2026-08-06)
         for name in (
             "references/lessons-2026-07-20-cut-silk-bilingual.md",
             "references/hf-remotion-capability-matrix.md",
             "references/lessons-2026-07-20-transition-motion-v2.md",
             "references/lessons-2026-07-20-seedance-quality.md",
+        ):
+            p = ROOT / name
+            self.assertTrue(p.is_file(), f"missing {p}")
+            text = p.read_text(encoding="utf-8")
+            self.assertTrue(len(text) > 80, name)
+        for name in (
             "memory/2026-07-20-transition-motion-v2.md",
             "memory/2026-07-20-seedance-quality.md",
             "memory/2026-07-20-session-index.md",
         ):
             p = ROOT / name
-            self.assertTrue(p.is_file(), f"missing {p}")
+            if not p.is_file():
+                p = ROOT / "memory" / "archive" / Path(name).name
+            self.assertTrue(p.is_file(), f"missing {name} (also checked memory/archive/)")
             text = p.read_text(encoding="utf-8")
             self.assertTrue(len(text) > 80, name)
 

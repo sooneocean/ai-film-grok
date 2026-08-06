@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.40.4] - 2026-08-06
+
+### Added / Fixed (final hang + volumedetect timeout honesty)
+- **final heartbeat stages**: stretch / video_concat / audio_mix / done + `apply_final_ffmpeg_timeout_env`.
+- **final timeout receipt**: `receipts/final-timeout.json` + clear `next_cmd` (no fake green).
+- **volumedetect**: `TimeoutExpired` → `TimeoutError` (H3 soft `volumedetect_timeout` works again).
+- Tests: antifragility H3 timeout suite · cut-silk memory/archive paths · heartbeat timeout receipt.
+
 ## [2.40.3] - 2026-08-06
 
 ### Added (shortform residual close · S1.3 / S2.3 / S3.1)

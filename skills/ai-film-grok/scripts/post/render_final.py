@@ -1114,6 +1114,7 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
         n_shots=len(shot_audio),
         transition_sec=transition_sec,
     )
+    _hb("video_concat", f"parts={len(parts)}")
     xfade_plan = concat_videos(
         parts,
         silent,
@@ -2801,26 +2802,30 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps(result, ensure_ascii=False, indent=2))
         return 0
     except subprocess.TimeoutExpired as exc:
-        stage = "unknown"
-        try:
-            from util import read_json
+        from util import read_json as _read_json
 
-            hb = read_json(root_for_timeout / "receipts" / "final-heartbeat.json") or {}
+        stage = "unknown"
+        next_cmd = None
+        try:
+            hb = _read_json(root_for_timeout / "receipts" / "final-heartbeat.json") or {}
             stage = str(hb.get("stage") or "unknown")
         except Exception:
             pass
         try:
             from final.heartbeat import write_final_timeout_receipt
 
-            rec = write_final_timeout_receipt(
+            rec_path = write_final_timeout_receipt(
                 root_for_timeout,
                 stage=stage,
                 timeout_sec=exc.timeout,
                 error=str(exc),
             )
-            next_cmd = (read_json(rec) or {}).get("next_cmd") if "read_json" in dir() else None
+            next_cmd = (_read_json(rec_path) or {}).get("next_cmd")
         except Exception:
-            next_cmd = None
+            next_cmd = (
+                f'aifilm final --root "{root_for_timeout}" --lipsync off '
+                f"# timed out stage={stage}; raise AIFILM_FFMPEG_TIMEOUT"
+            )
         print(
             json.dumps(
                 {
