@@ -1,14 +1,30 @@
 # 短版（shortform）问题分析 + 优化 Todo Plan
 
-**结论先行：** 短版默认主产线（`production_mode=shortform`）的 **消防规则与 final IRON 大多已 ship**；真正还在拖出片的，是 **「计划时长 / 镜数」与 H3 实源 ~5.2s 脱节**，以及 **`aifilm shortform` 导演包与主脊 dispatch 脱节**。下一轮应修 **plan 根因**，不是再开一轮 final 假绿/静默 10s 那类已修事故。
+**结论先行（2026-08-06 收口）：** 短版 **代码板已关**。S0 计划时长诚实 + S1 交付/plate 语义 + S2 旁路决策与 lipsync 冻结 + S3 衣着 ambition 均已落地（2.39.97–2.40.1）。残余只有 **S5 OPEN_OPS**（真 5090 drain / 真片 canary），不阻塞代码。
 
 | 项 | 值 |
 |----|-----|
 | Repo | `/Users/dex/.grok/plugins/ai-film-grok` |
 | 范围 | 默认 shortform 主产线 + `cli:shortform` 旁路 |
-| 状态 | **CODE CLOSED** · S0.1–S0.5 · S1.1–S1.2 · S1.4 · S2.1–S2.2 SHIPPED (2.40.1) · **S5 OPEN_OPS only** |
-| 拍板记录 | `go` 用推荐默认 **fail-closed + 明确 next**（非 auto 增镜/降 target） |
-| 与旧板关系 | 产品面 `docs/plans/2026-08-06-optimization-todoplan.md` Wave A/B 代码已多收；本档 = **短版残余专用板** |
+| 状态 | **CODE CLOSED / SHIPPED** (plugin **2.40.1+**) · **S5 OPEN_OPS only** |
+| 拍板记录 | fail-closed + 明确 next；S2.3 export-spec **不做**；S5 等人+GPU |
+| 与旧板关系 | 产品面 `2026-08-06-optimization-todoplan` A/B 已收；本档 = 短版收口真相 |
+
+### 收口账实（全部可交付代码项）
+
+| ID | 状态 | 证据 |
+|----|------|------|
+| S0.1–S0.4 | **SHIPPED** | `DEFAULT_DURATION_SEC=5.2` · shot cap · duration_target shot-count hard · rebalance shots_n · `duration_density` |
+| S0.5 | **SHIPPED** | hard-defaults 时长诚实表行 |
+| S1.1 | **SHIPPED** | ship-native `stage2.command` |
+| S1.2 | **SHIPPED** | `resolve_skip_canonical_truth` + receipt + tests |
+| S1.3 | **SHIPPED** | `NATIVE_AUDIO_MANDARIN_UNVERIFIED` soft · `AIFILM_NATIVE_AUDIO_MANDARIN_HARD` |
+| S1.4 | **SHIPPED** | closeout plate_vs_master · `plate_blocks_final_complete` |
+| S2.1–S2.2 | **SHIPPED** | shortform-director 决策树 · lipsync tombstone (v2.40) |
+| S2.3–S2.4 | **WONTDO** | handoff/deprecated 未主用；决策树已够 |
+| S3.1–S3.2 | **SHIPPED** | `wardrobe_ambition` / `wardrobe_honest_cap` on scale-fallback |
+| S4 | **SHIPPED / NON-GOAL** | sex_floor peel 已有；不冲刺 subprocess |
+| S5 | **OPEN_OPS** | until-empty queue_empty · 真片 duration canary |
 
 ---
 

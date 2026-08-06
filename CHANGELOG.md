@@ -1,11 +1,20 @@
 # Changelog
 
+## [2.40.2] - 2026-08-06
+
+### Docs (shortform board CODE CLOSED)
+- Mark `docs/plans/2026-08-06-shortform-optimization-todoplan.md` **CODE CLOSED**: S0–S4 shipped; residual **S5 OPEN_OPS** only.
+- Ledger: S1.3 Mandarin soft/hard · S3 wardrobe_ambition/honest_cap already in tree at 2.40.1 path.
+
 ## [2.40.1] - 2026-08-06
 
-### Added / Fixed (shortform closeout S1.2/S1.4 + S2.1 + freeze docs)
-- **S1.2** skip-canonical-truth contract tests (canonical graph raises; legacy soft).
-- **S1.4** closeout `plate_delivery_honesty`: OFFICIAL_FINAL_PLATE never counts as final_complete.
-- **S2.1** `references/shortform-director.md` + SKILL path picker; shortform lipsync stays hard-fail.
+### Added / Fixed (shortform closeout S1.2–S1.4 + S2 + S3)
+- **S1.2** `resolve_skip_canonical_truth` + `receipts/skip-canonical-truth.json` + tests (default off).
+- **S1.3** ship-native `NATIVE_AUDIO_MANDARIN_UNVERIFIED` soft + `listen_checklist`; hard via `AIFILM_NATIVE_AUDIO_MANDARIN_HARD=1`.
+- **S1.4** closeout `plate_vs_master` + `plate_blocks_final_complete` (plate never final_complete).
+- **S2.1** `references/shortform-director.md` decision tree + SKILL path picker.
+- **S2.2** shortform/post lipsync tombstone (v2.40 path; enable/render hard-fail).
+- **S3** scale-fallback `wardrobe_ambition` / `wardrobe_honest_cap` / `ambition_met`.
 - hard-defaults / lipsync.md v2.40 tombstone wording; variety precheck hard pointer.
 
 ## [2.40.0] - 2026-08-06
