@@ -371,7 +371,6 @@ def test_h3_temporal_prompt_non_5090_uses_spine(tmp_path: Path) -> None:
 
 def test_build_h3_temporal_prompt_with_ref_images(tmp_path: Path) -> None:
     """When ref_image_paths are provided, the prompt includes the 2V reference stage."""
-    from h3_timeline_prompt import inject_2v_reference_stage
 
     shot = {
         "id": "s1",

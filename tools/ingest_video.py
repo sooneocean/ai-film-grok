@@ -12,7 +12,6 @@ marks the source gap routed_generate. --normalize re-encodes to H.264/yuv420p
         --energy 0.3 --duration 12 --resolution 1080p --seed 123
 """
 import argparse
-import json
 import os
 import shutil
 import subprocess

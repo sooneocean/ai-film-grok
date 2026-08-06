@@ -57,7 +57,7 @@ def test_cmd_pilot_imported_from_cli_pilot() -> None:
 
 
 def test_simple_dispatch_maps_pilot() -> None:
-    from aifilm_grok import build_parser, main
+    from aifilm_grok import main
 
     # --help exits 0 without film root
     try:

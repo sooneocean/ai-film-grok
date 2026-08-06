@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
-from style_lock import GLOBAL_DEFAULT_NEGATIVE, build_agent_still_prompt_prefix, merge_default_negative
+from style_lock import (
+    GLOBAL_DEFAULT_NEGATIVE,
+    build_agent_still_prompt_prefix,
+    merge_default_negative,
+)
 
 
 def test_merge_dedupes():

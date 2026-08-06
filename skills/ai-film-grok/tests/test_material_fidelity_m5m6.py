@@ -1,11 +1,15 @@
 from __future__ import annotations
-import json, sys
+
+import json
+import sys
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 from dispatch_compact import compact_dispatch
 from generation_ready import generation_ready_report
 from h3_media_pack import resolve_media_pack
 from identity_refs import resolve_identity_refs, resolve_identity_refs_report
+
 
 def _png(path, tag=b"A"):
     path.parent.mkdir(parents=True, exist_ok=True)

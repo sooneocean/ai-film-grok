@@ -15,11 +15,11 @@ SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
 from shortform_director import (
-    export_spec,  # noqa: E402
     ShortformError,
     aroll_broll,
     create_package,
     enable_lipsync,
+    export_spec,  # noqa: E402
     render_lipsync,
     review,
     segment_aroll_words,
@@ -229,7 +229,7 @@ def test_lipsync_render_rejects_a_symlinked_default_candidate_parent(
 
 
 def test_export_spec_writes_draft_film_spec() -> None:
-    from shortform_director import create_package, export_spec, review
+    from shortform_director import create_package, review
 
     with tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp)

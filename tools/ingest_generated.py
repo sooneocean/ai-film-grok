@@ -13,14 +13,10 @@ file would sit orphaned in pending/ forever — that was the old open loop.
         --mood ambient --stem-profile pad --energy 0.35 --duration 30
 """
 import argparse
-import json
 import os
 import shutil
 import subprocess
 import sys
-import math
-import wave
-import array
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from pipeline_lib import (load_catalog, save_catalog, load_gaps, save_gaps,

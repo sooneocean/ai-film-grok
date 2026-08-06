@@ -120,31 +120,79 @@ def write_continue_handoff(
         write_json(handoff_dir / f"{shot_id}.json", meta)
         return meta
     try:
-        proc = subprocess.run(
-            [
-                "ffmpeg",
-                "-y",
-                "-hide_banner",
-                "-loglevel",
-                "error",
-                "-sseof",
-                "-0.12",
-                "-i",
-                str(deliver_p),
-                "-frames:v",
-                "1",
-                "-q:v",
-                "2",
-                str(end_png),
-            ],
-            capture_output=True,
-            text=True,
-            check=False,
-            timeout=60,
-        )
+        # Use -0.20 offset to avoid encoding tail dirty-frames (last ~0.1-0.15s often
+        # suffers from H.264 compression convergence artifacts in H3 output).
+        # If the frame is too blurry (Laplacian variance < threshold), fall back to -0.30.
+        _SSEOF_PRIMARY = "-0.20"
+        _SSEOF_FALLBACK = "-0.30"
+
+        def _extract_end_frame(sseof: str, dest: Path) -> subprocess.CompletedProcess[str]:
+            return subprocess.run(
+                [
+                    "ffmpeg",
+                    "-y",
+                    "-hide_banner",
+                    "-loglevel",
+                    "error",
+                    "-sseof",
+                    sseof,
+                    "-i",
+                    str(deliver_p),
+                    "-frames:v",
+                    "1",
+                    "-q:v",
+                    "2",
+                    str(dest),
+                ],
+                capture_output=True,
+                text=True,
+                check=False,
+                timeout=60,
+            )
+
+        proc = _extract_end_frame(_SSEOF_PRIMARY, end_png)
+        used_sseof = _SSEOF_PRIMARY
+
+        # Quality gate: check frame sharpness via Laplacian variance (proxy for blur).
+        # Fall back to -0.30 when the primary frame is too blurry (< 40 variance units).
+        if proc.returncode == 0 and end_png.is_file():
+            try:
+                _MIN_SHARPNESS_VARIANCE = 40.0
+                _is_sharp = True
+                try:
+                    # Lightweight sharpness probe: read PNG and compute simple pixel variance.
+                    # If numpy available use it; otherwise skip quality gate (conservative pass).
+                    import numpy as np
+                    from PIL import Image  # type: ignore[import]
+
+                    img = np.array(Image.open(end_png).convert("L"), dtype=float)
+                    # Laplacian kernel approximate variance: std of second derivative
+                    laplacian = np.array([[0, 1, 0], [1, -4, 1], [0, 1, 0]])
+                    from numpy.lib.stride_tricks import sliding_window_view  # type: ignore[import]
+                    h, w = img.shape
+                    if h > 2 and w > 2:
+                        padded = np.pad(img, 1, mode="reflect")
+                        patches = sliding_window_view(padded, (3, 3))
+                        lap_vals = (patches * laplacian).sum(axis=(-2, -1))
+                        variance = float(lap_vals.var())
+                        _is_sharp = variance >= _MIN_SHARPNESS_VARIANCE
+                except Exception:  # noqa: BLE001
+                    pass  # skip quality gate when deps unavailable
+
+                if not _is_sharp:
+                    fallback_png = handoff_dir / f"{shot_id}_end_fallback.png"
+                    proc2 = _extract_end_frame(_SSEOF_FALLBACK, fallback_png)
+                    if proc2.returncode == 0 and fallback_png.is_file():
+                        # Use fallback; rename it to canonical end_png
+                        fallback_png.replace(end_png)
+                        used_sseof = _SSEOF_FALLBACK
+            except Exception:  # noqa: BLE001
+                pass  # never let quality gate block the handoff
+
         if proc.returncode == 0 and end_png.is_file():
             meta["end_frame"] = str(end_png)
             meta["ok"] = True
+            meta["sseof_used"] = used_sseof
             meta["note"] = (
                 f"Next shot chain_mode=continue → plan uses {end_png}; "
                 f"AIFILM_CONTINUE_COPY_STILL=1 copies only if stills/<next>.png missing"

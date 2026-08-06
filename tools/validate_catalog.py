@@ -18,7 +18,6 @@ import json
 import os
 import re
 import sys
-from datetime import datetime
 
 LIB_SCHEMA = "aifilm-bgm-library-v1"
 ASSET_SCHEMA = "aifilm-bgm-asset-v1"

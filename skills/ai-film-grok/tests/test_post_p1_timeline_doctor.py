@@ -11,8 +11,8 @@ import pytest
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
-from post_doctor import run_post_doctor  # noqa: E402
 from mix_partial import write_final_mix_partial_receipt  # noqa: E402
+from post_doctor import run_post_doctor  # noqa: E402
 from timeline_clock import (  # noqa: E402
     audit_timeline_clock,
     compare_starts,

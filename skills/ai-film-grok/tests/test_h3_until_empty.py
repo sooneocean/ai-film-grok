@@ -19,7 +19,6 @@ from h3_fill_idle import (  # noqa: E402
     fill_idle_until_empty,
     next_fill_idle_job,
     prepare_capacity_free_first,
-    recover_capacity_contention,
     run_next_fill_idle,
     wait_for_comfy_capacity,
 )
@@ -564,7 +563,7 @@ class CapacityWaitTests(unittest.TestCase):
 
     def test_h3_floor_retry_exhausted_drops_from_pending(self) -> None:
         """After cap H3 takes still below floor → residual done, no infinite P1."""
-        from h3_fill_idle import classify_fill_idle_shot, _h3_floor_retry_cap
+        from h3_fill_idle import _h3_floor_retry_cap, classify_fill_idle_shot
 
         self.assertGreaterEqual(_h3_floor_retry_cap(), 1)
         with tempfile.TemporaryDirectory() as tmp:
@@ -580,7 +579,7 @@ class CapacityWaitTests(unittest.TestCase):
                     Path(str(p) + ".json"),
                     {"kind": "mean-absdiff-sidecar", "mean": 2.0, "mean_absdiff": 2.0},
                 )
-            from util.film_spec import _load_spec, _iter_shots
+            from util.film_spec import _iter_shots, _load_spec
 
             spec = _load_spec(root)
             meat = next(s for s in _iter_shots(spec) if s.get("id") == "meat1")

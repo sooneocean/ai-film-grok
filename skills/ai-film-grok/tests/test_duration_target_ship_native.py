@@ -205,6 +205,7 @@ class TestCropMasterStill(unittest.TestCase):
 class TestShipNativeDry(unittest.TestCase):
     def test_dry_run_writes_receipt(self) -> None:
         import tempfile
+
         from media.h3_ship_native import ship_native
 
         with tempfile.TemporaryDirectory() as td:
@@ -254,6 +255,7 @@ class TestShipNativeDry(unittest.TestCase):
     def test_caption_music_flags_stage2_only(self) -> None:
         """S1.1: caption/music-mood do not claim burned plate."""
         import tempfile
+
         from media.h3_ship_native import ship_native
 
         with tempfile.TemporaryDirectory() as td:
@@ -283,9 +285,10 @@ class TestShipNativeDry(unittest.TestCase):
 
     def test_mandarin_unverified_soft_and_hard_flag(self) -> None:
         """S1.3: aac present → MANDARIN_UNVERIFIED soft; hard env promotes stream fail."""
-        from media.h3_ship_native import sample_native_audio_audit
         from pathlib import Path
         from unittest import mock
+
+        from media.h3_ship_native import sample_native_audio_audit
 
         with mock.patch("media.h3_ship_native._ffprobe_has_audio", return_value=True), mock.patch(
             "media.h3_ship_native._mean_volume_db", return_value=-20.0
@@ -314,6 +317,7 @@ class TestPlateVsMaster(unittest.TestCase):
         """S1.4: OFFICIAL_FINAL_PLATE + final_complete → blocks ship complete."""
         import json
         import tempfile
+
         from final.delivery_class import plate_blocks_final_complete
 
         with tempfile.TemporaryDirectory() as td:

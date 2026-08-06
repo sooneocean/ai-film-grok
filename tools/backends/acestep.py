@@ -12,7 +12,7 @@ GPU run, automation handles everything after.
 import os
 
 from . import Backend, _write_ticket, _read_ticket
-from pipeline_lib import LIB, ROOT
+from pipeline_lib import ROOT
 
 
 class AceStepLocalBackend(Backend):

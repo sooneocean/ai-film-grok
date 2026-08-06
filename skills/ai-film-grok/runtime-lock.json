@@ -978,7 +978,7 @@
     },
     {
       "path": "scripts/core/media_ops.py",
-      "sha256": "c898f39026d1a3a1950ac6c4efbae4cc35a5475970f5ecdab9f90c734602c083"
+      "sha256": "b6e2d3e2dd2f3d03c216e898985287ac80b2bcfdf46a17a944f7af9918ab8371"
     },
     {
       "path": "scripts/core/paths.py",
@@ -1242,7 +1242,7 @@
     },
     {
       "path": "scripts/final/media_ops.py",
-      "sha256": "b9606eb7cfe893bcdbf195b12e00efdaf27a5e3920d5349c5c71ed41518b1fa3"
+      "sha256": "e12abd45114288733f1fe8492df757dc81775d284c99cfd3bb021de12a305c93"
     },
     {
       "path": "scripts/final/native_audio.py",
@@ -1802,7 +1802,7 @@
     },
     {
       "path": "scripts/narrative/edit_policy_heat.py",
-      "sha256": "75e111bd9dcc887de25d40f951ee1423c2859bed4738eb7f25f5d7ac42e63a5f"
+      "sha256": "37a8d69036c13929828bf5e4baeeb38c96a6dbb2ceb5893e59322d21c0e65db1"
     },
     {
       "path": "scripts/narrative/edit_policy_shared.py",
@@ -1842,7 +1842,7 @@
     },
     {
       "path": "scripts/narrative/heat_spice.py",
-      "sha256": "46828d0a1d745fe1f404cef1521750a8a330111532b3a83db137704171cde1b4"
+      "sha256": "c8b2a1590960d592cdf667674656517aa4284db1cf88ef4cadebd9f84968aac7"
     },
     {
       "path": "scripts/narrative/heat_wardrobe.py",
@@ -2178,7 +2178,7 @@
     },
     {
       "path": "scripts/post/render_final.py",
-      "sha256": "33ff029af9272b69c3052847362c9b317cccc65c0df12104a87adcf80d47e562"
+      "sha256": "bcf101e9da1157456f19f4722013181f811d0b8342dc471359c4bd36e953269e"
     },
     {
       "path": "scripts/post/render_final_music.py",
@@ -2478,7 +2478,7 @@
     },
     {
       "path": "scripts/spine/continue_handoff.py",
-      "sha256": "d65cfaeec673ccce63c3989c4fc51529063ab5528caa1396b57ac87afc9c83ee"
+      "sha256": "9295c0baec8536747c7633a056241823ced7d031ff65531f964b5f1c3b234d06"
     },
     {
       "path": "scripts/spine/craft_spine.py",
@@ -2598,7 +2598,7 @@
     },
     {
       "path": "scripts/transition_ops.py",
-      "sha256": "ea79ad4307249a99bb17102a5ab7517fd400dd06a2c3df7897788c0f8ecffbbd"
+      "sha256": "f5e06b8e33c4dacae46368bacbda18ebd5789fd2ddb12bf97173a27b27ec83d3"
     },
     {
       "path": "scripts/true_video_policy.py",

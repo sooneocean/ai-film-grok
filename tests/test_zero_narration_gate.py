@@ -7,7 +7,6 @@ defaults zero_narration_strict=true → NAR_BUDGET_VIOLATION when nar ratio > 0.
 
 from __future__ import annotations
 
-from pathlib import Path
 
 import pytest
 

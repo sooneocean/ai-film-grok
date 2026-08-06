@@ -18,12 +18,8 @@ SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
 import aifilm_grok  # noqa: E402
-from asset_registry import sync_assets  # noqa: E402
-from drama_graph import derive_graph  # noqa: E402
 from manifest_truth import migrate_manifest  # noqa: E402
 from media_qa import analyze_media  # noqa: E402
-from narrative_control import LOCK_SCOPES, lock_scope  # noqa: E402
-from production_chain import build_shot_contract  # noqa: E402
 from shot_review import create_shot_review  # noqa: E402
 from util import sha256_file, write_json  # noqa: E402
 

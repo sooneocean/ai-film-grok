@@ -19,7 +19,7 @@ def test_build_parser_has_write_spec() -> None:
 
     ns = build_parser().parse_args(["write-spec", "--root", "/tmp/film"])
     assert ns.cmd == "write-spec"
-    assert str(ns.root) in {"/tmp/film", "/tmp/film"}
+    assert str(ns.root) in {"/tmp/film"}
 
 
 def test_cmd_write_spec_imported_from_cli_write_spec() -> None:

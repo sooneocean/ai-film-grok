@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import pytest
-
 from lipsync_backend import (
     LIPSYNC_FROZEN_MSG,
     LipSyncError,

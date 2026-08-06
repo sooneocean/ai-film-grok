@@ -13,14 +13,14 @@ from heat_phase import (
     infer_heat_phase,
 )
 from heat_wardrobe import (
+    _EXPOSED_WARDROBE_MARKERS,
+    _FULL_DRESS_MARKERS,
+    _UNDRESS_ACTION_MARKERS,
     PHASE_WARDROBE_FLOOR,
     SEX_WARDROBE_OK,
     SEX_WARDROBE_STRONG,
     WARDROBE_STATES,
     WARDROBE_UNDRESS_RANK,
-    _EXPOSED_WARDROBE_MARKERS,
-    _FULL_DRESS_MARKERS,
-    _UNDRESS_ACTION_MARKERS,
 )
 
 __all__ = ["SPICE_LEVELS","HARDCORE_CRAFT_SPINE","_NAR_EXTREME_MARKERS","_NAR_MILD_ONLY_MARKERS","_NAR_SPICE_MARKERS","_NAR_SEX_VERB_MARKERS","_NAR_LITERARY_ONLY_HINTS","_TEMPLATE_NAR_POLLUTION_MARKERS","is_template_nar_pollution","lint_user_source_fidelity","nar_has_spice","nar_has_sex_verb","nar_has_extreme_spice","normalize_spice_level","lint_sex_vo_spice","apply_vo_spice_auto","suggest_vo_lines"]

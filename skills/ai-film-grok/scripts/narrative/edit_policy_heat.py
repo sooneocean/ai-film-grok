@@ -8,6 +8,7 @@ surface stays smaller. Public symbols re-exported by edit_policy for back-compat
 from __future__ import annotations
 
 # Cycle-free leaf — do not import edit_policy at module load (edit_policy re-exports us).
+from edit_policy_shared import PolicyError  # noqa: F401
 from heat_arc_lint import (  # noqa: F401
     _merge_sub_issues,
     _shot_duration_sec,

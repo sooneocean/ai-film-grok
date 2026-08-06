@@ -378,9 +378,9 @@ def normalize_clip(
         "-c:v",
         "libx264",
         "-preset",
-        "fast",
+        "medium",
         "-crf",
-        "20",
+        "18",
     ]
     if duration is not None and duration > 0:
         # If source shorter, slow slightly up to 1.33x then freeze-pad via tpad if needed.
@@ -409,9 +409,9 @@ def normalize_clip(
                 "-c:v",
                 "libx264",
                 "-preset",
-                "fast",
+                "medium",
                 "-crf",
-                "20",
+                "18",
                 str(dest),
             ]
             run(cmd)

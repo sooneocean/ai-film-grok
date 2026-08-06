@@ -1,79 +1,45 @@
 {
   "kind": "motion-gate-recovery",
-  "at": "2026-08-06T08:31:21.729065+00:00",
+  "at": "2026-08-06T09:23:29.292063+00:00",
   "film_root": "/Users/dex/AI FILM SPACE/0805/suse-evolution-ep01",
   "gate_ok": false,
   "audit_ok": false,
-  "weak_n": 10,
+  "weak_n": 4,
   "start_weak": 17,
-  "meat_mean_avg": 22.169,
-  "normal_mean_avg": 13.516,
+  "trajectory": "17→10→6→5→?",
+  "meat_mean_avg": 22.544,
+  "normal_mean_avg": 16.415,
   "weak": [
     {
       "id": "ep01_sc01_airport_s01",
-      "mean": 18.3906,
+      "mean": 19.3459,
       "floor": 20.0,
       "tier": "high"
     },
     {
-      "id": "ep01_sc01_airport_s02",
-      "mean": 5.0206,
-      "floor": 10.0,
-      "tier": "soft"
-    },
-    {
       "id": "ep01_sc02_flight_s04",
-      "mean": 9.4442,
+      "mean": 11.9274,
       "floor": 18.0,
       "tier": "normal"
     },
     {
       "id": "ep01_sc02_flight_s05",
-      "mean": 7.4127,
+      "mean": 7.8865,
       "floor": 10.0,
       "tier": "soft"
     },
     {
-      "id": "ep01_sc03_door_s06",
-      "mean": 11.1727,
-      "floor": 18.0,
-      "tier": "normal"
-    },
-    {
-      "id": "ep01_sc04_undress_s12",
-      "mean": 19.0695,
-      "floor": 20.0,
-      "tier": "meat"
-    },
-    {
-      "id": "ep01_sc05_union_s16",
-      "mean": 19.8525,
-      "floor": 20.0,
-      "tier": "meat"
-    },
-    {
       "id": "ep01_sc06_variety_s20",
-      "mean": 11.4365,
+      "mean": 12.5618,
       "floor": 20.0,
       "tier": "meat"
-    },
-    {
-      "id": "ep01_sc07_map_s23",
-      "mean": 14.0787,
-      "floor": 16.0,
-      "tier": "medium"
-    },
-    {
-      "id": "ep01_sc07_map_s26",
-      "mean": 13.6015,
-      "floor": 16.0,
-      "tier": "medium"
     }
   ],
-  "shipped_code": [
-    "762ac38e max-mean gate",
-    "bba14367 COITUS reexport + canary"
-  ],
   "status": "PARTIAL",
-  "note": "best-take selection + max-mean code cut weak 17→11; remaining need H3 energy or soft/normal floor stills rework"
+  "logs": [
+    "reshot3",
+    "reshot4",
+    "reshot5",
+    "reshot5b"
+  ]
 }

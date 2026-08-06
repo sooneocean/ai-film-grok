@@ -3,12 +3,10 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-import pytest
-
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
-from comfy_armory import ComfyArmoryError, load_armory, select_weapon  # noqa: E402
+from comfy_armory import load_armory, select_weapon  # noqa: E402
 
 
 def test_armory_contains_no_wan22_i2v_weapon() -> None:
