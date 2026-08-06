@@ -836,19 +836,34 @@ def tts_edge(
     attempts = max(1, int(max_attempts))
     floor = max(1, int(min_bytes))
     last_size = 0
-    data = b""
-    for attempt in range(1, attempts + 1):
-        data = asyncio.run(_run())
-        last_size = len(data) if data else 0
-        if data and last_size >= floor:
-            break
-        if attempt < attempts:
-            time.sleep(EDGE_RETRY_BACKOFF_SEC * attempt)
-    if not data or last_size < floor:
+
+    class _EmptyEdge(RuntimeError):
+        """Internal: edge stream too small — util.retry only."""
+
+    def _one_attempt() -> bytes:
+        nonlocal last_size
+        payload = asyncio.run(_run())
+        last_size = len(payload) if payload else 0
+        if payload and last_size >= floor:
+            return payload
+        raise _EmptyEdge(f"empty/tiny edge audio ({last_size}B < {floor}B)")
+
+    from util.retry import retry_call
+
+    try:
+        data = retry_call(
+            _one_attempt,
+            attempts=attempts,
+            delay_sec=float(EDGE_RETRY_BACKOFF_SEC),
+            backoff=2.0,
+            retry_on=(_EmptyEdge,),
+            sleep=time.sleep,
+        )
+    except _EmptyEdge as exc:
         raise TTSError(
             f"edge-tts empty/tiny audio after {attempts} attempt(s) "
             f"({last_size}B < {floor}B): {text[:40]}"
-        )
+        ) from exc
     out_mp3.parent.mkdir(parents=True, exist_ok=True)
     atomic_write_bytes(out_mp3, data)
     return out_mp3

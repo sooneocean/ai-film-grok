@@ -226,7 +226,10 @@ def run_quality_check(
     duration = float(probe_data.get("format", {}).get("duration") or 0.0)
 
     decode_errors = _ffmpeg_decode_test(video)
-    volume_stderr = _ffmpeg_filter(video, filter_expr="volumedetect")
+    from core.media_ops import probe_volume_stats
+
+    volume_stats = probe_volume_stats(video, timeout=120.0)
+    volume_stderr = str(volume_stats.get("raw_text") or "")
     silence_stderr = _ffmpeg_filter(
         video, filter_expr=f"silencedetect=noise={SILENCE_THRESHOLD_DB}dB:d={SILENCE_MIN_DURATION}"
     )
@@ -252,8 +255,12 @@ def run_quality_check(
     (out / "freezedetect.txt").write_text(freeze_stderr, encoding="utf-8")
 
     types = _stream_types(probe_data)
-    mean_volume = _parse_db(r"mean_volume:\s*(-?\d+(?:\.\d+)?) dB", volume_stderr)
-    max_volume = _parse_db(r"max_volume:\s*(-?\d+(?:\.\d+)?) dB", volume_stderr)
+    mean_volume = volume_stats.get("mean_volume_db")
+    max_volume = volume_stats.get("max_volume_db")
+    if mean_volume is None:
+        mean_volume = _parse_db(r"mean_volume:\s*(-?\d+(?:\.\d+)?) dB", volume_stderr)
+    if max_volume is None:
+        max_volume = _parse_db(r"max_volume:\s*(-?\d+(?:\.\d+)?) dB", volume_stderr)
 
     gates: dict[str, dict[str, str]] = {}
 

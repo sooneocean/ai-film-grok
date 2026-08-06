@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.39.91] - 2026-08-06
+
+### Fixed / Refactored (quality round 2)
+- **Volume probe residual**: `elevenlabs_canary`, `quality_check_video`, `reference_audit` use `core.media_ops.probe_volume_stats` / mean probe (no local volumedetect paste).
+- **`probe_volume_stats` / `parse_max_volume_db`**: mean+max+raw log from one ffmpeg pass.
+- **Edge TTS empty-stream retry** via `util.retry.retry_call` (sample hot-path wire-up).
+
 ## [2.39.90] - 2026-08-06
 
 ### Added (engineering quality + team uplift)

@@ -36,8 +36,11 @@ from core.media_ops import (
     _register_media,
     media_duration,
     normalize_clip,
+    parse_max_volume_db,
     parse_mean_volume_db,
+    parse_volume_stats,
     probe_native_audio_mean_volume,
+    probe_volume_stats,
 )
 from core.paths import film_output_path, record_file_matches, valid_shot_id, which_npx_safe
 
@@ -63,8 +66,11 @@ __all__ = [
     "load_manifest",
     "media_duration",
     "normalize_clip",
+    "parse_max_volume_db",
     "parse_mean_volume_db",
+    "parse_volume_stats",
     "probe_native_audio_mean_volume",
+    "probe_volume_stats",
     "recompute_gates",
     "record_file_matches",
     "save_director_notes",

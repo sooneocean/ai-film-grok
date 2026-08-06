@@ -131,27 +131,15 @@ def _audio_metrics(path: Path, *, chars: int) -> dict[str, Any]:
         raise ElevenLabsCanaryError("AUDIO_DURATION_INVALID")
 
     try:
-        volume = subprocess.run(
-            [
-                "ffmpeg",
-                "-v",
-                "error",
-                "-i",
-                str(path),
-                "-af",
-                "volumedetect",
-                "-f",
-                "null",
-                "-",
-            ],
-            capture_output=True,
-            text=True,
-            check=False,
-            timeout=60,
-        )
+        from core.media_ops import probe_native_audio_mean_volume
+
+        mean_volume_db = probe_native_audio_mean_volume(path, timeout=60.0)
     except subprocess.TimeoutExpired as exc:
         raise ElevenLabsCanaryError("AUDIO_VOLUME_TIMEOUT") from exc
-    mean_match = re.search(r"mean_volume:\s*(-?[\d.]+) dB", volume.stderr)
+    except Exception as exc:  # noqa: BLE001 — map probe failures to canary codes
+        if "timeout" in str(exc).lower():
+            raise ElevenLabsCanaryError("AUDIO_VOLUME_TIMEOUT") from exc
+        mean_volume_db = None
     try:
         silence = subprocess.run(
             [
@@ -179,7 +167,7 @@ def _audio_metrics(path: Path, *, chars: int) -> dict[str, Any]:
     return {
         "decode_ok": True,
         "duration_sec": round(duration, 3),
-        "mean_volume_db": float(mean_match.group(1)) if mean_match else None,
+        "mean_volume_db": mean_volume_db,
         "silence_ratio": round(min(1.0, silence_seconds / duration), 4),
         "speaking_rate_chars_per_sec": round(chars / duration, 3),
     }

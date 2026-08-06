@@ -294,24 +294,13 @@ def run_reference_audit(
         json.dumps(probe_data, ensure_ascii=False, indent=2), encoding="utf-8"
     )
 
-    # Audio reality
-    volume_proc = run_media_command(
-        [
-            ffmpeg,
-            "-hide_banner",
-            "-nostats",
-            "-i",
-            str(video),
-            "-af",
-            "volumedetect",
-            "-vn",
-            "-f",
-            "null",
-            "-",
-        ],
-        timeout=DEFAULT_DECODE_TIMEOUT,
-        check=False,
+    # Audio reality (volumedetect via single core.media_ops path)
+    from core.media_ops import probe_volume_stats
+
+    volume_stats = probe_volume_stats(
+        video, strip_video=True, timeout=float(DEFAULT_DECODE_TIMEOUT)
     )
+    volume_stderr = str(volume_stats.get("raw_text") or "")
     silence_proc = run_media_command(
         [
             ffmpeg,
@@ -329,8 +318,7 @@ def run_reference_audit(
         timeout=DEFAULT_DECODE_TIMEOUT,
         check=False,
     )
-    volume_stderr = volume_proc.stderr.strip()
-    silence_stderr = silence_proc.stderr.strip()
+    silence_stderr = (silence_proc.stderr or "").strip()
     (out / "volume.txt").write_text(volume_stderr, encoding="utf-8")
     (out / "silence.txt").write_text(silence_stderr, encoding="utf-8")
 

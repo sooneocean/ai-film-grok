@@ -358,7 +358,7 @@
     },
     {
       "path": "scripts/audio/tts_backend.py",
-      "sha256": "e29be9d7713fe70e19bd793d72d4eddc062486b82238eea3092ba1247007e0bd"
+      "sha256": "8fbc124d2d7abbc865b20cb99bfe54e52df90020fcd18a4ddc248dd743f28d3f"
     },
     {
       "path": "scripts/audio/tts_rehearsal.py",
@@ -942,7 +942,7 @@
     },
     {
       "path": "scripts/core/__init__.py",
-      "sha256": "a3f706cc8771e074d97b5809bbd9f9279d402bc054a34b08b345e041ac75c8cb"
+      "sha256": "4849ee5b1e8800102bc267576dfc81540d77d8f0ffd26e204bd4e6642dd8f516"
     },
     {
       "path": "scripts/core/constants.py",
@@ -962,7 +962,7 @@
     },
     {
       "path": "scripts/core/media_ops.py",
-      "sha256": "0f7870cfb812f8e0cffbccad7ab6c789b3a6b1f5e7b95f8287acf698ac0e1b4d"
+      "sha256": "d8acbe0683da33e5bf0d5a027135b560a60de829c555a27a1c27c38bd51dac2c"
     },
     {
       "path": "scripts/core/paths.py",
@@ -1118,7 +1118,7 @@
     },
     {
       "path": "scripts/elevenlabs_canary.py",
-      "sha256": "169da4090640a23aa66c2bb0ebec133debe9be6fe0952656b6e7f1247f276524"
+      "sha256": "8ff9b5e8bd3d2341b26421f49e0dd26c08c21e1984ae873793676bd984d55c98"
     },
     {
       "path": "scripts/env_plate.py",
@@ -2126,7 +2126,7 @@
     },
     {
       "path": "scripts/quality_check_video.py",
-      "sha256": "6d23bc3588aa3e9ae8f5d05c1216679e4d62972877eba8d793b04308a957cae5"
+      "sha256": "1707832971a15b957ba2c2c619c336791149fafde24ae25e0ee63b8aa723bf81"
     },
     {
       "path": "scripts/quality_closure.py",
@@ -2150,7 +2150,7 @@
     },
     {
       "path": "scripts/reference_audit.py",
-      "sha256": "09e7bf0abdeaa60f14abb3436052dcf5d0636f1214bf27a2a80bc045773251d2"
+      "sha256": "8a3b9ee03fe56869e54d743711fdd7badd6fc6ab2adc3dca3149d74b7aa840bf"
     },
     {
       "path": "scripts/render_final.py",
