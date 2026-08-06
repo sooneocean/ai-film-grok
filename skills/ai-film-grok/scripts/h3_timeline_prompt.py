@@ -73,7 +73,7 @@ def resolve_duration_sec(
     shot: dict[str, Any] | None,
     *,
     default: float = 5.0,
-    max_cap: float = 15.0,
+    max_cap: float = 8.0,
 ) -> float:
     """Pick generation length from shot / dsl / h3 intent fields."""
     sh = shot if isinstance(shot, dict) else {}

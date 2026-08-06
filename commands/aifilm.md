@@ -1,6 +1,6 @@
 ---
 name: aifilm
-description: ai-film-grok 短别名——dispatch / doctor / 成片管线入口
+description: ai-film-grok 短别名——dispatch / doctor / 成片管线入口（H3 5090 / fidelity / final 门禁）
 ---
 
 # /aifilm

@@ -305,6 +305,7 @@ class UntilEmptyTests(unittest.TestCase):
 
             with (
                 mock.patch("h3_fill_idle.next_fill_idle_job", return_value=nxt),
+                mock.patch("h3_fill_idle.probe_comfy_capacity_soft", return_value={"status": "ready", "blockers": []}),
                 mock.patch("h3_workflow.run_h3_shot", side_effect=_boom),
             ):
                 rep = run_next_fill_idle(root, execute=True, max_jobs=1, require_capacity=True)

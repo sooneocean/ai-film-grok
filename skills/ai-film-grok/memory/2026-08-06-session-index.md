@@ -20,6 +20,9 @@
   canary: `artifacts/2026-08-06-c1-until-empty-suse-ep01-canary.json`  
   takes 91→103 · jobs 6（1 prove + 5 cycle）· `stop_reason=queue_empty` · `--i-own-the-gpu --free-first`
 - **N1** 半吞吐机读 ✅ 2.40.14
+- **savani-ep01 plate 收工** ✅（宽带 duck final · 停 weak12 抢 H3）  
+  教训：[plate-boring-mean-mix](2026-08-06-plate-boring-mean-mix-iron.md) · 桌面 `~/Desktop/savani-ep01-plate` · **非 master**  
+  residual：独占窗再 weak mean（10 镜未齐）+ 人审
 - 巨石 residual：final stages · heat packs · export builder（挡路才拆）
 
 ## 本轮 L5 归档

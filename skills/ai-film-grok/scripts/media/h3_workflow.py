@@ -256,6 +256,7 @@ def _prompt_for_shot(
         )
     except (TypeError, ValueError):
         duration = 8.0
+    duration = max(3.0, min(8.0, duration))
 
     if author:
         # Keep author geometry/style; merge DF/want/dialogue; timeline when enabled.
@@ -368,7 +369,8 @@ def plan_h3_shot(
     weapon = str(mode_res["weapon_id"])
     endpoint = str(mode_res["source_endpoint"])
     audio_policy = str(intent.get("audio_policy") or h3.get("audio_policy") or "prefer_native")
-    max_dur = float(intent.get("max_duration_sec") or h3.get("max_duration_sec") or 8)
+    raw_dur = float(intent.get("max_duration_sec") or h3.get("max_duration_sec") or 8)
+    max_dur = max(3.0, min(8.0, raw_dur))
     enabled = bool(intent.get("h3_enabled") or h3.get("enabled") is True)
     alt = mode_res.get("alt_mode")
     last_cli = f' --last-frame "{last_path}"' if last_path and mode in {"flf", "r2v"} else ""

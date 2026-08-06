@@ -1,6 +1,6 @@
 ---
 name: ai-film-grok
-description: Grok Imagine AI 剧情片：短片/8–15 分钟竖屏长片、I2V、声音、后期与证据交付。触发：AI 电影、漫剧、长片、dispatch、成片。
+description: Grok Build 专业 AI 电影导演系统：把灵感收成可验收的 7 段成片主流程（定义故事→设计演出→Pilot 样片→批量制作→选片与粗剪→后期母版→审片与交付）。拍摄走多武器可插拔（Grok 静帧 + I2V、5090 本机 MiniMax H3 I2V/R2V/FLF、FRW LTX 对白原声），工程层以可验证门禁（input fidelity、style-bible、transition、cinematic、十一维 scorecard）守交付；支持 8–15 分钟竖屏长片与短剧/漫剧。触发：AI 电影、漫剧、长片、dispatch、成片、H3 5090。不作为 Photo/Ken Burns 静态轮播，也不替代真人 A-roll（→ aifilm shortform）。
 ---
 
 # Film Grok
