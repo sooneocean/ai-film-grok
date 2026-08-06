@@ -146,6 +146,19 @@ from final.enhance import (  # noqa: E402, F401
 )
 from final.errors import RenderError, RenderTimeoutError  # noqa: E402
 from final.watchdog import _run_with_watchdog  # noqa: E402, F401
+from final.render_defaults import (  # noqa: E402, F401
+    DEFAULT_BGM_GEN_AMP,
+    DEFAULT_MUSIC_VOLUME,
+    DEFAULT_SUB_MAX_CHARS,
+    DEFAULT_VO_GAIN,
+    DEFAULT_VO_PITCH,
+    DEFAULT_VO_RATE,
+    DEFAULT_VOCAL_COLOR_GAIN,
+    SR,
+)
+from final.io import read_json  # noqa: E402, F401
+from final.manifest import build_final_film_manifest_entry  # noqa: E402, F401
+from final.voice_mix_config import resolve_final_voice_mix_config  # noqa: E402, F401
 from final.media_ops import (  # noqa: E402, F401
     apply_dialogue_broll_visual,
     concat_audio_segments,
@@ -161,8 +174,11 @@ from final.native_audio import (  # noqa: E402, F401
     NATIVE_AUDIO_GAIN_MAX,
     NATIVE_AUDIO_GAIN_MIN,
     NATIVE_AUDIO_TARGET_DB,
+    dialogue_lane_suppresses_native,
+    dialogue_lane_tts_mix_gain,
     native_dialogue_replaced_by_post_tts,
     primary_native_shot_ids,
+    resolve_dialogue_audio_lane,
     resolve_native_audio_gain,
     resolve_native_audio_volume,
 )
@@ -191,17 +207,6 @@ def resolve_font() -> str:
     raise RenderError("No Chinese-capable system font found")
 
 
-# 中文女声优先：旁白是主叙事，必须压过 BGM
-# TTS 质量与稳定声线分开选择；跨服务商降级必须显式开启。
-DEFAULT_MUSIC_VOLUME = 0.48  # 略降 BGM，旁白更贴耳、节奏更干净
-DEFAULT_BGM_GEN_AMP = 0.22  # 程序化 BGM 生成响度（固定，勿再乘 music_volume）
-DEFAULT_VO_GAIN = 1.32  # 旁白增益：清晰压过环境音与 BGM（星声 lesson 略抬）
-DEFAULT_VOCAL_COLOR_GAIN = 0.0  # 2026-07-21: 语助轨默认关闭；成片以 nar+BGM 主导
-DEFAULT_VO_RATE = "+0%"  # 默认不拖腔；快节奏色气短片可用 +5%~+8%（禁 -3%+slot 叠拖）
-DEFAULT_VO_PITCH = "+0Hz"
-SR = 44100
-# 9:16 竖屏：一句一卡；过长句按逗号拆开，阅读更轻松
-DEFAULT_SUB_MAX_CHARS = 12  # phrase-sized cue; long nar always splits at ，/。
 
 
 def read_json(path: Path) -> dict[str, Any]:
@@ -240,32 +245,6 @@ from render_final_music import (  # noqa: E402, F401
 tts_synthesize = _tts_synthesize_default
 
 
-def build_final_film_manifest_entry(
-    *,
-    final_path: Path,
-    output_sha256: str,
-    duration_sec: float,
-    report_path: Path,
-    technical_qa: dict[str, Any],
-    official_final: dict[str, Any] | None,
-) -> dict[str, Any]:
-    """Build the manifest final_film descriptor.
-
-    This function is intentionally side-effect free and shared by render and tests,
-    so final-fidelity can evolve without touching scheduling code.
-    """
-    from final.delivery_class import delivery_fields_from_official_final
-
-    entry = {
-        "path": str(final_path.name),  # store relative name when under out/
-        "sha256": output_sha256,
-        "duration_sec": duration_sec,
-        "report": str(report_path.name),
-        "assembled_at": utc_now(),
-        "technical_qa": technical_qa,
-    }
-    entry.update(delivery_fields_from_official_final(official_final))
-    return entry
 
 
 def tts_to_wav(*args, **kwargs):
@@ -354,57 +333,23 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
     width = int(args.width or timeline.get("width") or manifest.get("width") or 720)
     height = int(args.height or timeline.get("height") or manifest.get("height") or 1280)
     fps = int(args.fps or timeline.get("fps") or 30)
-    # Film-spec may override VO strategy
-    vo_mode = str(spec.get("vo_mode") or "storyteller").lower()
-    # 默认中文女声（晓晓 edge 兜底）；Fish 时 voice 可填 FISH voice id
-    voice = (
-        args.voice
-        or spec.get("vo_voice")
-        or (STORYTELLER_VOICE if vo_mode in ("storyteller", "hybrid") else DEFAULT_VOICE)
-    )
-    # 一角一声：film-spec.cast_voices = {"storyteller": "zh-CN-XiaoxiaoNeural", "heroine": "..."}
-    cast_voices = normalize_cast_voices(spec.get("cast_voices") or {})
-    vo_rate = str(getattr(args, "vo_rate", None) or spec.get("vo_rate") or DEFAULT_VO_RATE)
-    vo_pitch = str(getattr(args, "vo_pitch", None) or spec.get("vo_pitch") or DEFAULT_VO_PITCH)
-    vo_tts_vol = str(getattr(args, "vo_tts_volume", None) or spec.get("vo_tts_volume") or "+0%")
-    tts_backend = (
-        getattr(args, "tts_backend", None)
-        or spec.get("tts_backend")
-        or os.environ.get("AIFILM_TTS_BACKEND")
-        or "auto"
-    )
-    tts_allow_network_fallback = bool(spec.get("tts_allow_network_fallback", False))
-    cast_tts_backends = normalize_cast_tts_backends(spec.get("cast_tts_backends") or {})
-    raw_gain = getattr(args, "vo_gain", None)
-    if raw_gain is None:
-        raw_gain = spec.get("vo_gain")
-    vo_gain = float(raw_gain if raw_gain is not None else DEFAULT_VO_GAIN)
-    # Multi-track voice policy (nar vs 娇喘语助 vs native)
-    voice_policy: dict[str, Any] = {}
-    if resolve_voice_tracks is not None:
-        try:
-            voice_policy = resolve_voice_tracks(spec)
-        except Exception:
-            voice_policy = {}
-    if voice_policy.get("nar_gain") is not None:
-        with contextlib.suppress(TypeError, ValueError):
-            vo_gain = float(voice_policy["nar_gain"])
-    native_audio_volume = resolve_native_audio_volume(args, spec, voice_policy)
-    raw_color_gain = getattr(args, "vocal_color_gain", None)
-    if raw_color_gain is None:
-        raw_color_gain = voice_policy.get("vocal_color_gain")
-    if raw_color_gain is None:
-        raw_color_gain = spec.get("vocal_color_gain")
-    try:
-        film_vocal_color_gain = float(
-            raw_color_gain if raw_color_gain is not None else DEFAULT_VOCAL_COLOR_GAIN
-        )
-    except (TypeError, ValueError):
-        film_vocal_color_gain = DEFAULT_VOCAL_COLOR_GAIN
-    film_vocal_color_gain = max(0.0, min(1.5, film_vocal_color_gain))
-    # 色气 / storyteller → seductive R&B by default；音乐必须远低于旁白
-    mood = args.music_mood or ("rnb" if vo_mode in ("storyteller", "hybrid") else "playful")
-    lipsync_mode = (getattr(args, "lipsync", None) or "off").lower()
+    # Film-spec / CLI → VO strategy (peeled leaf)
+    _vm = resolve_final_voice_mix_config(args, spec)
+    vo_mode = _vm["vo_mode"]
+    voice = _vm["voice"]
+    cast_voices = _vm["cast_voices"]
+    vo_rate = _vm["vo_rate"]
+    vo_pitch = _vm["vo_pitch"]
+    vo_tts_vol = _vm["vo_tts_vol"]
+    tts_backend = _vm["tts_backend"]
+    tts_allow_network_fallback = _vm["tts_allow_network_fallback"]
+    cast_tts_backends = _vm["cast_tts_backends"]
+    vo_gain = _vm["vo_gain"]
+    voice_policy = _vm["voice_policy"]
+    native_audio_volume = _vm["native_audio_volume"]
+    film_vocal_color_gain = _vm["film_vocal_color_gain"]
+    mood = _vm["mood"]
+    lipsync_mode = _vm["lipsync_mode"]
     tts_info = tts_probe() if tts_probe else {}
     log(
         f"vo_mode={vo_mode} tts={tts_backend}->{tts_info.get('active')} voice={voice} "
@@ -552,9 +497,6 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
             recorded_audible = native_record.get("audible")
             native_audio_audible = recorded_audible if isinstance(recorded_audible, bool) else None
             native_audio_gain = resolve_native_audio_gain(native_record)
-        native_dialogue_replaced = (
-            native_audio is not None and native_dialogue_replaced_by_post_tts(shot)
-        )
         caption_lang = str(
             spec.get("caption_lang") or (spec.get("voice_policy") or {}).get("caption_lang") or "zh"
         )
@@ -574,6 +516,33 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
         # dialogue_drama coverage (reaction / action_cover / silence without voice cue)
         # may legitimately carry no TTS line — plate is ambience/foley only.
         non_vo_coverage = _is_non_vo_coverage_shot(shot) and not text
+        # Film / H3 audio_policy string (prefer_native default; strip forces post_tts).
+        _ap = spec.get("audio_policy")
+        _h3 = spec.get("h3") if isinstance(spec.get("h3"), dict) else {}
+        if isinstance(_ap, dict):
+            film_audio_policy = str(
+                _ap.get("mode") or _ap.get("audio_policy") or _h3.get("audio_policy") or ""
+            )
+        else:
+            film_audio_policy = str(_ap or _h3.get("audio_policy") or "")
+        dialogue_audio_lane = resolve_dialogue_audio_lane(
+            shot,
+            has_native_stem=native_audio is not None,
+            native_audible=native_audio_audible,
+            has_spoken_text=bool(text and str(text).strip()),
+            non_vo_coverage=non_vo_coverage,
+            audio_policy=film_audio_policy or None,
+        )
+        # XOR: post_tts suppresses native; native lane never mixes Edge dialogue.
+        native_dialogue_replaced = native_audio is not None and dialogue_lane_suppresses_native(
+            dialogue_audio_lane
+        )
+        # Legacy contract helper still true for post_vo; lane is the single mix owner.
+        if native_dialogue_replaced_by_post_tts(shot) and dialogue_audio_lane != "post_tts":
+            dialogue_audio_lane = "post_tts"
+            native_dialogue_replaced = native_audio is not None
+        tts_mix_gain = dialogue_lane_tts_mix_gain(dialogue_audio_lane)
+        caption_clock_only = dialogue_audio_lane == "native"
         max_chars = int(
             getattr(args, "sub_max_chars", DEFAULT_SUB_MAX_CHARS) or DEFAULT_SUB_MAX_CHARS
         )
@@ -588,7 +557,7 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
             )
         except SecurityPolicyError as exc:
             raise RenderError(str(exc)) from exc
-        if non_vo_coverage:
+        if non_vo_coverage or dialogue_audio_lane == "silence":
             try:
                 plate_slot = float(shot.get("duration_sec") or 0.0)
             except (TypeError, ValueError):
@@ -616,7 +585,7 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
             tts_meta = {
                 "backend": "silence",
                 "voice": "none",
-                "note": "non_vo_coverage",
+                "note": "non_vo_coverage" if non_vo_coverage else "silence_lane",
                 "duration_sec": plate_slot,
             }
             text = ""
@@ -625,6 +594,50 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
             shot_voice = "none"
             shot_tts_backend = "silence"
             log(f"silence VO {sid}: coverage plate {plate_slot:.2f}s (no TTS)")
+            color_wav = None
+            color_dur = 0.0
+            color_meta = None
+            color_payload = {}
+            color_text = ""
+            color_gain = 0.0
+        elif dialogue_audio_lane == "native":
+            # Caption clock only: keep subtitle text, never synthesize Edge for mix.
+            try:
+                plate_slot = float(shot.get("duration_sec") or 0.0)
+            except (TypeError, ValueError):
+                plate_slot = 0.0
+            if plate_slot <= 0.05:
+                plate_slot = 1.0
+            silent_wav = work / f"vo_native_clock_{i:02d}_{sid}.wav"
+            silence_wav(silent_wav, plate_slot)
+            run(
+                [
+                    "ffmpeg",
+                    "-y",
+                    "-i",
+                    str(silent_wav),
+                    "-c:a",
+                    "libmp3lame",
+                    "-q:a",
+                    "4",
+                    str(mp3),
+                ]
+            )
+            wav = silent_wav
+            dur = plate_slot
+            tts_meta = {
+                "backend": "silence",
+                "voice": "none",
+                "note": "native_xor_caption_clock",
+                "duration_sec": plate_slot,
+                "dialogue_audio_lane": "native",
+            }
+            shot_voice = "none"
+            shot_tts_backend = "silence"
+            log(
+                f"native dialogue {sid}: keep clip audio, silent VO clock "
+                f"{plate_slot:.2f}s (caption only; no Edge double-speak)"
+            )
             color_wav = None
             color_dur = 0.0
             color_meta = None
@@ -674,7 +687,7 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
             )
             log(
                 f"  tts backend={tts_meta.get('backend')} voice={tts_meta.get('voice') or shot_voice} "
-                f"dur={dur:.2f}s"
+                f"dur={dur:.2f}s lane=post_tts"
             )
             # Independent 娇喘/语助词 stem (not mixed into nar text)
             color_wav: Path | None = None
@@ -683,6 +696,7 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
             color_payload: dict[str, Any] = {}
         if (
             not non_vo_coverage
+            and dialogue_audio_lane == "post_tts"
             and resolve_shot_vocal_color is not None
             and voice_policy.get("enabled", False)
         ):
@@ -690,10 +704,16 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
                 color_payload = resolve_shot_vocal_color(shot, policy=voice_policy, seed=i * 17)
             except Exception:
                 color_payload = {}
-        if not non_vo_coverage:
+        if not non_vo_coverage and dialogue_audio_lane == "post_tts":
             color_text = str(color_payload.get("text") or "").strip()
             color_gain = float(color_payload.get("gain") or film_vocal_color_gain or 0.0)
-        if (not non_vo_coverage) and color_text and color_gain > 0 and film_vocal_color_gain > 0:
+        if (
+            (not non_vo_coverage)
+            and dialogue_audio_lane == "post_tts"
+            and color_text
+            and color_gain > 0
+            and film_vocal_color_gain > 0
+        ):
             try:
                 c_mp3 = safe_output_path(
                     audio_dir,
@@ -741,7 +761,8 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
             _slot_for_cue = float(shot.get("duration_sec") or 0)
         except (TypeError, ValueError):
             _slot_for_cue = 0.0
-        if voice_cue and _slot_for_cue > 0:
+        # Native/silence: VO stem is silent plate clock — skip Edge cue triangle.
+        if voice_cue and _slot_for_cue > 0 and dialogue_audio_lane == "post_tts":
             from final.voice import check_vo_window_triangle
 
             tri_ok, tri_code = check_vo_window_triangle(
@@ -795,8 +816,8 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
                         "use --vo-fit atempo, or enlarge audio_cues duration within slot"
                     )
         # shorter tail — snappier cut to next shot
-        # non-vo coverage: silence already matches plate; no VO pad stretch
-        if non_vo_coverage:
+        # non-vo coverage / native XOR: silence already matches plate; no VO pad stretch
+        if non_vo_coverage or dialogue_audio_lane in {"native", "silence"}:
             pad = 0.0
             target = float(dur)
         else:
@@ -805,6 +826,7 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
         # visual_fit: "slot" locks to duration_sec; "vo" follows VO length.
         # Wave γ · dialogue_drama / spoken / mid_motion → vo (anti equal-length PPT).
         # See lessons-2026-07-20-action-fluency.md · shortform_no_double_play.
+        # Native dialogue lane: always plate/slot (Edge is caption-only, not duration owner).
         try:
             from edit_policy import default_visual_fit, resolve_shot_visual_fit
 
@@ -824,6 +846,8 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
                 use_fit = "vo"
             else:
                 use_fit = visual_fit if visual_fit in {"vo", "slot"} else default_fit
+        if dialogue_audio_lane == "native":
+            use_fit = "slot"
         visual_fit = str(spec.get("visual_fit") or default_fit).strip().lower()
         try:
             slot = float(shot.get("duration_sec") or 0)
@@ -933,8 +957,11 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
                 "tts_backend_lock": shot_tts_backend,
                 "native_audio": native_audio,
                 "native_audio_audible": native_audio_audible,
-                # The contract is the evidence that native audio contains
-                # dialogue. Do not sacrifice unlabelled ambience/foley.
+                # XOR: post_tts suppresses native; native keeps clip audio and
+                # silent Edge caption clock. Never both audible for same line.
+                "dialogue_audio_lane": dialogue_audio_lane,
+                "tts_mix_gain": tts_mix_gain,
+                "caption_clock_only": caption_clock_only,
                 "native_audio_suppressed_for_tts": native_dialogue_replaced,
                 "native_audio_gain": 0.0 if native_dialogue_replaced else native_audio_gain,
                 "visual_fit": use_fit,
@@ -1435,49 +1462,14 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
     def _apply_spotting_and_convert_to_stereo(
         float_bed: np.ndarray,
     ) -> tuple[np.ndarray, np.ndarray, dict[str, Any]]:
-        """mute/duck on bgm bed, sfx_accent on sfx bed (upmixes mono to stereo)."""
-        spotting: dict[str, Any]
-        try:
-            spotting = expand_sound_events(
-                sound_plan,
-                shot_starts=shot_start_map,
-                total_duration=float(total_dur),
-            )
-        except SoundPlanError as exc:
-            raise RenderError(str(exc)) from exc
-        events = spotting.get("applied_events") or []
-
-        if float_bed.ndim == 1:
-            bgm_out = np.column_stack((float_bed, float_bed))
-        elif float_bed.ndim == 2 and float_bed.shape[1] == 1:
-            bgm_out = np.column_stack((float_bed[:, 0], float_bed[:, 0]))
-        else:
-            bgm_out = float_bed.copy()
-
-        music_timeline = (
-            (sound_plan or {}).get("music_timeline") if isinstance(sound_plan, dict) else None
+        from final.bgm_spotting import apply_spotting_and_convert_to_stereo as _spot
+        return _spot(
+            float_bed,
+            sound_plan=sound_plan,
+            shot_start_map=shot_start_map,
+            total_dur=float(total_dur),
         )
-        if music_timeline and apply_music_timeline_to_samples is not None:
-            bgm_out = apply_music_timeline_to_samples(bgm_out, sr=SR, timeline=music_timeline)
-            spotting["music_cue_applied"] = "energy_duck_profile"
-            spotting["music_cue_shot_count"] = len(music_timeline)
-        else:
-            spotting["music_cue_applied"] = "none"
 
-        sfx_out = np.zeros_like(bgm_out)
-
-        if events:
-            bgm_out = apply_mute_windows_to_samples(bgm_out, sr=SR, events=events)
-            sfx_out = apply_sfx_accents_to_samples(sfx_out, sr=SR, events=events, level=0.55)
-            bgm_out = np.clip(bgm_out, -1.0, 1.0)
-            sfx_out = np.clip(sfx_out, -1.0, 1.0)
-            spotting["sfx_overlay_count"] = sum(
-                1 for e in events if e.get("type") == "sfx_accent" and e.get("overlay_applied")
-            )
-        else:
-            spotting["sfx_overlay_count"] = 0
-        spotting["bed_source"] = spotting.get("bed_source") or "unknown"
-        return bgm_out, sfx_out, spotting
 
     # Anti-fatigue seed first (pool pick + procedural style share it)
     plan_mood = (sound_plan or {}).get("mood") if sound_plan else None
@@ -2028,6 +2020,31 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
     suppressed_native_shots = [
         item["id"] for item in shot_audio if item.get("native_audio_suppressed_for_tts")
     ]
+    native_dialogue_shots = [
+        item["id"] for item in shot_audio if item.get("dialogue_audio_lane") == "native"
+    ]
+    post_tts_dialogue_shots = [
+        item["id"] for item in shot_audio if item.get("dialogue_audio_lane") == "post_tts"
+    ]
+    # Fail-closed bookkeeping: same shot must never keep native + audible TTS.
+    xor_violations = [
+        item["id"]
+        for item in shot_audio
+        if item.get("dialogue_audio_lane") == "native"
+        and float(item.get("tts_mix_gain") or 0.0) > 0.0
+    ] + [
+        item["id"]
+        for item in shot_audio
+        if item.get("dialogue_audio_lane") == "post_tts"
+        and item.get("native_audio")
+        and not item.get("native_audio_suppressed_for_tts")
+        and item.get("native_audio_audible") is not False
+    ]
+    if xor_violations:
+        raise RenderError(
+            "dialogue audio XOR violated (native + TTS both audible) for: "
+            + ", ".join(sorted({str(x) for x in xor_violations}))
+        )
     mix_spotting["native_audio"] = {
         "role": (
             "primary_video_sound"
@@ -2039,6 +2056,18 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
         "volume": native_audio_volume,
         "preserved_shots": preserved_native_shots,
         "suppressed_for_tts_shots": suppressed_native_shots,
+        "dialogue_xor": True,
+        "native_dialogue_shots": native_dialogue_shots,
+        "post_tts_dialogue_shots": post_tts_dialogue_shots,
+        "xor_violations": [],
+        "shot_lanes": {
+            item["id"]: {
+                "lane": item.get("dialogue_audio_lane"),
+                "tts_mix_gain": item.get("tts_mix_gain"),
+                "caption_clock_only": item.get("caption_clock_only"),
+            }
+            for item in shot_audio
+        },
         "gain_plan": {
             item["id"]: item["native_audio_gain"] for item in shot_audio if item.get("native_audio")
         },

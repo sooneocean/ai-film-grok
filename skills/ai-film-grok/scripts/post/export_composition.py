@@ -7,6 +7,14 @@ This is the designed-post bridge: captions, title cards, overlays, preview Studi
 
 from __future__ import annotations
 
+from export_cues import expand_cues_phrase_split  # noqa: F401
+from export_helpers import (  # noqa: F401
+    caption_clock_offset_for,
+    parse_srt,
+    remotion_captions,
+    resolve_compose_preset,
+)
+
 import argparse
 import html
 import json
@@ -142,182 +150,10 @@ def format_caption_lines(
 HF_CAPTION_MAX_CHARS = 12
 
 
-def expand_cues_phrase_split(
-    cues: list[dict[str, Any]],
-    *,
-    max_chars: int = HF_CAPTION_MAX_CHARS,
-    min_cue_sec: float = 0.55,
-) -> list[dict[str, Any]]:
-    """Re-split long SRT/nar cues into one-phrase cards for HyperFrames readability.
-
-    Timing: char-weighted within each original cue window. Does not change
-    total coverage of the parent cue's [start, end].
-    """
-    try:
-        from render_final import split_units
-    except Exception:  # pragma: no cover
-        split_units = None  # type: ignore
-
-    if not cues:
-        return []
-    out: list[dict[str, Any]] = []
-    for cue in cues:
-        start = float(cue.get("start") or 0.0)
-        end = float(cue.get("end") or start)
-        span = max(0.05, end - start)
-        zh = str(cue.get("zh") or cue.get("text") or "").strip()
-        en = str(cue.get("en") or "").strip()
-        mode = str(cue.get("mode") or "zh")
-        # Prefer zh for split; keep en only on first sub-cue when dual
-        text_for_split = zh or str(cue.get("text") or "")
-        if split_units is None:
-            units = [text_for_split] if text_for_split else []
-        else:
-            units = split_units(text_for_split, max_len=max_chars)
-        if not units:
-            continue
-        # One phrase fits the card: keep original window (no retime)
-        # Allow +1 only for a trailing punct so 12+， still counts as one card
-        _one = units[0]
-        _one_ok = len(units) == 1 and (
-            len(_one) <= max_chars
-            or (len(_one) == max_chars + 1 and _one[-1] in "，。！？…、,.;!?——")
-        )
-        if _one_ok:
-            lines = format_caption_lines(_one, en if mode == "zh_en" else "", mode=mode)
-            out.append(
-                {
-                    **{k: v for k, v in cue.items() if k not in {"text", "zh", "en", "html_kind"}},
-                    "start": start,
-                    "end": end,
-                    "text": lines["text"],
-                    "zh": lines["zh"],
-                    "en": lines["en"],
-                    "mode": lines["mode"],
-                    "html_kind": lines["html_kind"],
-                }
-            )
-            continue
-        # Drop units that would be shorter than min if we pack too many into short span
-        weights = [max(1.0, float(len(u))) for u in units]
-        total_w = sum(weights) or 1.0
-        # If span too short for n cues, merge adjacent short units first
-        # Never re-glue past max_chars (user: 一句一卡，長串拆開)
-        n = len(units)
-        if span < min_cue_sec * n and n > 1:
-            merged: list[str] = []
-            cur = ""
-            for u in units:
-                if not cur:
-                    cur = u
-                elif len(cur) + len(u) <= max_chars:
-                    cur = cur + u
-                else:
-                    merged.append(cur)
-                    cur = u
-            if cur:
-                merged.append(cur)
-            units = merged or units
-            weights = [max(1.0, float(len(u))) for u in units]
-            total_w = sum(weights) or 1.0
-        t = start
-        gap = 0.04
-        usable = max(0.2, span - gap * max(0, len(units) - 1))
-        for i, (u, w) in enumerate(zip(units, weights, strict=False)):
-            dur = usable * (w / total_w)
-            dur = max(min_cue_sec * 0.7, dur)
-            t1 = t + dur
-            if i == len(units) - 1:
-                t1 = end
-            # en only on first phrase of dual block (avoid repeating EN n times)
-            en_i = en if (i == 0 and mode == "zh_en") else ""
-            lines = format_caption_lines(u, en_i, mode=mode if en_i else "zh")
-            out.append(
-                {
-                    "start": round(t, 3),
-                    "end": round(min(end, t1), 3),
-                    "text": lines["text"],
-                    "zh": lines["zh"],
-                    "en": lines["en"],
-                    "mode": lines["mode"],
-                    "html_kind": lines["html_kind"],
-                    "shot_id": cue.get("shot_id"),
-                }
-            )
-            t = min(end, t1 + gap)
-            if t >= end - 0.02:
-                break
-    return out
 
 
-def parse_srt(path: Path) -> list[dict[str, Any]]:
-    """Parse a simple SRT into {start, end, text} seconds."""
-    if not path.is_file():
-        return []
-    raw = path.read_text(encoding="utf-8", errors="replace").strip()
-    if not raw:
-        return []
-
-    def ts_to_sec(ts: str) -> float:
-        ts = ts.strip().replace(",", ".")
-        parts = ts.split(":")
-        if len(parts) != 3:
-            return 0.0
-        h, m, s = parts
-        return int(h) * 3600 + int(m) * 60 + float(s)
-
-    cues: list[dict[str, Any]] = []
-    blocks = re.split(r"\n\s*\n", raw)
-    for block in blocks:
-        lines = [ln for ln in block.splitlines() if ln.strip() != ""]
-        if len(lines) < 2:
-            continue
-        # skip index line if present
-        if "-->" not in lines[0] and len(lines) >= 2:
-            lines = lines[1:]
-        if not lines or "-->" not in lines[0]:
-            continue
-        left, _, right = lines[0].partition("-->")
-        text = " ".join(ln.strip() for ln in lines[1:]).strip()
-        if not text:
-            continue
-        cues.append(
-            {
-                "start": ts_to_sec(left),
-                "end": ts_to_sec(right),
-                "text": text,
-            }
-        )
-    return cues
 
 
-def remotion_captions(cues: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Map internal cues to @remotion/captions Caption shape.
-
-    Dual zh_en cues use a single Caption text with newline (Remotion display
-    preserves line breaks when whiteSpace is pre-line).
-    """
-    out: list[dict[str, Any]] = []
-    for cue in cues:
-        start_ms = int(round(float(cue["start"]) * 1000))
-        end_ms = int(round(float(cue["end"]) * 1000))
-        text = str(cue.get("text") or "")
-        # Prefer explicit dual assembly
-        if cue.get("html_kind") == "dual" and cue.get("zh") and cue.get("en"):
-            text = f"{cue['zh']}\n{cue['en']}"
-        out.append(
-            {
-                "text": text if text.startswith(" ") or not out else f" {text}",
-                "startMs": start_ms,
-                "endMs": end_ms,
-                "timestampMs": start_ms,
-                "confidence": None,
-                "zh": cue.get("zh"),
-                "en": cue.get("en"),
-                "caption_mode": cue.get("mode") or cue.get("caption_mode"),
-            }
-        )
-    return out
 
 
 def build_timeline_package(
@@ -720,73 +556,8 @@ def resolve_layout(package: dict[str, Any], layout: str) -> str:
     return layout
 
 
-def resolve_compose_preset(package: dict[str, Any], preset: str = "auto") -> str:
-    """Resolve designed-post visual preset.
-
-    - explicit ``ecchi-rnb`` | ``minimal``
-    - ``auto``: rnb/soul/sensual/色气 tone → ecchi-rnb, else minimal
-    """
-    raw = (preset or "auto").strip().lower().replace("_", "-")
-    aliases = {
-        "ecchi": "ecchi-rnb",
-        "rnb": "ecchi-rnb",
-        "soul": "ecchi-rnb",
-        "sensual": "ecchi-rnb",
-        "seductive": "ecchi-rnb",
-        "clean": "minimal",
-        "plain": "minimal",
-    }
-    raw = aliases.get(raw, raw)
-    if raw in COMPOSE_PRESET_RESOLVED:
-        return raw
-    if raw not in {"auto", ""}:
-        raise ComposeExportError(f"compose_preset must be auto|ecchi-rnb|minimal; got {preset!r}")
-
-    mood = ""
-    sp = package.get("sound_plan")
-    if isinstance(sp, dict):
-        mood = str(sp.get("mood") or "").lower()
-    tone = ""
-    di = package.get("director_intent")
-    if isinstance(di, dict):
-        tone = str(di.get("tone") or "").lower()
-    blob = f"{mood} {tone}"
-    ecchi_tokens = (
-        "rnb",
-        "soul",
-        "sensual",
-        "seductive",
-        "ecchi",
-        "色气",
-        "暧昧",
-        "里番",
-        "诱惑",
-        "浪漫",
-        "romantic",
-    )
-    if mood in {"rnb", "soul", "sensual", "seductive"} or any(t in blob for t in ecchi_tokens):
-        return "ecchi-rnb"
-    return "minimal"
 
 
-def caption_clock_offset_for(
-    *,
-    layout: str,
-    title_dur: float,
-    caption_source: str = "",
-) -> float:
-    """Map package caption times onto the composition clock.
-
-    - **underlay**: film_final (or SRT from final) shares absolute film clock → **0**.
-      Never subtract title pad (would collapse early cues to t=0 and desync VO).
-    - **multiclip**: I2V packed from t=0 without black title pad; package cues
-      (final.srt / film_tl shot_starts) still include title pad → subtract title_dur.
-    """
-    if (layout or "").strip().lower() == "underlay":
-        return 0.0
-    # multiclip always authored against film_timeline with title pad
-    _ = caption_source  # reserved for future SRT-without-title variants
-    return max(0.0, float(title_dur))
 
 
 def preset_hf_styles(preset: str, *, width: int) -> dict[str, str]:

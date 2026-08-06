@@ -1,0 +1,2 @@
+from narrative.heat_spice import *  # noqa: F403
+from narrative.heat_spice import _NAR_EXTREME_MARKERS, _NAR_LITERARY_ONLY_HINTS, _NAR_MILD_ONLY_MARKERS, _NAR_SEX_VERB_MARKERS, _NAR_SPICE_MARKERS, _TEMPLATE_NAR_POLLUTION_MARKERS

@@ -1,0 +1,10 @@
+"""Render mix defaults (closeout)."""
+from __future__ import annotations
+DEFAULT_MUSIC_VOLUME = 0.48
+DEFAULT_BGM_GEN_AMP = 0.22
+DEFAULT_VO_GAIN = 1.32
+DEFAULT_VOCAL_COLOR_GAIN = 0.0
+DEFAULT_VO_RATE = "+0%"
+DEFAULT_VO_PITCH = "+0Hz"
+SR = 44100
+DEFAULT_SUB_MAX_CHARS = 12

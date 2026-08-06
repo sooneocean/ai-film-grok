@@ -60,6 +60,91 @@ def native_dialogue_replaced_by_post_tts(shot: dict[str, Any]) -> bool:
     return False
 
 
+def _contract_audio_origins(shot: dict[str, Any]) -> set[str]:
+    origins: set[str] = set()
+    contracts = shot.get("dialogue_contracts")
+    if not isinstance(contracts, list):
+        return origins
+    for contract in contracts:
+        if not isinstance(contract, dict):
+            continue
+        for line in contract.get("lines") or []:
+            if isinstance(line, dict):
+                origin = str(line.get("audio_origin") or "").strip().lower()
+                if origin:
+                    origins.add(origin)
+    return origins
+
+
+def _force_strip_native_policy(
+    shot: dict[str, Any],
+    *,
+    audio_policy: str | None = None,
+) -> bool:
+    """True when policy explicitly replaces native dialogue with post TTS/BGM."""
+    candidates: list[str] = []
+    if audio_policy:
+        candidates.append(str(audio_policy))
+    for key in ("audio_policy", "h3_audio_policy", "native_audio_policy"):
+        raw = shot.get(key)
+        if isinstance(raw, dict):
+            candidates.append(str(raw.get("mode") or raw.get("audio_policy") or ""))
+        elif raw is not None:
+            candidates.append(str(raw))
+    for value in candidates:
+        token = value.strip().lower()
+        if token in {"strip_native_use_tts_bgm", "mute_native", "post_tts", "adr"}:
+            return True
+    return False
+
+
+def resolve_dialogue_audio_lane(
+    shot: dict[str, Any],
+    *,
+    has_native_stem: bool,
+    native_audible: bool | None,
+    has_spoken_text: bool,
+    non_vo_coverage: bool = False,
+    audio_policy: str | None = None,
+) -> str:
+    """Pick exactly one dialogue audio lane: native XOR post_tts XOR silence.
+
+    Never returns a lane that would mix audible native dialogue with Edge TTS
+    for the same spoken line (double-speak disaster).
+    """
+    if non_vo_coverage and not has_spoken_text:
+        return "silence"
+
+    origins = _contract_audio_origins(shot)
+    force_strip = _force_strip_native_policy(shot, audio_policy=audio_policy)
+    usable_native = bool(has_native_stem) and native_audible is not False
+
+    if force_strip or "post_vo" in origins:
+        if has_spoken_text:
+            return "post_tts"
+        return "silence"
+
+    if "native" in origins and usable_native:
+        return "native"
+
+    if usable_native and has_spoken_text:
+        return "native"
+
+    if has_spoken_text:
+        return "post_tts"
+
+    return "silence"
+
+
+def dialogue_lane_tts_mix_gain(lane: str) -> float:
+    """Audible TTS only on post_tts lane; native/silence keep caption clock silent."""
+    return 1.0 if str(lane or "").strip().lower() == "post_tts" else 0.0
+
+
+def dialogue_lane_suppresses_native(lane: str) -> bool:
+    return str(lane or "").strip().lower() == "post_tts"
+
+
 def resolve_native_audio_gain(native_record: dict[str, Any] | None) -> float:
     """Normalize audible I2V stems conservatively; never amplify known silence."""
     if not isinstance(native_record, dict):

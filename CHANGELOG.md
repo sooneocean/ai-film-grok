@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.40.17] - 2026-08-06
+
+### Structure (monolith closeout — heat facade + export/final/film_spec leaves)
+- **Heat DONE as packs:** `edit_policy_heat` pure re-export facade (~90 LOC). Packs: `heat_phase` · `heat_wardrobe` · `heat_coitus` · `heat_spice` · `heat_impact` · `heat_multi` · `heat_arc_lint`.
+- **Final leaves:** `final/{render_defaults,io,manifest,voice_mix_config,bgm_spotting,watchdog}` wired into `render_final` (orchestrator body still residual for TTS/mix/subs loops).
+- **Export leaves:** `post/export_cues.py` + `post/export_helpers.py` (phrase split / parse_srt / preset / caption clock).
+- **Film-spec:** `plan/film_spec_lints.py` peeled from `film_spec_validate` (validate body residual).
+- IRON defaults not retuned. Peel suite ~147 passed (export integration tests that need full dramatic_meaning fixtures are product-fixture, not structure).
+
 ## [2.40.16] - 2026-08-06
 
 ### Added (AD process implementation · code closeout)
