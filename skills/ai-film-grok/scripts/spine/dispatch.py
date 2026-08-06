@@ -379,9 +379,9 @@ def build_dispatch(
             }
         )
 
-    # Action motion profile.  Capability checks may skip an unready lane, but
-    # the policy order remains FRW LTX → FRW API I2V → Grok Video 1.5.
-    i2v_profile = "ltx23_primary"
+    # Action motion profile. Free-local default is h3_primary (5090 MiniMax H3);
+    # Grok Video 1.5 is technical/explicit 兜底 only under that strategy.
+    i2v_profile = "h3_primary"
     try:
         from film_spec import resolve_i2v_profile
 
@@ -418,6 +418,16 @@ def build_dispatch(
                     "Grok 为人物动主力；FRW 仅在明确技术失败后 fallback，不提交默认 FRW bulk",
                     "visual",
                 )
+        elif i2v_profile == "h3_primary":
+            if craft_stage in {"shots", "media"}:
+                pre(
+                    "h3-primary-local",
+                    f"# Free-local (profile={i2v_profile}): still=Qwen/Grok · motion=aifilm h3 plan|run --register / h3 run-next "
+                    f"(comfy-h3 I2V/FLF/R2V/T2V film-wide) · Grok Video 1.5 technical/escape 兜底 only "
+                    f"(AIFILM_ALLOW_CLOUD_RESTRICTED=1; signed switch on tech failure)",
+                    "5090 MiniMax H3 主生成；禁默认云 bulk；Grok Video 1.5 仅技术失败或显式 escape",
+                    "visual",
+                )
         elif i2v_profile == "hybrid_h3":
             if craft_stage in {"shots", "media"}:
                 pre(
@@ -427,7 +437,7 @@ def build_dispatch(
                     "visual",
                 )
         else:
-            # Never make an FRW canary a normal Grok-primary step.  A typed
+            # Never make an FRW canary a normal free-local step.  A typed
             # upload-probe is requested only after a provider-switch receipt.
             if craft_stage == "media" and canary.is_file():
                 pre(
@@ -926,13 +936,31 @@ def build_dispatch(
         f"原因：{next_why or '—'}",
     ]
     if craft_stage in {"media", "shots"} and cap and not (cap.get("frw") or {}).get("present"):
-        agent_do.append("bulk 前先 frw canary；403 走 Grok，勿死磕 Seedance")
+        if i2v_profile == "h3_primary":
+            agent_do.append(
+                "free-local h3_primary：主 bulk 走 aifilm h3 plan|run / run-next；"
+                "Grok Video 1.5 仅技术失败或 AIFILM_ALLOW_CLOUD_RESTRICTED 逃生（勿默认 frw canary bulk）"
+            )
+        elif i2v_profile not in {"hybrid_h3"}:
+            agent_do.append("bulk 前先 frw canary；403 走 Grok，勿死磕 Seedance")
     if craft_stage == "shots" and not gates.get("style_locked"):
         agent_do.append("先 lock-style 再 pilot / bulk")
     if craft_stage in {"shots", "media", "selects"}:
-        agent_do.append(
-            "Grok Build：静帧 image_edit(cast)/image_gen；动 bulk FRW 或 image_to_video；加载 /imagine"
-        )
+        if i2v_profile == "h3_primary":
+            agent_do.append(
+                "Grok Build：静帧 image_edit(cast)/Qwen；动 bulk=5090 MiniMax H3 "
+                "(aifilm h3 plan|run --register / h3 run-next)；"
+                "Grok Video 1.5=技术/escape 兜底 only；加载 /imagine"
+            )
+        elif i2v_profile == "hybrid_h3":
+            agent_do.append(
+                "Grok Build：静帧 image_edit(cast)；soft bulk=Grok image_to_video；"
+                "meat=aifilm h3 plan|run；加载 /imagine"
+            )
+        else:
+            agent_do.append(
+                "Grok Build：静帧 image_edit(cast)/image_gen；动 bulk FRW 或 image_to_video；加载 /imagine"
+            )
         agent_do.append("推理产出 structured film-spec 字段；事实先 web_search；记忆写 film-root")
         agent_do.append(
             "生成串行 first/last（必触发）：register-clip 后自动 promote 末帧→下镜首帧；"
@@ -1023,23 +1051,55 @@ def build_dispatch(
             "grok_primary: still=image_edit(cast) · motion=image_to_video · "
             "FRW Wan/local only after readiness or technical-failure gates"
         )
+    if i2v_profile == "h3_primary":
+        env_plate_line = (
+            "h3_primary free-local: env/bridge → H3 T2V (no-face); "
+            "Grok/FRW only technical or explicit escape"
+        )
+        routing_ref = (
+            "references/hard-defaults.md · weapon-lane-matrix.md · stages/visual.md · "
+            "i2v-grok-primary.md (compat only)"
+        )
+        grok_video_line = (
+            "Grok Video 1.5 = technical/escape 兜底 only under free-local h3_primary; "
+            "primary motion = aifilm h3 plan|run (comfy-h3)"
+        )
+    elif i2v_profile in {"grok_primary", "hybrid_h3"}:
+        env_plate_line = "env: FRW LTX no-face optional; hybrid meat stays H3"
+        routing_ref = (
+            "references/hard-defaults.md · weapon-lane-matrix.md · i2v-grok-primary.md (compat)"
+        )
+        grok_video_line = (
+            "Grok image_to_video bulk (compat profile); batch OAuth: grok-oauth video --image kf --wait"
+        )
+    else:
+        env_plate_line = "FRW LTX no-face path first; then Grok and verified local fallback"
+        routing_ref = (
+            "references/frw-lipsync.md · ltx-env-plate.md · frw-degrade-dispatch.md · "
+            "i2v-grok-primary.md (compat)"
+        )
+        grok_video_line = (
+            "LTX chain first; Grok Video 1.5 technical fallback; batch OAuth: grok-oauth video --wait"
+        )
+
     routing = {
         "tts_default": "edge",
+
         "tts_quality": "voicebox if app up",
         "bgm": "film audio → skill assets/bgm → procedural rnb",
         "lipsync": "off default; canary after backend-lock",
         "i2v_profile": i2v_profile,
         "i2v": i2v_line,
-        "env_plate": "FRW LTX no-face path first; then Grok and verified local fallback",
+        "env_plate": env_plate_line,
         "lipsync_frw": "FRW lipsync is fallback-only; upload-probe and new receipt required",
-        "ref": "references/frw-lipsync.md · ltx-env-plate.md · i2v-grok-primary.md",
+        "ref": routing_ref,
         "grok_build": {
             "host": "Grok Build session (native tools)",
             "oauth": "aifilm grok-oauth doctor — ~/.grok/auth.json SuperGrok path",
             "text": "Reasoning + structured JSON → brief / director_intent / beats / film-spec",
             "tools": "web_search · x_* · shell/aifilm · optional MCP collections",
             "image": "image_gen · image_edit(cast); batch: grok-oauth image|image-edit",
-            "video": "SECOND: image_to_video after FRW LTX; batch OAuth: grok-oauth video --image kf --wait",
+            "video": grok_video_line,
             "voice": "session chat ≠ VO; default Edge 中文对白/旁白；其他后端须显式选择并留回执",
             "memory": "film-root + receipts (project RAG default)",
             "sdk_optional": "OAuth first; XAI_API_KEY only if no auth.json",

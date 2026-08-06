@@ -189,3 +189,76 @@ def test_media_queue_blocks_h3_primary_cloud(tmp_path: Path) -> None:
     msg = str(ei.value)
     assert "h3_primary" in msg or "MiniMax H3" in msg
     assert "AIFILM_ALLOW_CLOUD_RESTRICTED" in msg
+
+
+def test_dispatch_h3_primary_agent_do_ranks_local_h3(tmp_path: Path) -> None:
+    """Live dispatch under free-local must not rank FRW/Grok bulk above H3."""
+    import json
+
+    from dispatch import build_dispatch
+
+    root = tmp_path / "film"
+    root.mkdir()
+    (root / "brief.json").write_text('{"title":"t","theme":"x"}\n', encoding="utf-8")
+    (root / "film-spec.json").write_text(
+        json.dumps(
+            {
+                "title": "t",
+                "tts_backend": "edge",
+                "_i2v_profile": "h3_primary",
+                "i2v_provider": "comfy-h3",
+                "h3": {"enabled": True},
+                "shots": [
+                    {
+                        "id": "shot01",
+                        "nar": "话说",
+                        "dramatic_function": "hook",
+                        "dsl": {
+                            "action": "walks",
+                            "motion": "walk forward",
+                            "visible_change": "stands→walks",
+                        },
+                    }
+                ],
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    with mock.patch.dict(os.environ, {"AIFILM_I2V_PROFILE": "h3_primary"}):
+        packet = build_dispatch(
+            root,
+            gates={"spec": True, "style_locked": True},
+            include_capability=False,
+            write_receipt=False,
+        )
+    assert packet.get("craft_stage") in {"shots", "media", "selects", "agent"}
+    routing = packet.get("routing") or {}
+    assert routing.get("i2v_profile") == "h3_primary"
+    i2v = str(routing.get("i2v") or "")
+    assert "H3" in i2v or "h3" in i2v.lower()
+    assert "兜底" in i2v or "fallback" in i2v.lower() or "escape" in i2v.lower()
+    ref = str(routing.get("ref") or "")
+    assert "hard-defaults" in ref or "weapon-lane" in ref
+    # compat pointer ok; must not present grok doc as sole default truth without compat label
+    assert "compat" in ref.lower() or "i2v-grok-primary" not in ref
+    agent_blob = "\n".join(packet.get("agent_do") or [])
+    assert "动 bulk FRW 或 image_to_video" not in agent_blob
+    assert "bulk 前先 frw canary" not in agent_blob
+    assert "5090" in agent_blob or "MiniMax H3" in agent_blob or "h3 plan" in agent_blob.lower()
+    # pre-action chain must advertise local H3 primary
+    pre_ids = [str(a.get("id") or "") for a in (packet.get("next_actions") or [])]
+    assert "h3-primary-local" in pre_ids
+    video = str((routing.get("grok_build") or {}).get("video") or "")
+    assert "兜底" in video or "escape" in video.lower() or "h3" in video.lower()
+    assert "SECOND: image_to_video after FRW" not in video
+
+
+def test_dispatch_exception_default_profile_is_h3_primary() -> None:
+    """Source-level: free-local exception default must not be ltx23_primary."""
+    src = (Path(__file__).resolve().parents[1] / "scripts" / "spine" / "dispatch.py").read_text(
+        encoding="utf-8"
+    )
+    assert 'i2v_profile = "h3_primary"' in src
+    assert "the policy order remains FRW LTX" not in src
+

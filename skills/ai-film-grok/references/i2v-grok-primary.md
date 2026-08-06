@@ -1,26 +1,32 @@
-# I2V · Grok Primary 运营模式（Seedance 暂不可用）
+# I2V · Grok Primary（兼容模式 · 非免费默认）
 
-> 2026-07-21 · 保留给旧项目显式锁定的 **Grok-first 兼容模式**；当前默认为 `ltx23_primary`。
-> 恢复 Seedance：`AIFILM_I2V_PROFILE=seedance_first` + canary 201。
+> **2026-08-06 free-first**：日常默认是 **`h3_primary`**（5090 MiniMax H3 主生成；Grok Video 1.5 = 技术/escape 兜底）。  
+> 本档只给 **无 5090 / 显式云 bulk** 的旧项目：`AIFILM_I2V_PROFILE=grok_primary`。  
+> 免费主产线真相：`hard-defaults.md` · `weapon-lane-matrix.md` · `stages/visual.md`。  
+> Seedance 仍不可用；`seedance_first` 会归一到 grok_primary。
 
-## 一句话
+## 一句话（仅 grok_primary 兼容）
 
 ```text
 Still = Grok image_edit(cast)
-Motion bulk = Grok image_to_video 720p（6s/10s）
+Motion bulk = Grok image_to_video 720p（6s/10s）— 仅当显式 grok_primary
 Env 可选 = FRW ltx-t2v（有 canary 再开）
+禁止 = 把本档当免费默认；免费默认请 h3_primary + aifilm h3
 禁止 = 默认 seedance bulk、legacy img2video 冒充质量、T2V 锁脸
 ```
 
 ## 环境开关
 
 ```bash
-# config.env（推荐当前）
+# 免费默认（推荐 · 有 5090）
+AIFILM_I2V_PROFILE=h3_primary
+
+# 本档兼容：无 GPU / 显式云 bulk 才开
 AIFILM_I2V_PROFILE=grok_primary
 # 或
 AIFILM_SEEDANCE_AVAILABLE=0
 
-# Seedance 恢复后
+# Seedance 恢复后（仍非 free-local 默认）
 # AIFILM_I2V_PROFILE=seedance_first
 # AIFILM_SEEDANCE_AVAILABLE=1
 ```
