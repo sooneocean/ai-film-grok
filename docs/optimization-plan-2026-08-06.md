@@ -36,7 +36,9 @@ P0 五个自动硬门已全部实现并接入门禁/流水线，相关测试全�
 | **H3 Fill-Idle 自动派单（dispatch-order 显式化）** | ✅ **本会话** | v2.40.15 `fill_idle_sort_key` 抽离为纯函数+单测（`test_fill_idle_dispatch_order.py` 8 用例）；P0→P1→P2 / dual-sticky 优先 / P1 最少 H3 takes / P2 最低 mean 派单序从 `build_fill_idle_queue` 内嵌闭包提升为可测不变量 | 
 | **H3 Fill-Idle 模式/Lane 选取（R2V=能量位自动选取）** | ✅ **本会话** | v2.40.16 `select_fill_idle_mode` 抽离为纯函数+单测（`test_fill_idle_mode_select.py` 10 用例）；把 `classify_fill_idle_shot` 末尾的 R2V=能量位自动选取内联分支提升为可测不变量：primary dual second leg（r2v / flf-i2v）+ P2 soft challenge 优先 face-lock（flf/i2v）除非真实 on-cam-close 能量 | 
 | **H3 Fill-Idle P2 空闲挑战自动派（γ3 低 ROI 跳过）** | ✅ **本会话** | v2.40.17 `decide_p2_challenge` 抽离为纯函数+单测（`test_fill_idle_p2_challenge.py` 9 用例）；把 `classify_fill_idle_shot` 的 `has_still and has_any` 分支（含 γ3 `best>=floor+6.0` 低 ROI 跳过）提升为可测不变量：H3 已 ok→done / H3 低于 floor→P1 retry / 无 H3 且基线强→skip_p2_baseline_strong / 否则 P2 fill_idle_challenge（有 grok 基线标 has_baseline_take） | 
-| 介质路由 / sung | ⬜ P2 | 未做（sung 受 HeartMuLa 外部依赖阻塞；介质路由按 cast_state 稳定性选写实/漫剧待更多调研——`weapon_router.build_weapon_route` 仅做 workflow-demand→weapon/provider 路由，写实/漫剧稳定性路由在 i2v_provider/cast_state 暂未定位清晰边界） |
+| **H3 Fill-Idle primary 分类纯函数化（P0a/P0b/P0c + dual leg）** | ✅ **本会话** | v2.40.21 `classify_primary_h3_shot` 抽离为纯函数+单测（`test_fill_idle_primary_classify.py` 11 用例）；把 `classify_fill_idle_shot` 的 `elif primary:` 块（P0a/P0b/P0c 分级 + dual I2V+R2V 第二腿含 γ3 强身份腿跳过盲 R2V）提升为可测不变量；`classify_fill_idle_shot` 调用并 extend reasons，输出完全一致。闭合 v2.40.15–17 Fill-Idle 自动派单分解 | 
+| **介质自动路由（按角色稳定性选写实/漫剧）** | ✅ **本会话** | v2.40.20 `media/media_routing.py`：`route_character_medium`（unstable+photoreal→anime）/ `load_cast_stability`（spec `cast_stability` 覆盖，默认全 stable）/ `resolve_shot_medium` / `media_routing_report`；规划期定介质、不破运行时 medium lock；`test_media_routing.py` 15 用例。闭合 P2「介质自动路由」 |
+| sung 自动生成 | ⬜ P2 | 未做（`audio_recipe` 已有 `musical_hybrid`+`sung_beat`+无 provider 降级；缺口仅在 HeartMuLa 实际生成后端，外部依赖阻塞；可建 `SungProvider` 接口+`LocalFallbackSungProvider` 闭环，不依赖外部） |
 
 > 剩余真正开放的高 ROI P1/P2：首帧毒化·静帧压缩晋升 style_lock 默认硬锁、介质自动路由、H3 Fill-Idle 完整派单（R2V 能量位 + P2 空闲挑战自动派）、sung 自动生成（HeartMuLa⛔）、长片 SOP 固化。
 

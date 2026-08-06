@@ -464,6 +464,100 @@ def decide_p2_challenge(
     return "P2", "challenge_grok", "pending", reasons
 
 
+def classify_primary_h3_shot(
+    *,
+    shot: dict[str, Any],
+    intent: dict[str, Any],
+    takes: list[dict[str, Any]],
+    wants_continue: bool,
+    on_cam: bool,
+    close: bool,
+    has_h3: bool,
+    below: bool,
+    has_last: bool,
+    best: float | None,
+    floor: float | None,
+) -> tuple[str, str, str, list[str]]:
+    """Classify a primary-H3 shot for Fill-Idle (P0a/P0b/P0c + dual-need policy).
+
+    Pure function extracted from ``classify_fill_idle_shot`` (the ``elif primary:``
+    block) so the restricted-primary priority tiers and the dual I2V+R2V leg
+    logic — including the γ3 skip-blind-R2V when the identity leg is already
+    strong — are a single testable invariant rather than inline branches
+    (P2, v2.40.18). The ``dual_need_r2v`` / ``dual_need_i2v`` reasons returned
+    here are exactly what ``select_fill_idle_mode`` consumes to pick the final
+    mode, closing the loop on the Fill-Idle auto-dispatch decomposition.
+
+    Returns ``(priority, lane, status, added_reasons)``.
+    """
+    lane = "primary_h3"
+    reasons: list[str] = []
+    if wants_continue:
+        priority = "P0c"
+        reasons.append("continue_endframe")
+    elif on_cam and close:
+        priority = "P0b"
+        reasons.append("dialogue_close_restricted")
+    else:
+        priority = "P0a"
+        reasons.append("restricted_primary")
+
+    h3_modes = h3_modes_in_takes(takes)
+    dual = wants_dual_take(
+        shot, intent=intent, primary=True, on_cam_close=bool(on_cam and close)
+    )
+    if has_h3 and below:
+        priority = "P1"
+        status = "retry"
+        reasons.append("h3_below_floor")
+        h3_n = _count_h3_takes(takes)
+        cap = _h3_floor_retry_cap()
+        if cap > 0 and h3_n >= cap:
+            # Residual: keep evidence, drop from pending so until-empty can finish.
+            priority, lane, status = "done", "primary_h3", "done"
+            reasons.append("h3_floor_retry_exhausted")
+            reasons.append(f"h3_takes={h3_n}>={cap}")
+    elif has_h3 and not below and dual:
+        # Dual: identity leg (I2V or FLF) + energy R2V for high-value PK.
+        has_i2v = (
+            "i2v" in h3_modes
+            or "flf" in h3_modes
+            or ("h3" in h3_modes and "r2v" not in h3_modes)
+        )
+        has_r2v = "r2v" in h3_modes
+        explicit_dual = _explicit_dual_flag(shot, intent)
+        # γ3: auto-dual only — if I2V/FLF already well above floor, skip blind R2V.
+        i2v_strong = _i2v_mean_strong_enough(takes, floor=floor, best=best)
+        if has_i2v and has_r2v:
+            status = "done"
+            reasons.append("h3_dual_complete")
+        elif has_r2v and not has_i2v:
+            status = "pending"
+            reasons.append("dual_need_i2v")
+            if has_last:
+                reasons.append("dual_prefer_flf")
+        elif has_i2v and not has_r2v:
+            if i2v_strong and not explicit_dual:
+                status = "done"
+                reasons.append("skip_r2v_i2v_strong_enough")
+            else:
+                status = "pending"
+                reasons.append("dual_need_r2v")
+        else:
+            status = "pending"
+            reasons.append("dual_need_second_mode")
+            if has_last:
+                reasons.append("dual_prefer_flf")
+    elif has_h3 and not below:
+        status = "done"
+        reasons.append("h3_take_ok")
+    else:
+        status = "pending"
+        reasons.append("needs_h3_primary")
+
+    return priority, lane, status, reasons
+
+
 def _poison_blocked(root: Path, shot_id: str) -> bool:
     """Soft check: poison receipts or rejected stills skip the queue."""
     man = read_json(root / "manifest.json") or {}
@@ -571,71 +665,20 @@ def classify_fill_idle_shot(
             priority, lane, status = "done", "skip", "has_take"
             reasons.append("env_has_take")
     elif primary:
-        lane = "primary_h3"
-        if wants_continue:
-            priority = "P0c"
-            reasons.append("continue_endframe")
-        elif on_cam and close:
-            priority = "P0b"
-            reasons.append("dialogue_close_restricted")
-        else:
-            priority = "P0a"
-            reasons.append("restricted_primary")
-        h3_modes = h3_modes_in_takes(takes)
-        dual = wants_dual_take(
-            shot,
+        priority, lane, status, primary_added = classify_primary_h3_shot(
+            shot=shot,
             intent=intent,
-            primary=True,
-            on_cam_close=bool(on_cam and close),
+            takes=takes,
+            wants_continue=wants_continue,
+            on_cam=bool(on_cam),
+            close=bool(close),
+            has_h3=has_h3,
+            below=below,
+            has_last=has_last,
+            best=best,
+            floor=floor,
         )
-        if has_h3 and below:
-            priority = "P1"
-            status = "retry"
-            reasons.append("h3_below_floor")
-            h3_n = _count_h3_takes(takes)
-            cap = _h3_floor_retry_cap()
-            if cap > 0 and h3_n >= cap:
-                # Residual: keep evidence, drop from pending so until-empty can finish.
-                priority, lane, status = "done", "primary_h3", "done"
-                reasons.append("h3_floor_retry_exhausted")
-                reasons.append(f"h3_takes={h3_n}>={cap}")
-        elif has_h3 and not below and dual:
-            # Dual: identity leg (I2V or FLF) + energy R2V for high-value PK
-            has_i2v = (
-                "i2v" in h3_modes
-                or "flf" in h3_modes
-                or ("h3" in h3_modes and "r2v" not in h3_modes)
-            )
-            has_r2v = "r2v" in h3_modes
-            explicit_dual = _explicit_dual_flag(shot, intent)
-            # γ3: auto-dual only — if I2V/FLF already well above floor, skip blind R2V
-            i2v_strong = _i2v_mean_strong_enough(takes, floor=floor, best=best)
-            if has_i2v and has_r2v:
-                status = "done"
-                reasons.append("h3_dual_complete")
-            elif has_r2v and not has_i2v:
-                status = "pending"
-                reasons.append("dual_need_i2v")
-                if has_last:
-                    reasons.append("dual_prefer_flf")
-            elif has_i2v and not has_r2v:
-                if i2v_strong and not explicit_dual:
-                    status = "done"
-                    reasons.append("skip_r2v_i2v_strong_enough")
-                else:
-                    status = "pending"
-                    reasons.append("dual_need_r2v")
-            else:
-                status = "pending"
-                reasons.append("dual_need_second_mode")
-                if has_last:
-                    reasons.append("dual_prefer_flf")
-        elif has_h3 and not below:
-            status = "done"
-            reasons.append("h3_take_ok")
-        else:
-            status = "pending"
-            reasons.append("needs_h3_primary")
+        reasons.extend(primary_added)
     elif below and has_any:
         priority, lane, status = "P1", "challenge_weak", "retry"
         reasons.append("take_below_floor")
