@@ -741,7 +741,7 @@ def build_fill_idle_queue(
             "P2 sorted lowest mean first; pilot stage for fill challenges",
             "PK: select-shortlist advisory → human --promote",
             "aifilm comfy free-memory --confirm before mode switch",
-            "Overnight: aifilm h3 cycle --until-empty --execute",
+            "Overnight exclusive only: aifilm h3 cycle --until-empty --execute --i-own-the-gpu",
         ],
     }
 
@@ -1181,10 +1181,16 @@ def capacity_plan(
             "note": "ETA is planning only; real wall time varies with VRAM/queue",
         },
         "ops": [
-            f'aifilm h3 cycle --root "{base}" --until-empty --execute',
+            # Multi-agent IRON: default is batch 5, never until-empty without exclusive flag
             f'aifilm h3 run-next --root "{base}" --execute --max 5',
             f'aifilm h3 capacity-plan --root "{base}"',
+            (
+                f'aifilm h3 cycle --root "{base}" --until-empty --execute --i-own-the-gpu '
+                f"# ONLY when user named exclusive / overnight own GPU"
+            ),
         ],
+        "default_safe": "run-next --max 5",
+        "until_empty_requires": "--i-own-the-gpu or AIFILM_I_OWN_THE_GPU=1",
     }
     try:
         from util import write_json

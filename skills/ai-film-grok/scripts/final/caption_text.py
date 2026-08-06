@@ -522,10 +522,17 @@ def write_srt(path: Path, cues: list[dict[str, Any]], *, preserve_overlaps: bool
 
         write_srt_file(path, cues, allow_overlaps=True)
         return
+    try:
+        from caption_pixel_check import fix_chinese_caption_text
+    except Exception:  # pragma: no cover
+
+        def fix_chinese_caption_text(t: str) -> str:  # type: ignore
+            return t
+
     fixed: list[dict[str, Any]] = []
     prev_end = 0.0
     for cue in cues:
-        text = str(cue.get("text") or "").strip()
+        text = fix_chinese_caption_text(str(cue.get("text") or "").strip())
         if not text:
             continue
         start = float(cue["start"])

@@ -278,7 +278,6 @@ def detect_pipeline_stage(
     final_rec = _final_record(root)
     rehearse_ok = _tts_rehearse_ok(root)
     preview_ok = _preview_ok(root)
-    post_audit_fresh = post_audit_current(root)
 
     blockers: list[str] = []
     stage = "agent"

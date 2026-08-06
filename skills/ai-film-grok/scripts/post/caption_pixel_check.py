@@ -38,6 +38,20 @@ def _skip_enabled() -> bool:
 
 
 _CJK_SPACE = re.compile(r"[\u4e00-\u9fff]\s+[\u4e00-\u9fff]")
+_CJK_RUN = re.compile(r"([\u4e00-\u9fff])\s+(?=[\u4e00-\u9fff])")
+
+
+def fix_chinese_caption_text(text: str) -> str:
+    """Remove spaces/ideographic spaces between CJK characters (keep Latin spacing)."""
+    if not text:
+        return text
+    out = text.replace("\u3000", " ")
+    # Iterate until stable (chains of "你 好 啊")
+    prev = None
+    while prev != out:
+        prev = out
+        out = _CJK_RUN.sub(r"\1", out)
+    return out.strip()
 
 
 def lint_chinese_caption_spacing(srt: Path | str) -> dict[str, Any]:
@@ -65,9 +79,9 @@ def lint_chinese_caption_spacing(srt: Path | str) -> dict[str, Any]:
                     "line": i,
                     "message": f"line {i}: Chinese caption has spaces between CJK chars",
                     "sample": line[:80],
+                    "fixed_preview": fix_chinese_caption_text(line)[:80],
                 }
             )
-        # Empty or whitespace-only cue body after index/timing already skipped
         if line.replace(" ", "").replace("\u3000", "") == "":
             issues.append(
                 {
@@ -80,7 +94,58 @@ def lint_chinese_caption_spacing(srt: Path | str) -> dict[str, Any]:
         "ok": not issues,
         "checked": checked,
         "issues": issues,
-        "next_cmd": "fix SRT / re-render Edge captions without CJK spacing",
+        "next_cmd": "auto-fix via fix_chinese_caption_srt / re-final",
+    }
+
+
+def fix_chinese_caption_srt(
+    srt: Path | str, *, write: bool = True, backup: bool = True
+) -> dict[str, Any]:
+    """Rewrite SRT in place removing CJK-internal spaces. Returns before/after stats."""
+    path = Path(srt)
+    if not path.is_file():
+        return {"ok": False, "error": "srt missing", "fixed": 0}
+    raw = path.read_text(encoding="utf-8", errors="replace")
+    lines = raw.splitlines(keepends=True)
+    fixed_n = 0
+    out_lines: list[str] = []
+    for line in lines:
+        ending = ""
+        body = line
+        if line.endswith("\r\n"):
+            ending = "\r\n"
+            body = line[:-2]
+        elif line.endswith("\n"):
+            ending = "\n"
+            body = line[:-1]
+        stripped = body.strip()
+        if (
+            stripped
+            and "-->" not in stripped
+            and not stripped.isdigit()
+            and re.search(r"[\u4e00-\u9fff]", stripped)
+            and _CJK_SPACE.search(stripped)
+        ):
+            new_body = fix_chinese_caption_text(body)
+            if new_body != body.strip() or " " in body:
+                # preserve indent style: strip both sides for caption body
+                new_body = fix_chinese_caption_text(stripped)
+                out_lines.append(new_body + ending)
+                fixed_n += 1
+                continue
+        out_lines.append(line if line.endswith("\n") or not ending else body + ending)
+    new_text = "".join(out_lines)
+    if write and fixed_n:
+        if backup:
+            bak = path.with_suffix(path.suffix + ".pre-cjk-fix")
+            if not bak.is_file():
+                bak.write_text(raw, encoding="utf-8")
+        path.write_text(new_text, encoding="utf-8")
+    return {
+        "ok": True,
+        "fixed": fixed_n,
+        "path": str(path),
+        "backup": str(path.with_suffix(path.suffix + ".pre-cjk-fix")) if backup and fixed_n else None,
     }
 
 
@@ -182,6 +247,14 @@ def run_caption_pixel_check(
     caption_path = route.get("caption_path")
 
     spacing = lint_chinese_caption_spacing(srt)
+    cjk_fix: dict[str, Any] = {"fixed": 0}
+    if not spacing.get("ok") and any(
+        i.get("code") == "CAPTION_CJK_INTERNAL_SPACE" for i in (spacing.get("issues") or [])
+    ):
+        # Auto-heal SRT then re-lint (pixel ink still checked on video as-is)
+        cjk_fix = fix_chinese_caption_srt(srt, write=True, backup=True)
+        spacing = lint_chinese_caption_spacing(srt)
+        cjk_fix["recheck_ok"] = spacing.get("ok")
     report = {
         "schema_version": 1,
         "kind": "caption-pixel-check",
@@ -196,6 +269,7 @@ def run_caption_pixel_check(
             "sha256": sha256_file(srt),
         },
         "cjk_spacing": spacing,
+        "cjk_auto_fix": cjk_fix,
         "cues_checked": sample_n,
         "likely_count": likely,
         "timestamps": timestamps,

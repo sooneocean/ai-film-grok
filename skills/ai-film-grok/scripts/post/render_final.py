@@ -1500,19 +1500,20 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
             "issues": fatigue.get("issues"),
             "recommend": fatigue.get("recommend"),
         }
-        # Auto-promote template timeline on very long single-loop risk
+        # Auto multi-chapter when hard single-loop risk (procedural bed path)
         hard_fat = [
             i for i in (fatigue.get("issues") or []) if i.get("severity") == "hard"
         ]
-        if hard_fat and str(ap.get("bed_source") or "auto").lower() in {"auto", ""}:
-            if not getattr(args, "music_template", None):
-                # Prefer multi-style procedural via seed already diversifying; force template auto→timeline if library later
-                log(
-                    "bgm anti-fatigue: long plate single-loop risk — "
-                    "prefer music_template=timeline or approved multi-chapter bed"
-                )
+        mix_spotting["bgm_anti_fatigue"]["hard_count"] = len(hard_fat)
+        if hard_fat:
+            log(
+                "bgm anti-fatigue HARD: inject multi-chapter procedural motifs "
+                f"(dur={total_dur:.0f}s)"
+            )
+            mix_spotting["bgm_anti_fatigue"]["auto_chapters"] = True
     except Exception as exc:  # noqa: BLE001
         mix_spotting["bgm_anti_fatigue"] = {"ok": True, "error": str(exc)[:120]}
+        hard_fat = []
 
     # Phase 4: Plot-Adaptive Mood Timeline
     if isinstance(sound_plan, dict):
@@ -1534,6 +1535,35 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
                 sound_plan["mood_timeline"] = sound_plan["music_timeline"]
             except ValueError as exc:
                 raise RenderError(f"invalid shot music_cue: {exc}") from exc
+        # Force multi-chapter motif rotation for long single-loop risk
+        if hard_fat or (
+            float(total_dur) >= 180.0
+            and (mix_spotting.get("bgm_anti_fatigue") or {}).get("auto_chapters")
+        ):
+            try:
+                from bgm_anti_fatigue import inject_anti_fatigue_chapters
+
+                base_tl = (
+                    sound_plan.get("music_timeline")
+                    or sound_plan.get("mood_timeline")
+                    or []
+                )
+                injected = inject_anti_fatigue_chapters(
+                    base_tl if isinstance(base_tl, list) else [],
+                    total_dur_sec=float(total_dur),
+                    default_mood=mood,
+                    chapter_sec=45.0,
+                )
+                sound_plan["mood_timeline"] = injected
+                sound_plan["music_timeline"] = injected
+                mix_spotting["bgm_anti_fatigue"] = {
+                    **(mix_spotting.get("bgm_anti_fatigue") or {}),
+                    "chapters_injected": len(injected),
+                    "auto_chapters": True,
+                }
+                log(f"bgm anti-fatigue: {len(injected)} chapters injected for procedural variety")
+            except Exception as exc:  # noqa: BLE001
+                log(f"bgm anti-fatigue chapter inject skip: {exc}")
 
     # Phase H: local template pool. `timeline` is opt-in because it requires a
     # licensed mood-specific file for every cue; it never degrades to one loop.

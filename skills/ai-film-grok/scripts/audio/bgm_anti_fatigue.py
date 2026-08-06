@@ -121,3 +121,63 @@ def check_bgm_anti_fatigue(
         rec.parent.mkdir(parents=True, exist_ok=True)
         write_json(rec, out)
     return out
+
+
+def inject_anti_fatigue_chapters(
+    mood_timeline: list[dict[str, Any]] | None,
+    *,
+    total_dur_sec: float,
+    default_mood: str = "rnb",
+    chapter_sec: float = 45.0,
+) -> list[dict[str, Any]]:
+    """Ensure long plates have multi-chapter motif breaks for procedural beds.
+
+    If timeline already has ≥3 chapters spanning the film, return as-is.
+    Else split into ~chapter_sec windows with rotating motif_id / seed offsets.
+    """
+    dur = max(0.0, float(total_dur_sec or 0.0))
+    if dur < LONG_FORM_SEC:
+        return list(mood_timeline or [])
+    chapters = [c for c in (mood_timeline or []) if isinstance(c, dict)]
+    if len(chapters) >= 3:
+        return chapters
+    step = max(30.0, float(chapter_sec or 45.0))
+    out: list[dict[str, Any]] = []
+    t = 0.0
+    i = 0
+    motifs = ("bed_a", "bed_b", "bed_c", "bed_d")
+    while t < dur - 0.5:
+        ed = min(dur, t + step)
+        mood = default_mood
+        if chapters:
+            # pick nearest original chapter mood
+            for c in chapters:
+                try:
+                    if float(c.get("start_sec") or 0) <= t + 0.01:
+                        mood = str(c.get("mood") or mood)
+                except (TypeError, ValueError):
+                    pass
+        out.append(
+            {
+                "start_sec": round(t, 3),
+                "end_sec": round(ed, 3),
+                "mood": mood,
+                "motif_id": motifs[i % len(motifs)],
+                "seed": (i * 97) & 0xFFFF,
+                "energy": 0.45 + 0.1 * (i % 3),
+                "transition": "crossfade" if i else "cut",
+                "anti_fatigue_injected": True,
+            }
+        )
+        t = ed
+        i += 1
+    return out or [
+        {
+            "start_sec": 0.0,
+            "end_sec": dur,
+            "mood": default_mood,
+            "motif_id": "bed_a",
+            "seed": 0,
+            "transition": "cut",
+        }
+    ]

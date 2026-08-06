@@ -143,17 +143,6 @@ FRW_VIDEO_MODELS = frozenset(
 )
 
 
-DEFAULT_H3_CONFIG: dict[str, object] = {
-    "enabled": False,
-    "stage": "pilot",
-    "max_duration_sec": 8,
-    "megapixels_draft": 0.2,
-    "megapixels_select": 0.6,
-    "audio_policy": "prefer_native",
-    "allow_bulk": False,
-}
-
-
 DEFAULT_I2V_PROVIDER = "auto"  # resolved in validate via profile
 DEFAULT_FRW_VIDEO_MODEL = FRW_I2V_FRW_ONLY_LIFEBOAT
 FRW_I2V_FALLBACK_CHAIN = frw_i2v_fallback_chain()

@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.40.9] - 2026-08-06
+
+### Added (quality closeout · auto-fix + auto multi-chapter + GPU safe ops)
+- **Caption auto-fix**: `fix_chinese_caption_text/srt` removes CJK-internal spaces; `write_srt` + caption-pixel-check auto-heal SRT (backup `.pre-cjk-fix`).
+- **BGM multi-chapter auto**: long-plate hard fatigue injects `inject_anti_fatigue_chapters` into mood/music timeline for procedural multi-motif beds.
+- **Fill-Idle ops safe**: capacity-plan default `run-next --max 5`; until-empty only with `--i-own-the-gpu` in ops list.
+- Tests: CJK fix · chapter inject · h3 capacity safe ops.
+
 ## [2.40.8] - 2026-08-06
 
 ### Added (quality P1 · motion mean / caption CJK / BGM fatigue / style NEG)
