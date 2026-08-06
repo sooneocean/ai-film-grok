@@ -258,7 +258,7 @@
     },
     {
       "path": "scripts/audio/audio_recipe.py",
-      "sha256": "52cef58f184ebfdb27dc59e1a26d7baf730eea24a4ee225994a30f80b2e3e487"
+      "sha256": "03e4bc31c60ab2e1a6e1427f3cdb17e169f46d923c65b899510d0785bab96524"
     },
     {
       "path": "scripts/audio/audio_timeline.py",
@@ -355,6 +355,10 @@
     {
       "path": "scripts/audio/sound_plan.py",
       "sha256": "963594de4cf620c24c803f1cd6f3478e577080f50a6a75517df21c2ca49736f0"
+    },
+    {
+      "path": "scripts/audio/sung_provider.py",
+      "sha256": "d8112654eff9e2e1ef3c293ff01509669a7e313c5d28f0c5e45fd362f0a680ce"
     },
     {
       "path": "scripts/audio/tts_ab.py",

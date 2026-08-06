@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.40.22] - 2026-08-06
+
+### Changed (quality P2 · 拔掉 sung 自动生成的 HeartMuLa 外部依赖阻塞)
+- **`sung_beat` 不再因缺外部 HeartMuLa 而降级。** 新增 `scripts/audio/sung_provider.py`：`SungProvider` 抽象接口 + 两个实现——`HeartMuLaSungProvider`（外部 `AIFILM_MUSIC_ARGV`，保持原行为）+ `LocalFallbackSungProvider`（复用项目已捆绑的本地 TTS 适配器 cosyvoice/piper/kokoro/chatterbox，或 `AIFILM_LOCAL_SUNG_PROVIDER=1` 显式 opt-in，无需外部服务/网络）。`select_sung_provider()` = 外部优先否则本地；`sung_provider_ready()` = 任一可用即为 True。
+- **`audio/audio_recipe.py` 门禁解除**：`probe_caps_for_root` 改用 `sung_provider.sung_provider_ready()`（不再只认 `AIFILM_MUSIC_ARGV`）；`degrade_recipe` 原因文案同步更新。原来的硬降级 `sung_beat → narrate_bed` 在无 HeartMuLa 时不再触发。
+- **测试**：`tests/test_sung_provider.py`（12 用例，hotpath）覆盖抽象契约、HeartMuLa 仅 argparse 设置时可用、LocalFallback 注入 tts_callable 可用+写音频、外部优先于本地、全无时 `None`+`ready=False`，及关键回归 `test_sung_beat_no_longer_blocked_by_heartmula`（`AIFILM_LOCAL_SUNG_PROVIDER=1` + `AIFILM_MUSIC_ARGV=""` 时 `probe_caps_for_root` 报 `sung_provider_ready=True` 且 `resolve_shot_audio_recipe` 返回 `recipe=="sung_beat"` 不降级）。
+- **注意**：本次仅解除 planning 门禁；渲染期实际调用 `LocalFallbackSungProvider.synthesize_beat` 接入留待后续（HeartMuLa 配置路径不变）。
+
 ## [2.40.21] - 2026-08-06
 
 ### Changed (quality P2 · H3 Fill-Idle 完整派单 · primary 分类纯函数化)

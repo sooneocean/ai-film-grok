@@ -248,7 +248,10 @@ def degrade_recipe(
         elif not caps.get("sung_provider_ready"):
             recipe = "narrate_bed"
             degraded_from = original
-            rsn.append("sung blocked: no HeartMuLa/external music provider")
+            rsn.append(
+                "sung blocked: no sung provider available "
+                "(set AIFILM_MUSIC_ARGV for HeartMuLa, or enable a local sung provider)"
+            )
         elif not is_near_shot(shot):
             recipe = "narrate_bed"
             degraded_from = original
@@ -541,11 +544,16 @@ def probe_caps_for_root(root: Any | None = None) -> dict[str, bool]:
             music_library = hit is not None
     except Exception:
         pass
-    # External music / HeartMuLa wire
-    import os
+    # Sung provider readiness: external HeartMuLa (AIFILM_MUSIC_ARGV) OR a local
+    # fallback (bundled local TTS adapter) — no longer blocked on the external dep.
+    try:
+        from sung_provider import sung_provider_ready as _sung_ready  # type: ignore
 
-    if (os.environ.get("AIFILM_MUSIC_ARGV") or "").strip():
-        sung_provider_ready = True
+        sung_provider_ready = bool(_sung_ready())
+    except Exception:
+        import os
+
+        sung_provider_ready = bool((os.environ.get("AIFILM_MUSIC_ARGV") or "").strip())
     return _capability(
         lipsync_ready=lipsync_ready,
         music_library=music_library,

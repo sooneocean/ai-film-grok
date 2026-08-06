@@ -38,7 +38,7 @@ P0 五个自动硬门已全部实现并接入门禁/流水线，相关测试全�
 | **H3 Fill-Idle P2 空闲挑战自动派（γ3 低 ROI 跳过）** | ✅ **本会话** | v2.40.17 `decide_p2_challenge` 抽离为纯函数+单测（`test_fill_idle_p2_challenge.py` 9 用例）；把 `classify_fill_idle_shot` 的 `has_still and has_any` 分支（含 γ3 `best>=floor+6.0` 低 ROI 跳过）提升为可测不变量：H3 已 ok→done / H3 低于 floor→P1 retry / 无 H3 且基线强→skip_p2_baseline_strong / 否则 P2 fill_idle_challenge（有 grok 基线标 has_baseline_take） | 
 | **H3 Fill-Idle primary 分类纯函数化（P0a/P0b/P0c + dual leg）** | ✅ **本会话** | v2.40.21 `classify_primary_h3_shot` 抽离为纯函数+单测（`test_fill_idle_primary_classify.py` 11 用例）；把 `classify_fill_idle_shot` 的 `elif primary:` 块（P0a/P0b/P0c 分级 + dual I2V+R2V 第二腿含 γ3 强身份腿跳过盲 R2V）提升为可测不变量；`classify_fill_idle_shot` 调用并 extend reasons，输出完全一致。闭合 v2.40.15–17 Fill-Idle 自动派单分解 | 
 | **介质自动路由（按角色稳定性选写实/漫剧）** | ✅ **本会话** | v2.40.20 `media/media_routing.py`：`route_character_medium`（unstable+photoreal→anime）/ `load_cast_stability`（spec `cast_stability` 覆盖，默认全 stable）/ `resolve_shot_medium` / `media_routing_report`；规划期定介质、不破运行时 medium lock；`test_media_routing.py` 15 用例。闭合 P2「介质自动路由」 |
-| sung 自动生成 | ⬜ P2 | 未做（`audio_recipe` 已有 `musical_hybrid`+`sung_beat`+无 provider 降级；缺口仅在 HeartMuLa 实际生成后端，外部依赖阻塞；可建 `SungProvider` 接口+`LocalFallbackSungProvider` 闭环，不依赖外部） |
+| **sung 自动生成（拔掉 HeartMuLa 外部依赖阻塞）** | ✅ **本会话** | v2.40.22 `scripts/audio/sung_provider.py`：`SungProvider` 抽象 + `HeartMuLaSungProvider`（外部 `AIFILM_MUSIC_ARGV`）+ `LocalFallbackSungProvider`（复用本地 TTS 适配器 cosyvoice/piper/kokoro/chatterbox，或 `AIFILM_LOCAL_SUNG_PROVIDER=1` 显式 opt-in）；`select_sung_provider()`=外部优先否则本地，`sung_provider_ready()` 任一可用即为 True。`audio/audio_recipe.py` 的 `probe_caps_for_root` 改用 `sung_provider.sung_provider_ready()`（不再只认 `AIFILM_MUSIC_ARGV`），`degrade_recipe` 原因文案同步；闭环 P2「sung 自动生成」的**阻塞移除**（recipe 层不再因缺外部 HeartMuLa 而降级 `sung_beat→narrate_bed`）；`test_sung_provider.py` 12 用例含关键回归 `test_sung_beat_no_longer_blocked_by_heartmula`。注：渲染期实际调用 `LocalFallbackSungProvider.synthesize_beat` 接入留待后续（planning 门禁已解） |
 
 > 剩余真正开放的高 ROI P1/P2：首帧毒化·静帧压缩晋升 style_lock 默认硬锁、介质自动路由、H3 Fill-Idle 完整派单（R2V 能量位 + P2 空闲挑战自动派）、sung 自动生成（HeartMuLa⛔）、长片 SOP 固化。
 
@@ -162,7 +162,7 @@ P0 五个自动硬门已全部实现并接入门禁/流水线，相关测试全�
 **最影响成片质量的短板**
 
 1. **TTS 语言乒乓**：`ep2-voice-heat-final(P0)` 口白中文/角色日文需人工守，禁乒乓未自动。
-2. **sung 不自动生成**：`musical_hybrid` 降级（缺 HeartMuLa 适配器）。
+2. **sung 渲染未接本地 fallback**：planning 门禁已解（`sung_provider_ready` 外部优先否则本地 TTS），但渲染期实际调用 `LocalFallbackSungProvider.synthesize_beat` 仍待接入；HeartMuLa 配置路径不变。
 3. **BGM 抗疲劳**长片强度不够；纯乐器兜底未自动触发。
 4. **lipsync 后端晋级**未全自动化（5090 CUDA12.8 canary）。
 
@@ -202,7 +202,7 @@ P0 五个自动硬门已全部实现并接入门禁/流水线，相关测试全�
 
 - visual_bible 自动生成、介质自动路由
 - H3 Fill-Idle 自动派单
-- sung 自动生成（HeartMuLa）
+- sung 自动生成（HeartMuLa 外部阻塞已拔除 v2.40.22；渲染期本地 fallback 接入待做）
 - HF 转场全量 + 长片 SOP 固化（`short-drama-sop-bridge`）
 
 ---
