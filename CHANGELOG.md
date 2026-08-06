@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.40.15] - 2026-08-06
+
+### Changed (quality P2 · H3 Fill-Idle 自动派单 · dispatch-order 显式化)
+- **Fill-Idle dispatch-order policy extracted to a pure, unit-tested function** (`media/h3_fill_idle.py::fill_idle_sort_key`): the P0→P1→P2 / dual-sticky-first / P1-fewest-H3-takes / P2-lowest-mean ordering was previously a nested closure inside `build_fill_idle_queue`, invisible to tests. It is now an explicit, behavior-preserving module-level function so the dispatch order is a CI-verifiable invariant. `build_fill_idle_queue` calls it directly (identical sort tuple).
+- Tests: `tests/test_fill_idle_dispatch_order.py` (8 cases — priority rank / dual-sticky / P2 lowest-mean / P2 missing-mean-last / P1 fewest-h3-takes / P1 mean tiebreak / shot_id tiebreak / full stability).
+
 ## [2.40.14] - 2026-08-06
 
 ### Added (quality P2 · H3 Fill-Idle / 5090 统一调度器 · no-hog 程序化校验)

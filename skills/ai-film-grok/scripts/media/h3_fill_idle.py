@@ -620,6 +620,37 @@ def _i2v_mean_strong_enough(
     return False
 
 
+def fill_idle_sort_key(row: dict[str, Any]) -> tuple:
+    """Pure dispatch-order key for the Fill-Idle queue (H3 Fill-Idle 自动派单).
+
+    Order: priority rank (P0<P1<P2) → dual-sticky first → fewest H3 takes first
+    (P1) → lowest best_mean first (P2/P1) → shot_id tiebreak.
+
+    Mirrors the policy previously inlined in ``build_fill_idle_queue`` so the
+    dispatch ordering is an explicit, unit-tested invariant rather than a nested
+    closure. Pure — operates only on the already-classified row dict.
+    """
+    r = row if isinstance(row, dict) else {}
+    rank = int(r.get("priority_rank") or 99)
+    sticky = 0 if r.get("dual_sticky") else 1
+    mean = r.get("best_mean")
+    h3_n = 0
+    for t in r.get("takes") or []:
+        if isinstance(t, dict) and t.get("lane") == "h3":
+            h3_n += 1
+    if r.get("priority") == "P2":
+        mean_key = float(mean) if mean is not None else 1e9
+        take_key = 0
+    elif r.get("priority") == "P1":
+        # fewest H3 takes first, then lowest mean
+        take_key = h3_n
+        mean_key = float(mean) if mean is not None else 1e9
+    else:
+        mean_key = 0.0
+        take_key = 0
+    return (rank, sticky, take_key, mean_key, str(r.get("shot_id") or ""))
+
+
 def build_fill_idle_queue(
     root: Path | str,
     *,
@@ -675,27 +706,8 @@ def build_fill_idle_queue(
 
     # P0 dual sticky first within rank; P1 rotate fewest H3 takes first (avoid
     # shot09 monopolizing the 5090 when mean never clears floor); P2 lowest mean.
-    def sort_key(r: dict[str, Any]) -> tuple:
-        rank = int(r.get("priority_rank") or 99)
-        sticky = 0 if r.get("dual_sticky") else 1
-        mean = r.get("best_mean")
-        h3_n = 0
-        for t in r.get("takes") or []:
-            if isinstance(t, dict) and t.get("lane") == "h3":
-                h3_n += 1
-        if r.get("priority") == "P2":
-            mean_key = float(mean) if mean is not None else 1e9
-            take_key = 0
-        elif r.get("priority") == "P1":
-            # fewest H3 takes first, then lowest mean (hardest still gets more later)
-            take_key = h3_n
-            mean_key = float(mean) if mean is not None else 1e9
-        else:
-            mean_key = 0.0
-            take_key = 0
-        return (rank, sticky, take_key, mean_key, str(r.get("shot_id") or ""))
-
-    rows.sort(key=sort_key)
+    # Ordering is the explicit, unit-tested fill_idle_sort_key policy.
+    rows.sort(key=fill_idle_sort_key)
 
     pending = [r for r in rows if r.get("command")]
     next_row = pending[0] if pending else None
