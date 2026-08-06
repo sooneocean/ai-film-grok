@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.39.93] - 2026-08-06
+
+### Quality / tooling (close the local gate-trust gap, cont.)
+- `scripts/check-all.sh`: added **step 7 coverage gate** — `coverage run` over the fast path (`-m "not slow"`), then `coverage report --fail-under=58` plus per-file floors (`media_qa.py` 45 / `quality_evidence.py` 80 / `continuity.py` 85), mirroring CI `validate-core`. Local `make check-all` now fully ≡ CI green line (validate + ruff + doctor + pytest not-slow + secret-scan + hotpath + coverage 58%).
+- `Makefile`: updated `help` / header to reflect the new coverage step.
+
 ## [2.39.92] - 2026-08-06
 
 ### Quality / tooling (close the local gate-trust gap)

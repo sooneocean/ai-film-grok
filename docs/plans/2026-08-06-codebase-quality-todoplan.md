@@ -17,7 +17,7 @@
 | IRON coverage table | **DONE** `docs/reports/2026-08-06-iron-gate-coverage.md` |
 | hotpath markers | **DONE**（≥6 test files；旧文「0 处」过时） |
 | `core.hooksPath=.githooks` | **DONE**（`make install-hooks`） |
-| 本地 `check-all` 镜像 CI（secret-scan + hotpath） | **DONE**（`scripts/check-all.sh` 2.39.92：本地绿线 ≡ CI = validate+ruff+doctor+pytest not-slow+secret-scan+hotpath） |
+| 本地 `check-all` 镜像 CI（secret-scan + hotpath + coverage 58%） | **DONE**（`scripts/check-all.sh` 2.39.93：本地绿线 ≡ CI = validate+ruff+doctor+pytest not-slow+secret-scan+hotpath+coverage 58% 门槛 + 单文件 floor） |
 | `util.read_json_source` + semantic_index | **DONE** |
 | volume probe → `core.media_ops` | **DONE** 含 canary/quality_check/reference_audit（2.39.92） |
 | `util.retry` | **DONE** 工具 + **edge TTS 样板**；media_queue 等 OPEN |
@@ -198,6 +198,6 @@ T0.1 门禁真相（最高优先，1 小时内可决）
 T0.1 的「唯一门禁」已闭环为两端：
 
 - **CI 端（2.39.90）**：`ci.yml` 每个 push/PR 真实跑 `secret_scan.py` + `hotpath` job（fail-closed）。
-- **本地端（2.39.92）**：`scripts/check-all.sh` 由 4 步扩到 6 步，新增 **secret-scan（step 1）** 与 **hotpath 契约（step 6）**，本地 `make check-all` ≡ CI 绿线。工程师本地即可复现远端门禁，不再有「以为在扫其实没扫」的盲区。
+- **本地端（2.39.92→2.39.93）**：`scripts/check-all.sh` 由 4 步扩到 7 步，新增 **secret-scan（step 1）** / **hotpath 契约（step 6）** / **coverage 58% 门槛 + 单文件 floor（step 7）**，本地 `make check-all` ≡ CI 绿线（validate+ruff+doctor+pytest not-slow+secret-scan+hotpath+coverage）。工程师本地即可复现远端门禁，不再有「以为在扫其实没扫 / 以为覆盖够其实没测」的盲区。
 
-残留项（非阻塞，已文档化）：本地 `check-all` 未跑 coverage 58% 阈值（CI 独有）；`core.hooksPath` 仍需 `make install-hooks` 手动启用一次。对称缺口仅剩 canonical 仓库统一（§10 主项）。
+残留项（非阻塞，已文档化）：`core.hooksPath` 仍需 `make install-hooks` 手动启用一次（pre-push hook 有「缺 gitea-publish 静默跳过」分支，启用前需先修掉漏扫风险）。对称缺口仅剩 canonical 仓库统一（§10 主项）。
