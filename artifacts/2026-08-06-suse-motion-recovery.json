@@ -1,0 +1,100 @@
+{
+  "kind": "motion-gate-recovery",
+  "at": "2026-08-06T08:30:15.981983+00:00",
+  "film_root": "/Users/dex/AI FILM SPACE/0805/suse-evolution-ep01",
+  "gate_ok": false,
+  "audit_ok": false,
+  "weak_n": 11,
+  "weak": [
+    {
+      "id": "ep01_sc01_airport_s01",
+      "mean": 18.3906,
+      "floor": 20.0,
+      "tier": "high"
+    },
+    {
+      "id": "ep01_sc01_airport_s02",
+      "mean": 5.0206,
+      "floor": 10.0,
+      "tier": "soft"
+    },
+    {
+      "id": "ep01_sc02_flight_s04",
+      "mean": 9.4442,
+      "floor": 18.0,
+      "tier": "normal"
+    },
+    {
+      "id": "ep01_sc02_flight_s05",
+      "mean": 7.4127,
+      "floor": 10.0,
+      "tier": "soft"
+    },
+    {
+      "id": "ep01_sc03_door_s06",
+      "mean": 11.1727,
+      "floor": 18.0,
+      "tier": "normal"
+    },
+    {
+      "id": "ep01_sc04_undress_s12",
+      "mean": 19.0695,
+      "floor": 20.0,
+      "tier": "meat"
+    },
+    {
+      "id": "ep01_sc05_union_s13",
+      "mean": 19.0625,
+      "floor": 20.0,
+      "tier": "meat"
+    },
+    {
+      "id": "ep01_sc05_union_s16",
+      "mean": 19.8525,
+      "floor": 20.0,
+      "tier": "meat"
+    },
+    {
+      "id": "ep01_sc06_variety_s20",
+      "mean": 19.5674,
+      "floor": 20.0,
+      "tier": "meat"
+    },
+    {
+      "id": "ep01_sc07_map_s23",
+      "mean": 14.0787,
+      "floor": 16.0,
+      "tier": "medium"
+    },
+    {
+      "id": "ep01_sc07_map_s26",
+      "mean": 13.6015,
+      "floor": 16.0,
+      "tier": "medium"
+    }
+  ],
+  "meat_mean_avg": 22.447,
+  "normal_mean_avg": 13.516,
+  "progress": {
+    "start_weak": 17,
+    "after_best_take_maxmean": 11,
+    "now_weak": 11,
+    "cleared_examples": [
+      "s25 mean 21.8",
+      "s13 mean 23.3",
+      "s14 28.4",
+      "s10 20.6"
+    ]
+  },
+  "code_fixes": [
+    "collect_motion_gate_rows uses max mean across takes/manifest/audit",
+    "COITUS_BEATS re-export for edit_policy_heat hard-compat"
+  ],
+  "blocked": [
+    "VRAM_BELOW_FLOOR intermittent",
+    "history timeout on tunnel",
+    "armory JSON merge corruption (restored)",
+    "remaining soft/normal setup shots need more H3 energy"
+  ],
+  "next_cmd": "aifilm comfy free-memory --confirm --base-url http://127.0.0.1:18188; aifilm h3 run --root \"/Users/dex/AI FILM SPACE/0805/suse-evolution-ep01\" --shot-id <weak> --mode i2v --register; aifilm i2v-motion-gate --root \"/Users/dex/AI FILM SPACE/0805/suse-evolution-ep01\" --write"
+}
