@@ -9,8 +9,12 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
+import pytest
+
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
+
+pytestmark = pytest.mark.hotpath
 
 from media_queue import MediaQueue, QueueError  # noqa: E402
 from workflow_pack import WorkflowPackError  # noqa: E402

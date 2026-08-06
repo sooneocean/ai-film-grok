@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.39.91] - 2026-08-06
+
+### Quality / tooling (follow-up to 2.39.90)
+- AGENTS.md: fix wrong source-checkout path (was `plugins/ai-film-grok`, now documents both diverged checkouts); declare CI as the only real gate (local pre-push hook is not wired); note split-brain repo risk.
+- Tag fail-closed gate suites (`test_bulk_preflight_hard_gate`, `test_strict_gate_paths`, `test_production_gates`) with `pytest.mark.hotpath` so they stay in the fast fail-mode contract path (CI hotpath job now covers them).
+
 ## [2.39.90] - 2026-08-06
 
 ### Added (engineering quality + team uplift)
