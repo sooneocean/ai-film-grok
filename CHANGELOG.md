@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.40.28] - 2026-08-06
+
+### Changed (senior-dev 代码质量把控 · Phase 4 测试缺口补漏 · P4-1 起手)
+- **零覆盖基座测试起步（P4-1）**：`util/retry.py`（`retry_call` / `poll_until`，全局重试地基、此前零单测）补 `tests/test_util_retry.py`（8 用例，全用注入式 fake `sleep`/`clock`，确定性零等待）：首试即成功不 sleep；指数退避直到成功；全失败抛末次异常且 sleep 次数 = attempts-1；`retry_on` 不匹配即立即透传；`attempts<1` 报 `ValueError`；`poll_until` 就绪即返回不 sleep；超时抛 `TimeoutError`；`timeout_sec<=0`/`interval_sec<0` 参数校验。
+- **路线图**：P4-1 继续覆盖 `util`(validators/subprocess/json_io/errors)、`core`(film_io/paths/constants/media_ops)、`node`(GPU 适配)、`final`(单元层)；P4-2 跟进校验类 `film_spec*`/`story_contract`/`subtitle_typesetter`/`edit_policy_*`。每补一个零覆盖模块即一个 PR，测试不降绿。
+
 ## [2.40.27] - 2026-08-06
 
 ### Changed (senior-dev 代码质量把控 · Phase 3 迁移 & 去重 · P3-1 起手模板)
