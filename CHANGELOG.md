@@ -6,6 +6,11 @@
 - `scripts/check-all.sh`: local green line now mirrors CI — added **secret-scan** (`scripts/secret_scan.py`) as step 1 and **hotpath fail-closed contracts** (`pytest -m "hotpath and not slow"`) as step 6. Local `make check-all` ≡ CI gates (validate + ruff + doctor + pytest not-slow + secret-scan + hotpath).
 - `Makefile`: corrected misleading header (was pointing at `plugins/ai-film-grok` as the root; now documents the dual checkout — git root `ai-film-grok` vs runtime mirror `plugins/ai-film-grok` — and that CI is the real gate, not local pre-push). Updated `help` text for `check-all`/`release-light`.
 
+### Fixed / Refactored (quality round 2 · residual)
+- **Volume probe residual**: `elevenlabs_canary`, `quality_check_video`, `reference_audit` use `core.media_ops.probe_volume_stats` / mean probe (no local volumedetect paste).
+- **`probe_volume_stats` / `parse_max_volume_db`**: mean+max+raw log from one ffmpeg pass.
+- **Edge TTS empty-stream retry** via `util.retry.retry_call` (sample hot-path wire-up).
+
 ## [2.39.91] - 2026-08-06
 
 ### Quality / tooling (follow-up to 2.39.90)

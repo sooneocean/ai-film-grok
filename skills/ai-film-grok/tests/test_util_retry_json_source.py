@@ -52,7 +52,12 @@ def test_read_json_source_rejects_non_object_array(tmp_path: Path) -> None:
 
 
 def test_parse_mean_volume_db() -> None:
-    from core.media_ops import parse_mean_volume_db
+    from core.media_ops import parse_mean_volume_db, parse_max_volume_db, parse_volume_stats
 
     assert parse_mean_volume_db("mean_volume: -22.5 dB") == pytest.approx(-22.5)
     assert parse_mean_volume_db("nope") is None
+    text = "mean_volume: -18.0 dB\nmax_volume: -3.1 dB\n"
+    assert parse_max_volume_db(text) == pytest.approx(-3.1)
+    stats = parse_volume_stats(text)
+    assert stats["mean_volume_db"] == pytest.approx(-18.0)
+    assert stats["max_volume_db"] == pytest.approx(-3.1)

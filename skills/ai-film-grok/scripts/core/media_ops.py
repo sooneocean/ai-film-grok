@@ -49,6 +49,7 @@ def media_duration(path: Path) -> float:
 
 
 _MEAN_VOLUME_RE = re.compile(r"mean_volume:\s*(-?\d+(?:\.\d+)?)\s*dB")
+_MAX_VOLUME_RE = re.compile(r"max_volume:\s*(-?\d+(?:\.\d+)?)\s*dB")
 
 
 def parse_mean_volume_db(text: str) -> float | None:
@@ -57,7 +58,22 @@ def parse_mean_volume_db(text: str) -> float | None:
     return float(match.group(1)) if match else None
 
 
-def probe_native_audio_mean_volume(
+def parse_max_volume_db(text: str) -> float | None:
+    """Parse ffmpeg volumedetect max_volume from combined stdout/stderr text."""
+    match = _MAX_VOLUME_RE.search(text or "")
+    return float(match.group(1)) if match else None
+
+
+def parse_volume_stats(text: str) -> dict[str, float | None]:
+    """Parse mean + max volume from volumedetect log text."""
+    return {
+        "mean_volume_db": parse_mean_volume_db(text),
+        "max_volume_db": parse_max_volume_db(text),
+        "raw_text": text or "",
+    }
+
+
+def _volumedetect_text(
     path: Path,
     *,
     sample_sec: float | None = None,
@@ -65,13 +81,8 @@ def probe_native_audio_mean_volume(
     strip_video: bool = False,
     timeout: float | None = 60.0,
     run_fn: Any | None = None,
-) -> float | None:
-    """Return media mean volume (dB), or None when ffmpeg cannot measure it.
-
-    Single implementation for native-audio honesty and loudness probes.
-    Pass ``run_fn`` (e.g. hub ``run``) so tests can patch the caller module.
-    Optional ``sample_sec`` / ``start_sec`` limit decode window (compose path).
-    """
+) -> str | None:
+    """Run ffmpeg volumedetect; return combined log text or None on failure."""
     runner = run_fn or run
     cmd: list[str] = ["ffmpeg", "-hide_banner"]
     if start_sec is not None and float(start_sec) > 0:
@@ -92,8 +103,57 @@ def probe_native_audio_mean_volume(
             result = runner(cmd, check=False)
     except (OSError, subprocess.SubprocessError, subprocess.TimeoutExpired, TimeoutError):
         return None
-    text = f"{getattr(result, 'stderr', '') or ''}{getattr(result, 'stdout', '') or ''}"
-    return parse_mean_volume_db(text)
+    return f"{getattr(result, 'stderr', '') or ''}{getattr(result, 'stdout', '') or ''}"
+
+
+def probe_volume_stats(
+    path: Path,
+    *,
+    sample_sec: float | None = None,
+    start_sec: float | None = None,
+    strip_video: bool = False,
+    timeout: float | None = 60.0,
+    run_fn: Any | None = None,
+) -> dict[str, Any]:
+    """Return mean/max volume stats (+ raw log) from a single volumedetect pass."""
+    text = _volumedetect_text(
+        path,
+        sample_sec=sample_sec,
+        start_sec=start_sec,
+        strip_video=strip_video,
+        timeout=timeout,
+        run_fn=run_fn,
+    )
+    if text is None:
+        return {"mean_volume_db": None, "max_volume_db": None, "raw_text": ""}
+    return parse_volume_stats(text)
+
+
+def probe_native_audio_mean_volume(
+    path: Path,
+    *,
+    sample_sec: float | None = None,
+    start_sec: float | None = None,
+    strip_video: bool = False,
+    timeout: float | None = 60.0,
+    run_fn: Any | None = None,
+) -> float | None:
+    """Return media mean volume (dB), or None when ffmpeg cannot measure it.
+
+    Single implementation for native-audio honesty and loudness probes.
+    Pass ``run_fn`` (e.g. hub ``run``) so tests can patch the caller module.
+    Optional ``sample_sec`` / ``start_sec`` limit decode window (compose path).
+    """
+    stats = probe_volume_stats(
+        path,
+        sample_sec=sample_sec,
+        start_sec=start_sec,
+        strip_video=strip_video,
+        timeout=timeout,
+        run_fn=run_fn,
+    )
+    mean = stats.get("mean_volume_db")
+    return float(mean) if isinstance(mean, (int, float)) and not isinstance(mean, bool) else None
 
 
 def _register_media(

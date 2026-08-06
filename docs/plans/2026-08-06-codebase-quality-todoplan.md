@@ -3,9 +3,9 @@
 > **作者角色**：Senior Developer（高级开发工程师）— 资深全栈 / 代码质量把控
 > **结论先行**：本仓库**功能与产线规则已成熟**（见既有 `2026-08-06-optimization-todoplan.md`，那是「产品/出片」迭代板）。本档是**互补的另一面**——聚焦**代码库工程质量、技术债、测试纪律与团队能力 uplift**。一句话：规则不缺，缺的是「把规则变成机器门禁 + 把质量把控变成团队习惯」。
 
-**Status（2026-08-06 晚）:** Q0 团队底座 + Q1 部分 + Q2.1/Q2.2 **SHIPPED** 于本轮（见 v2.39.90 CHANGELOG）  
+**Status（2026-08-06 round-2）:** Q0–Q2 底座 **SHIPPED** · residual volume **SHIPPED** (2.39.92) · edge `util.retry` sample **SHIPPED** · gate hotpath tags **SHIPPED** (2.39.91)  
 **仓库真相：** `/Users/dex/.grok/plugins/ai-film-grok`  
-**plugin：** 见 `plugin.json`（本轮 bump 2.39.90）
+**plugin：** 见 `plugin.json`（本轮 bump **2.39.92**）
 
 ### 账实快照（勿按旧段落重做）
 
@@ -19,8 +19,8 @@
 | `core.hooksPath=.githooks` | **DONE**（`make install-hooks`） |
 | 本地 `check-all` 镜像 CI（secret-scan + hotpath） | **DONE**（`scripts/check-all.sh` 2.39.92：本地绿线 ≡ CI = validate+ruff+doctor+pytest not-slow+secret-scan+hotpath） |
 | `util.read_json_source` + semantic_index | **DONE** |
-| volume probe → `core.media_ops` | **DONE** 主路径；canary/quality_check 可 residual |
-| `util.retry` | **DONE** 工具落地；全仓替换 OPEN |
+| volume probe → `core.media_ops` | **DONE** 含 canary/quality_check/reference_audit（2.39.92） |
+| `util.retry` | **DONE** 工具 + **edge TTS 样板**；media_queue 等 OPEN |
 | heat↔policy sys.modules | **OPEN** bug-driven |
 | 虚荣 peel | **NON-GOAL** |
 
