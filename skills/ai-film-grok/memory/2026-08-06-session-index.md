@@ -12,6 +12,7 @@
 | Comfy 隧道 auto | [tunnel-ensure](2026-08-06-comfy-tunnel-auto-ensure.md) | 18188→8188 · LaunchAgent |
 | 养分对账 | [nutrient-matrix](../../../docs/plans/2026-08-06-nutrient-matrix.md) | L3/L4 守门 · L5 废文 |
 | Memory 契约 | [README](README.md) · `archive/` | active ~37；canary/session-wrap 归档 |
+| **plate 有片仍无聊** | [plate-boring-mean-mix](2026-08-06-plate-boring-mean-mix-iron.md) | mean+邻镜+禁 acrossover 假死；spec≠像素 |
 
 ## OPEN / 本轮闭合
 

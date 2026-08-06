@@ -1912,6 +1912,16 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
         sidechain["performance_duck_db"] = performance_bgm.get("duck_db")
     sc_frag = sidechain_filter_fragment(sidechain)
     filters_help = run(["ffmpeg", "-filters"], check=False).stdout
+    # Long multi-stem plates: dynamic_eq (sidechain+acrossover) can hang 30–60m+.
+    # AIFILM_FORCE_SIMPLE_AMIX=1 → plain amix (no duck).
+    # AIFILM_FORCE_BROADBAND_DUCK=1 → sidechaincompress only (light duck, no acrossover).
+    _env_on = lambda k: os.environ.get(k, "").strip().lower() in {"1", "true", "yes", "on"}
+    if _env_on("AIFILM_FORCE_SIMPLE_AMIX"):
+        filters_help = ""
+        mix_spotting["force_simple_amix"] = True
+    elif _env_on("AIFILM_FORCE_BROADBAND_DUCK"):
+        filters_help = (filters_help or "").replace("acrossover", "___disabled_acrossover___")
+        mix_spotting["force_broadband_duck"] = True
 
     try:
         from acoustic_policy import resolve_acoustic_space

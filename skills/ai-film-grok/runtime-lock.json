@@ -1242,7 +1242,7 @@
     },
     {
       "path": "scripts/final/media_ops.py",
-      "sha256": "c493053e7c67fb0f8d078cc78ee39b5c23d73fcc3c14e150f49657b499443923"
+      "sha256": "b9606eb7cfe893bcdbf195b12e00efdaf27a5e3920d5349c5c71ed41518b1fa3"
     },
     {
       "path": "scripts/final/native_audio.py",
@@ -2178,7 +2178,7 @@
     },
     {
       "path": "scripts/post/render_final.py",
-      "sha256": "7f16ee0b0c9da10297a577372180b2d13b2cbc4d0e822ef622262819de2ecf79"
+      "sha256": "33ff029af9272b69c3052847362c9b317cccc65c0df12104a87adcf80d47e562"
     },
     {
       "path": "scripts/post/render_final_music.py",
@@ -2478,7 +2478,7 @@
     },
     {
       "path": "scripts/spine/continue_handoff.py",
-      "sha256": "6fa1be2eaac8b527e7b47c4885c61707c4174a55f8b3832ac86cce74501bacd2"
+      "sha256": "d65cfaeec673ccce63c3989c4fc51529063ab5528caa1396b57ac87afc9c83ee"
     },
     {
       "path": "scripts/spine/craft_spine.py",
