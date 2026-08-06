@@ -62,3 +62,22 @@ def test_resolve_plate_slot_sec_from_shot(render_final_mod) -> None:
         == 2.5
     )
 
+
+def test_resolve_plate_slot_sec_zero_default_keeps_zero(render_final_mod) -> None:
+    # cue/slot paths: invalid → 0, not silence-path default 1.0
+    assert (
+        render_final_mod.resolve_plate_slot_sec({}, default=0.0, min_sec=0.0) == 0.0
+    )
+    assert (
+        render_final_mod.resolve_plate_slot_sec(
+            {"duration_sec": "x"}, default=0.0, min_sec=0.0
+        )
+        == 0.0
+    )
+    assert (
+        render_final_mod.resolve_plate_slot_sec(
+            {"duration_sec": 3.25}, default=0.0, min_sec=0.0
+        )
+        == 3.25
+    )
+

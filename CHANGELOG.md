@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.40.39] - 2026-08-06
+
+### Changed (code metabolism round 2 · P3-1×8 + plate-slot peel + core.emit tests)
+- **P3-1 migrate + hard-compat shims (8):** `render_workspace`→`post/`, `vo_atempo`→`audio/`, `context_routing`→`spine/` (fix `SKILL_ROOT` depth parents[2]), `benchmark`/`product_brief`/`planning_autopilot`→`plan/`, `provider_canary`→`media/`, `elevenlabs_canary`→`audio/`.
+- **Peel:** `resolve_plate_slot_sec` used for cue-window plate slot and visual-fit slot (default=0 path) in `post/render_final`.
+- **P4-1:** `tests/test_core_emit.py` (3 cases) for zero-coverage `core.emit` (TTY vs compact vs `AIFILM_PRETTY_JSON`).
+- **Inventory:** `docs/reports/2026-08-06-code-metabolism-inventory.md` refreshed (non-shim top ~92→~84).
+- Iron: public `import name` preserved via shims; no heat/i2v/pilot retune.
+
 ## [2.40.38] - 2026-08-06
 
 ### Changed (senior-dev 代码质量把控 · Phase 4 测试缺口补漏 · P4-2)

@@ -1,60 +1,47 @@
 # Code metabolism inventory — 2026-08-06
 
-**Generated:** 2026-08-06T11:14:02Z
-**Batch:** 2.40.38
+**Generated:** 2026-08-06T11:34:48Z
+**Latest batch:** 2.40.39
 
 ## Summary
 
 | Metric | Value |
 |--------|------:|
 | Top-level modules | 348 |
-| Classified shims | 256 |
-| Non-shim top-level | 92 |
+| Classified shims | 255 |
+| Non-shim top-level | 93 |
 | Functions ≥200 LOC | 74 |
-| Max function | 2456 `post/render_final.py::render_final` |
+| Max function LOC | 2450 |
 
 ## Four lanes
 
 | Lane | Rule |
 |------|------|
-| A DELETE | 0 import ∧ 0 CLI ∧ 0 test (empty this scan) |
-| B TOMBSTONE | frozen public API (lipsync) keep thin |
-| C MIGRATE | low-importer → package + thin hard-compat shim |
-| D PEEL | giant orchestrators → pure leaves |
+| A DELETE | 0 import ∧ 0 CLI ∧ 0 test (empty) |
+| B TOMBSTONE | frozen lipsync keep thin |
+| C MIGRATE | package + thin hard-compat shim |
+| D PEEL | pure leaves from giant orchestrators |
 
-## This batch (C + D)
+## Batch 2.40.39 (this round)
 
-| Module | Package | Shim |
-|--------|---------|------|
-| `vo_lint` | `narrative/` | top-level |
-| `native_text_gate` | `gates/` | top-level |
-| `seedance_bridge` | `media/` | top-level |
-| `show_package` | `post/` | top-level |
-| `gold_calibration` | `plan/` | top-level |
-| `golden_suite` | `gates/` (prior) | shim added |
-| `color_grade` | `post/` (prior) | shim added |
-| `realesrgan_probe` | `media/` (prior a635a6fc) | already shimmed |
+| Module | Package |
+|--------|---------|
+| `render_workspace` | `post/` |
+| `vo_atempo` | `audio/` |
+| `context_routing` | `spine/` (+ SKILL_ROOT parents[2]) |
+| `benchmark` | `plan/` |
+| `provider_canary` | `media/` |
+| `product_brief` | `plan/` |
+| `planning_autopilot` | `plan/` |
+| `elevenlabs_canary` | `audio/` |
 
-**Peel:** `post/render_final.resolve_plate_slot_sec`.
+**Peel:** more `resolve_plate_slot_sec` call sites (cue triangle + visual slot).  
+**P4:** `tests/test_core_emit.py` for `core.emit`.
 
-## Giant Top-12
+## Prior batch 2.40.38
 
-| LOC | Path | Function |
-|----:|------|----------|
-| 2456 | `post/render_final.py` | `render_final` |
-| 2322 | `plan/film_spec_validate.py` | `validate_film_spec` |
-| 1937 | `gates/preflight.py` | `run_preflight` |
-| 1189 | `spine/dispatch.py` | `build_dispatch` |
-| 785 | `post/export_composition.py` | `write_hyperframes` |
-| 765 | `post/post_audit.py` | `audit` |
-| 745 | `cli/cli_post.py` | `cmd_final` |
-| 734 | `post/closeout.py` | `closeout_status` |
-| 681 | `plan/story_plan.py` | `project_graph_to_film_spec` |
-| 653 | `cli/cli_post.py` | `add_post_parsers` |
-| 648 | `spine/next_actions.py` | `build_next_actions` |
-| 591 | `state_index_gate.py` | `run_state_index_check` |
+vo_lint, native_text_gate, seedance_bridge, show_package, gold_calibration + golden_suite/color_grade shims + first plate-slot peel.
 
 ## Iron
 
-- Public CLI strings unchanged · hard-compat shims · no heat/i2v/pilot retune.
-
+Public import names via shims · no heat/i2v/pilot retune in structure commits.

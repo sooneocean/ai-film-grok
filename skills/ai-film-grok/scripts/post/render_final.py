@@ -789,10 +789,7 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
         # A2 · 2026-08-06: 口白窗三角 — offset+cue≤slot; TTS≤cue; try atempo→cue before fail.
         cue_offset = float(voice_cue.get("start_offset_sec") or 0.0) if voice_cue else 0.0
         cue_window = float(voice_cue.get("duration_sec") or 0.0) if voice_cue else 0.0
-        try:
-            _slot_for_cue = float(shot.get("duration_sec") or 0)
-        except (TypeError, ValueError):
-            _slot_for_cue = 0.0
+        _slot_for_cue = resolve_plate_slot_sec(shot, default=0.0, min_sec=0.0)
         # Native/silence: VO stem is silent plate clock — skip Edge cue triangle.
         if voice_cue and _slot_for_cue > 0 and dialogue_audio_lane == "post_tts":
             from final.voice import check_vo_window_triangle
@@ -881,10 +878,7 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
         if dialogue_audio_lane == "native":
             use_fit = "slot"
         visual_fit = str(spec.get("visual_fit") or default_fit).strip().lower()
-        try:
-            slot = float(shot.get("duration_sec") or 0)
-        except (TypeError, ValueError):
-            slot = 0.0
+        slot = resolve_plate_slot_sec(shot, default=0.0, min_sec=0.0)
         dsl = shot.get("dsl") if isinstance(shot.get("dsl"), dict) else {}
         cut_on = str(dsl.get("cut_on") or "").strip().lower()
 
