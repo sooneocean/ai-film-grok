@@ -69,6 +69,40 @@ class RunNextLedgerTests(unittest.TestCase):
                 skip = run_next_fill_idle(root, execute=True, require_capacity=True)
             self.assertEqual(skip.get("skipped_reason"), "capacity_not_ready")
             self.assertFalse(skip.get("ran"))
+            self.assertEqual(skip.get("halt_reason_code"), "RUN_NOT_EXECUTED_CAPACITY")
+            self.assertIsNotNone(skip.get("open_ops"))
+            self.assertTrue(skip["open_ops"])
+            self.assertEqual(skip["open_ops"][0].get("halt_reason_code"), "RUN_NOT_EXECUTED_CAPACITY")
+            self.assertEqual(skip["open_ops"][0].get("halt_reason_group"), "capacity")
+            self.assertEqual(skip["open_ops"][0].get("reason"), "capacity_not_ready")
+
+    def test_run_next_queue_empty_records_decision_tree(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            write_json(
+                root / "film-spec.json",
+                {
+                    "title": "rn",
+                    "h3": {"enabled": True},
+                    "genre": "adult",
+                    "heat_scale": "max",
+                    "director_intent": {"protagonist_want": "x"},
+                    "scenes": [],
+                },
+            )
+            with mock.patch(
+                "h3_fill_idle.next_fill_idle_job",
+                return_value={"ok": True, "next": None, "pending_count": 0},
+            ):
+                rep = run_next_fill_idle(root, execute=True, max_jobs=1)
+            self.assertEqual(rep.get("skipped_reason"), "queue_empty")
+            self.assertEqual(rep.get("halt_reason_code"), "RUN_QUEUE_EMPTY")
+            self.assertEqual(rep.get("halt_reason_group"), "queue")
+            self.assertTrue(rep.get("open_ops"))
+            self.assertEqual(rep["open_ops"][0].get("halt_reason_group"), "queue")
+            self.assertIn("request", rep.get("decision_tree", {}))
+            self.assertEqual(len(rep.get("decision_trees") or []), 1)
+            self.assertIn("skipped_reason", rep.get("decision_trees")[0])
 
     def test_pk_ledger_append_not_auto(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
