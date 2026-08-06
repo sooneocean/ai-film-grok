@@ -7,6 +7,7 @@
 | 卸装 + 尺度兜底 | [wardrobe](2026-08-06-wardrobe-no-redress-fullnude-fallback.md) | 不回穿→裸诱→模型极限勿硬上 |
 | 正牌 final IRON | [suse-final](2026-08-06-suse-ep01-official-final-iron.md) | sex floor fail-closed；plate≠master |
 | H3 原声季 | [h3-native](2026-08-06-h3-native-ship-review-lessons.md) | ship-native=plate；字幕走 final 二段 |
+| **原声 XOR TTS 禁双轨** | [native-xor-tts](2026-08-06-native-xor-tts-no-double-dialogue.md) | native/post_tts/silence 互斥；Edge 不叠原声 |
 | C1 capacity-wait | [c1-capacity](2026-08-06-c1-capacity-wait-iron.md) | wait max 8h · P1 rotate · queue_empty 仍 OPEN |
 | Comfy 隧道 auto | [tunnel-ensure](2026-08-06-comfy-tunnel-auto-ensure.md) | 18188→8188 · LaunchAgent |
 | 养分对账 | [nutrient-matrix](../../../docs/plans/2026-08-06-nutrient-matrix.md) | L3/L4 守门 · L5 废文 |

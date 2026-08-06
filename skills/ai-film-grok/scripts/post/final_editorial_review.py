@@ -153,6 +153,56 @@ def audit(root: Path | str, *, write: bool = True) -> dict[str, Any]:
             }
         )
 
+    # Full XOR: native dialogue lane must never carry audible Edge TTS.
+    shot_lanes = native.get("shot_lanes") if isinstance(native.get("shot_lanes"), dict) else {}
+    for shot_id, lane_info in shot_lanes.items():
+        if not isinstance(lane_info, dict):
+            continue
+        lane = str(lane_info.get("lane") or "")
+        try:
+            tts_gain = float(lane_info.get("tts_mix_gain") or 0.0)
+        except (TypeError, ValueError):
+            tts_gain = 0.0
+        if lane == "native" and tts_gain > 0.0:
+            issues.append(
+                {
+                    "code": "DUPLICATE_DIALOGUE_AUDIO",
+                    "message": "native dialogue lane still has audible TTS (XOR violated)",
+                    "shot_id": str(shot_id),
+                }
+            )
+        if lane == "post_tts" and str(shot_id) in preserved and str(shot_id) not in suppressed:
+            issues.append(
+                {
+                    "code": "DUPLICATE_DIALOGUE_AUDIO",
+                    "message": "post_tts lane still preserves native stem (XOR violated)",
+                    "shot_id": str(shot_id),
+                }
+            )
+    for shot_id in native.get("xor_violations") or []:
+        issues.append(
+            {
+                "code": "DUPLICATE_DIALOGUE_AUDIO",
+                "message": "mix_report recorded dialogue audio XOR violation",
+                "shot_id": str(shot_id),
+            }
+        )
+    for shot_id in native.get("native_dialogue_shots") or []:
+        sid = str(shot_id)
+        info = shot_lanes.get(sid) if isinstance(shot_lanes.get(sid), dict) else {}
+        try:
+            tts_gain = float(info.get("tts_mix_gain") or 0.0)
+        except (TypeError, ValueError):
+            tts_gain = 0.0
+        if tts_gain > 0.0:
+            issues.append(
+                {
+                    "code": "DUPLICATE_DIALOGUE_AUDIO",
+                    "message": "native dialogue shot mixed with audible Edge TTS",
+                    "shot_id": sid,
+                }
+            )
+
     report: dict[str, Any] = {
         "schema_version": 1,
         "kind": "final-editorial-review",

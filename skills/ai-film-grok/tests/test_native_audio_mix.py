@@ -75,6 +75,119 @@ def test_only_explicit_post_tts_dialogue_replaces_native_audio() -> None:
     )
 
 
+def test_resolve_dialogue_audio_lane_xor() -> None:
+    from final.native_audio import (
+        dialogue_lane_suppresses_native,
+        dialogue_lane_tts_mix_gain,
+        resolve_dialogue_audio_lane,
+    )
+
+    spoken = {"dialogue": "你好"}
+    # Audible native + spoken → native (no Edge double-speak)
+    assert (
+        resolve_dialogue_audio_lane(
+            spoken,
+            has_native_stem=True,
+            native_audible=True,
+            has_spoken_text=True,
+        )
+        == "native"
+    )
+    # Explicit post_vo wins
+    assert (
+        resolve_dialogue_audio_lane(
+            {
+                "dialogue": "你好",
+                "dialogue_contracts": [{"lines": [{"audio_origin": "post_vo"}]}],
+            },
+            has_native_stem=True,
+            native_audible=True,
+            has_spoken_text=True,
+        )
+        == "post_tts"
+    )
+    # No native → post_tts
+    assert (
+        resolve_dialogue_audio_lane(
+            spoken,
+            has_native_stem=False,
+            native_audible=None,
+            has_spoken_text=True,
+        )
+        == "post_tts"
+    )
+    # Explicit strip policy
+    assert (
+        resolve_dialogue_audio_lane(
+            spoken,
+            has_native_stem=True,
+            native_audible=True,
+            has_spoken_text=True,
+            audio_policy="strip_native_use_tts_bgm",
+        )
+        == "post_tts"
+    )
+    # Silence inaudible native falls back to TTS
+    assert (
+        resolve_dialogue_audio_lane(
+            spoken,
+            has_native_stem=True,
+            native_audible=False,
+            has_spoken_text=True,
+        )
+        == "post_tts"
+    )
+    # Coverage plate
+    assert (
+        resolve_dialogue_audio_lane(
+            {"screen_mode": "reaction"},
+            has_native_stem=True,
+            native_audible=True,
+            has_spoken_text=False,
+            non_vo_coverage=True,
+        )
+        == "silence"
+    )
+    assert dialogue_lane_tts_mix_gain("native") == 0.0
+    assert dialogue_lane_tts_mix_gain("post_tts") == 1.0
+    assert dialogue_lane_suppresses_native("post_tts") is True
+    assert dialogue_lane_suppresses_native("native") is False
+
+
+def test_primary_native_and_tts_not_both() -> None:
+    """Bookkeeping: native lane never reports TTS mix gain."""
+    from final.native_audio import dialogue_lane_tts_mix_gain, resolve_dialogue_audio_lane
+
+    lane = resolve_dialogue_audio_lane(
+        {"dialogue": "重复对白禁止"},
+        has_native_stem=True,
+        native_audible=True,
+        has_spoken_text=True,
+    )
+    assert lane == "native"
+    assert dialogue_lane_tts_mix_gain(lane) == 0.0
+    # post_tts path suppresses native in primary_native_shot_ids
+    shots = [
+        {
+            "id": "s1",
+            "native_audio": Path("a.m4a"),
+            "native_audio_audible": True,
+            "native_audio_suppressed_for_tts": False,
+            "dialogue_audio_lane": "native",
+            "tts_mix_gain": 0.0,
+        },
+        {
+            "id": "s2",
+            "native_audio": Path("b.m4a"),
+            "native_audio_audible": True,
+            "native_audio_suppressed_for_tts": True,
+            "dialogue_audio_lane": "post_tts",
+            "tts_mix_gain": 1.0,
+        },
+    ]
+    assert render_final.primary_native_shot_ids(shots) == ["s1"]
+
+
 def test_native_audio_gain_normalizes_audible_stems_without_amplifying_silence() -> None:
     assert render_final.resolve_native_audio_gain({"audible": False, "mean_volume_db": -55}) == 0
     assert render_final.resolve_native_audio_gain({"audible": True, "mean_volume_db": -80}) == 1.6

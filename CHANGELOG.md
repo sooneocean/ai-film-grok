@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.40.18] - 2026-08-06
+
+### Fixed (P0 · native XOR TTS · no double dialogue)
+- **Root cause:** `prefer_native` kept H3/Grok clip audio while Edge still synthesized the same `spoken_text` into `narration` → character + duplicate VO.
+- **`resolve_dialogue_audio_lane`:** per-shot `native` \| `post_tts` \| `silence` (mutually exclusive).
+- **`render_final`:** native lane = silent VO caption clock + plate/slot fit; post_tts suppresses native; mix fail-closed on XOR violation.
+- **Gate:** `DUPLICATE_DIALOGUE_AUDIO` in `final_editorial_review`; mix_report `shot_lanes` / `dialogue_xor`.
+- **Docs:** hard-defaults + stages/voice + memory card.
+- **Tests:** `test_native_audio_mix` lane XOR · `test_final_editorial_review` duplicate gate.
+
 ## [2.40.17] - 2026-08-06
 
 ### Structure (monolith closeout — heat facade + export/final/film_spec leaves)
