@@ -8,7 +8,7 @@ from pathlib import Path
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
-from golden_suite import validate_golden_contract  # noqa: E402
+from gates.golden_suite import validate_golden_contract  # noqa: E402
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures" / "professional-director-golden"
 

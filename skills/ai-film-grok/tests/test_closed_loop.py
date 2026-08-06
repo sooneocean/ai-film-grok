@@ -21,7 +21,7 @@ SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
 from cinema_prompt import inject_camera_prompts  # noqa: E402
-from color_grade import plan_shot_grades  # noqa: E402
+from post.color_grade import plan_shot_grades  # noqa: E402
 from compose_render import duration_advisory  # noqa: E402
 from edit_policy import merge_edls  # noqa: E402
 from i2v_provider import preferred, registry_report  # noqa: E402

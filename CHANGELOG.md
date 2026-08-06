@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.40.38] - 2026-08-06
+
+### Changed (senior-dev 代码质量把控 · Phase 4 测试缺口补漏 · P4-2)
+- **P4-2 补 `core/film_io.py` 首测**（确定性清单/目录树 IO 模块，此前零覆盖）：新增 `tests/test_core_film_io.py`（9 用例，纯函数、`tmp_path` 隔离、零网络/ffmpeg 依赖）。覆盖全部 8 个对外契约：
+  - `empty_manifest`：结构形态（title/theme/aspect、portrait 9:16 维度 width>0 且 height>width、必需键齐备）；`gates` 恰有一个 `True`（键 `brief`）；`created_at`/`updated_at` 均为含 `T` 的 ISO 字符串。
+  - `film_dirs` / `ensure_tree`：7 个子目录（prompts/canonical/keyframes/clips/audio/out/receipts）均被创建且位于 root 下。
+  - `save_manifest` / `load_manifest`：往返保留 title/aspect；缺失文件抛 `FilmError`。
+  - 导演笔记：`director_notes_path` 指向 `director_notes.json`；`save`/`load` 往返一致；缺失时回退为空 `dict`（不抛）。
+- ruff 干净，9 passed。纯增量、未动模块本体，`runtime-lock.json` 无需再生；`make doctor` 不受影响（仍全绿）。
+- **顺带修复 Round 18/19 迁移遗留的测试 import 断点**（恢复 `tests/` 整套 CI 可收集）：`color_grade` 在 R18 迁到 `post/`、`golden_suite` 在 R19 迁到 `gates/`，但 `tests/test_closed_loop.py` 与 `tests/test_professional_golden.py` 仍在用旧顶层名，导致整套 `pytest tests/` 收集期 2 个 `ModuleNotFoundError` 中断。已分别改为 `from post.color_grade import plan_shot_grades` / `from gates.golden_suite import validate_golden_contract`（`tests/conftest.py` 已把 `scripts/` 注入 sys.path，包导入可解析）。修复后整套 `tests/` 收集恢复零错误。
+- **下一步 P4 候选**（仍零覆盖，`util/core/node/final`）：`util.spine_helpers`、`core.emit`、`node.backend_probe`/`latentsync_adapter`/`musetalk_adapter`/`stable_audio_probe`、`final.bgm_spotting`/`caption_text`/`enhance`/`io`/`tts_tracks`/`voice_mix_config`/`watchdog`。优先挑纯函数/确定性者。
+
 ## [2.40.37] - 2026-08-06
 
 ### Added (Real-ESRGAN formal upscale · canary → CLI → hooks)
