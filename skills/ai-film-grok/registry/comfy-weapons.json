@@ -1518,7 +1518,7 @@
         "review_temporal_consistency_faces_and_text",
         "light_degradation_oversharpening_review"
       ],
-      "probe_command": "./scripts/runtime-python scripts/seedvr2_probe.py",
+      "probe_command": "./scripts/runtime-python scripts/media/seedvr2_probe.py",
       "promotion_requirements": [
         "model_and_vae_fingerprints",
         "single_gpu_rtx5090_evidence",
@@ -1626,7 +1626,7 @@
         "no_dialogue_delivery_without_separate_lipsync_review",
         "no_identity_or_choreography_claim_without_human_review"
       ],
-      "probe_command": "./scripts/runtime-python scripts/wan_dancer_probe.py",
+      "probe_command": "./scripts/runtime-python scripts/media/wan_dancer_probe.py",
       "promotion_requirements": [
         "idle_queue_and_resource_gate",
         "model_and_audio_encoder_fingerprints",
@@ -1681,7 +1681,7 @@
         "reference_identity_and_geometry_review_required",
         "no_dialogue_delivery_without_separate_lipsync_review"
       ],
-      "probe_command": "./scripts/runtime-python scripts/wan_fun_control_probe.py",
+      "probe_command": "./scripts/runtime-python scripts/media/wan_fun_control_probe.py",
       "promotion_requirements": [
         "idle_queue_and_resource_gate",
         "model_and_clip_vision_fingerprints",

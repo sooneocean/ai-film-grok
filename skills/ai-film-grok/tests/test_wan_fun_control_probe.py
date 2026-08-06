@@ -8,7 +8,7 @@ SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
 from comfy_armory import load_armory  # noqa: E402
-from wan_fun_control_probe import (  # noqa: E402
+from media.wan_fun_control_probe import (  # noqa: E402
     REQUIRED_CLASS_TYPES,
     REQUIRED_MODELS,
     probe_wan_fun_control,
@@ -22,7 +22,7 @@ def _object_info(*, complete: bool = True) -> dict[str, object]:
     return classes
 
 
-@patch("wan_fun_control_probe._json_request")
+@patch("media.wan_fun_control_probe._json_request")
 def test_probe_proves_named_dependencies_without_claiming_execution_ready(
     request: MagicMock,
 ) -> None:
@@ -47,7 +47,7 @@ def test_probe_proves_named_dependencies_without_claiming_execution_ready(
     assert report["auto_submission_blocked"] is True
 
 
-@patch("wan_fun_control_probe._json_request")
+@patch("media.wan_fun_control_probe._json_request")
 def test_probe_fails_closed_when_clip_vision_dependency_is_missing(
     request: MagicMock,
 ) -> None:
@@ -64,7 +64,7 @@ def test_probe_fails_closed_when_clip_vision_dependency_is_missing(
     assert report["execution_ready"] is False
 
 
-@patch("wan_fun_control_probe._json_request")
+@patch("media.wan_fun_control_probe._json_request")
 def test_probe_fails_closed_when_fun_control_node_is_missing(
     request: MagicMock,
 ) -> None:

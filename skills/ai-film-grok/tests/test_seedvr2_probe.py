@@ -8,7 +8,7 @@ SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
 from comfy_armory import load_armory  # noqa: E402
-from seedvr2_probe import REQUIRED_CLASS_TYPES, probe_seedvr2  # noqa: E402
+from media.seedvr2_probe import REQUIRED_CLASS_TYPES, probe_seedvr2  # noqa: E402
 
 
 def _object_info(*, include_all: bool = True) -> dict[str, object]:
@@ -36,7 +36,7 @@ def _object_info(*, include_all: bool = True) -> dict[str, object]:
     return classes
 
 
-@patch("seedvr2_probe._json_request")
+@patch("media.seedvr2_probe._json_request")
 def test_probe_proves_nodes_but_never_claims_weights_or_execution_ready(
     request: MagicMock,
 ) -> None:
@@ -56,7 +56,7 @@ def test_probe_proves_nodes_but_never_claims_weights_or_execution_ready(
     ]
 
 
-@patch("seedvr2_probe._json_request")
+@patch("media.seedvr2_probe._json_request")
 def test_probe_fails_closed_when_a_required_class_type_is_missing(
     request: MagicMock,
 ) -> None:
@@ -70,7 +70,7 @@ def test_probe_fails_closed_when_a_required_class_type_is_missing(
     assert report["execution_ready"] is False
 
 
-@patch("seedvr2_probe._json_request")
+@patch("media.seedvr2_probe._json_request")
 def test_probe_fails_closed_when_loader_model_contract_is_malformed(
     request: MagicMock,
 ) -> None:
@@ -103,4 +103,4 @@ def test_registry_keeps_seedvr2_research_only_and_blocks_automatic_actions() -> 
         "not_final",
     }.issubset(weapon["restrictions"])
     assert set(weapon["required_class_types"]) == set(REQUIRED_CLASS_TYPES)
-    assert weapon["probe_command"] == "./scripts/runtime-python scripts/seedvr2_probe.py"
+    assert weapon["probe_command"] == "./scripts/runtime-python scripts/media/seedvr2_probe.py"

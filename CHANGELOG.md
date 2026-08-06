@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.40.33] - 2026-08-06
+
+### Changed (senior-dev 代码质量把控 · Phase 3 迁移 & 去重 · P3-1 续)
+- **P3-1 再迁 3 个媒体探针模块**（累计 6/109+）到 `media/`：`seedvr2_probe.py` / `wan_dancer_probe.py` / `wan_fun_control_probe.py`（均 0 importer、无 `__file__` 相对资源路径、`git mv` 保留历史；依赖 `comfy_armory`/`comfy_video` 仍为顶层模块，迁移零回退）。
+- **既有 1:1 测试随迁移更新**：3 个探针**已有** `tests/test_*_probe.py`（共 12 用例），迁移时同步把 import 从顶层 `from X import` 改为 `from media.X import`，并把 `@patch("X._json_request")` 改为 `media.X._json_request`（修掉导入时绑定导致的 patch 失效）。这暴露并修正了一个既有隐患——测试原本只因模块在顶层才通过。
+- **registry 引用同步**：`registry/comfy-weapons.json` 3 处武器 `probe_command` 从 `scripts/<name>.py` 改为 `scripts/media/<name>.py`，保证迁移后武器命令仍可定位模块。GRAPH/references 仅为文案提及，无需改。
+- 全仓 grep 确认无 dangling 引用；registry JSON 校验通过；3 测试 12 passed；ruff 干净。
+
 ## [2.40.32] - 2026-08-06
 
 ### Changed (senior-dev 代码质量把控 · Phase 5 收尾 · 类型/文档/可复现)
