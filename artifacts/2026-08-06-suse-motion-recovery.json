@@ -1,45 +1,37 @@
 {
   "kind": "motion-gate-recovery",
-  "at": "2026-08-06T09:23:29.292063+00:00",
+  "at": "2026-08-06T09:49:57.686933+00:00",
   "film_root": "/Users/dex/AI FILM SPACE/0805/suse-evolution-ep01",
   "gate_ok": false,
   "audit_ok": false,
-  "weak_n": 4,
+  "weak_n": 3,
   "start_weak": 17,
-  "trajectory": "17→10→6→5→?",
-  "meat_mean_avg": 22.544,
-  "normal_mean_avg": 16.415,
+  "trajectory": "17→10→6→5→4→? (s01 7001=23.5, s26 cleared)",
+  "meat_mean_avg": 22.892,
+  "normal_mean_avg": 16.977,
   "weak": [
     {
-      "id": "ep01_sc01_airport_s01",
-      "mean": 19.3459,
-      "floor": 20.0,
-      "tier": "high"
-    },
-    {
       "id": "ep01_sc02_flight_s04",
-      "mean": 11.9274,
+      "mean": 13.7763,
       "floor": 18.0,
       "tier": "normal"
     },
     {
       "id": "ep01_sc02_flight_s05",
-      "mean": 7.8865,
+      "mean": 8.5841,
       "floor": 10.0,
       "tier": "soft"
     },
     {
       "id": "ep01_sc06_variety_s20",
-      "mean": 12.5618,
+      "mean": 17.4294,
       "floor": 20.0,
       "tier": "meat"
     }
   ],
   "status": "PARTIAL",
-  "logs": [
-    "reshot3",
-    "reshot4",
-    "reshot5",
-    "reshot5b"
-  ]
+  "receipts": {
+    "audit": "/Users/dex/AI FILM SPACE/0805/suse-evolution-ep01/receipts/i2v-high-motion-audit.json",
+    "gate": "/Users/dex/AI FILM SPACE/0805/suse-evolution-ep01/receipts/i2v-final-gate.json"
+  }
 }

@@ -1,13 +1,13 @@
 # ai-film-grok（skill 本体）
 
 > **安装 / 使用逻辑 / 架构图 / 可插拔模型** → 仓库根 [README.md](../../README.md)（对外主文档）。  
-> **版本**：**`2.39.56`** · 变更 [CHANGELOG](../../CHANGELOG.md) · 本季要点见根 README「v2.39 本季要点」。
+> **版本**：**`2.40.25`** · 变更 [CHANGELOG](../../CHANGELOG.md) · 本季要点见根 README「v2.40 本季要点」。
 
 **一句话**：把「从灵感到可发布的 AI 动态短片」收成**可恢复、可验收**的七段流程——定义故事 → 设计演出 → Pilot → 批量制作 → 选片与粗剪 → 后期母版 → 审片与交付。
 
 正式交付必须是**真实动态成片**（I2V 验收），不是静图轮播、Ken Burns 或只有关键帧。
 
-### v2.39 本 skill 增量（相对 2.37 以前）
+### v2.40 本 skill 增量（相对 2.38 以前）
 
 | 模块 | 做什么 | CLI |
 |------|--------|-----|
@@ -91,7 +91,7 @@ Grok Agent（规划 + Prompt 优化 + 角色一致性 + dispatch）
 
 ## 技术栈（你实际在用什么）
 
-### 核心生成：四武器 + 证据化路由（v2.39）
+### 核心生成：四武器 + 证据化路由（v2.40）
 
 | 能力 | 在本 skill 中的角色 | 入口 |
 |------|---------------------|------|
@@ -190,7 +190,7 @@ OAuth/API 路径传 `--root` 后会自动保存每次请求的真实
 
 ---
 
-## 端到端流水线（技术细节 · v2.39）
+## 端到端流水线（技术细节 · v2.40）
 
 ```text
 用户意图 / 剧本 / 角色参考图
@@ -432,11 +432,11 @@ Private skill for team use unless otherwise stated.
 <!-- BEGIN GENERATED: project-status -->
 ### 当前项目状态（自动同步）
 
-- 插件版本：`2.40.24`
+- 插件版本：`2.40.25`
 - Published skills：`2`
 - Skill Registry：`32/34` 项标记为 `implemented`
 - Python 脚本：`675` 个
-- pytest 文件：`434` 个
+- pytest 文件：`435` 个
 - 同步入口：`make sync-docs`（只更新文档）或 `make sync`（验证、提交并 push）
 - Graph：[`docs/GRAPH.md`](./docs/GRAPH.md)
 <!-- END GENERATED: project-status -->

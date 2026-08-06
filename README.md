@@ -7,7 +7,7 @@
 
 | | |
 |---|---|
-| **版本** | **`2.39.69`**（见 [`plugin.json`](./plugin.json) · 变更 [`CHANGELOG.md`](./CHANGELOG.md)） |
+| **版本** | **`2.40.25`**（见 [`plugin.json`](./plugin.json) · 变更 [`CHANGELOG.md`](./CHANGELOG.md)） |
 | **GitHub** | https://github.com/sooneocean/ai-film-grok |
 | **Gitea（个人）** | http://172.238.15.154:3000/Redredchen01/ai-film-grok |
 | **Gitea（aidev）** | http://172.238.15.154:3000/aidev/ai-film-grok |
@@ -18,36 +18,53 @@
 
 ---
 
-## v2.39 本季要点（2026-08-04）
+## v2.40 本季要点（2026-08-06）
 
-一句话：**剧本先算呈现价值 → 输入保真写进镜表 → 双轨火力拍片（Grok 铺量 + 5090 H3 攻坚）→ 空闲挑战提升画质，人审才 promote。**
+一句话：**剧本先算呈现价值 → 输入保真写进镜表 → 双轨火力拍片（Grok 铺量 + 5090 H3 攻坚）→ 空闲挑战提升画质，人审才 promote；工程层以「可验证门禁」守成片。**
+
+### 拍摄能力（延续自 v2.3x）
 
 | 能力 | 解决什么 | 命令 / 入口 |
-|------|----------|-------------|
+|------|----------|--------------|
 | **Script-value debrief** | 锁故事前先写「用户/编剧/导演/观众/生产」L0–L4 价值卡；确认 promise + 不可砍 beat | `aifilm plan debrief --action seed\|confirm\|validate` |
 | **Input Fidelity** | 源句、must_keep、受保护对白是否还在成片链上；污染/实体覆盖/锚点打分 | `aifilm fidelity status\|check\|apply` · 回执 `receipts/input-fidelity.json` |
 | **design-go** | debrief + fidelity + 抗无聊一页纸；**永不代签 pilot** | `aifilm design-go --root <film>` |
-| **h3_primary 主产线** | 有 5090：全镜本地 H3（无限时间产能）；云 bulk 默认硬拦 | `AIFILM_I2V_PROFILE=h3_primary` · `aifilm h3 run-next` |
-| **hybrid_h3 双轨** | 安全 bulk 走 Grok；肉戏/高难/对白 CU 软锁本机 MiniMax H3（5090） | `AIFILM_I2V_PROFILE=hybrid_h3` · `aifilm h3 plan\|run` |
+| **h3_primary 主产线** | 有 5090：全镜本地 H3（无限产能）；云 bulk 默认硬拦 | `AIFILM_I2V_PROFILE=h3_primary` · `aifilm h3 run-next` |
+| **hybrid_h3 双轨** | 安全 bulk 走 Grok；肉戏/高难/对白 CU 直接本机 MiniMax H3（5090） | `AIFILM_I2V_PROFILE=hybrid_h3` · `aifilm h3 plan\|run` |
 | **FLF first+last** | 有首尾静帧时 H3 主轨优先 first+last frame；R2V 作能量位 / pose land | 有 end still 时自动 FLF；见 weapon-lane |
 | **Fill-Idle 挑战** | GPU 空闲时 P0→P1→P2 挑战（不抢 P0）；多 take 只给 shortlist，**人 promote** | `aifilm h3 next\|run-next\|cycle\|pk-compare\|evidence` |
 | **Layer-4 时间轴提示词** | 5090 H3 主产线自动使用 `[0s-Ns]` 分段提示词；每段独立视觉单元 | `dsl.prompt_format=timeline` 强制单镜分段；`flat` 退回 spine |
-| **still-challenge** | 弱 take 可先 FRW i2i 刷更好静帧再 I2V/FLF/R2V（30s 限速；禁静默 promote） | `aifilm still-challenge plan\|run\|promote` |
-| **对白优先** | 场硬闸：每场 ≥1 句 on/off_camera；对白镜画面=说话者；中文 TTS 默认 edge | 见 hard-defaults · stages/voice |
+| **still-challenge** | 弱 take 可先 FRW i2i 刷更好 still 再 I2V (30s 限速；禁静默 promote) | `aifilm still-challenge plan\|run\|promote` |
+| **对白优先** | 场硬闸：每场 ≥1 句 on/off_camera；对白镜画面=说话者；中文 TTS 默认 Edge | 见 hard-defaults · stages/voice |
+
+### 工程门禁（v2.40 新增 · senior-dev 代码质量把控）
+
+| 能力 | 解决什么 | 版本 |
+|------|----------|------|
+| **统一 `FilmError` 错误体系** | 9 个子系统 `*Error` 收敛到可兜底捕获的 `FilmError`（仍兼容 `RuntimeError`） | 2.40.25 |
+| **门禁 fail-closed** | 验证子系统出错即拦截，不再静默放行坏产出（`assert_pilot_go_allows_bulk`） | 2.40.23 |
+| **统一 logger** | `util/logger.py` 走 stderr，不污染 stdout 的 JSON API 管道 | 2.40.23 |
+| **CI 聚合 merge-gate** | validate + hotpath + test-full 三套件聚成一个 required check | 2.40.23 |
+| **介质自动路由** | 按 cast 稳定性自动把不稳定写实角色排到动漫/漫剧，保身份连贯 | 2.40.21 |
+| **H3 派单纯函数化** | Fill-Idle 排序 / mode / P2 / 主分类全部提炼成可单测的纯函数（10+ 不变式） | 2.40.15–17 |
+| **GPU no-hog** | 多 agent 5090 禁抢：忙时零 submit，`--i-own-the-gpu` 才独占 | 2.40.14 |
+| **style-bible 自动生成 + 一致性门禁** | 从 film-spec 自动派生 style-bible，验证其身份/灯光与镜头计划一致 | 2.40.13 |
+| **Transition 受控策略 + 导出 read-back** | 转场计划与回读双重门禁：续镜 hard、章节 soft、防风格漂移 | 2.40.11–12 |
+| **render_final 拆解** | 先抽出纯函数 `resolve_render_dimension` 并单测，大型单体逐步瘦身 | 2.40.24 |
 
 **推荐阅读顺序（agent / 维护者）**
 
 1. 主脊：[`skills/ai-film-grok/SKILL.md`](./skills/ai-film-grok/SKILL.md)  
 2. 硬表：[`references/hard-defaults.md`](./skills/ai-film-grok/references/hard-defaults.md)  
 3. 火力矩阵：[`references/weapon-lane-matrix.md`](./skills/ai-film-grok/references/weapon-lane-matrix.md)  
-4. 剧本价值：[`references/script-value-debrief.md`](./skills/ai-film-grok/references/script-value-debrief.md)  
-5. 版本明细：[`CHANGELOG.md`](./CHANGELOG.md) → `[2.39.56]` … `[2.38.0]`
+4. 剧本价值：[`skills/ai-film-grok/references/script-value-debrief.md`](./skills/ai-film-grok/references/script-value-debrief.md)  
+5. 版本明细：[`CHANGELOG.md`](./CHANGELOG.md) → `[2.40.25]` … `[2.38.0]`
 
 ---
 
 ## 目录
 
-1. [v2.39 本季要点](#v239-本季要点2026-08-04)
+1. [v2.40 本季要点](#v240-本季要点2026-08-06)
 2. [安装](#安装)
 3. [使用逻辑（先读这个）](#使用逻辑先读这个)
 4. [架构图](#架构图)
@@ -589,8 +606,8 @@ cd ~/.grok/plugins/ai-film-grok
 
 | 路径 | 用途 |
 |------|------|
-| `plugin.json` | 插件元数据 / 版本 **`2.39.56`** |
-| `CHANGELOG.md` | 版本明细（本季从 2.38→2.39 的 debrief / fidelity / H3 FLF / Fill-Idle） |
+| `plugin.json` | 插件元数据 / 版本 **`2.40.25`** |
+| `CHANGELOG.md` | 版本明细（本季从 2.38→2.40 的 debrief / fidelity / H3 / 工程门禁） |
 | `commands/` | `/ai-film-grok` · `/aifilm` |
 | `skills/ai-film-grok/SKILL.md` | Agent 主脊（短） |
 | `skills/ai-film-grok/scripts/` | `aifilm` CLI + 适配器 |
@@ -626,11 +643,11 @@ MIT © [dex](https://github.com/sooneocean)
 <!-- BEGIN GENERATED: project-status -->
 ### 当前项目状态（自动同步）
 
-- 插件版本：`2.40.24`
+- 插件版本：`2.40.25`
 - Published skills：`2`
 - Skill Registry：`32/34` 项标记为 `implemented`
 - Python 脚本：`675` 个
-- pytest 文件：`434` 个
+- pytest 文件：`435` 个
 - 同步入口：`make sync-docs`（只更新文档）或 `make sync`（验证、提交并 push）
 - Graph：[`docs/GRAPH.md`](./docs/GRAPH.md)
 <!-- END GENERATED: project-status -->

@@ -1,6 +1,6 @@
 ---
 name: ai-film-grok
-description: 启动 AI 短片/漫剧七段成片主流程（Imagine I2V + edge TTS + final）
+description: 启动 AI 短片/漫剧七段成片主流程：dispatch 驱动，可插拔拍摄（Grok I2V / 5090 H3 / FRW LTX 对白原声）+ Edge TTS + final 可验证交付
 ---
 
 # /ai-film-grok
