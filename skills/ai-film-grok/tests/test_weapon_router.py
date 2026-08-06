@@ -4,6 +4,8 @@ import json
 import sys
 from pathlib import Path
 
+import pytest
+
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
@@ -109,6 +111,26 @@ def test_adult_bulk_motion_routes_h3_film_lane_no_auto_bulk(tmp_path: Path) -> N
     assert route["operation"] == "adult-meat-motion-i2v"
     assert route["pilot_only"] is False
     assert route["production_promoted"] is True
+    assert route["auto_execute_when_requested"] is False
+
+
+@pytest.mark.parametrize(
+    "intent",
+    ["control-video-i2v-research", "pose-guided-motion-research"],
+)
+def test_research_motion_intent_never_falls_back_to_generic_i2v(
+    tmp_path: Path,
+    intent: str,
+) -> None:
+    route = build_weapon_route(
+        tmp_path,
+        workflow=_workflow("bulk"),
+        primary_job={"skillId": "image.animate", "input": {"intent": intent}},
+    )
+
+    assert route["status"] == "blocked"
+    assert route["operation"] == intent
+    assert route["fail_closed"] is True
     assert route["auto_execute_when_requested"] is False
 
 

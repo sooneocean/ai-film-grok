@@ -158,3 +158,60 @@ module identities.
 Before mutations, read `/queue`. Never interrupt an unknown running prompt.
 Large model installation still uses `.part` download, exact byte count,
 SHA-256 verification and atomic rename before it can enter the armory.
+
+## SeedVR2 research lane
+
+`seedvr2-video-restoration-research` records the live custom-node contract
+without treating advertised model choices as installed weights. Probe it with:
+
+```bash
+cd skills/ai-film-grok
+./scripts/runtime-python scripts/seedvr2_probe.py
+```
+
+The command is read-only and intentionally reports `execution_ready=false`.
+See `seedvr2-video-restoration.md` for the weight-fingerprint, full-decode,
+source-comparison and human-review gates required before a bounded canary.
+
+## Wan 2.2 S2V research lane
+
+`wan22-s2v-performance-research` is a sound-conditioned I2V research route.
+Its dependency probe checks only the node contract and named model listings:
+
+```bash
+cd skills/ai-film-grok
+./scripts/runtime-python scripts/wan_s2v_probe.py
+```
+
+It does not make a queued prompt executable. It remains excluded from dialogue
+lip-sync and final delivery until an idle-queue resource gate, model and audio
+encoder fingerprints, full decode, alignment review and human review all pass.
+
+## Wan 2.2 Dancer research lane
+
+`wan22-dancer-performance-research` records the paired global/local Dancer
+dependency contract without treating its model names as fingerprints or pilot
+evidence:
+
+```bash
+cd skills/ai-film-grok
+./scripts/runtime-python scripts/wan_dancer_probe.py
+```
+
+It is limited to research. A future canary requires an idle queue, 24 GiB free
+VRAM, hash-bound source image/audio, exact weight fingerprints, full decode and
+human review; it never substitutes for dialogue lip-sync or final media.
+
+## Wan 2.2 Fun Control research lane
+
+`wan22-fun-control-research` records the reference-image/control-video node
+contract and only its named dependencies:
+
+```bash
+cd skills/ai-film-grok
+./scripts/runtime-python scripts/wan_fun_control_probe.py
+```
+
+It remains research-only. Any later canary needs source/control-video rights and
+hashes, an idle resource gate, model/CLIP Vision fingerprints, full decode,
+control-following review and human review.

@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "kind": "ai-film-comfy-weapon-armory",
-  "updated_at": "2026-08-05",
+  "updated_at": "2026-08-06T08:18:02Z",
   "default_node": "rtx5090-main",
   "nodes": {
     "rtx5090-main": {
@@ -1476,6 +1476,220 @@
         "windows_cuda_probe",
         "single_shot_listening_review",
         "human_review"
+      ]
+    },
+    {
+      "id": "seedvr2-video-restoration-research",
+      "display_name": "SeedVR2 video restoration and upscale research",
+      "status": "experimental",
+      "readiness": "custom_nodes_ready_weights_unverified",
+      "provider": "comfy_lan",
+      "node": "rtx5090-main",
+      "intents": [
+        "video-restoration-research",
+        "video-upscale-research"
+      ],
+      "allowed_stages": [
+        "research"
+      ],
+      "license_scope": "Apache-2.0_verify_model_and_output_rights_before_release",
+      "latest_canary_receipt_path": null,
+      "required_class_types": [
+        "SeedVR2LoadDiTModel",
+        "SeedVR2LoadVAEModel",
+        "SeedVR2TorchCompileSettings",
+        "SeedVR2VideoUpscaler"
+      ],
+      "bounded_canary_candidates": [
+        "seedvr2_ema_3b_fp8_e4m3fn.safetensors",
+        "seedvr2_ema_7b_fp16.safetensors"
+      ],
+      "requirements": {
+        "minimum_vram_mib": 24576,
+        "weights_preinstalled_and_fingerprinted": true,
+        "source_media_hash_required": true
+      },
+      "restrictions": [
+        "no_auto_download",
+        "no_auto_execute",
+        "no_auto_promotion",
+        "not_final",
+        "preserve_source_geometry_fps_and_duration",
+        "review_temporal_consistency_faces_and_text",
+        "light_degradation_oversharpening_review"
+      ],
+      "probe_command": "./scripts/runtime-python scripts/seedvr2_probe.py",
+      "promotion_requirements": [
+        "model_and_vae_fingerprints",
+        "single_gpu_rtx5090_evidence",
+        "terminal_media_decode",
+        "source_output_geometry_fps_duration_comparison",
+        "temporal_consistency_review",
+        "face_text_hallucination_review",
+        "human_review"
+      ]
+    },
+    {
+      "id": "wan22-s2v-performance-research",
+      "display_name": "Wan 2.2 sound-conditioned performance research",
+      "status": "experimental",
+      "readiness": "named_dependencies_present_fingerprint_unverified",
+      "provider": "comfy_lan",
+      "node": "rtx5090-main",
+      "intents": [
+        "sound-conditioned-i2v-research",
+        "performance-motion-research"
+      ],
+      "allowed_stages": [
+        "research"
+      ],
+      "license_scope": "verify_model_and_audio_input_rights_before_release",
+      "latest_canary_receipt_path": null,
+      "required_class_types": [
+        "WanSoundImageToVideo",
+        "AudioEncoderLoader",
+        "AudioEncoderEncode"
+      ],
+      "required_models": {
+        "diffusion_models": "wan2.2_s2v_14B_fp8_scaled.safetensors",
+        "audio_encoders": "wav2vec2_large_english_fp16.safetensors"
+      },
+      "requirements": {
+        "minimum_free_vram_mib": 24576,
+        "minimum_free_ram_mib": 12288,
+        "source_image_and_audio_hashes_required": true,
+        "model_and_audio_encoder_fingerprints_required": true
+      },
+      "restrictions": [
+        "no_auto_download",
+        "no_auto_execute",
+        "no_auto_promotion",
+        "not_final",
+        "not_lipsync_substitute",
+        "no_dialogue_delivery_without_separate_lipsync_review",
+        "human_review_required"
+      ],
+      "probe_command": "./scripts/runtime-python scripts/wan_s2v_probe.py",
+      "promotion_requirements": [
+        "idle_queue_and_resource_gate",
+        "model_and_audio_encoder_fingerprints",
+        "source_image_and_audio_hashes",
+        "terminal_media_decode",
+        "audio_video_alignment_review",
+        "identity_and_background_stability_review",
+        "full_human_review"
+      ]
+    },
+    {
+      "id": "wan22-dancer-performance-research",
+      "display_name": "Wan 2.2 Dancer audio-conditioned performance research",
+      "status": "experimental",
+      "readiness": "named_dependencies_present_fingerprint_unverified",
+      "execution_ready": false,
+      "provider": "comfy_lan",
+      "node": "rtx5090-main",
+      "intents": [
+        "audio-conditioned-dance-research",
+        "performance-choreography-research"
+      ],
+      "allowed_stages": [
+        "research"
+      ],
+      "license_scope": "verify_model_and_audio_input_rights_before_release",
+      "latest_canary_receipt_path": null,
+      "required_class_types": [
+        "WanDancerVideo",
+        "WanDancerEncodeAudio",
+        "AudioEncoderLoader",
+        "AudioEncoderEncode"
+      ],
+      "required_models": {
+        "diffusion_models": [
+          "wan2.2_dancer_14b_global_fp8_scaled.safetensors",
+          "wan2.2_dancer_14b_local_fp8_scaled.safetensors"
+        ],
+        "audio_encoders": "wav2vec2_large_english_fp16.safetensors"
+      },
+      "requirements": {
+        "minimum_free_vram_mib": 24576,
+        "minimum_free_ram_mib": 12288,
+        "source_image_and_audio_hashes_required": true,
+        "model_and_audio_encoder_fingerprints_required": true,
+        "fixed_initial_frame_count": 149
+      },
+      "restrictions": [
+        "no_auto_download",
+        "no_auto_execute",
+        "no_auto_promotion",
+        "not_final",
+        "not_lipsync_substitute",
+        "no_dialogue_delivery_without_separate_lipsync_review",
+        "no_identity_or_choreography_claim_without_human_review"
+      ],
+      "probe_command": "./scripts/runtime-python scripts/wan_dancer_probe.py",
+      "promotion_requirements": [
+        "idle_queue_and_resource_gate",
+        "model_and_audio_encoder_fingerprints",
+        "source_image_and_audio_hashes",
+        "terminal_media_decode",
+        "rhythm_and_motion_alignment_review",
+        "identity_background_and_anatomy_stability_review",
+        "full_human_review"
+      ]
+    },
+    {
+      "id": "wan22-fun-control-research",
+      "display_name": "Wan 2.2 Fun Control video-guidance research",
+      "status": "experimental",
+      "readiness": "named_dependencies_present_fingerprint_unverified",
+      "execution_ready": false,
+      "provider": "comfy_lan",
+      "node": "rtx5090-main",
+      "intents": [
+        "control-video-i2v-research",
+        "pose-guided-motion-research"
+      ],
+      "allowed_stages": [
+        "research"
+      ],
+      "license_scope": "verify_model_reference_and_control_video_rights_before_release",
+      "latest_canary_receipt_path": null,
+      "required_class_types": [
+        "Wan22FunControlToVideo",
+        "WanFunControlToVideo",
+        "CLIPVisionLoader"
+      ],
+      "required_models": {
+        "diffusion_models": [
+          "wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors",
+          "wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors"
+        ],
+        "clip_vision": "wan2.2_clip_vision.safetensors"
+      },
+      "requirements": {
+        "minimum_free_vram_mib": 24576,
+        "minimum_free_ram_mib": 12288,
+        "source_reference_and_control_video_hashes_required": true,
+        "model_and_clip_vision_fingerprints_required": true
+      },
+      "restrictions": [
+        "no_auto_download",
+        "no_auto_execute",
+        "no_auto_promotion",
+        "not_final",
+        "control_video_rights_required",
+        "reference_identity_and_geometry_review_required",
+        "no_dialogue_delivery_without_separate_lipsync_review"
+      ],
+      "probe_command": "./scripts/runtime-python scripts/wan_fun_control_probe.py",
+      "promotion_requirements": [
+        "idle_queue_and_resource_gate",
+        "model_and_clip_vision_fingerprints",
+        "source_reference_and_control_video_hashes",
+        "terminal_media_decode",
+        "control_following_and_temporal_consistency_review",
+        "identity_geometry_and_background_stability_review",
+        "full_human_review"
       ]
     }
   ],
