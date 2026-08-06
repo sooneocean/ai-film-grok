@@ -297,12 +297,21 @@ def ship_native(
         "duration_target": dur_rep,
         "notes": [
             "native ship preserves clip aac when present; aac≠intelligible Mandarin",
-            "not master_lock; run gate-auto + review-final for formal master",
-            "optional: aifilm final --skip-canonical-truth for Edge+hardburn path",
+            "OFFICIAL_FINAL_PLATE only — no hardburn/rnb sidechain on this path",
+            "not master_lock; formal master = gate-auto green + review-final",
+            "stage-2 captions/BGM: aifilm final --skip-canonical-truth "
+            "--post-engine ffmpeg --tts-backend edge --music-mood rnb --caption-path ship_hardburn",
         ],
         "next": list(
             dict.fromkeys(
-                list(dur_rep.get("next") or []) + list(audio_audit.get("next") or [])
+                list(dur_rep.get("next") or [])
+                + list(audio_audit.get("next") or [])
+                + [
+                    f'aifilm final --root "{root_p}" --skip-canonical-truth '
+                    f"--post-engine ffmpeg --tts-backend edge --music-mood rnb "
+                    f"--caption-path ship_hardburn  # plate→hardburn/BGM stage-2",
+                    f'aifilm gate-auto --root "{root_p}"',
+                ]
             )
         ),
     }
@@ -355,6 +364,8 @@ def ship_native(
             reason="h3_ship_native",
             path=str(out),
         )
-    except Exception:
-        pass
+    except Exception as exc:  # noqa: BLE001
+        report.setdefault("honest_limits", []).append(
+            f"plate_report_write_failed:{type(exc).__name__}:{str(exc)[:100]}"
+        )
     return report

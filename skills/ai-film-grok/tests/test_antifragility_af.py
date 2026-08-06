@@ -108,6 +108,7 @@ class AF5UntilEmptyCapacityTests(unittest.TestCase):
                 rep = fill_idle_until_empty(
                     root,
                     execute=True,
+                    i_own_the_gpu=True,
                     max_jobs_per_cycle=2,
                     max_cycles=5,
                     include_challenge=False,

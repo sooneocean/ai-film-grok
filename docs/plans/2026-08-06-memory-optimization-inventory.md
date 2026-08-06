@@ -1,6 +1,6 @@
 # Plugin 优化点全表（从 memory 反查 · 2026-08-06）
 
-**范围：** 主仓 `ai-film-grok` plugin（`~/.grok/plugins/ai-film-grok`）；记忆约 **80** 张短卡 + session 索引 + 既有 plan。  
+**范围：** 主仓 `ai-film-grok` plugin（`~/.grok/plugins/ai-film-grok`）；记忆 active **~39**（2026-08-06 归档 ~47 → `memory/archive/`）+ session 索引 + 既有 plan。plugin **2.39.98**。  
 **读法：** 记忆里的「优化」分三类，**不要混成同一待办清单**：
 
 | 类 | 含义 | 该怎么用 |
@@ -27,8 +27,8 @@
 
 | ID | 优化点 | 记忆/证据 | 状态 | 下一步 |
 |----|--------|-----------|------|--------|
-| **C1** | until-empty 真烧到 `queue_empty` | `2026-08-06-c1-*` · `2026-08-05-s53-*` · AF7 | **PARTIAL** | 换 **variety 绿** 片根；修 `L4_INSERT_LOW` 后再 execute |
-| **C2** | free-first 不杀 foreign + capacity-wait | `2026-08-05-s53-free-first-ops` | 代码 ship；真片竞争仍常见 | 运维纪律 + 回执 |
+| **C1** | until-empty 真烧到 `queue_empty` | `2026-08-06-c1-*` · AF7 | **OPEN_OPS** | 用户独占 + `--i-own-the-gpu` + variety 绿片 |
+| **C2** | free-first 不杀 foreign + 禁默认 hog | multi-agent-gpu-no-hog | **机读 ship 2.39.98**；真片仍纪律 | exclusive flag + 回执 |
 | **C3** | 正牌 final plate vs master 在交付文案 | `2026-08-06-suse-ep01-official-final-iron` | 代码 A5 ship | 新片强制看 `official-final-report.json` |
 | **C4** | rnb 仅 license 无 wav → procedural 诚实 | 同上 · A4 | ship | 有 wav 再换库 |
 | **C5** | 模型极限勿硬上 / soft-max 档 | `2026-08-06-wardrobe-no-redress-fullnude-fallback` · scale_fallback | 码+receipt ship | promote 路径再压一轮真片 |

@@ -196,7 +196,11 @@ def _go_template(
             lines.append(f"   {cmd}")
         if profile == "h3_primary":
             lines.append(
-                f'5) aifilm h3 cycle --root "{root}" --until-empty --execute  # bulk 挂机'
+                f'5) aifilm h3 run-next --root "{root}" --execute --max 5  # bulk 单批（默认）'
+            )
+            lines.append(
+                f'   # 独占一夜才: aifilm h3 cycle --root "{root}" '
+                f"--until-empty --execute --i-own-the-gpu"
             )
         else:
             lines.append(
@@ -324,7 +328,7 @@ def pilot_pack(root: Path | str, *, shots: list[str] | None = None) -> dict[str,
         next_cmd = f'aifilm state-index check --root "{base}"'
 
     bulk_hint = (
-        f'aifilm h3 cycle --root "{base}" --until-empty --execute'
+        f'aifilm h3 run-next --root "{base}" --execute --max 5  # exclusive: cycle --until-empty --execute --i-own-the-gpu'
         if profile == "h3_primary"
         else f'media-queue add --root "{base}" …  # or h3 run-next'
     )

@@ -994,8 +994,10 @@ class MediaQueue:
                     error=str(error),
                     shot_id=str(job.get("shot_id") or ""),
                 )
-            except Exception:  # noqa: BLE001
-                pass
+            except Exception as exc:  # noqa: BLE001 — honesty: never silent
+                job.setdefault("honest_limits", []).append(
+                    f"scale_fallback_write_failed:{type(exc).__name__}:{str(exc)[:80]}"
+                )
         return job
 
     def _maybe_write_scale_fallback_on_fail(

@@ -1538,6 +1538,58 @@ def pk_compare(
     }
 
 
+def _count_take_video_files(root: Path) -> int:
+    """Progress truth: non-empty take videos under takes/ (not pending count)."""
+    takes_root = Path(root) / "takes"
+    if not takes_root.is_dir():
+        return 0
+    n = 0
+    for p in takes_root.rglob("*"):
+        if not p.is_file():
+            continue
+        if p.suffix.lower() not in {".mp4", ".webm", ".mov", ".mkv"}:
+            continue
+        try:
+            if p.stat().st_size > 0:
+                n += 1
+        except OSError:
+            continue
+    return n
+
+
+def _pending_reason_breakdown(root: Path, *, include_challenge: bool = True) -> dict[str, int]:
+    """Count primary reason tags among pending fill-idle rows (honest pending≠stuck)."""
+    queue = build_fill_idle_queue(root, include_challenge=include_challenge, include_done=False)
+    counts: dict[str, int] = {}
+    for row in queue.get("shots") or []:
+        if not isinstance(row, dict) or not row.get("command"):
+            continue
+        reasons = row.get("reasons") or []
+        tag = str(reasons[0]) if reasons else "unknown"
+        # Prefer floor / dual tags when present (ops care)
+        for r in reasons:
+            rs = str(r)
+            if rs in {
+                "h3_below_floor",
+                "take_below_floor",
+                "needs_h3_primary",
+                "dual_need_r2v",
+                "dual_need_i2v",
+                "fill_idle_challenge",
+            }:
+                tag = rs
+                break
+        counts[tag] = counts.get(tag, 0) + 1
+    return dict(sorted(counts.items(), key=lambda kv: (-kv[1], kv[0])))
+
+
+def _env_i_own_the_gpu() -> bool:
+    import os
+
+    raw = (os.environ.get("AIFILM_I_OWN_THE_GPU") or "").strip().lower()
+    return raw in {"1", "true", "yes", "on"}
+
+
 def fill_idle_cycle(
     root: Path | str,
     *,
@@ -1550,10 +1602,12 @@ def fill_idle_cycle(
     stop_on_capacity: bool = True,
     free_first: bool = False,
     capacity_wait_sec: float = 0.0,
+    i_own_the_gpu: bool = False,
 ) -> dict[str, Any]:
     """One agent-facing cycle: evidence → run-next → evidence → pk peek.
 
     free_first / capacity_wait_sec enable contention recovery (never cancel foreign).
+    until_empty --execute requires i_own_the_gpu (or AIFILM_I_OWN_THE_GPU=1).
     """
     base = _root(root)
     if until_empty:
@@ -1567,6 +1621,7 @@ def fill_idle_cycle(
             stop_on_capacity=bool(stop_on_capacity),
             free_first=bool(free_first),
             capacity_wait_sec=float(capacity_wait_sec or 0.0),
+            i_own_the_gpu=bool(i_own_the_gpu),
         )
     free_prep = prepare_capacity_free_first(
         free_first=bool(free_first),
@@ -1657,16 +1712,75 @@ def fill_idle_until_empty(
     stop_on_capacity: bool = True,
     free_first: bool = False,
     capacity_wait_sec: float = 0.0,
+    i_own_the_gpu: bool = False,
 ) -> dict[str, Any]:
     """Overnight loop until queue empty or safety stop.
 
     free_first and/or capacity_wait_sec recover contention then continue if ready.
     Never cancels foreign prompts; not an OS daemon.
+
+    Multi-agent IRON (2026-08-06): execute=True requires i_own_the_gpu or
+    AIFILM_I_OWN_THE_GPU=1 — free-first must not hog empty slots for other agents.
     """
     base = _root(root)
+    own = bool(i_own_the_gpu) or _env_i_own_the_gpu()
     max_cycles = max(1, min(int(max_cycles or 40), _UNTIL_EMPTY_MAX_CYCLES_HARD))
     max_jobs_per_cycle = max(1, min(int(max_jobs_per_cycle or 5), _UNTIL_EMPTY_MAX_JOBS_PER_CYCLE))
     capacity_wait_sec = max(0.0, min(float(capacity_wait_sec or 0.0), _CAPACITY_WAIT_SEC_HARD_MAX))
+    takes_before = _count_take_video_files(base)
+    pending_breakdown_before = _pending_reason_breakdown(
+        base, include_challenge=include_challenge
+    )
+    if bool(execute) and not own:
+        plan_before = capacity_plan(base, include_challenge=include_challenge)
+        report = {
+            "schema_version": 1,
+            "kind": "ai-film-fill-idle-until-empty",
+            "ok": False,
+            "root": str(base),
+            "execute": True,
+            "until_empty": True,
+            "i_own_the_gpu": False,
+            "stop_reason": "exclusive_gpu_required",
+            "cycles_run": 0,
+            "jobs_ran_total": 0,
+            "takes_count_before": takes_before,
+            "takes_count_after": takes_before,
+            "takes_count_delta": 0,
+            "pending_reason_breakdown": pending_breakdown_before,
+            "plan_before": {
+                "pending_jobs": plan_before.get("pending_jobs"),
+                "eta_minutes_total": plan_before.get("eta_minutes_total"),
+                "p0_jobs": plan_before.get("p0_jobs"),
+            },
+            "honest_limits": [
+                "until-empty --execute requires --i-own-the-gpu or AIFILM_I_OWN_THE_GPU=1 "
+                "(multi-agent 5090: no default drain hog)"
+            ],
+            "human_next": [
+                f'aifilm h3 run-next --root "{base}" --execute --max 5',
+                f'aifilm h3 cycle --root "{base}" --execute --max 5',
+                (
+                    f'aifilm h3 cycle --root "{base}" --until-empty --execute '
+                    f"--i-own-the-gpu  # only when user named exclusive / overnight own"
+                ),
+            ],
+            "note": (
+                "refused: free-first does not cancel foreign but until-empty still "
+                "fills every idle slot — default multi-agent must not hog 5090"
+            ),
+        }
+        try:
+            from util import write_json
+
+            path = base / "receipts" / "fill-idle-until-empty.json"
+            path.parent.mkdir(parents=True, exist_ok=True)
+            write_json(path, report)
+            report["path"] = str(path)
+        except Exception as exc:  # noqa: BLE001
+            report["write_error"] = str(exc)[:160]
+        return report
+
     free_prep = prepare_capacity_free_first(
         free_first=bool(free_first),
         dry_run=not bool(execute),
@@ -1763,6 +1877,10 @@ def fill_idle_until_empty(
     plan_after = capacity_plan(base, include_challenge=include_challenge)
     pk = pk_compare(base, measure_missing=False, write_dailies=True)
     multi = sum(1 for s in (pk.get("shots") or []) if int(s.get("take_count") or 0) >= 2)
+    takes_after = _count_take_video_files(base)
+    pending_breakdown_after = _pending_reason_breakdown(
+        base, include_challenge=include_challenge
+    )
     report = {
         "schema_version": 1,
         "kind": "ai-film-fill-idle-until-empty",
@@ -1770,6 +1888,7 @@ def fill_idle_until_empty(
         "root": str(base),
         "execute": bool(execute),
         "until_empty": True,
+        "i_own_the_gpu": bool(own),
         "free_first": bool(free_first),
         "capacity_wait_sec": capacity_wait_sec,
         "capacity_waits": capacity_waits,
@@ -1779,6 +1898,11 @@ def fill_idle_until_empty(
         "max_cycles": max_cycles,
         "max_jobs_per_cycle": max_jobs_per_cycle,
         "jobs_ran_total": total_ran,
+        "takes_count_before": takes_before,
+        "takes_count_after": takes_after,
+        "takes_count_delta": int(takes_after) - int(takes_before),
+        "pending_reason_breakdown": pending_breakdown_after,
+        "pending_reason_breakdown_before": pending_breakdown_before,
         "plan_before": {
             "pending_jobs": plan_before.get("pending_jobs"),
             "eta_minutes_total": plan_before.get("eta_minutes_total"),
@@ -1802,9 +1926,10 @@ def fill_idle_until_empty(
             ]
             if multi or stop_reason == "queue_empty"
             else [
+                f'aifilm h3 run-next --root "{base}" --execute --max 5',
                 (
                     f'aifilm h3 cycle --root "{base}" --until-empty --execute '
-                    f"--free-first --capacity-wait-sec 120"
+                    f"--i-own-the-gpu --free-first --capacity-wait-sec 120"
                 ),
                 "aifilm comfy free-memory --confirm  # manual if free_first skipped queue_busy",
                 f'aifilm h3 capacity-plan --root "{base}"',
@@ -1812,7 +1937,8 @@ def fill_idle_until_empty(
         ),
         "note": (
             "until-empty owns process until stop; never auto-promote; "
-            "free_first never cancels foreign; capacity_wait polls without cancel"
+            "free_first never cancels foreign; capacity_wait polls without cancel; "
+            "progress = takes_count_delta (not pending alone)"
         ),
     }
     try:
@@ -1870,8 +1996,12 @@ def write_fill_idle_evidence(
         },
         "next_ops": [
             f'aifilm h3 capacity-plan --root "{base}"',
-            f'aifilm h3 cycle --root "{base}" --until-empty --execute',
             f'aifilm h3 run-next --root "{base}" --execute --max 5',
+            f'aifilm h3 cycle --root "{base}" --execute --max 5',
+            (
+                f'aifilm h3 cycle --root "{base}" --until-empty --execute '
+                f"--i-own-the-gpu  # exclusive GPU only"
+            ),
             f'aifilm ship-prep --root "{base}"',
             f'aifilm h3 pk-compare --root "{base}"',
         ],

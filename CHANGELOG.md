@@ -1,5 +1,16 @@
 # Changelog
 
+## [2.39.98] - 2026-08-06
+
+### Added / Fixed (multi-agent GPU gate + memory slim)
+- **until-empty execute gate**: `--until-empty --execute` requires `--i-own-the-gpu` or `AIFILM_I_OWN_THE_GPU=1` (dry-run free). Stop `exclusive_gpu_required`.
+- **Default next**: h3_primary → `run-next --max 5` / single cycle; until-empty only with exclusive flag (dispatch + pilot_pack + SKILL).
+- **Receipt honesty**: `takes_count_*` + `pending_reason_breakdown` on until-empty report.
+- **ship-native**: stage-2 next = `final --skip-canonical-truth` hardburn/rnb (plate stays OFFICIAL_FINAL_PLATE).
+- **media_queue**: scale-fallback write fail → job `honest_limits`.
+- **memory/**: archive ~47 cards → `memory/archive/`; active ~39; README Active P0.
+- hard-defaults multi-agent row documents machine gate.
+
 ## [2.39.97] - 2026-08-06
 
 ### Fixed (shortform S0.1–S0.2 · plan H3 duration honesty)

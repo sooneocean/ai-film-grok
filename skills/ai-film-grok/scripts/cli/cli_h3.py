@@ -255,6 +255,15 @@ def add_h3_parsers(sub: argparse._SubParsersAction[argparse.ArgumentParser]) -> 
             "up to N seconds for ready before stop (never cancels foreign; hard max 600)"
         ),
     )
+    cycle.add_argument(
+        "--i-own-the-gpu",
+        action="store_true",
+        dest="i_own_the_gpu",
+        help=(
+            "Required with --until-empty --execute: user-named exclusive 5090 "
+            "(multi-agent default: no overnight drain hog). Env AIFILM_I_OWN_THE_GPU=1 ok"
+        ),
+    )
     cycle.add_argument("--no-challenge", action="store_true")
     cycle.add_argument("--notes", default="")
     cycle.add_argument("--receipt", type=Path, default=None)
@@ -407,6 +416,7 @@ def run_h3(args: argparse.Namespace) -> dict[str, Any]:
                 stop_on_capacity=not bool(getattr(args, "continue_on_capacity", False)),
                 free_first=bool(getattr(args, "free_first", False)),
                 capacity_wait_sec=float(getattr(args, "capacity_wait_sec", 0.0) or 0.0),
+                i_own_the_gpu=bool(getattr(args, "i_own_the_gpu", False)),
             )
         elif action == "capacity-plan":
             from h3_fill_idle import capacity_plan

@@ -730,12 +730,19 @@ def build_next_actions(
                 )
             if h3_enabled:
                 if is_h3_primary:
-                    # Primary production path: 5090 unlimited overnight throughput.
+                    # Default multi-agent safe: batch only. Overnight drain needs exclusive flag.
                     add(
-                        "h3-until-empty",
-                        f'aifilm h3 cycle --root "{r}" --until-empty --execute --max 5',
+                        "h3-run-next",
+                        f'aifilm h3 run-next --root "{r}" --execute --max 5',
                         _with_primary(
-                            "h3_primary 挂机：until-empty 吃光 P0→P1→P2（无限本地算力；永不 auto-promote）"
+                            "h3_primary 主产线：单批 5 镜（多 agent 默认；禁默认 until-empty 占满 5090）"
+                        ),
+                    )
+                    add(
+                        "h3-fill-idle",
+                        f'aifilm h3 cycle --root "{r}" --execute --max 5',
+                        _with_primary(
+                            "Fill-Idle 一循环：evidence→run-next→pk peek（永不 auto-promote）"
                         ),
                     )
                     add(
@@ -744,17 +751,13 @@ def build_next_actions(
                         _with_primary("全片 H3 backlog ETA（按 I2V/FLF/R2V/T2V）"),
                     )
                     add(
-                        "h3-run-next",
-                        f'aifilm h3 run-next --root "{r}" --execute --max 5',
-                        _with_primary(
-                            "h3_primary 主产线：单批 5 镜；或改用 until-empty 挂机"
+                        "h3-until-empty",
+                        (
+                            f'aifilm h3 cycle --root "{r}" --until-empty --execute '
+                            f"--i-own-the-gpu --max 5"
                         ),
-                    )
-                    add(
-                        "h3-fill-idle",
-                        f'aifilm h3 cycle --root "{r}" --execute --max 5',
                         _with_primary(
-                            "Fill-Idle 一循环：evidence→run-next→pk peek（永不 auto-promote）"
+                            "仅用户点名独占 5090 时：until-empty 排水（须 --i-own-the-gpu）"
                         ),
                     )
                     add(

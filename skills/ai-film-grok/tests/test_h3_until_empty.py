@@ -121,6 +121,26 @@ class UntilEmptyTests(unittest.TestCase):
             self.assertEqual(rep["stop_reason"], "dry_run_pass_execute")
             self.assertEqual(int(rep["jobs_ran_total"]), 0)
             self.assertIn("plan_before", rep)
+            self.assertIn("takes_count_delta", rep)
+
+    def test_until_empty_execute_refuses_without_i_own_the_gpu(self) -> None:
+        """Multi-agent IRON: until-empty --execute needs exclusive ownership."""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _film(root)
+            with mock.patch.dict("os.environ", {"AIFILM_I_OWN_THE_GPU": ""}, clear=False):
+                rep = fill_idle_until_empty(
+                    root,
+                    execute=True,
+                    i_own_the_gpu=False,
+                    max_cycles=3,
+                )
+            self.assertFalse(rep.get("ok"))
+            self.assertEqual(rep.get("stop_reason"), "exclusive_gpu_required")
+            self.assertEqual(int(rep.get("jobs_ran_total") or 0), 0)
+            self.assertTrue((root / "receipts" / "fill-idle-until-empty.json").is_file())
+            self.assertIn("takes_count_delta", rep)
+            self.assertIn("pending_reason_breakdown", rep)
 
     def test_until_empty_execute_queue_empty(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -140,6 +160,7 @@ class UntilEmptyTests(unittest.TestCase):
                 rep = fill_idle_until_empty(
                     root,
                     execute=True,
+                    i_own_the_gpu=True,
                     max_jobs_per_cycle=2,
                     max_cycles=5,
                     include_challenge=True,
@@ -167,6 +188,7 @@ class UntilEmptyTests(unittest.TestCase):
                 rep = fill_idle_until_empty(
                     root,
                     execute=True,
+                    i_own_the_gpu=True,
                     max_jobs_per_cycle=2,
                     max_cycles=5,
                     include_challenge=True,
@@ -243,6 +265,7 @@ class UntilEmptyTests(unittest.TestCase):
                     rep = fill_idle_until_empty(
                         root,
                         execute=True,
+                        i_own_the_gpu=True,
                         max_jobs_per_cycle=2,
                         max_cycles=3,
                         free_first=True,
@@ -397,6 +420,7 @@ class CapacityWaitTests(unittest.TestCase):
                         rep = fill_idle_until_empty(
                             root,
                             execute=True,
+                            i_own_the_gpu=True,
                             max_cycles=5,
                             free_first=True,
                             capacity_wait_sec=60.0,
@@ -439,6 +463,7 @@ class CapacityWaitTests(unittest.TestCase):
                         rep = fill_idle_until_empty(
                             root,
                             execute=True,
+                            i_own_the_gpu=True,
                             max_cycles=3,
                             free_first=True,
                             capacity_wait_sec=30.0,
