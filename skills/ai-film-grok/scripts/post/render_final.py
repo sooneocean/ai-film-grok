@@ -2471,6 +2471,8 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
             "aac",
             "-b:a",
             "256k",
+            "-movflags",
+            "+faststart",
             "-shortest",
             str(final_path),
         ]

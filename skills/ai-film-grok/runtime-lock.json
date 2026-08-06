@@ -1242,7 +1242,7 @@
     },
     {
       "path": "scripts/final/media_ops.py",
-      "sha256": "e12abd45114288733f1fe8492df757dc81775d284c99cfd3bb021de12a305c93"
+      "sha256": "4f61d00aa39ccf692a827291ccded0b7d8d16146edbf7c689dfb5c969482a213"
     },
     {
       "path": "scripts/final/native_audio.py",
@@ -1798,7 +1798,7 @@
     },
     {
       "path": "scripts/narrative/edit_policy.py",
-      "sha256": "e40e571ab52637ecb3ec6789919d769004d4577e4ecc4b1282f3fbf771d4b451"
+      "sha256": "3a7288f0751ef2ac6312ef95aa8f59ef1d6e3440d70557b4a7477280abf6dffe"
     },
     {
       "path": "scripts/narrative/edit_policy_heat.py",
@@ -2178,7 +2178,7 @@
     },
     {
       "path": "scripts/post/render_final.py",
-      "sha256": "a9b58e5666560e873cd40b26982ce95a9c86824a1d5687410d16e50360220367"
+      "sha256": "d6b007ed2e7ad64a15640a2b8a9d62a947c6fc22214200822279928724cabd86"
     },
     {
       "path": "scripts/post/render_final_music.py",
@@ -2598,7 +2598,7 @@
     },
     {
       "path": "scripts/transition_ops.py",
-      "sha256": "f5e06b8e33c4dacae46368bacbda18ebd5789fd2ddb12bf97173a27b27ec83d3"
+      "sha256": "ce4f68e355b6e655569f6df9663c6b13690474f58dd86f78c08daa46adfbc9d8"
     },
     {
       "path": "scripts/true_video_policy.py",

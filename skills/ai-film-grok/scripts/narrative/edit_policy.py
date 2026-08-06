@@ -913,6 +913,7 @@ EDIT_CRAFTS = frozenset(
         "montage_jump",  # parallel / action burst hard
         "soft_glue",  # scene-interior silk soft
         "whip_soft",  # directional energy soft (hblur/smooth*)
+        "speed_ramp",  # kinetic energy ramp transition
         "mood_hold",  # afterglow landing hold
         "scene_bridge",  # cross-scene soft/hold
     }
@@ -928,6 +929,7 @@ _CRAFT_TO_JOIN: dict[str, tuple[str, str]] = {
     "montage_jump": ("hard", "hard"),
     "soft_glue": ("soft", "dissolve"),
     "whip_soft": ("soft", "hblur"),
+    "speed_ramp": ("soft", "smoothright"),
     "mood_hold": ("hold", "fadeblack"),
     "scene_bridge": ("soft", "fadeblack"),
 }
@@ -941,6 +943,7 @@ _CRAFT_WHY: dict[str, str] = {
     "montage_jump": "蒙太奇/连打动作 hard 跳切",
     "soft_glue": "场内情绪连续 soft 胶水",
     "whip_soft": "方向性能量 soft（whip/hblur 感）",
+    "speed_ramp": "动能变速切 soft（尾端加速+首端落点）",
     "mood_hold": "余韵着陆 hold 长叠",
     "scene_bridge": "跨场景桥 soft/fadeblack",
 }
