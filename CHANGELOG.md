@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.40.32] - 2026-08-06
+
+### Changed (senior-dev 代码质量把控 · Phase 5 收尾 · 类型/文档/可复现)
+- **[P5-2] 修文档漂移**：`make sync-docs` 已把 README/GRAPH 的 marker 块版本指针对齐当前版；另手动对齐 README 顶部「版本」表（2.39.69→2.40.31）与「插件元数据/版本」表（2.39.56→2.40.31）——这两处硬编码指针不在 sync-docs 的 marker 块内、脚本不覆盖，此前是真实漂移。建议 CI 加"README/GRAPH 全部版本指针 == plugin.json"校验。
+- **[P5-3] 修可复现性**：仓库根此前**无任何依赖清单**。已生成 `requirements.lock`（479 行，运行时 Python 3.11.15 全环境冻结；已过滤 `-e` editable 本地路径如 `/Users/dex/YDEX/...`，避免破坏克隆复现）。后续可裁剪为项目真实 import 集合或改用 `--require-hashes`。
+- **[P5-1] 类型均匀化（增量门禁已立）**：`skills/ai-film-grok/pyproject.toml` 新增 `[tool.mypy]`（`mypy_path="scripts"` + `explicit_package_bases=true`，解决 `scripts/` 自带 `__init__.py` 引发的模块名双映射）；新增 `make type` 作为 mypy 增量门禁**种子**，首批只扫已干净的 `util/validators.py` + `util/errors.py`（无错误）。全树扫描暴露 2315 处类型错误（跨 187 文件，集中在 `post/export_composition`/`core/gates` 巨型文件）——系真多轮工程，按"每清一模块即扩 `make type` 扫描列表"逐步推进，不一次性强开全树门禁。
+
 ## [2.40.31] - 2026-08-06
 
 ### Changed (senior-dev 代码质量把控 · Phase 4 测试缺口补漏 · P4-1 续)

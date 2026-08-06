@@ -32,3 +32,11 @@ markers = [
 ]
 testpaths = ["tests"]
 pythonpath = ["scripts"]
+
+[tool.mypy]
+mypy_path = "scripts"
+explicit_package_bases = true
+python_version = "3.11"
+warn_unused_ignores = true
+disallow_untyped_defs = false
+ignore_missing_imports = true

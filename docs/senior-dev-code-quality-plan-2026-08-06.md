@@ -87,9 +87,9 @@
 - **[P4-2] 校验类模块加测**：`film_spec*`、`story_contract`、`subtitle_typesetter`、`edit_policy_*`——最易回归处，补契约测试。
 
 ### Phase 5 — 收尾（类型 / 文档 / 可复现）
-- **[P5-1] 类型均匀化**：把 legacy 文件类型注解补到 90%+；用 mypy 增量门禁守住。
-- **[P5-2] 修文档漂移**：README(2.39.69→2.40.22)、GRAPH(2.40.21→2.40.22)；统一由 `make sync-docs` 生成（CI 已校验版本一致）。
-- **[P5-3] 修可复现性**：`requirements.lock` 补全（或改用完整 lock + `--require-hashes`），让"克隆即跑"成立。
+- **[P5-1] 类型均匀化（增量门禁已立 · 全量 90% 迭代中）**：`skills/ai-film-grok/pyproject.toml` 新增 `[tool.mypy]`（`mypy_path="scripts"` + `explicit_package_bases=true`，解决 `scripts/` 自带 `__init__.py` 的模块名双映射）；`make type` 即 mypy 增量门禁**种子**，当前只扫已干净的 `util/validators.py` + `util/errors.py`（无错误）。全树扫描暴露 2315 处类型错误（跨 187 文件，集中在 `post/export_composition`、`core/gates` 等巨型文件）——这是真多轮工程，按"每清一个模块就把文件名加进 `make type` 扫描列表"逐步推进，不一次性强开全树门禁（会红）。
+- **[P5-2] 修文档漂移（✅ 已修，v2.40.31）**：`make sync-docs` 已把 README/GRAPH 的 marker 块版本指针对齐到当前版；但 README 顶部「版本」表（2.39.69）与「插件元数据/版本」表（2.39.56）两处硬编码指针不在 marker 块内、sync-docs 不覆盖，已手动对齐到 2.40.31。CI 后续应加"README/GRAPH 全部版本指针 == plugin.json"校验（含非 marker 块）。
+- **[P5-3] 修可复现性（✅ 已修，v2.40.32）**：仓库根此前**无任何依赖清单**（无 requirements.txt / pyproject 依赖 / setup）。已生成 `requirements.lock`（479 行，运行时 Python 3.11.15 全环境冻结；已过滤 `-e` editable 本地路径如 `/Users/dex/YDEX/...`，避免破坏克隆复现）。后续可裁剪为项目真实 import 集合，或改用 `--require-hashes` 完整 lock。
 
 ---
 

@@ -48,6 +48,9 @@ __pycache__/
 
 # ---- lock & OS junk (never version these) ----
 *.lock
+# exception: requirements.lock is the pinned dependency manifest for reproducibility (P5-3);
+# it MUST be versioned so a fresh clone can `pip install -r requirements.lock`.
+!requirements.lock
 
 # ---- Safety backups produced by mutation scripts ----
 *.bak

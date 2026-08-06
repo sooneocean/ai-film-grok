@@ -17,7 +17,7 @@ SKILL := $(ROOT)/skills/ai-film-grok
 AIFILM := $(SKILL)/scripts/aifilm
 RUNTIME_PYTHON := $(SKILL)/scripts/runtime-python
 
-.PHONY: help setup dev test test-fast test-hotpath check-all review clean validate doctor coverage audit audit-full lessons-audit release-check release-light update inspect version sync-docs sync install-hooks lock-runtime
+.PHONY: help setup dev test test-fast test-hotpath check-all review clean validate doctor coverage audit audit-full lessons-audit release-check release-light update inspect version sync-docs sync install-hooks lock-runtime type
 
 help:
 	@echo "ai-film-grok make targets"
@@ -31,6 +31,7 @@ help:
 	@echo "  release-check   package + full test suite"
 	@echo "  lock-runtime    refresh runtime-lock.json fingerprints"
 	@echo "  sync-docs       regenerate README/GRAPH version pointers"
+	@echo "  type            P5-1 mypy incremental typing gate (scoped)"
 	@echo "  install-hooks   core.hooksPath=.githooks"
 
 setup: install-hooks
@@ -110,6 +111,11 @@ sync-docs:
 
 sync:
 	@python3 "$(ROOT)/scripts/sync_project_docs.py" --commit --push
+
+# P5-1 incremental typing gate (mypy). Scoped to the already-clean modules;
+# extend the file list as more modules are typed. Full-tree typing is iterative.
+type:
+	cd "$(SKILL)" && env -u PYTHONPATH "$$($(RUNTIME_PYTHON))" -m mypy scripts/util/validators.py scripts/util/errors.py
 
 install-hooks:
 	@git -C "$(ROOT)" config core.hooksPath .githooks
