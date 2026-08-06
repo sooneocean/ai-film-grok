@@ -13,7 +13,6 @@ from typing import Any
 from util import require_json as read_json
 from util import write_json
 from util.errors import FilmError
-from util.subprocess import run
 
 
 def _emit(obj: dict[str, Any]) -> None:
@@ -481,7 +480,7 @@ def cmd_audio_plan(args: argparse.Namespace) -> int:
 def cmd_audio_verify(args: argparse.Namespace) -> int:
     """Run the fail-closed audio delivery evidence gate for one film root."""
     from audio_delivery_gate import build_delivery_report
-    from util import read_json, write_json
+    from util import read_json
 
     root = Path(args.root).expanduser().resolve()
     audio_dir = root / "audio"
@@ -521,7 +520,6 @@ def cmd_audio_verify(args: argparse.Namespace) -> int:
 def cmd_verify(args: argparse.Namespace) -> int:
     """Aggregate local automation gates without initiating generation or uploads."""
     from automation_verify import build_verification_report
-    from util import write_json
 
     root = Path(args.root).expanduser().resolve()
     report = build_verification_report(root)
@@ -557,7 +555,7 @@ def cmd_audio_produce(args: argparse.Namespace) -> int:
 
 def cmd_audio_event(args: argparse.Namespace) -> int:
     from audio_event_editor import AudioEventEditError, edit_event
-    from util import read_json, write_json
+    from util import read_json
 
     root = Path(args.root).expanduser().resolve()
     audio_dir = root / "audio"

@@ -9,7 +9,6 @@ from __future__ import annotations
 import hashlib
 import json
 import math
-import os
 import re
 from datetime import UTC, datetime
 from pathlib import Path

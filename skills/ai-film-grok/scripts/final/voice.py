@@ -9,7 +9,6 @@ from typing import Any
 from final.caption_text import (
     _shot_speaker_key,
     is_character_speech_shot,
-    spoken_text_for_shot,
 )
 from final.errors import RenderError
 

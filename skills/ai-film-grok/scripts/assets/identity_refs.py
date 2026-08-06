@@ -2,7 +2,6 @@
 """Canonical identity reference resolution (M5)."""
 from __future__ import annotations
 from pathlib import Path
-from typing import Any
 from util import read_json, sha256_file
 MAX_AUTO_REFS = 3
 

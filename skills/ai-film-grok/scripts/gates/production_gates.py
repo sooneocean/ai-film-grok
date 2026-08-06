@@ -255,8 +255,25 @@ def _assert_dialogue_benchmark_receipt(
         raise ProductionGateError(message)
 
 
-def assert_dialogue_drama_production_evidence(root: Path) -> dict[str, Any]:
-    """Hard-gate dialogue final/bulk on TTS, package, lipsync, and benchmark proof."""
+def assert_dialogue_drama_production_evidence(
+    root: Path, *, force: bool = False
+) -> dict[str, Any]:
+    """Hard-gate dialogue final/bulk on TTS, package, lipsync, and benchmark proof.
+
+    H3 prefer_native / post-lipsync freeze: skip when force or
+    AIFILM_SKIP_DIALOGUE_PACKAGE_GATE=1 (plate path; not master).
+    """
+    if force or os.environ.get("AIFILM_SKIP_DIALOGUE_PACKAGE_GATE", "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }:
+        return {
+            "checked": False,
+            "reason": "skipped_force_or_env",
+            "note": "post lipsync frozen; H3 prefer_native plate may skip package gate",
+        }
     base, root_fd = _open_gate_root(root)
     try:
         spec = _read_regular_json(
@@ -280,8 +297,9 @@ def assert_dialogue_drama_production_evidence(root: Path) -> dict[str, Any]:
             codes = ", ".join(str(item.get("code")) for item in result.get("errors") or [])
             raise ProductionGateError(
                 "dialogue package gate: production evidence incomplete "
-                f"[{codes or 'PACKAGE_INVALID'}]; run tts-rehearse, complete LatentSync review, "
-                "then regenerate the dialogue scene package."
+                f"[{codes or 'PACKAGE_INVALID'}]; H3 prefer_native: "
+                "AIFILM_SKIP_DIALOGUE_PACKAGE_GATE=1 or --allow-loop-risk force path; "
+                "not LatentSync (frozen)."
             )
         if spec.get("dialogue_benchmark_required") is True:
             benchmark = _read_regular_json(
@@ -890,7 +908,7 @@ def assert_no_loop_risk(
             strict=strict_tts_rehearsal,
             force=False,
         )
-        assert_dialogue_drama_production_evidence(Path(root))
+        assert_dialogue_drama_production_evidence(Path(root), force=bool(force))
 
     if force:
         return []

@@ -273,7 +273,7 @@ def _collect_l0(root: Path, *, final: dict[str, Any] | None, duration: float) ->
             "plate_subs": route.get("plate_subs"),
         }
         try:
-            from post_route import PostRouteError, assert_no_double_caption_layers
+            from post_route import assert_no_double_caption_layers
 
             delivery = read_json(root / "out" / "final-delivery.json") or {}
             subs_meta = (

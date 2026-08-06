@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "kind": "s5-until-empty-open-ops",
+  "at": "2026-08-06T06:26:58+00:00",
+  "ok": false,
+  "stop_reason": "comfy_tunnel_down",
+  "probes": {
+    "127.0.0.1:18188": "connection_refused_or_timeout",
+    "127.0.0.1:8188": "connection_refused"
+  },
+  "action_taken": "none — multi-agent IRON + no idle Comfy; no until-empty submit",
+  "required_to_proceed": [
+    "start Comfy on 5090 host with API on 8188",
+    "open local tunnel 18188→8188 (not 8189)",
+    "user exclusive: aifilm h3 cycle --until-empty --execute --i-own-the-gpu --free-first"
+  ],
+  "code_board": "shortform S0–S3 CLOSED @ 2.40.3"
+}

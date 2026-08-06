@@ -12,7 +12,6 @@ import contextlib
 import hashlib
 import json
 import os
-import re
 import shutil
 import subprocess
 import sys
@@ -31,16 +30,12 @@ from dialogue_broll import validate_broll_visual_review, write_broll_edit_report
 from edit_policy import (
     DEFAULT_TRANSITION_SEC,
     PolicyError,
-    build_acrossfade_filter_graph,
-    build_xfade_filter_graph,
     expand_story_join_intents,
     expand_story_join_styles,
     film_segment_timeline,
     normalize_transition_sec,
-    plan_stretch,
 )
 from event_voice_stem import EventVoiceStemError, render_event_voice_stem
-from film_spec import FilmSpecError, validate_film_spec
 from logger import log
 from media_qa import MediaQAError, analyze_media, approved_clip_record
 from narrative_timeline import (
@@ -48,10 +43,6 @@ from narrative_timeline import (
     _is_non_vo_coverage_shot,
     validate_sfx_scene_bindings,
 )
-from narrative_timeline import (
-    validate_linear_narration as _validate_linear_narration,
-)
-from PIL import Image, ImageDraw, ImageFont
 from render_workspace import RenderWorkspaceError, prepare_render_workspace, resolve_render_paths
 from runtime_policy import sha256
 from scene_sound import reconcile as reconcile_scene_sound
@@ -77,8 +68,7 @@ from sound_plan import (
     validate_audio_tracks_contract,
 )
 from transition_ops import TransitionOperationError, bind_transition_operations_to_timeline
-from util import run_ffmpeg, utc_now, write_json
-from util.subprocess import run as util_run
+from util import utc_now, write_json
 
 # local sibling import
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -149,9 +139,6 @@ from final.cards import (  # noqa: E402, F401
     _wrap_title_lines,
     mkcard_video,
     sub_png,
-)
-from final.cards import (
-    resolve_font as _resolve_font_from_cards,
 )
 from final.enhance import (  # noqa: E402, F401
     build_post_enhancement_vf_chain,
@@ -227,12 +214,8 @@ from final.tts_tracks import (  # noqa: E402, F401
     DEFAULT_VOCAL_COLOR_GAIN as _TTS_DEFAULT_VOCAL_COLOR_GAIN,
 )
 from final.tts_tracks import (
-    SR as _TTS_SR,
-)
-from final.tts_tracks import (
     build_native_track,
     build_vocal_color_track,
-    tts_edge,
 )
 from final.tts_tracks import (
     tts_synthesize as _tts_synthesize_default,
@@ -461,11 +444,32 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
         dialogue_spoken_lang=dialogue_spoken_lang,
         narration_spoken_lang=narration_spoken_lang,
     )
+    # H3 native / plate force path: file-on-disk + status candidate|approved enough
+    # when AIFILM_FINAL_ALLOW_CANDIDATE_CLIPS / force_allow_clips (post lipsync freeze).
+    force_allow_clips = os.environ.get("AIFILM_FINAL_ALLOW_CANDIDATE_CLIPS", "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    } or os.environ.get("AIFILM_SKIP_DIALOGUE_PACKAGE_GATE", "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
     shot_audio: list[dict[str, Any]] = []
     for i, shot in enumerate(shots):
         sid = shot["id"]
         rec = clips_map.get(sid)
-        if not approved_clip_record(rec):
+        if not isinstance(rec, dict):
+            raise RenderError(f"Clip {sid} missing from manifest")
+        st = str(rec.get("status") or "").lower()
+        if force_allow_clips:
+            if st not in {"approved", "candidate"} or not rec.get("path"):
+                raise RenderError(
+                    f"Clip {sid} not usable on plate path (need approved|candidate + path)"
+                )
+        elif not approved_clip_record(rec):
             raise RenderError(
                 f"Clip {sid} lacks endpoint, identity, motion, review-note, or decode QA evidence"
             )

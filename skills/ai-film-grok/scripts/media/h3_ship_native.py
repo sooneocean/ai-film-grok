@@ -465,16 +465,24 @@ def ship_native(
         report["next"] = list(dict.fromkeys((report.get("next") or []) + (dur_rep.get("next") or [])))
 
     write_json(root_p / "receipts" / "h3-ship-native.json", report)
-    # Align with plate vs master honesty when official-final helper exists
+    # Align with plate vs master honesty (OFFICIAL_FINAL_PLATE; never master_lock)
     try:
-        from final.delivery_class import write_plate_report  # type: ignore
-
-        write_plate_report(
-            root_p,
-            status="OFFICIAL_FINAL_PLATE",
-            reason="h3_ship_native",
-            path=str(out),
+        from final.delivery_class import (
+            classify_official_final,
+            write_official_final_report,
         )
+
+        official = classify_official_final(
+            skip_preflight=True,
+            final_complete=False,
+            gate_auto_ok=None,
+        )
+        official["status"] = "OFFICIAL_FINAL_PLATE"
+        official["partial"] = True
+        official["reason"] = "h3_ship_native"
+        official["path"] = str(out)
+        official["master_lock"] = False
+        write_official_final_report(root_p, official)
     except Exception as exc:  # noqa: BLE001
         report.setdefault("honest_limits", []).append(
             f"plate_report_write_failed:{type(exc).__name__}:{str(exc)[:100]}"

@@ -434,11 +434,7 @@ MOTION_POSITIVE_HINTS = (
 
 # PolicyError + coitus markers live in edit_policy_shared (cycle-free leaf).
 from edit_policy_shared import (  # noqa: E402
-    COITUS_BEATS,
-    COITUS_REQUIRED_BEATS,
     PolicyError,
-    _COITUS_PSEUDO_ONLY,
-    _COITUS_READABLE_MARKERS,
 )
 
 

@@ -5,7 +5,7 @@ Never silently pads act/climax duration_sec to invent stretchable slots.
 
 from __future__ import annotations
 
-from typing import Any, Callable
+from typing import Any
 
 
 class SexFloorError(ValueError):

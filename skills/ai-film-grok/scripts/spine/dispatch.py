@@ -21,14 +21,10 @@ from typing import Any
 
 from quality_gates import summarize_quality
 from spine.action_policy import (
-    ACTION_SKILLS as _ACTION_SKILLS,
-    COMMAND_POLICIES as _COMMAND_POLICIES,
-    SKILL_POLICIES as _SKILL_POLICIES,
     resolve_policy,
     resolve_skill_id,
 )
-from spine.stage_model import STAGE_OWNERS as _STAGE_OWNERS
-from spine.stage_model import project_stages, responsibility_for_stage, stage_owners
+from spine.stage_model import project_stages, responsibility_for_stage
 from util import read_json, write_json
 
 _STATE_OK_ONLY = frozenset(

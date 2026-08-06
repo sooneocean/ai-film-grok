@@ -5,7 +5,6 @@ Public symbols remain re-exported by ``render_final`` for hard-compat tests.
 
 from __future__ import annotations
 
-import json
 import re
 from pathlib import Path
 from typing import Any
@@ -18,7 +17,6 @@ from narrative_timeline import (
 )
 from edit_policy import film_segment_timeline
 
-from security_policy import atomic_write_text, safe_output_path, SecurityPolicyError
 
 # Voice / caption defaults (peeled from render_final W4)
 DEFAULT_VOICE = "zh-CN-XiaoxiaoNeural"  # edge 显式后端默认女声

@@ -6,7 +6,6 @@ from __future__ import annotations
 import argparse
 import contextlib
 import json
-import os
 import subprocess
 import sys
 from pathlib import Path
@@ -52,10 +51,6 @@ from core import (  # noqa: E402, F401
 )
 
 # probe_native_audio_mean_volume stays on hub for test patchability of ``run``.
-from security_policy import (
-    SecurityPolicyError,
-    safe_existing_file,
-)
 from runtime_policy import sha256  # noqa: F401 — re-exported; tests use aifilm_grok.sha256
 from util import require_json as read_json
 from util import sha256_file, utc_now, write_json
@@ -346,7 +341,6 @@ from cli_misc_ops import (  # noqa: E402
     cmd_dashboard,
     cmd_experiment,
     cmd_gold,
-    cmd_graph,
     cmd_h3,
     cmd_init,
     cmd_interactive,
@@ -359,7 +353,6 @@ from cli_misc_ops import (  # noqa: E402
     cmd_quality_ledger,
     cmd_review_ui,
     cmd_route,
-    cmd_skill,
     cmd_still_challenge,
     cmd_team,
     cmd_truth,
@@ -438,11 +431,6 @@ from cli_status import (  # noqa: E402, F401
     cmd_status,
 )
 from cli_write_spec import (  # noqa: E402
-    _compatibility_audio_cues,
-    _compatibility_director_intent,
-    _compatibility_dramatic_functions,
-    _compatibility_screen_modes,
-    _compatibility_vo_mode,
     cmd_write_spec,
 )
 

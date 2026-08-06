@@ -370,9 +370,7 @@ def build_reference_composition_prompt(
     """
     from motion_prompt_spine import (
         camera_clause,
-        dramatic_function_of,
         motion_tier_for,
-        want_beat_line,
     )
 
     mode = (mode or "i2v").strip().lower()

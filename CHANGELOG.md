@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.40.5] - 2026-08-06
+
+### Fixed / Ops
+- ship-native plate report via `write_official_final_report` (honest OFFICIAL_FINAL_PLATE).
+- cli_post / production_gates residual honesty for final hang path.
+- **S5 OPEN_OPS canary**: Comfy `18188`/`8188` down — no until-empty (`artifacts/2026-08-06-s5-until-empty-open-ops.json`).
+
 ## [2.40.4] - 2026-08-06
 
 ### Added / Fixed (final hang + volumedetect timeout honesty)

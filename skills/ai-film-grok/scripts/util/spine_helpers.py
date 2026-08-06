@@ -9,7 +9,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from util import read_json, soft_json
+from util import soft_json
 
 
 def present(path: Path, *, min_bytes: int = 2) -> bool:

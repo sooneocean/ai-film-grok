@@ -19,7 +19,6 @@ from security_policy import atomic_write_text
 from spine.stage_model import (
     INTERNAL_PIPELINE as PIPELINE_STAGES,
     PIPELINE_LABELS_ZH as _STAGE_LABELS_ZH,
-    STAGE_OWNERS as _STAGE_OWNERS,
     responsibility_for_stage,
 )
 from util import read_json, write_json

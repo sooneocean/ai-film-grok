@@ -3,12 +3,8 @@
 from __future__ import annotations
 
 import contextlib
-import json
-import os
-import re
 import shutil
 import subprocess
-import wave
 from pathlib import Path
 from typing import Any
 
@@ -21,13 +17,9 @@ from edit_policy import (
     plan_stretch,
 )
 from final.errors import RenderError
-from media_duration import MediaDurationError, probe_duration_sec
 from runtime_policy import sha256
 from security_policy import (
-    SecurityPolicyError,
     atomic_write_text,
-    safe_existing_file,
-    safe_output_path,
 )
 from util import run_ffmpeg
 from util.subprocess import run as util_run

@@ -257,12 +257,39 @@ def cmd_final(args: argparse.Namespace) -> int:
     from cinematic_audit import write_audit
 
     cinematic = write_audit(root, require_authored_contract=True, require_clip_evidence=True)
+    skip_cinematic = bool(getattr(args, "skip_cinematic", False)) or (
+        str(_os.environ.get("AIFILM_SKIP_CINEMATIC") or "").strip().lower()
+        in {"1", "true", "yes", "on"}
+    )
     if not cinematic.get("ok"):
-        raise FilmError(
-            "Cannot render final: cinematic audit failed ["
-            + ", ".join(cinematic.get("blocking_codes") or [])
-            + "]"
-        )
+        if skip_cinematic:
+            log(
+                "final: skipping cinematic audit block ["
+                + ", ".join(cinematic.get("blocking_codes") or [])
+                + "] (--skip-cinematic / AIFILM_SKIP_CINEMATIC) → OFFICIAL_FINAL_PLATE honesty"
+            )
+            try:
+                from util import write_json, utc_now
+
+                write_json(
+                    root / "receipts" / "skip-cinematic.json",
+                    {
+                        "schema_version": 1,
+                        "kind": "skip_cinematic",
+                        "at": utc_now(),
+                        "blocking_codes": list(cinematic.get("blocking_codes") or []),
+                        "note": "plate path only; not master_lock",
+                    },
+                )
+            except Exception:  # noqa: BLE001
+                pass
+        else:
+            raise FilmError(
+                "Cannot render final: cinematic audit failed ["
+                + ", ".join(cinematic.get("blocking_codes") or [])
+                + "]. Escape: --skip-cinematic or AIFILM_SKIP_CINEMATIC=1 "
+                "(writes plate honesty; not master)."
+            )
 
     # Fail early before TTS if loop-risk VO would force boring stream_loop.
     # When receipts/tts-rehearsal.json present, measured_duration_sec preferred over estimate.
@@ -296,10 +323,40 @@ def cmd_final(args: argparse.Namespace) -> int:
         sum_inv = recompute_gates(root, man_inv)
         from shot_inventory import InventoryError, assert_inventory_for_final
 
-        assert_inventory_for_final(
-            sum_inv.get("shot_ids") or [],
-            sum_inv.get("approved_clips") or [],
-        )
+        shot_ids = list(sum_inv.get("shot_ids") or [])
+        approved_clips = list(sum_inv.get("approved_clips") or [])
+        # H3 native stage-2 / plate path: film-spec may fail cinematic framing
+        # validate (empty shot_ids) while timeline + candidate clips exist.
+        allow_cand = bool(getattr(args, "allow_candidate_clips", False)) or (
+            str(_os.environ.get("AIFILM_FINAL_ALLOW_CANDIDATE_CLIPS") or "").strip().lower()
+            in {"1", "true", "yes", "on"}
+        ) or skip_cinematic or skip_truth
+        if (not shot_ids or allow_cand) and (root / "timeline.json").is_file():
+            try:
+                from util import read_json as _rj
+
+                tl = _rj(root / "timeline.json") or {}
+                tl_ids = [
+                    str(s.get("id"))
+                    for s in (tl.get("shots") or [])
+                    if isinstance(s, dict) and s.get("id")
+                ]
+                if tl_ids:
+                    shot_ids = tl_ids
+            except Exception:  # noqa: BLE001
+                pass
+        if allow_cand:
+            clips = man_inv.get("clips") if isinstance(man_inv.get("clips"), dict) else {}
+            usable = []
+            for sid, rec in clips.items():
+                if not isinstance(rec, dict):
+                    continue
+                st = str(rec.get("status") or "").lower()
+                if st in {"approved", "candidate"} and rec.get("path"):
+                    usable.append(str(sid))
+            if usable:
+                approved_clips = usable
+        assert_inventory_for_final(shot_ids, approved_clips)
     except InventoryError as exc:
         raise FilmError(str(exc)) from exc
 
@@ -2110,6 +2167,22 @@ def add_post_parsers(sub: argparse._SubParsersAction[argparse.ArgumentParser]) -
         "--skip-heat-gate",
         action="store_true",
         help="Skip adult-max heat final_ok (S-grade) gate before final (not recommended)",
+    )
+    fin.add_argument(
+        "--skip-cinematic",
+        action="store_true",
+        help=(
+            "Skip cinematic audit hard block before final (H3 native stage-2 plate path). "
+            "Also AIFILM_SKIP_CINEMATIC=1. Marks plate honesty; not master_lock."
+        ),
+    )
+    fin.add_argument(
+        "--allow-candidate-clips",
+        action="store_true",
+        help=(
+            "Count candidate clips as inventory-complete for final plate path "
+            "(H3 native season). Also AIFILM_FINAL_ALLOW_CANDIDATE_CLIPS=1."
+        ),
     )
     fin.add_argument(
         "--preflight-strict",
