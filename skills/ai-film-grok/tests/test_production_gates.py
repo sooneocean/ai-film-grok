@@ -11,8 +11,12 @@ from hashlib import sha256
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
+
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
+
+pytestmark = pytest.mark.hotpath
 
 from dialogue_benchmark import WEAPONS  # noqa: E402
 from film_spec import RECOMMENDED_NAR_CHARS  # noqa: E402

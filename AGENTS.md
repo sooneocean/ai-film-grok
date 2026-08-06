@@ -6,13 +6,20 @@
 
 ## Source checkout（本机开发真相）
 
+> ⚠️ 本机存在**两个分叉的 git checkout**，禁止在两者之间手动拷贝文件。永远以当前
+> `git rev-parse --show-toplevel` 返回的仓库为唯一真相。
+
 ```text
-/Users/dex/.grok/plugins/ai-film-grok
+# 开发 / 提交 checkout（本会话工作树）
+/Users/dex/.grok/ai-film-grok          # git 根；push 走 origin(Gitea) + github(GitHub)
+# 插件加载 checkout（运行中插件实际读取处）
+/Users/dex/.grok/plugins/ai-film-grok  # ~/.grok/skills/ai-film-grok symlink → 此处 skills/
 ```
 
-- **只改这里**（plugin 源码）。
-- User skill 是 symlink：`~/.grok/skills/ai-film-grok` → `…/plugins/ai-film-grok/skills/ai-film-grok`
+- **只改当前 git 工作树**（即你 `cd` 进去的那个 checkout）。
+- User skill 是 symlink：`~/.grok/skills/ai-film-grok` → `plugins/ai-film-grok/skills/ai-film-grok`
 - 运行时副本：`~/.grok/installed-plugins/ai-film-grok-*`（用 `grok plugin update` 刷新，勿当源码改）
+- 两 checkout 共享历史但已分叉（plugins 含未提交 h3 工作）；同步请用 git，不要手动复制。
 
 ## 布局
 
@@ -77,8 +84,9 @@ make -C "$ROOT" check-all          # validate + ruff + doctor + pytest -m 'not s
 grok plugin update ai-film-grok
 
 # 10) commit（message 英文）
-# 11) push：pre-push 默认 light（docs+doctor core）；重测用 AIFILM_RELEASE_GATE=full
-git push origin main
+# 11) push 前先 fetch --all 防远端领先；CI 是唯一真实门禁（ruff/doctor/pytest/coverage + secret-scan）。
+#     本地 pre-push 钩子默认不触发（core.hooksPath 未设），不可当门禁依赖。
+git fetch --all && git push origin main
 ```
 
 JSON 约定：`util.read_json` 软（None）；`util.require_json` 硬（FilmError）；安全 nofollow 读 `util.read_json_source`；新代码勿再复制 `_read_json`。

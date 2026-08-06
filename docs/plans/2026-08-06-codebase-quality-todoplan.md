@@ -3,9 +3,9 @@
 > **作者角色**：Senior Developer（高级开发工程师）— 资深全栈 / 代码质量把控
 > **结论先行**：本仓库**功能与产线规则已成熟**（见既有 `2026-08-06-optimization-todoplan.md`，那是「产品/出片」迭代板）。本档是**互补的另一面**——聚焦**代码库工程质量、技术债、测试纪律与团队能力 uplift**。一句话：规则不缺，缺的是「把规则变成机器门禁 + 把质量把控变成团队习惯」。
 
-**Status（2026-08-06 round-2）:** Q0–Q2 底座 **SHIPPED** · residual volume **SHIPPED** (2.39.91) · edge `util.retry` sample **SHIPPED**  
+**Status（2026-08-06 round-2）:** Q0–Q2 底座 **SHIPPED** · residual volume **SHIPPED** (2.39.92) · edge `util.retry` sample **SHIPPED** · gate hotpath tags **SHIPPED** (2.39.91)  
 **仓库真相：** `/Users/dex/.grok/plugins/ai-film-grok`  
-**plugin：** 见 `plugin.json`（本轮 bump **2.39.91**）
+**plugin：** 见 `plugin.json`（本轮 bump **2.39.92**）
 
 ### 账实快照（勿按旧段落重做）
 
@@ -18,7 +18,7 @@
 | hotpath markers | **DONE**（≥6 test files；旧文「0 处」过时） |
 | `core.hooksPath=.githooks` | **DONE**（`make install-hooks`） |
 | `util.read_json_source` + semantic_index | **DONE** |
-| volume probe → `core.media_ops` | **DONE** 含 canary/quality_check/reference_audit（2.39.91） |
+| volume probe → `core.media_ops` | **DONE** 含 canary/quality_check/reference_audit（2.39.92） |
 | `util.retry` | **DONE** 工具 + **edge TTS 样板**；media_queue 等 OPEN |
 | heat↔policy sys.modules | **OPEN** bug-driven |
 | 虚荣 peel | **NON-GOAL** |
@@ -178,3 +178,16 @@ T0.1 门禁真相（最高优先，1 小时内可决）
 - 装机副本：`grok plugin update ai-film-grok`。
 - 非琐碎收尾：派 `verifier` 复核。
 - **所有 commit 英文**（AGENTS 硬规则）。
+
+---
+
+## 10. 双 checkout 分叉（2026-08-06 实测关键风险）
+
+本机实测存在**两个分享历史但已分叉**的 git 仓库，禁止手动互拷：
+
+- 开发/提交 checkout（本会话工作树）：`/Users/dex/.grok/ai-film-grok`（git 根；远端 origin=Gitea + github=GitHub）。
+- 插件加载 checkout（运行中插件实际读取处）：`/Users/dex/.grok/plugins/ai-film-grok`（HEAD `ce06076`；远端 gitea + gitea-aidev + origin=GitHub；含未提交 h3 工作）。
+
+两者共享 `5379ca9`（本 plan 首提）后分叉；`plugins/ai-film-grok` 还被并行 agent 推到了 github/main（`ce06076`）。本会话的 quality uplift 先落在 `ai-film-grok`，后被并行 commit `922caf5`（2.39.90，含 `scripts/secret_scan.py`、`parse_mean_volume_db`、`util/retry.py`、CONTRIBUTING/REVIEW_CHECKLIST、CI hotpath job）覆盖为 **superset**。
+
+**结论 / 行动项**：选定唯一 canonical 仓库（建议 `plugins/ai-film-grok`，契合 AGENTS 原意），统一远端与同步流程；将 `ai-film-grok` 的独有修正（AGENTS 路径纠错、3 个 gate 套件 hotpath 打标）以 follow-up commit（2.39.91）落到 canonical，解决 plugins 侧未提交 h3 工作后再 `grok plugin update`。
