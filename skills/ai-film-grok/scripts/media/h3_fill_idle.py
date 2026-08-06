@@ -1596,6 +1596,96 @@ def _env_i_own_the_gpu() -> bool:
     return raw in {"1", "true", "yes", "on"}
 
 
+# Multi-agent 5090 no-hog policy (2026-08-06 IRON, user: '不准再犯').
+# Pure decision — no GPU/network — so the rule is machine-checkable and
+# unit-testable independently of the Comfy `submission_capacity` API. This is
+# the explicit-first increment of the "H3 Fill-Idle 自动派单" / "5090 统一调度器"
+# P2 items: make the busy→zero-submit rule a tested invariant rather than an
+# implicit side-effect of capacity probing.
+def gpu_no_hog_decision(
+    *,
+    queue_busy: bool,
+    i_own_gpu: bool = False,
+    mode: str = "run_next",
+    execute: bool = True,
+) -> dict[str, Any]:
+    """Pure multi-agent 5090 no-hog dispatch decision.
+
+    Rules (2026-08-06 IRON):
+    - ``until_empty`` execute requires explicit ownership (``i_own_gpu``).
+    - busy queue (foreign/other agents' jobs running) => zero submit unless owned.
+    - free-first never cancels foreign (enforced at the capacity layer; this only
+      gates submission).
+    - dry-run (``execute=False``) never holds — probing is always allowed.
+
+    Returns ``{"decision": "proceed" | "hold" | "refused", "reason_code": str, ...}``.
+    """
+    owned = bool(i_own_gpu)
+    mode = str(mode or "run_next")
+    if not execute:
+        return {
+            "decision": "proceed",
+            "reason_code": "dry_run_allowed",
+            "owned": owned,
+            "queue_busy": bool(queue_busy),
+            "mode": mode,
+        }
+    if mode == "until_empty" and not owned:
+        return {
+            "decision": "refused",
+            "reason_code": "until_empty_requires_ownership",
+            "owned": owned,
+            "queue_busy": bool(queue_busy),
+            "mode": mode,
+        }
+    if bool(queue_busy) and not owned:
+        return {
+            "decision": "hold",
+            "reason_code": "no_hog_busy_hold",
+            "owned": owned,
+            "queue_busy": bool(queue_busy),
+            "mode": mode,
+        }
+    return {
+        "decision": "proceed",
+        "reason_code": "no_hog_ok",
+        "owned": owned,
+        "queue_busy": bool(queue_busy),
+        "mode": mode,
+    }
+
+
+def gpu_no_hog_report(
+    *,
+    queue_busy: bool,
+    i_own_gpu: bool = False,
+    mode: str = "run_next",
+    execute: bool = True,
+) -> dict[str, Any]:
+    """Wrap :func:`gpu_no_hog_decision` into a gate-style report dict.
+
+    ``holds`` is advisory — the live scheduler still decides whether to submit —
+    but the policy is now machine-checkable and unit-tested.
+    """
+    dec = gpu_no_hog_decision(
+        queue_busy=bool(queue_busy),
+        i_own_gpu=bool(i_own_gpu),
+        mode=mode,
+        execute=bool(execute),
+    )
+    return {
+        "schema_version": 1,
+        "kind": "ai-film-gpu-no-hog",
+        "decision": dec["decision"],
+        "holds": dec["decision"] in {"hold", "refused"},
+        "reason_code": dec["reason_code"],
+        "owned": dec["owned"],
+        "queue_busy": dec["queue_busy"],
+        "mode": dec["mode"],
+        "execute": bool(execute),
+    }
+
+
 def fill_idle_cycle(
     root: Path | str,
     *,
@@ -2102,6 +2192,22 @@ def run_next_fill_idle(
         "free_memory_on_mode_switch": bool(free_memory_on_mode_switch),
     }
     prev_mode: str | None = None
+
+    # Multi-agent 5090 no-hog guard (2026-08-06 IRON, user: '不准再犯'):
+    # a busy queue holding foreign/other agents' jobs must not be submitted to.
+    # The capacity probe can report status=="ready" while still carrying the
+    # COMFY_QUEUE_BUSY blocker — this explicit check closes that gap. Dry-run is
+    # always allowed; GPU ownership (AIFILM_I_OWN_THE_GPU) overrides the hold.
+    if execute:
+        _cap = probe_comfy_capacity_soft()
+        _busy = _QUEUE_BUSY_CODE in _capacity_blocker_codes(_cap)
+        if _busy and not _env_i_own_the_gpu():
+            last_out["skipped_reason"] = "no_hog_busy_hold"
+            last_out["ok"] = True
+            last_out["no_hog"] = gpu_no_hog_report(
+                queue_busy=True, i_own_gpu=False, mode="run_next", execute=True
+            )
+            return last_out
 
     for job_i in range(max_jobs):
         nxt_rep = next_fill_idle_job(base, include_challenge=include_challenge, check_capacity=True)

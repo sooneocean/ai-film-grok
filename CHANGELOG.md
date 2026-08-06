@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.40.14] - 2026-08-06
+
+### Added (quality P2 · H3 Fill-Idle / 5090 统一调度器 · no-hog 程序化校验)
+- **Multi-agent 5090 no-hog policy as a tested invariant** (`media/h3_fill_idle.py::gpu_no_hog_decision` + `gpu_no_hog_report`): the "busy queue ⇒ zero submit unless this session owns the GPU" rule (2026-08-06 IRON, user: '不准再犯') is now a **pure, GPU-free decision function** instead of an implicit side-effect of capacity probing. Encodes: `until_empty` execute requires explicit ownership; busy+not-owned ⇒ hold; dry-run always allowed; ownership (`AIFILM_I_OWN_THE_GPU`) overrides the hold.
+- **Explicit guard wired into `run_next_fill_idle`**: before any job submission it reads the Comfy capacity probe's `COMFY_QUEUE_BUSY` blocker directly. This closes a real gap — `submission_capacity` can report `status=="ready"` while still carrying the busy blocker, which the existing `capacity_ready` check could miss. Busy+not-owned ⇒ early return `skipped_reason="no_hog_busy_hold"` (behavior-preserving hold, clearer audit reason).
+- Tests: `tests/test_gpu_no_hog.py` (13 cases — dry-run / idle / busy-hold / owned-override / until_empty-ownership / report-wrap / env-override + wired-guard integration with mocked probe+planner).
+
 ## [2.40.13] - 2026-08-06
 
 ### Added (quality P2 · visual_bible 自动生成 / style-bible consistency)

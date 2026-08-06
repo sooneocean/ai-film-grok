@@ -32,9 +32,10 @@ P0 五个自动硬门已全部实现并接入门禁/流水线，相关测试全�
 | HF 转场受控策略（spec 级校验） | ✅ **本会话** | v2.40.11 `transition_policy_report` + `assert_transition_policy` + preflight 接入（`test_transition_policy.py` 16 用例） |
 | **HF 转场 export read-back 全量** | ✅ **本会话** | v2.40.12 `transition_export_readback_report` + `assert_transition_export_readback` + preflight 接入（`test_transition_export_readback.py` 19 用例）；校验 built transition_ops 全量覆盖 + 意图/风格/策略一致（continue→hard_cut/0.0s/no-overlay；soft→xfade+声明风格；chapter→soft fade/dissolve；scene cut→禁 whip/grid） |
 | **visual_bible 自动生成（第一增量）** | ✅ **本会话** | v2.40.13 `derive_style_bible_from_spec` + `assert_style_bible_consistency` + preflight 接入（`test_style_bible_consistency.py` 12 用例）；spec 驱动派生 lighting_timeline（heat_phase）+ cast_masters，consistency 门校验缺失/hero 缺失/光照数不一致 —— 视觉语法自洽第一增量，像素 palette 抽取待补 | 
-| 介质路由 / H3 Fill-Idle / sung | ⬜ P2 | 未做（sung 受 HeartMuLa 外部依赖阻塞；介质路由/H3 Fill-Idle 待更多调研） |
+| **5090 no-hog 程序化校验（第一增量）** | ✅ **本会话** | v2.40.14 `gpu_no_hog_decision` + `gpu_no_hog_report` + `run_next_fill_idle` 显式守卫（`test_gpu_no_hog.py` 13 用例）；把"busy→零 submit 除非本会话独占 GPU"固化成纯函数+单测，补 submission_capacity 报 ready 却带 `COMFY_QUEUE_BUSY` 的漏判 —— 5090 统一调度器 / H3 Fill-Idle 第一增量 | 
+| 介质路由 / H3 Fill-Idle 自动派单 / sung | ⬜ P2 | 未做（sung 受 HeartMuLa 外部依赖阻塞；介质路由 / H3 Fill-Idle 完整派单待更多调研） |
 
-> 剩余真正开放的高 ROI P1/P2：首帧毒化·静帧压缩晋升 style_lock 默认硬锁、5090 统一调度器、HF 转场全量、visual_bible 自动、介质自动路由、H3 Fill-Idle 自动派单、sung 自动生成、长片 SOP 固化。
+> 剩余真正开放的高 ROI P1/P2：首帧毒化·静帧压缩晋升 style_lock 默认硬锁、介质自动路由、H3 Fill-Idle 自动派单（完整）、sung 自动生成（HeartMuLa⛔）、长片 SOP 固化。
 
 ---
 
