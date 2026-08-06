@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.39.81] - 2026-08-06
+
+### Added (effect board Q4.1 + Q5.1)
+- **Q4.1** `plan/duration_target.py`: planned sum vs `target_duration` honesty; soft >12% / hard >20% shortfall; H3 ~5.2s shot-count advice; receipt `receipts/duration-target.json`; wired into `bulk-preflight` (hard gap blocks bulk). Escape `AIFILM_SKIP_DURATION_TARGET=1`.
+- **Q5.1** `aifilm h3 ship-native`: timeline-order concat keep clip aac; delivery `OFFICIAL_FINAL_PLATE` (not master); dry-run + duration sub-report; `receipts/h3-ship-native.json`.
+- Tests: `tests/test_duration_target_ship_native.py` (savani 41×5.17 vs 300s hard; ship dry).
+
 ## [2.39.80] - 2026-08-06
 
 ### Added / Fixed (C1 drain launch · D2 · E peel)

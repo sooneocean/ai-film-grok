@@ -16,11 +16,13 @@
 
 ## 插件优化（已做 / 待做）
 - **已做**：`aifilm final --skip-canonical-truth` 与 env `AIFILM_SKIP_CANONICAL_TRUTH=1`（H3 原声 bulk 逃生；非锁定 canonical 系列默认关）。
+- **已做（2.39.81）**：
+  - `aifilm h3 ship-native`：timeline 序 concat 保 aac → `OFFICIAL_FINAL_PLATE`（可选 BGM/字幕仍走 final）
+  - 时长门：`plan/duration_target` + bulk-preflight；`receipts/duration-target.json`
 - **待做**：
-  - `aifilm h3 ship-native`：timeline 序 concat + 可选 softsub/BGM 混音收据
-  - 时长门：`target_duration` vs `sum(clip_dur)` 预检；不足则建议加镜或 FLF 加长
   - still：Imagine 审核失败 → 明确 fallback 收据 + 禁止「整集仅 crop master」不告警
   - 原声抽听：随机 N 镜 `volumedetect` + 可选 ASR 是否含中文
+  - ship-native 叠 hardburn/rnb 侧链（当前仅 concat plate）
 
 ## 默认口诀
 - **H3 原声季**：clip 保留 aac → final 可 `--skip-canonical-truth` 或 ship-native；再叠字幕/BGM。

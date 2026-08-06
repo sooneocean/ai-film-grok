@@ -290,6 +290,39 @@ def add_h3_parsers(sub: argparse._SubParsersAction[argparse.ArgumentParser]) -> 
     combo.add_argument("--seed", type=int, default=20260805)
     combo.add_argument("--receipt", type=Path, default=None)
 
+    ship = actions.add_parser(
+        "ship-native",
+        help=(
+            "H3 native-audio season plate: timeline-order concat keep aac; "
+            "OFFICIAL_FINAL_PLATE (not master_lock)"
+        ),
+    )
+    ship.add_argument("--root", type=Path, required=True)
+    ship.add_argument(
+        "--out",
+        type=Path,
+        default=None,
+        help="Output mp4 (default out/film_native_h3.mp4)",
+    )
+    ship.add_argument(
+        "--allow-candidate",
+        action="store_true",
+        help="Allow candidate clips (default approved only)",
+    )
+    ship.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Plan + duration honesty only; no ffmpeg",
+    )
+    ship.add_argument(
+        "--sample-audio",
+        type=int,
+        default=3,
+        dest="sample_audio",
+        help="How many head clips to note has_audio_stream (default 3)",
+    )
+    ship.add_argument("--receipt", type=Path, default=None)
+
 
 def run_h3(args: argparse.Namespace) -> dict[str, Any]:
     action = str(args.h3_action)
@@ -420,6 +453,19 @@ def run_h3(args: argparse.Namespace) -> dict[str, Any]:
                 last_override=getattr(args, "last_frame", None),
                 refs_override=getattr(args, "refs", None),
             )
+        elif action == "ship-native":
+            from h3_ship_native import H3ShipNativeError, ship_native
+
+            try:
+                report = ship_native(
+                    args.root,
+                    out_path=getattr(args, "out", None),
+                    allow_candidate=bool(getattr(args, "allow_candidate", False)),
+                    dry_run=bool(getattr(args, "dry_run", False)),
+                    sample_audio=int(getattr(args, "sample_audio", 3) or 3),
+                )
+            except H3ShipNativeError as exc:
+                raise H3WorkflowError(str(exc)) from exc
         else:
             raise H3WorkflowError(f"unknown h3 action: {action}")
     except H3WorkflowError as exc:

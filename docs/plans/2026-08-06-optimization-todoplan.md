@@ -2,9 +2,10 @@
 
 **结论先行：** 产线「规则硬 + 包边界拆完」阶段已过；下一轮不该再开绿地 IRON / 虚荣 LOC 冲刺，而应 **(1) 锁死 08-06 正牌 final 实坑 (2) 运维把 5090 until-empty 烧穿 (3) 按出片风险做叶拆与热路径诚实**。
 
-**Status:** ACTIVE · **A–E code SHIPPED** (2.39.80) · **C1 drain RUNNING** (capacity-wait; not yet queue_empty)  
-**Repo:** `/Users/dex/.grok/plugins/ai-film-grok` · plugin **2.39.80**  
-**依据：** memory 08-06 · strategy/AF/opt residual · residual-monolith · 本机探针（LOC / closeout / film_spec auto-extend）
+**Status:** ACTIVE · **A–E code SHIPPED** · **Effect Q4.1+Q5.1 SHIPPED** (2.39.81) · **C1 drain** still OPEN_OPS  
+**Repo:** `/Users/dex/.grok/plugins/ai-film-grok` · plugin **2.39.81**  
+**效果向合并板（会话）：** 记忆教训 → Q0–Q9（上游 still / H3 语法 / 选片 / 时长 / ship-native / final 诚实 / GPU）  
+**依据：** memory 08-06 · savani H3 native · suse final · inventory C
 
 ---
 

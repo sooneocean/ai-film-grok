@@ -271,6 +271,10 @@ def _bulk_next_cmd_for_failure(
         "variety": (
             f'aifilm variety-precheck --root "{r}"  # fix ADJACENT_MOTION / poses before {motion}'
         ),
+        "duration_target": (
+            f'cat "{r}/receipts/duration-target.json"  '
+            f"# planned sum ≪ target: add shots or FLF (~5.2s H3) / lower target_duration"
+        ),
     }
     return cmd_map.get(failed_id, f'aifilm bulk-preflight --root "{r}"')
 
@@ -458,6 +462,40 @@ def bulk_preflight(
         except Exception as exc:  # noqa: BLE001
             add("variety", False, error=str(exc)[:240])
 
+    # Q4.1 duration target honesty (planned sum vs target; H3 ~5.2s advice)
+    # Soft by default; hard only when DURATION_*_HARD or duration_target_strict.
+    skip_dur = os.environ.get("AIFILM_SKIP_DURATION_TARGET", "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+    if skip_dur:
+        add("duration_target", True, skipped=True, escape="AIFILM_SKIP_DURATION_TARGET=1")
+    else:
+        try:
+            from plan.duration_target import (
+                check_duration_target,
+                write_duration_target_receipt,
+            )
+
+            dur_rep = check_duration_target(spec)
+            write_duration_target_receipt(root, dur_rep)
+            # Soft shortfalls do not block bulk; hard (gap>20%) does.
+            add(
+                "duration_target",
+                bool(dur_rep.get("ok")),
+                severity=dur_rep.get("severity"),
+                codes=dur_rep.get("codes"),
+                planned_sum_sec=dur_rep.get("planned_sum_sec"),
+                target_duration_sec=dur_rep.get("target_duration_sec"),
+                suggested_min_shots_h3=dur_rep.get("suggested_min_shots_h3"),
+                message=dur_rep.get("message"),
+                next=dur_rep.get("next"),
+            )
+        except Exception as exc:  # noqa: BLE001
+            add("duration_target", True, skipped=True, error=str(exc)[:120])
+
     failed = [c for c in checks if not c.get("ok")]
     ok = not failed
     next_cmd = None
@@ -485,6 +523,11 @@ def bulk_preflight(
                 c["weapon_hint"] = f"edit={edit}; ban I2V on poison ({motion})"
             elif cid in {"tunnel", "gpu_lease", "local_comfy_client", "variety"}:
                 c["weapon_hint"] = f"motion={motion}"
+            elif cid == "duration_target":
+                c["weapon_hint"] = (
+                    "add shots / FLF longer / lower target_duration "
+                    f"(H3 ~5.2s · see receipts/duration-target.json)"
+                )
             elif cid == "pilot":
                 c["weapon_hint"] = f"no bulk until pilot GO · motion primary {motion}"
         next_why = (
