@@ -198,12 +198,29 @@ def wait_frw_rate_limit(
     slept = 0.0
     log_fn = log or (lambda msg: print(msg, flush=True))
     try:
-        deadline = time.time() + 120.0
-        while lock_fd is None and time.time() < deadline:
+        class _LockBusy(RuntimeError):
+            """Internal: rate-state lock held — util.retry only."""
+
+        def _try_open_lock() -> int:
             try:
-                lock_fd = os.open(str(lock_path), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
-            except FileExistsError:
-                sleep_fn(0.05)
+                return os.open(str(lock_path), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+            except FileExistsError as exc:
+                raise _LockBusy("frw rate lock busy") from exc
+
+        from util.retry import retry_call
+
+        # 120s / 0.05s ≈ 2400 attempts at constant delay (backoff=1).
+        try:
+            lock_fd = retry_call(
+                _try_open_lock,
+                attempts=2400,
+                delay_sec=0.05,
+                backoff=1.0,
+                retry_on=(_LockBusy,),
+                sleep=sleep_fn,
+            )
+        except _LockBusy:
+            lock_fd = None
         t0 = time.time() if now is None else float(now)
         state = _load_rate_state(path)
         last = float(state.get(kind) or 0.0)

@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.39.94] - 2026-08-06
+
+### Added / Refactored (quality round 4)
+- **Shim policy**: `docs/SHIM_POLICY.md` (linked from CONTRIBUTING); tests cover `edit_policy_shared` thin shim + cycle-free heat import.
+- **frw_rate_limit** exclusive lock wait → `util.retry.retry_call` (constant 50ms backoff, 120s budget).
+
 ## [2.39.93] - 2026-08-06
 
 ### Fixed / Refactored (quality round 3)

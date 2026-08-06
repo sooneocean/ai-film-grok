@@ -1474,7 +1474,7 @@
     },
     {
       "path": "scripts/media/frw_rate_limit.py",
-      "sha256": "4ac17ee25e5eb1ab14035477ecd9b67ac404d637482285882f00645215e6c307"
+      "sha256": "cca70b9c517551c514b7902253c9121c4296ec4fc0e1e76241a7ceb813349e32"
     },
     {
       "path": "scripts/media/frw_upload.py",

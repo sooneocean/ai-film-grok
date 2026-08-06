@@ -3,9 +3,9 @@
 > **作者角色**：Senior Developer（高级开发工程师）— 资深全栈 / 代码质量把控
 > **结论先行**：本仓库**功能与产线规则已成熟**（见既有 `2026-08-06-optimization-todoplan.md`，那是「产品/出片」迭代板）。本档是**互补的另一面**——聚焦**代码库工程质量、技术债、测试纪律与团队能力 uplift**。一句话：规则不缺，缺的是「把规则变成机器门禁 + 把质量把控变成团队习惯」。
 
-**Status（2026-08-06 round-3）:** Q0–Q2 **SHIPPED** · volume residual **SHIPPED** · heat↔policy cycle hack **SHIPPED** (2.39.93) · util.retry samples (edge+comfy) **SHIPPED**  
+**Status（2026-08-06 round-4）:** Q0–Q3 **SHIPPED** · SHIM_POLICY **SHIPPED** (2.39.94) · util.retry samples edge+comfy+frw_rate · media_queue OPEN  
 **仓库真相：** `/Users/dex/.grok/plugins/ai-film-grok`  
-**plugin：** 见 `plugin.json`（本轮 bump **2.39.93**）
+**plugin：** 见 `plugin.json`（本轮 bump **2.39.94**）
 
 ### 账实快照（勿按旧段落重做）
 
@@ -20,8 +20,9 @@
 | 本地 `check-all` 镜像 CI（secret-scan + hotpath） | **DONE**（`scripts/check-all.sh` 2.39.92：本地绿线 ≡ CI = validate+ruff+doctor+pytest not-slow+secret-scan+hotpath） |
 | `util.read_json_source` + semantic_index | **DONE** |
 | volume probe → `core.media_ops` | **DONE** 含 canary/quality_check/reference_audit（2.39.92） |
-| `util.retry` | **DONE** 工具 + edge TTS + comfy_recovery 样板；media_queue OPEN |
+| `util.retry` | **DONE** edge TTS + comfy_recovery + frw_rate lock；media_queue OPEN |
 | heat↔policy sys.modules | **DONE** → `edit_policy_shared` leaf (2.39.93) |
+| shim 政策文档 | **DONE** `docs/SHIM_POLICY.md` (2.39.94) |
 | 虚荣 peel | **NON-GOAL** |
 
 ---
