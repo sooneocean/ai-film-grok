@@ -21,6 +21,7 @@ from production_gates import (
     load_pilot_approval,
     loop_risk_shots_from_spec,
     pilot_is_user_approved,
+    transition_policy_report,
 )
 from util import read_json, utc_now
 
@@ -912,6 +913,41 @@ def run_preflight(root: Path) -> dict[str, Any]:
                     "headroom_probe_error",
                     f"headroom probe failed: {exc}"[:200],
                     fix="check production_gates.headroom_report",
+                )
+            )
+
+        # --- Controlled transition policy (P2 · HF 转场受控策略全量) ---
+        # continue 接戏缝必须 hard match-cut；场景硬切禁 whip/grid；段落转场限
+        # fade/dissolve。Soft advisory by default; hard on transition_policy_strict
+        # or adult max heat. 把"编辑语法"固化成默认门，提前暴露转场意图漂移。
+        try:
+            tp = transition_policy_report(spec)
+            tp_codes = list(tp.get("codes") or [])
+            if tp_codes:
+                tp_strict = spec.get("transition_policy_strict") is True or str(
+                    spec.get("heat_scale") or ""
+                ).lower() in {"max", "hot", "extreme"}
+                tp_issue = _issue(
+                    "hard" if tp_strict else "soft",
+                    "transition_policy",
+                    f"transition-policy {'hard' if tp_strict else 'soft'}: {tp_codes} — "
+                    f"{(tp.get('issues') or [{}])[0].get('message', '')[:120]}",
+                    fix=(
+                        "continue 接戏缝→hard match-cut；场景硬切→禁 whip/grid；"
+                        "段落转场→soft fade/dissolve。lessons/hf-transition-policy"
+                    ),
+                )
+                if tp_strict:
+                    hard.append(tp_issue)
+                else:
+                    soft.append(tp_issue)
+        except Exception as exc:
+            soft.append(
+                _issue(
+                    "soft",
+                    "transition_policy_probe_error",
+                    f"transition-policy probe failed: {exc}"[:200],
+                    fix="check production_gates.transition_policy_report",
                 )
             )
 

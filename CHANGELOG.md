@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.40.11] - 2026-08-06
+
+### Added (quality P2 · controlled transition-policy gate / HF 转场受控策略全量)
+- **Transition-policy gate** (`gates/production_gates.py::assert_transition_policy` + `transition_policy_report`): programmatic enforcement of the controlled transition grammar from `references/hf-transition-policy.md` — continue 接戏缝 must be hard match-cut (no xfade/dissolve); scene hard cuts must not use flashy styles (whip/grid); chapter/段落转场 restricted to soft fade/dissolve. Fills the gap left by `enforce_continue_hard_joins` (which silently auto-fixes continue seams) by *reporting* intent drift early; also covers scene-cut flashy-style and paragraph-transition rules nobody previously validated.
+- intro/outro / pure-MG roles relax to allow-all (HF catalog open).
+- Wired into `preflight` as soft advisory; hard under `transition_policy_strict` or adult `heat_scale` max/hot/extreme (incremental rollout like P0/P1 gates).
+- Emergency escape: `AIFILM_SKIP_TRANSITION_POLICY_GATE=1`.
+- Tests: `tests/test_transition_policy.py` (16 cases — continue-not-hard / paragraph-bad / scene-flashy / intro-relax / strict-raise / env-escape / root-spec).
+
 ## [2.40.10] - 2026-08-06
 
 ### Added (quality P1 · headroom / anti-crop timeline gate)

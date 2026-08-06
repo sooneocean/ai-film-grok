@@ -29,7 +29,8 @@ P0 五个自动硬门已全部实现并接入门禁/流水线，相关测试全�
 | 首帧毒化/静帧压缩 → style_lock 默认 | 🟡 部分（NEG token 在，未强制门） | 待补 |
 | 5090 统一调度器 | 🟡 部分（h3_fill_idle free_first） | 待补/进行中 |
 | lipsync 自动晋级 | ⛔ v2.40.0 已冻结，跳过 | — |
-| HF 转场全量 / visual_bible / 介质路由 / H3 Fill-Idle / sung | ⬜ P2 | 未做 |
+| HF 转场受控策略（spec 级校验） | ✅ **本会话** | v2.40.11 `transition_policy_report` + `assert_transition_policy` + preflight 接入（`test_transition_policy.py` 16 用例）；export read-back 全量仍待补 |
+| visual_bible / 介质路由 / H3 Fill-Idle / sung | ⬜ P2 | 未做 |
 
 > 剩余真正开放的高 ROI P1/P2：首帧毒化·静帧压缩晋升 style_lock 默认硬锁、5090 统一调度器、HF 转场全量、visual_bible 自动、介质自动路由、H3 Fill-Idle 自动派单、sung 自动生成、长片 SOP 固化。
 

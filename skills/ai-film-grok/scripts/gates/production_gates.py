@@ -1320,6 +1320,208 @@ def assert_headroom_protected(
     )
 
 
+# --- Controlled transition-policy gate (P2 · HF 转场受控策略全量) ---
+# references/hf-transition-policy.md: continue 接戏缝永远 hard match-cut；场景硬切
+# 禁 whip/grid 等花哨转场；段落转场限 fade/dissolve。把"编辑语法"固化成可程序化
+# 校验的默认门：spec 作者写错转场意图/风格时提前报错，而非渲染时才被
+# enforce_continue_hard_joins 静默改掉（掩盖意图漂移）。
+# Soft advisory by default; hard under transition_policy_strict or adult max heat.
+_TRANSITION_POLICY_CONTINUE = frozenset(
+    {"continue", "match", "match_cut", "match-cut", "byte"}
+)
+# Scene hard-cut 太花哨的转场（references/hf-transition-policy.md：whip 太快 / grid 太花）
+_FLASHY_SCENE_STYLES = frozenset({"whip", "grid"})
+# 段落/章间转场允许的 xfade 风格（fade 家族 + dissolve）
+_PARAGRAPH_STYLES = frozenset({"fade", "fadeblack", "fadewhite", "dissolve", None})
+# intro/outro / 纯 MG 段：放开 HF 转场全目录
+_RELAX_ROLES = frozenset({"intro", "outro", "title", "credit", "mg"})
+
+
+def _shot_chain_mode(shot: dict[str, Any]) -> str:
+    if not isinstance(shot, dict):
+        return ""
+    dsl = shot.get("dsl") if isinstance(shot.get("dsl"), dict) else {}
+    return str(
+        shot.get("chain_mode") or dsl.get("chain_mode") or shot.get("join") or ""
+    ).strip().lower()
+
+
+def transition_policy_report(spec: dict[str, Any]) -> dict[str, Any]:
+    """Validate the controlled transition policy on transition_intents/transition_styles.
+
+    Returns {"ok", "checked", "codes", "issues"}. Does not raise; callers decide
+    whether to block (assert_transition_policy flips to hard under
+    transition_policy_strict / adult max heat).
+
+    Seam type per join i (between shot i and shot i+1), using the *incoming* shot:
+      - chain_mode in continue-set        -> "continue"  (hard match-cut only)
+      - dramatic_function == chapter_transition -> "paragraph" (soft fade/dissolve)
+      - scene_id change                   -> "scene_cut" (no whip/grid)
+      - else                              -> "default"   (treated like scene_cut)
+    intro/outro and pure-MG roles relax to allow-all (HF catalog open).
+    """
+    if not isinstance(spec, dict):
+        return {"ok": True, "checked": False, "codes": [], "issues": []}
+    intents = spec.get("transition_intents")
+    if not isinstance(intents, list) or not intents:
+        return {"ok": True, "checked": False, "codes": [], "issues": []}
+
+    shots = _flatten_shots(spec)
+    n = len(shots)
+    n_joins = n - 1
+    if n_joins <= 0:
+        return {"ok": True, "checked": False, "codes": [], "issues": []}
+
+    # shot -> scene id mapping (scene change ⇒ cross_scene)
+    shot_to_scene: dict[str, str] = {}
+    scenes = spec.get("scenes") or []
+    if isinstance(scenes, list):
+        for sci, sc in enumerate(scenes):
+            if not isinstance(sc, dict):
+                continue
+            sid = str(sc.get("id") or f"scene{sci}")
+            for sh in sc.get("shots") or []:
+                if isinstance(sh, dict) and sh.get("id"):
+                    shot_to_scene[str(sh.get("id"))] = sid
+    styles = spec.get("transition_styles")
+    if not isinstance(styles, list):
+        styles = [None] * n_joins
+
+    issues: list[dict[str, Any]] = []
+    for i in range(n_joins):
+        intent = str(intents[i] if i < len(intents) else "").strip().lower()
+        style = styles[i] if i < len(styles) else None
+        style = str(style).strip().lower() if style else None
+        incoming = shots[i + 1] if i + 1 < n else {}
+        chain = _shot_chain_mode(incoming)
+        df = str((incoming or {}).get("dramatic_function") or "").strip().lower()
+        role = str(
+            (incoming or {}).get("role") or (incoming or {}).get("kind") or ""
+        ).strip().lower()
+
+        # intro/outro / pure-MG → allow all (HF catalog open)
+        if role in _RELAX_ROLES:
+            continue
+
+        if chain in _TRANSITION_POLICY_CONTINUE:
+            if intent != "hard":
+                issues.append(
+                    {
+                        "code": "HF_TRANSITION_CONTINUE_NOT_HARD",
+                        "join_index": i,
+                        "intent": intent or None,
+                        "message": (
+                            f"join {i}: chain_mode={chain!r} (continue seam) but "
+                            f"transition_intent={intent!r} — must be hard match-cut "
+                            f"(forbid xfade/dissolve on continue 接戏缝)"
+                        ),
+                    }
+                )
+            continue
+        if df == "chapter_transition":
+            if intent != "soft" or (style is not None and style not in _PARAGRAPH_STYLES):
+                issues.append(
+                    {
+                        "code": "HF_TRANSITION_PARAGRAPH_BAD",
+                        "join_index": i,
+                        "intent": intent or None,
+                        "style": style,
+                        "message": (
+                            f"join {i}: chapter/段落转场 but intent={intent!r} "
+                            f"style={style!r} — must be soft with fade/dissolve"
+                        ),
+                    }
+                )
+            continue
+        # scene_cut / default
+        if intent in {"hard", "soft", "hold"}:
+            if style in _FLASHY_SCENE_STYLES:
+                issues.append(
+                    {
+                        "code": "HF_TRANSITION_SCENE_FLASHY_STYLE",
+                        "join_index": i,
+                        "intent": intent,
+                        "style": style,
+                        "message": (
+                            f"join {i}: scene cut transition intent={intent!r} "
+                            f"style={style!r} — whip/grid too busy for narrative scene cut"
+                        ),
+                    }
+                )
+        elif style in _FLASHY_SCENE_STYLES:
+            issues.append(
+                {
+                    "code": "HF_TRANSITION_SCENE_FLASHY_STYLE",
+                    "join_index": i,
+                    "intent": intent or None,
+                    "style": style,
+                    "message": (
+                        f"join {i}: scene cut uses flashy transition style={style!r} "
+                        f"(whip/grid too busy for narrative scene cut)"
+                    ),
+                }
+            )
+
+    return {
+        "ok": len(issues) == 0,
+        "checked": True,
+        "codes": sorted({i["code"] for i in issues}),
+        "issues": issues,
+    }
+
+
+def assert_transition_policy(
+    root: Path | None = None,
+    *,
+    spec: dict[str, Any] | None = None,
+    force: bool = False,
+    env_skip: bool = True,
+) -> dict[str, Any]:
+    """P2 controlled transition-policy hard gate (HF 转场受控策略全量).
+
+    HARD when film-spec ``transition_policy_strict`` is True, or adult ``heat_scale``
+    is max/hot/extreme. Otherwise surfaces as a soft advisory (incremental rollout).
+
+    Emergency escapes: ``force=True`` or ``AIFILM_SKIP_TRANSITION_POLICY_GATE=1``.
+    """
+    if force:
+        return {"skipped": True, "reason": "force"}
+    if env_skip and os.environ.get("AIFILM_SKIP_TRANSITION_POLICY_GATE", "").strip() in {
+        "1",
+        "true",
+        "yes",
+    }:
+        return {"skipped": True, "reason": "env"}
+    data = spec
+    if data is None and root is not None:
+        path = Path(root).expanduser().resolve() / "film-spec.json"
+        data = read_json(path) or {}
+    if not isinstance(data, dict) or not data:
+        return {"ok": True, "checked": False, "reason": "no_spec"}
+
+    strict = bool(data.get("transition_policy_strict") is True) or str(
+        data.get("heat_scale") or ""
+    ).lower() in {"max", "hot", "extreme"}
+    report = transition_policy_report(data)
+    if not report["codes"]:
+        return {"ok": True, "checked": report.get("checked", False), "codes": []}
+    if not strict:
+        return {
+            "ok": True,
+            "checked": True,
+            "soft": True,
+            "codes": report["codes"],
+            "issues": report["issues"],
+        }
+    message = "; ".join(f"[{i['code']}] {i['message']}" for i in report["issues"][:6])
+    raise ProductionGateError(
+        f"transition-policy gate (strict): {message} "
+        "Fix: continue seams → hard match-cut; scene cuts → no whip/grid; "
+        "chapter transitions → soft fade/dissolve. "
+        "Emergency: --skip-transition-policy or AIFILM_SKIP_TRANSITION_POLICY_GATE=1"
+    )
+
+
 # --- Face-identity post_audit gate (P0 · face-identity-pixel) ---
 # A post_audit that ran and found keyframe pixel drift means an approved clip would
 # carry a face-identity break; register-clip / final must reject until re-audited.
