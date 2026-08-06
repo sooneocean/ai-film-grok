@@ -33,7 +33,9 @@ sys.path.insert(0, str(SCRIPTS))
 pytestmark = pytest.mark.hotpath
 
 import final_stages  # noqa: E402
+from final.delivery_class import plate_blocks_final_complete  # noqa: E402
 from compose_render import ComposeRenderError, assert_underlay_not_double_burn  # noqa: E402
+from h3_fill_idle import fill_idle_until_empty, run_next_fill_idle  # noqa: E402
 from longform import estimate_plate_timeout  # noqa: E402
 from mix_partial import write_final_mix_partial_receipt  # noqa: E402
 from post_doctor import run_post_doctor  # noqa: E402
@@ -376,6 +378,108 @@ class PlateTimeoutFloorHotpathTests(unittest.TestCase):
                 estimate_plate_timeout(root, duration_sec=500, shot_count=20),
                 1800,
             )
+
+
+class QueueHonestyHotpathTests(unittest.TestCase):
+    def test_run_next_capacity_skip_has_machine_reason(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            write_json(
+                root / "film-spec.json",
+                {
+                    "title": "hotpath-queue",
+                    "h3": {"enabled": True},
+                    "genre": "adult",
+                    "heat_scale": "max",
+                    "director_intent": {"protagonist_want": "x"},
+                    "scenes": [
+                        {
+                            "shots": [
+                                {
+                                    "id": "hero1",
+                                    "shot_role": "hero",
+                                    "heat_phase": "act",
+                                    "wardrobe_state": "bare",
+                                    "dramatic_function": "action",
+                                }
+                            ]
+                        }
+                    ],
+                },
+            )
+            with mock.patch(
+                "h3_fill_idle.next_fill_idle_job",
+                return_value={
+                    "ok": True,
+                    "next": {
+                        "shot_id": "hero1",
+                        "mode": "i2v",
+                        "priority": "P0a",
+                        "lane": "primary_h3",
+                        "command": (
+                            "aifilm h3 run --root \"X\" --shot-id hero1 --mode i2v --register"
+                        ),
+                    },
+                    "capacity_ready": False,
+                },
+            ):
+                rep = run_next_fill_idle(root, execute=True, max_jobs=1)
+            self.assertEqual(rep.get("skipped_reason"), "capacity_not_ready")
+            self.assertEqual(rep.get("halt_reason_code"), "RUN_NOT_EXECUTED_CAPACITY")
+            self.assertEqual(rep.get("halt_reason_group"), "capacity")
+            self.assertEqual(len(rep.get("open_ops") or []), 1)
+            self.assertEqual(rep["open_ops"][0].get("halt_reason_code"), "RUN_NOT_EXECUTED_CAPACITY")
+            self.assertEqual(rep["open_ops"][0].get("halt_reason_group"), "capacity")
+            self.assertEqual(rep["open_ops"][0].get("reason"), "capacity_not_ready")
+            self.assertIn("aifilm h3 run", rep["open_ops"][0].get("command", ""))
+
+    def test_until_empty_execute_requires_i_own_the_gpu(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            write_json(
+                root / "film-spec.json",
+                {
+                    "title": "hotpath-until-empty",
+                    "h3": {"enabled": True},
+                    "genre": "adult",
+                    "heat_scale": "max",
+                    "director_intent": {"protagonist_want": "x"},
+                    "scenes": [
+                        {
+                            "shots": [
+                                {
+                                    "id": "hero1",
+                                    "shot_role": "hero",
+                                    "heat_phase": "act",
+                                    "wardrobe_state": "bare",
+                                    "dramatic_function": "action",
+                                }
+                            ]
+                        }
+                    ],
+                },
+            )
+            rep = fill_idle_until_empty(root, execute=True, i_own_the_gpu=False, max_cycles=1)
+            self.assertFalse(rep.get("ok"))
+            self.assertEqual(rep.get("stop_reason"), "exclusive_gpu_required")
+
+
+class FinalHonestyHotpathTests(unittest.TestCase):
+    def test_official_final_plate_blocks_final_complete(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            write_json(
+                root / "receipts" / "official-final-report.json",
+                {
+                    "status": "OFFICIAL_FINAL_PLATE",
+                    "master_lock": False,
+                    "partial": True,
+                },
+            )
+            report = plate_blocks_final_complete(root, gates={"final_complete": True})
+            self.assertFalse(report.get("ok"))
+            self.assertTrue(report.get("blocks_ship_complete"))
+            self.assertIn("PLATE_CLAIMED_FINAL_COMPLETE", report.get("codes") or [])
 
 
 if __name__ == "__main__":
