@@ -12,6 +12,7 @@ SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
 from h3_fill_idle import (  # noqa: E402
+    _is_capacity_contention_error,
     assert_priority_order,
     build_fill_idle_queue,
     capacity_plan,
@@ -19,6 +20,7 @@ from h3_fill_idle import (  # noqa: E402
     next_fill_idle_job,
     prepare_capacity_free_first,
     recover_capacity_contention,
+    run_next_fill_idle,
     wait_for_comfy_capacity,
 )
 from util import write_json  # noqa: E402
@@ -173,6 +175,45 @@ class UntilEmptyTests(unittest.TestCase):
             self.assertEqual(rep["stop_reason"], "capacity_not_ready")
             self.assertNotEqual(rep["stop_reason"], "run_failed")
             self.assertTrue((root / "receipts" / "fill-idle-until-empty.json").is_file())
+
+    def test_queue_busy_submit_is_capacity_not_run_failed(self) -> None:
+        """C1 race: probe ready then COMFY_QUEUE_BUSY → capacity_not_ready (retryable)."""
+        self.assertTrue(
+            _is_capacity_contention_error(
+                "comfy-h3 generate failed: ComfyUI submission blocked by resource tower: COMFY_QUEUE_BUSY"
+            )
+        )
+        self.assertFalse(_is_capacity_contention_error("variety preflight failed: L4_INSERT_LOW"))
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _film(root)
+
+            nxt = {
+                "ok": True,
+                "next": {
+                    "shot_id": "meat1",
+                    "mode": "i2v",
+                    "priority": "P0c",
+                    "lane": "primary_h3",
+                    "command": "x",
+                },
+                "capacity_ready": True,
+            }
+
+            def _boom(*_a, **_k):
+                raise RuntimeError(
+                    "comfy-h3 generate failed: ComfyUI submission blocked by "
+                    "resource tower: COMFY_QUEUE_BUSY"
+                )
+
+            with (
+                mock.patch("h3_fill_idle.next_fill_idle_job", return_value=nxt),
+                mock.patch("h3_workflow.run_h3_shot", side_effect=_boom),
+            ):
+                rep = run_next_fill_idle(root, execute=True, max_jobs=1, require_capacity=True)
+            self.assertEqual(rep.get("skipped_reason"), "capacity_not_ready")
+            self.assertTrue(rep.get("ok"))
+            self.assertNotEqual(rep.get("skipped_reason"), "run_failed")
 
     def test_until_empty_free_first_in_report(self) -> None:
         """S5.3-ops · free_prep lands on until-empty receipt; never cancels foreign."""

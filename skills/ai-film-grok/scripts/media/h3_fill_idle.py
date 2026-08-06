@@ -705,6 +705,22 @@ def build_fill_idle_queue(
 _MEMORY_FLOOR_CODES = frozenset({"RAM_BELOW_FLOOR", "VRAM_BELOW_FLOOR"})
 _QUEUE_BUSY_CODE = "COMFY_QUEUE_BUSY"
 
+# Submit race: capacity probe ready then queue/VRAM flips — treat as capacity skip, not hard fail.
+_CAPACITY_CONTENTION_MARKERS = (
+    "COMFY_QUEUE_BUSY",
+    "VRAM_BELOW_FLOOR",
+    "RAM_BELOW_FLOOR",
+    "RESOURCE TOWER",
+    "SUBMISSION BLOCKED BY RESOURCE",
+    "CAPACITY_NOT_READY",
+    "QUEUE BUSY",
+)
+
+
+def _is_capacity_contention_error(msg: object) -> bool:
+    text = str(msg or "").upper()
+    return any(m in text for m in _CAPACITY_CONTENTION_MARKERS)
+
 
 def probe_comfy_capacity_soft() -> dict[str, Any]:
     """Best-effort 5090 readiness (never raises; offline → ready=None)."""
@@ -1903,21 +1919,51 @@ def run_next_fill_idle(
             }
             last_out["ok"] = bool(result.get("ok"))
             if not result.get("ok"):
-                last_out["skipped_reason"] = "run_failed"
+                err_txt = str(
+                    result.get("error")
+                    or result.get("detail")
+                    or result.get("message")
+                    or result
+                )[:300]
+                if _is_capacity_contention_error(err_txt):
+                    # Race: probe said ready; submit hit queue/VRAM floor.
+                    last_out["skipped_reason"] = "capacity_not_ready"
+                    last_out["ok"] = True
+                    last_out["error"] = err_txt
+                    run_row["error"] = err_txt[:200]
+                    run_row["capacity_contention"] = True
+                else:
+                    last_out["skipped_reason"] = "run_failed"
                 break
         except Exception as exc:  # noqa: BLE001
-            last_out["ok"] = False
-            last_out["skipped_reason"] = "run_failed"
-            last_out["error"] = str(exc)[:300]
-            runs.append(
-                {
-                    "shot_id": sid,
-                    "mode": mode,
-                    "stage": stage,
-                    "ok": False,
-                    "error": str(exc)[:200],
-                }
-            )
+            err_txt = str(exc)[:300]
+            if _is_capacity_contention_error(err_txt):
+                last_out["ok"] = True
+                last_out["skipped_reason"] = "capacity_not_ready"
+                last_out["error"] = err_txt
+                runs.append(
+                    {
+                        "shot_id": sid,
+                        "mode": mode,
+                        "stage": stage,
+                        "ok": False,
+                        "error": err_txt[:200],
+                        "capacity_contention": True,
+                    }
+                )
+            else:
+                last_out["ok"] = False
+                last_out["skipped_reason"] = "run_failed"
+                last_out["error"] = err_txt
+                runs.append(
+                    {
+                        "shot_id": sid,
+                        "mode": mode,
+                        "stage": stage,
+                        "ok": False,
+                        "error": err_txt[:200],
+                    }
+                )
             break
 
     # Chain hint after last successful/attempted job

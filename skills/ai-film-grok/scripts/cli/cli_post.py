@@ -162,11 +162,26 @@ def cmd_final(args: argparse.Namespace) -> int:
         raise FilmError(f"Missing {script}")
     root = Path(args.root).expanduser().resolve()
     from production_truth import ProductionTruthError, require_current_canonical_truth
+    import os as _os
 
-    try:
-        require_current_canonical_truth(root)
-    except ProductionTruthError as exc:
-        raise FilmError(str(exc)) from exc
+    # H3 native / incomplete drama-graph ship: --skip-canonical-truth or AIFILM_SKIP_CANONICAL_TRUTH=1
+    skip_truth = bool(getattr(args, "skip_canonical_truth", False)) or (
+        str(_os.environ.get("AIFILM_SKIP_CANONICAL_TRUTH") or "").strip().lower()
+        in {"1", "true", "yes", "on"}
+    )
+    if not skip_truth:
+        try:
+            require_current_canonical_truth(root)
+        except ProductionTruthError as exc:
+            raise FilmError(
+                f"{exc}. Fix drama-graph/manifest truth, or pass --skip-canonical-truth "
+                f"(H3 native bulk ship; not for canonical series lock)."
+            ) from exc
+    else:
+        log(
+            "final: skipping require_current_canonical_truth "
+            "(--skip-canonical-truth or AIFILM_SKIP_CANONICAL_TRUTH)"
+        )
     post_engine = str(getattr(args, "post_engine", "hyperframes") or "hyperframes").strip().lower()
     if post_engine not in {"ffmpeg", "hyperframes", "remotion"}:
         raise FilmError("--post-engine must be ffmpeg|hyperframes|remotion")
@@ -2065,6 +2080,15 @@ def add_post_parsers(sub: argparse._SubParsersAction[argparse.ArgumentParser]) -
         "--skip-preflight",
         action="store_true",
         help="Skip lesson preflight hard gates before final (not recommended)",
+    )
+    fin.add_argument(
+        "--skip-canonical-truth",
+        action="store_true",
+        help=(
+            "Skip production-truth canonical graph/manifest gate before final. "
+            "For H3 keep_native bulk ship when drama-graph is incomplete; "
+            "also AIFILM_SKIP_CANONICAL_TRUTH=1. Not for locked canonical series."
+        ),
     )
     fin.add_argument(
         "--skip-heat-gate",

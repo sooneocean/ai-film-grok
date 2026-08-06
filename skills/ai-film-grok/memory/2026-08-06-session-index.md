@@ -11,3 +11,4 @@
 ## 片场
 - `AI FILM SPACE/0805/suse-evolution-ep01`：`out/film_final.mp4`；`receipts/official-final-report.json`
 - C1 探针：`0721/velvet-stage-dual` · `artifacts/2026-08-06-c1-until-empty-dry-open-ops.json`
+- savani H3 native review lessons → memory/2026-08-06-h3-native-ship-review-lessons.md · Agents 成片硬默认指针
