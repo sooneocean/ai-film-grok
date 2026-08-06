@@ -189,9 +189,22 @@ class FrwDegradeDocsTests(unittest.TestCase):
         self.assertEqual(DEFAULT_I2V_PROVIDER, "auto")
         self.assertEqual(DEFAULT_FRW_VIDEO_MODEL, "legacy-img2video")
         self.assertEqual(DEFAULT_FRW_ENV_MODEL, "ltx-t2v")
-        self.assertEqual(default_i2v_provider(), "grok")
+        # Free-local default is h3_primary → comfy-h3.
+        import os
+        from unittest import mock
+
+        import config_loader as cl
+
+        with mock.patch.dict(os.environ, {"AIFILM_I2V_PROFILE": "h3_primary"}, clear=False):
+            cl._CONFIG = None
+            cl._CONFIG_ENV_FINGERPRINT = None
+            self.assertEqual(default_i2v_provider(), "comfy-h3")
+        with mock.patch.dict(os.environ, {"AIFILM_I2V_PROFILE": "grok_primary"}, clear=False):
+            cl._CONFIG = None
+            cl._CONFIG_ENV_FINGERPRINT = None
+            self.assertEqual(default_i2v_provider(), "grok")
         spec = {
-            "title": "grok-primary-default-probe",
+            "title": "h3-primary-default-probe",
             "vo_mode": "storyteller",
             "director_intent": {
                 "logline": "测试 ltx23_primary 默认写入 film-spec 的行为。",

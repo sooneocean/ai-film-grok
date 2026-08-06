@@ -1008,8 +1008,10 @@ def build_dispatch(
         )
     elif i2v_profile == "h3_primary":
         i2v_line = (
-            "h3_primary: still=Qwen/Grok · motion=H3 I2V/FLF/R2V/T2V film-wide · "
-            "cloud escape only with AIFILM_ALLOW_CLOUD_RESTRICTED"
+            "h3_primary (free-local default): still=Qwen/Grok · "
+            "motion=5090 MiniMax H3 I2V/FLF/R2V/T2V film-wide primary · "
+            "Grok Video 1.5 = technical/explicit 兜底 only (signed switch) · "
+            "cloud bulk escape only with AIFILM_ALLOW_CLOUD_RESTRICTED"
         )
     elif i2v_profile == "hybrid_h3":
         i2v_line = (

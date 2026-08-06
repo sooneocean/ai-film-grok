@@ -22,5 +22,5 @@ AIFILM="$SKILL_DIR/scripts/aifilm"
 - Professional Director 11 阶段与八环保留为相容／诊断字段，不能形成第二套入口
 - 可用 `advance --root …` 执行 allowlist 内本地步骤；human/paid/external 必停
 - pilot 须用户批准才 bulk；中文 final TTS 用 **edge**；BGM 默认 **rnb**（dark 仅恐怖）
-- I2V 默认 `ltx23_primary`：FRW LTX 2.3 → FRW API I2V → Grok Video 1.5；每路须当前影片 approved canary，`grok_primary` 仅供旧项目显式锁定
+- I2V 免费默认 `h3_primary`：5090 MiniMax H3 主生成；**Grok Video 1.5 = 技术/escape 兜底 only**；无 GPU 才 `grok_primary`；旧 `ltx23_primary` 兼容
 - 只读返回的 `context_refs`；完整导航见 `references/INDEX.md`

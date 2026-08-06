@@ -59,6 +59,17 @@ class I2VProfileTests(unittest.TestCase):
             self.assertEqual(resolve_i2v_profile(), "h3_primary")
             self.assertEqual(default_i2v_provider(), "comfy-h3")
 
+
+    def test_unknown_profile_fails_closed_to_h3_free_default(self) -> None:
+        """Unknown profile must not silently prefer paid cloud bulk."""
+        import config_loader as cl
+
+        with mock.patch.dict(os.environ, {"AIFILM_I2V_PROFILE": "not_a_real_profile"}):
+            cl._CONFIG = None
+            cl._CONFIG_ENV_FINGERPRINT = None
+            self.assertEqual(resolve_i2v_profile(), "h3_primary")
+            self.assertEqual(default_i2v_provider(), "comfy-h3")
+
     def test_write_spec_auto_to_grok(self) -> None:
         with mock.patch.dict(os.environ, {"AIFILM_I2V_PROFILE": "grok_primary"}):
             spec = {

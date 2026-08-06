@@ -200,7 +200,7 @@ class ConfigSchema:
     frwclaw_root: str = ""
 
     # ── I2V ─────────────────────────────────────────────────────────────
-    i2v_profile: str = "grok_primary"
+    i2v_profile: str = "h3_primary"
     seedance_available: bool = False
     comfyui_base_url: str = ""
 
@@ -312,7 +312,7 @@ def get_config() -> ConfigSchema:
         frw_api_key=_env("FRW_API_KEY"),
         frwclaw_root=_env("FRWCLAW_ROOT"),
         # I2V
-        i2v_profile=_resolve("grok_primary", "AIFILM_I2V_PROFILE"),
+        i2v_profile=_resolve("h3_primary", "AIFILM_I2V_PROFILE"),
         seedance_available=_resolve_bool("AIFILM_SEEDANCE_AVAILABLE", default=False),
         comfyui_base_url=_env("AIFILM_COMFYUI_BASE_URL"),
         # Lipsync

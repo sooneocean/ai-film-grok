@@ -17,12 +17,12 @@
 
 | 片型 | Profile / H3 |
 |------|----------------|
-| **本机 5090 主产线（推荐）** | **`AIFILM_I2V_PROFILE=h3_primary`** → auto=`comfy-h3`；setup/meat/对白/env 默认本地；云 bulk 硬拦 |
+| **本机 5090 主产线（免费默认）** | **`AIFILM_I2V_PROFILE=h3_primary`**（代码/config 默认）→ auto=`comfy-h3`；**Grok Video 1.5 仅技术/escape 兜底**；云 bulk 硬拦 |
 | `genre=adult` 或 `heat_scale=max/hot/extreme` | 自动 `h3.enabled=true`，片级 `_i2v_profile→hybrid_h3`（Grok bulk + H3 meat）；**有 5090 请显式改 `h3_primary`** |
 | **云 LTX 有声铺量（成人 opt-in）** | **`AIFILM_I2V_PROFILE=ltx23_adult`**：safe 对白/soft→LTX 2.3 audio；**meat/bare→H3 hard**；still 坏→`still-challenge`；**不**因 adult 自动选用 |
 | 非成人 / `heat soft` / `adult_max_iron:false` / `h3.enabled=false` | 保持 `grok_primary`，不锁 H3 |
 | 显式 `AIFILM_I2V_PROFILE=hybrid_h3` | 双轨：Grok soft + H3 restricted；lanes 可挂 LTX 安全对白 |
-| 显式 `AIFILM_I2V_PROFILE=h3_primary` | **全片 H3 主轨**（时间无限；Grok 仅 escape） |
+| 显式 / 默认 `AIFILM_I2V_PROFILE=h3_primary` | **全片 H3 主轨**（**Grok Video 1.5 = 技术失败或 escape 兜底**，质量拒片不切云） |
 | `ltx23_primary` | **legacy** 全片 LTX 标签；新成人 max 片勿用 |
 
 > 定策档：[docs/plans/2026-08-05-h3-primary-capacity.md](../../../docs/plans/2026-08-05-h3-primary-capacity.md)
@@ -31,11 +31,11 @@
 
 | 类型 | Still | Motion | Audio |
 |------|-------|--------|-------|
-| Setup / 非敏感 hero | Grok `image_edit(cast)` | Grok Video 1.5 `media-queue` | Edge TTS + BGM |
-| Foreplay soft clothed | Grok | Grok 优先；moderation → 签名切 H3 | 同上 |
+| Setup / 非敏感 hero（**h3_primary 默认**） | Grok/Qwen still | **H3 I2V**（非 Grok bulk） | Edge TTS + BGM / H3 native |
+| Foreplay soft clothed（**h3_primary**） | Grok/Qwen | **H3 I2V**；hybrid 兼容才 Grok bulk | 同上 |
 | Act / climax / bare / undressed | Qwen Edit / undress-anchor | **H3 I2V**（queue 硬拦云 bulk） | H3 `prefer_native` |
 | 高难（deep_thrust / creampie / L4+contact / force_local_h3） | 本地状态照 | **H3 I2V**；能量不够 → **R2V** | 同上 |
-| 对白近景（非敏感） | Grok face | **Grok** 默认；**`ltx23_adult` / lanes 允许 → LTX 2.3 有声** | **原声** prefer_native（禁后期对嘴） |
+| 对白近景（非敏感） | Grok face | **h3_primary→H3**；hybrid→Grok；**`ltx23_adult` → LTX 有声** | **原声** prefer_native（禁后期对嘴） |
 | **对白近景（restricted / bare）** | Qwen 状态照 | **H3 I2V**（台词注入）；狠嘴 CU / 状态链 → **H3 R2V** | H3 **原声** spoken Mandarin |
 | soft 亲密（clothed · `ltx23_adult`） | 批 still / FRW i2i | **LTX 2.3 有声 I2V**；失败→H3 | prefer_native |
 | Env / bridge | 可选 | FRW env 或 **H3 T2V**（无脸） | 环境 |
@@ -156,7 +156,7 @@ aifilm h3 run  --root "<film>" --shot-id shot03 --mode i2v|r2v|t2v --register --
 | 对白近景 | **H3** | I2V+台词；狠嘴→R2V |
 | env / bridge 无脸 | **H3** | **T2V** |
 | 续镜 continue | **H3** | I2V 末帧 / FLF |
-| Grok | 可选 pilot / 云 escape | 不默认 bulk |
+| Grok Video 1.5 | **仅**技术失败签名切换 / 云 escape | **非**默认 bulk |
 
 **`hybrid_h3`（双轨兼容）**
 

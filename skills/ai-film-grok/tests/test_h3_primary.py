@@ -115,6 +115,29 @@ def test_hybrid_setup_still_grok() -> None:
     assert intent["provider_lock"] is None
 
 
+
+
+def test_h3_primary_preferred_and_priority() -> None:
+    """Shipped preferred()/provider_priority() must lock free-local to comfy-h3."""
+    from i2v_provider import preferred, provider_priority
+
+    with mock.patch.dict(os.environ, {"AIFILM_I2V_PROFILE": "h3_primary"}):
+        assert resolve_i2v_profile() == "h3_primary"
+        assert default_i2v_provider() == "comfy-h3"
+        assert provider_priority() == ("comfy-h3", "grok")
+        active = preferred()
+        assert active.name == "comfy-h3"
+
+
+def test_grok_primary_preferred_still_grok() -> None:
+    from i2v_provider import preferred, provider_priority
+
+    with mock.patch.dict(os.environ, {"AIFILM_I2V_PROFILE": "grok_primary"}):
+        assert resolve_i2v_profile() == "grok_primary"
+        assert default_i2v_provider() == "grok"
+        assert provider_priority() == ("grok",)
+        assert preferred().name == "grok"
+
 def test_media_queue_blocks_h3_primary_cloud(tmp_path: Path) -> None:
     from media_queue import MediaQueue, QueueError
 

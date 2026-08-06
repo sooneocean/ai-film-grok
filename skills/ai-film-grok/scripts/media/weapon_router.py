@@ -183,7 +183,8 @@ def build_weapon_route(
                 "status": "blocked",
                 "fail_closed": True,
                 "reason": (
-                    f"{exc}; cloud I2V chain (grok_primary) remains the default production path"
+                    f"{exc}; free-local default is h3_primary (5090 MiniMax H3); "
+                    f"Grok Video 1.5 is technical/explicit 兜底 only (set grok_primary only when no GPU)"
                 ),
             }
         return {

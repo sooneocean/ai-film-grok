@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """I2V provider abstraction and action-routing layer.
 
-Runs the production action order FRW LTX 2.3 → FRW API I2V → Grok Video 1.5
-behind a single interface. New providers can be added
+Free-local default (h3_primary): 5090 MiniMax H3 primary, Grok Video 1.5 兜底.
+Compatibility: ltx23_* LTX chain; grok_primary/hybrid soft → Grok first. New providers can be added
 by implementing :class:`I2VProvider` and registering them instead of scattering
 ``source_endpoint`` labels through the codebase.
 
@@ -76,6 +76,10 @@ _SWITCH_KEY_ENV = "AIFILM_PROVIDER_SWITCH_RECEIPT_KEY"
 _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 _WAN_MODEL_IDENTITY_RE = re.compile(r"(?:^|/)wan(?:[0-9._-]|$)")
 ACTION_PROVIDER_PRIORITY = ("frw-ltx23", "frw-api-i2v", "grok")
+# Free-local 5090 primary: MiniMax H3 first; Grok Video 1.5 = technical 兜底 only.
+H3_PRIMARY_PROVIDER_PRIORITY = ("comfy-h3", "grok")
+# Paid-cloud Grok bulk (grok_primary) and hybrid soft lane.
+GROK_PRIMARY_PROVIDER_PRIORITY = ("grok",)
 
 
 def is_technical_failure(error: object) -> bool:
@@ -267,7 +271,8 @@ def route_after_failure(
     fallback_name: str | None = None,
 ) -> tuple[I2VProvider, dict[str, Any]] | None:
     """Select a reviewed fallback only after a classified technical failure."""
-    if primary not in ACTION_PROVIDER_PRIORITY or not is_technical_failure(error):
+    priority = provider_priority()
+    if primary not in priority or not is_technical_failure(error):
         return None
     try:
         stable_shot_id = validate_identifier(shot_id, field="shot id")
@@ -275,10 +280,10 @@ def route_after_failure(
         raise I2VProviderError(f"PROVIDER_SWITCH_SHOT_ID_INVALID: {exc}") from exc
     if fallback_name is None:
         try:
-            fallback_name = ACTION_PROVIDER_PRIORITY[ACTION_PROVIDER_PRIORITY.index(primary) + 1]
+            fallback_name = priority[priority.index(primary) + 1]
         except (ValueError, IndexError):
             return None
-    if fallback_name not in ACTION_PROVIDER_PRIORITY:
+    if fallback_name not in priority:
         raise I2VProviderError(f"PROVIDER_SWITCH_FALLBACK_INVALID: {fallback_name}")
     provider = get(fallback_name)
     return provider, _write_switch_receipt(
@@ -1135,22 +1140,62 @@ def for_endpoint(source_endpoint: str) -> I2VProvider | None:
     return None
 
 
+def _resolve_profile_for_routing() -> str:
+    try:
+        from film_spec import resolve_i2v_profile
+
+        return resolve_i2v_profile()
+    except Exception:
+        return "h3_primary"
+
+
 def provider_priority() -> tuple[str, ...]:
-    """Return the closed cloud production action order."""
+    """Return the profile-aware production action order.
+
+    Free-local ``h3_primary``: local MiniMax H3 first, Grok Video 1.5 last (兜底).
+    Quality/human/moderation failures never auto-advance the chain — only
+    :func:`is_technical_failure` errors do, and each switch writes a signed receipt.
+    """
+    profile = _resolve_profile_for_routing()
+    if profile == "h3_primary":
+        return H3_PRIMARY_PROVIDER_PRIORITY
+    if profile in {"grok_primary", "hybrid_h3"}:
+        return GROK_PRIMARY_PROVIDER_PRIORITY
+    # ltx23_primary / ltx23_adult / any residual cloud-chain profile
     return ACTION_PROVIDER_PRIORITY
 
 
 def preferred(*, root: Path | None = None) -> I2VProvider:
     """Resolve the configured production primary without overriding shot locks."""
     try:
-        from film_spec import resolve_i2v_profile
+        from film_spec import default_i2v_provider, resolve_i2v_profile
 
         profile = resolve_i2v_profile()
+        primary_name = default_i2v_provider()
     except Exception:
-        profile = "grok_primary"
+        profile = "h3_primary"
+        primary_name = "comfy-h3"
     requested = profile
-    provider = get("grok" if profile == "grok_primary" else "frw-ltx23")
+    try:
+        provider = get(primary_name)
+    except I2VProviderError:
+        provider = get("comfy-h3" if profile == "h3_primary" else "grok")
     if root is not None:
+        if provider.name == "comfy-h3":
+            reason = (
+                "h3_primary free-local: 5090 MiniMax H3 is film-wide motion primary; "
+                "Grok Video 1.5 is technical/explicit 兜底 only (signed switch receipt)"
+            )
+        elif provider.name == "grok":
+            reason = (
+                "Grok Video 1.5 bulk (grok_primary / hybrid_h3 soft lane); "
+                "not the free-local default — use AIFILM_I2V_PROFILE=h3_primary for 5090"
+            )
+        else:
+            reason = (
+                "explicit ltx23 compatibility profile: FRW LTX → FRW API I2V → "
+                "Grok Video 1.5 technical fallback"
+            )
         write_json(
             Path(root) / "receipts" / "i2v-routing.json",
             {
@@ -1160,13 +1205,7 @@ def preferred(*, root: Path | None = None) -> I2VProvider:
                 "selected_provider": provider.name,
                 "provider_priority": list(provider_priority()),
                 "fallback": False,
-                "reason": (
-                    "Grok image_to_video is first for bulk action; FRW retains LTX "
-                    "native-audio talking heads and legacy compatibility via explicit "
-                    "ltx23_primary profile"
-                    if provider.name == "grok"
-                    else "explicit ltx23_primary compatibility profile"
-                ),
+                "reason": reason,
                 "models": list(provider.probe(root=root).models),
                 "requires_hero_repilot": False,
             },

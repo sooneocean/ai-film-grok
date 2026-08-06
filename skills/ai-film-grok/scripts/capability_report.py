@@ -92,7 +92,7 @@ def suggest_i2v_from_canary(
 
         profile = resolve_i2v_profile()
     except Exception:
-        profile = "grok_primary"
+        profile = "h3_primary"
     out["i2v_profile"] = profile
     if profile in {"ltx23_primary", "ltx23_adult"}:
         patch = {

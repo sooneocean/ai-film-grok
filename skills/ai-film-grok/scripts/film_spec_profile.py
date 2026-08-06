@@ -52,7 +52,8 @@ def resolve_i2v_profile() -> str:
     """Operating profile for hero motion bulk.
 
     ``seedance_first`` is retained for backwards-compatible parsing but now
-    normalizes to the supported Grok-first action chain.
+    normalizes to Grok-first (paid compat).
+    Free-local default unknown→h3_primary.
     ``h3_primary`` = local 5090 MiniMax H3 is the film-wide primary (T2V/I2V/R2V/FLF).
     """
     from config_loader import get_config
@@ -61,7 +62,7 @@ def resolve_i2v_profile() -> str:
     raw = cfg.i2v_profile.strip().lower()
     if raw == "seedance_first":
         return "grok_primary"
-    return raw if raw in I2V_PROFILES else "grok_primary"
+    return raw if raw in I2V_PROFILES else "h3_primary"
 
 
 def default_i2v_provider() -> str:
