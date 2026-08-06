@@ -35,6 +35,10 @@
 | **C6** | 构图防抢走 multi-seed | `2026-08-05-composition-anti-hijack` | gate 在 | shortlist/pk **禁只比 mean** 纪律 |
 | **C7** | Material fidelity 闭环纪律 | `2026-08-05-material-fidelity-loop` | M0–M6 ship | 每 restricted 镜 request.json |
 | **C8** | Fill-Idle 真烧 + 人 promote | `2026-08-04-h3-fill-idle` · session-wrap | dry 多 · execute 常 capacity/variety | 绿片 + idle 5090 |
+| **C15** | 时长目标 vs H3 镜数 | savani · Q4.1 | **ship 2.39.81** | bulk `duration_target` |
+| **C16** | h3 ship-native plate | savani · Q5.1 | **ship 2.39.81** | 叠 hardburn 仍待 final |
+| **C17** | crop-master still 告警 | savani · Q1.4 | **ship 2.39.82** | 真片再压 |
+| **C18** | 原声 volumedetect sample | savani · Q5.2 | **ship 2.39.82** soft | ASR 可选延后 |
 | **C9** | render_final / heat / film_spec 巨石 | residual-monolith plan | 包边界 ship · **orchestrator 仍厚** | **bug 驱动** peel only |
 | **C10** | 热路径 bare subprocess | antifragility AF1 | 主热路径有 timeout；Popen 长跑保留 | 触达再补，勿全仓冲刺 |
 | **C11** | Job-graph checkpoint 超 final | antifragility deferred | 延后 | takes 文件 + stale reclaim 已部分抗重烧 |
