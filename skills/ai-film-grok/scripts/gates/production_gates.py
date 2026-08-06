@@ -1180,6 +1180,146 @@ def assert_anti_boring_variety(
     )
 
 
+# --- Headroom / anti-crop gate (P1 · shortform headroom auto-protect) ---
+# "防裁头": a too-short shot gets cropped/abrupt at the head; a scene-opening shot
+# needs extra lead-in so the subject's entrance isn't cut. This is the *timeline*
+# half of headroom — framing_lint.lint_framing_iron covers the *frame* half
+# (composition: full head + headroom in the picture). Soft advisory by default;
+# hard under headroom_strict or adult max heat (incremental rollout like P0 gates).
+_HEADROOM_MIN_SHOT_SEC = 2.0
+_HEADROOM_FIRST_SHOT_MIN_SEC = 3.5
+
+
+def headroom_report(spec: dict[str, Any]) -> dict[str, Any]:
+    """Detect timeline headroom / anti-crop failures.
+
+    Returns {"ok", "checked", "codes", "issues"}. Does not raise; callers decide
+    whether to block (assert_headroom_protected flips to hard under headroom_strict
+    / adult max heat).
+    """
+    issues: list[dict[str, Any]] = []
+    if not isinstance(spec, dict):
+        return {"ok": True, "checked": False, "codes": [], "issues": []}
+
+    def _dur(sh: dict[str, Any]) -> float | None:
+        raw = sh.get("duration_sec")
+        if raw is None:
+            return None
+        try:
+            return float(raw)
+        except (TypeError, ValueError):
+            return None
+
+    # Every shot floor: micro-shots get cropped/abrupt ("裁头" risk).
+    for sh in _flatten_shots(spec):
+        sid = str(sh.get("id") or "?")
+        dur = _dur(sh)
+        if dur is None:
+            continue
+        if dur + 1e-9 < _HEADROOM_MIN_SHOT_SEC:
+            issues.append(
+                {
+                    "code": "HEADROOM_SHOT_TOO_SHORT",
+                    "shot_id": sid,
+                    "duration_sec": dur,
+                    "min_sec": _HEADROOM_MIN_SHOT_SEC,
+                    "message": (
+                        f"{sid}: shot {dur}s < floor {_HEADROOM_MIN_SHOT_SEC}s "
+                        f"— too short, prone to head-crop / abrupt cut"
+                    ),
+                }
+            )
+
+    # Scene-opening shot needs extra lead-in so the subject's entrance isn't cut.
+    scenes = spec.get("scenes") or []
+    if isinstance(scenes, list):
+        for sci, scene in enumerate(scenes):
+            if not isinstance(scene, dict):
+                continue
+            shots = scene.get("shots") or []
+            if not isinstance(shots, list) or not shots:
+                continue
+            first = next((s for s in shots if isinstance(s, dict)), None)
+            if first is None:
+                continue
+            sid = str(first.get("id") or f"scene{sci}:0")
+            dur = _dur(first)
+            if dur is None:
+                continue
+            if dur + 1e-9 < _HEADROOM_FIRST_SHOT_MIN_SEC:
+                issues.append(
+                    {
+                        "code": "HEADROOM_FIRST_SHOT_TOO_SHORT",
+                        "shot_id": sid,
+                        "duration_sec": dur,
+                        "min_sec": _HEADROOM_FIRST_SHOT_MIN_SEC,
+                        "message": (
+                            f"{sid}: scene-opening shot {dur}s < lead-in floor "
+                            f"{_HEADROOM_FIRST_SHOT_MIN_SEC}s — subject entrance may be cropped"
+                        ),
+                    }
+                )
+
+    return {
+        "ok": len(issues) == 0,
+        "checked": True,
+        "codes": sorted({i["code"] for i in issues}),
+        "issues": issues,
+    }
+
+
+def assert_headroom_protected(
+    root: Path | None = None,
+    *,
+    spec: dict[str, Any] | None = None,
+    force: bool = False,
+    env_skip: bool = True,
+) -> dict[str, Any]:
+    """P1 headroom / anti-crop hard gate.
+
+    HARD when film-spec ``headroom_strict`` is True, or adult ``heat_scale`` is
+    max/hot/extreme. Otherwise surfaces as a soft advisory (incremental rollout).
+
+    Emergency escapes: ``force=True`` or ``AIFILM_SKIP_HEADROOM_GATE=1``.
+    """
+    if force:
+        return {"skipped": True, "reason": "force"}
+    if env_skip and os.environ.get("AIFILM_SKIP_HEADROOM_GATE", "").strip() in {
+        "1",
+        "true",
+        "yes",
+    }:
+        return {"skipped": True, "reason": "env"}
+    data = spec
+    if data is None and root is not None:
+        path = Path(root).expanduser().resolve() / "film-spec.json"
+        data = read_json(path) or {}
+    if not isinstance(data, dict) or not data:
+        return {"ok": True, "checked": False, "reason": "no_spec"}
+
+    strict = bool(data.get("headroom_strict") is True) or str(
+        data.get("heat_scale") or ""
+    ).lower() in {"max", "hot", "extreme"}
+    report = headroom_report(data)
+    if not report["codes"]:
+        return {"ok": True, "checked": report.get("checked", False), "codes": []}
+    if not strict:
+        return {
+            "ok": True,
+            "checked": True,
+            "soft": True,
+            "codes": report["codes"],
+            "issues": report["issues"],
+        }
+    message = "; ".join(f"[{i['code']}] {i['message']}" for i in report["issues"][:6])
+    raise ProductionGateError(
+        f"headroom gate (strict): {message} "
+        "Fix: give every shot >= 2.0s and scene-opening shots >= 3.5s lead-in so the "
+        "subject's head/entrance isn't cropped. "
+        "Emergency: --skip-headroom or AIFILM_SKIP_HEADROOM_GATE=1"
+    )
+
+
 # --- Face-identity post_audit gate (P0 · face-identity-pixel) ---
 # A post_audit that ran and found keyframe pixel drift means an approved clip would
 # carry a face-identity break; register-clip / final must reject until re-audited.

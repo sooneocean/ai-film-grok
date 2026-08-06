@@ -17,6 +17,7 @@ from production_gates import (
     ProductionGateError,
     anti_boring_variety_report,
     assert_face_identity_passed,
+    headroom_report,
     load_pilot_approval,
     loop_risk_shots_from_spec,
     pilot_is_user_approved,
@@ -877,6 +878,40 @@ def run_preflight(root: Path) -> dict[str, Any]:
                     "face_identity_probe_error",
                     f"face-identity probe failed: {exc}"[:200],
                     fix="check production_gates.assert_face_identity_passed",
+                )
+            )
+
+        # --- Headroom / anti-crop (shortform headroom P1) ---
+        # Timeline half of "防裁头": every shot >= 2.0s, scene-openers >= 3.5s lead-in.
+        # Soft advisory by default; hard on headroom_strict or adult max heat.
+        try:
+            hr = headroom_report(spec)
+            hr_codes = list(hr.get("codes") or [])
+            if hr_codes:
+                hr_strict = spec.get("headroom_strict") is True or str(
+                    spec.get("heat_scale") or ""
+                ).lower() in {"max", "hot", "extreme"}
+                hr_issue = _issue(
+                    "hard" if hr_strict else "soft",
+                    "headroom_protect",
+                    f"headroom {'hard' if hr_strict else 'soft'}: {hr_codes} — "
+                    f"{(hr.get('issues') or [{}])[0].get('message', '')[:120]}",
+                    fix=(
+                        "每镜 duration_sec ≥2.0s；场景开头镜 ≥3.5s 留白，避免裁头/ abrupt cut。"
+                        "lessons-2026-08-06-headroom"
+                    ),
+                )
+                if hr_strict:
+                    hard.append(hr_issue)
+                else:
+                    soft.append(hr_issue)
+        except Exception as exc:
+            soft.append(
+                _issue(
+                    "soft",
+                    "headroom_probe_error",
+                    f"headroom probe failed: {exc}"[:200],
+                    fix="check production_gates.headroom_report",
                 )
             )
 

@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.40.10] - 2026-08-06
+
+### Added (quality P1 · headroom / anti-crop timeline gate)
+- **Headroom gate** (`gates/production_gates.py::assert_headroom_protected` + `headroom_report`): timeline half of "防裁头" — every shot must keep `duration_sec >= 2.0s` and each scene-opening shot needs `>= 3.5s` lead-in so the subject's entrance isn't cropped/abrupt. Complements `framing_lint.lint_framing_iron` (which covers the *frame* half). Wired into `preflight` as soft advisory; hard under `headroom_strict` or adult `heat_scale` max/hot/extreme.
+- Emergency escape: `AIFILM_SKIP_HEADROOM_GATE=1`.
+- Tests: `tests/test_headroom.py` (12 cases — floor / scene-opener / top-level / strict-raise / env-escape / root-spec).
+
 ## [2.40.9] - 2026-08-06
 
 ### Added (quality closeout · auto-fix + auto multi-chapter + GPU safe ops)

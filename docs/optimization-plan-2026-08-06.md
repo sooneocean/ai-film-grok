@@ -7,17 +7,31 @@
 
 ## 执行状态（2026-08-06 已落地）
 
-P0 五个自动硬门已全部实现并接入门禁/流水线，相关测试全绿（新增 56 用例，全量非 slow 套件 3153 passed）。详见 CHANGELOG `2.39.96`。
+P0 五个自动硬门已全部实现并接入门禁/流水线，相关测试全绿（新增 56 用例，全量非 slow 套件 3153 passed）。详见 CHANGELOG。
 
+> ⚠️ 双 checkout 并发：本会话（git 根 `/Users/dex/.grok/ai-film-grok`）与插件/其他 checkout 同推一个 `main`，远端多次 force-push。下列 P1 项由**另一条开发线**已先行落地（非本会话）：narrative 收尾重绑 + 发色锁 + 成人弧线（v2.40.6）、运动量化门 + 字幕 CJK + BGM 抗疲劳 + style NEG（v2.40.7）。本会话聚焦补齐**尚未覆盖**的 P1 项。
+
+### P0（本会话落地）
 | P0 | 门 | 落地文件 | 测试 |
 |----|----|---------|------|
 | 1 | 抗无聊硬门 | `gates/production_gates.py` `assert_anti_boring_variety` + `preflight` 接入 | `test_production_gates.py::AntiBoringGateTests` |
 | 2 | 每镜脸身份 post_audit 门 | `gates/production_gates.py` `assert_face_identity_passed` + `preflight` + `cli_media.register_clip` 注入 | `test_production_gates.py::FaceIdentityGateTests` |
-| 3 | 九项接戏程序化校验 | `assets/continuity_chain.py` 九项清单 + 字节复用 + **新增禁止掩盖检测**（byte-identical continue 缝叠长 dissolve / 定格倒放插镜）+ `gates/production_gates.py` `assert_continuity_chain_passed` | `test_continuity_chain.py`（含 coverup 用例） |
+| 3 | 九项接戏程序化校验 | `assets/continuity_chain.py` 九项清单 + 字节复用 + **新增禁止掩盖检测** + `gates/production_gates.py` `assert_continuity_chain_passed` | `test_continuity_chain.py`（含 coverup 用例） |
 | 4 | render_final 超时/假死防护 | `post/render_final.py` `_run_with_watchdog` + `--render-timeout`（默认 1800s，0 关闭）+ `final/errors.py` `RenderTimeoutError` | `test_render_watchdog.py` |
-| 5 | TTS 语言乒乓校验 | `audio/voice_cast_profiles.py` `detect_language_pingpong` + `audio/audio_plan.py` 接入（dry-run 输出 `tts_language_issues`） | `test_tts_language_pingpong.py` |
+| 5 | TTS 语言乒乓校验 | `audio/voice_cast_profiles.py` `detect_language_pingpong` + `audio/audio_plan.py` 接入 | `test_tts_language_pingpong.py` |
 
-> P1/P2（lesson→默认硬门晋升、运动量化门、5090 调度器、字幕/headroom 自动、BGM 抗疲劳、lipsync 自动晋级、visual_bible 自动、H3 Fill-Idle 自动、sung 生成、HF 转场全量、长片 SOP 固化）为后续深化与规模化阶段，未在本轮执行。
+### P1 进度（截至 v2.40.9）
+| P1 项 | 状态 | 落地 |
+|------|------|------|
+| 发色锁 / 成人弧线 / narrative 收尾重绑 | ✅ 另一条线 | v2.40.6 |
+| 运动量化门 / 字幕 CJK / BGM 抗疲劳 / style NEG | ✅ 另一条线 | v2.40.7 |
+| **headroom 自动构图保护（时间线防裁头）** | ✅ **本会话** | v2.40.9 `headroom_report` + `assert_headroom_protected` + preflight 接入（`test_headroom.py` 12 用例） |
+| 首帧毒化/静帧压缩 → style_lock 默认 | 🟡 部分（NEG token 在，未强制门） | 待补 |
+| 5090 统一调度器 | 🟡 部分（h3_fill_idle free_first） | 待补/进行中 |
+| lipsync 自动晋级 | ⛔ v2.40.0 已冻结，跳过 | — |
+| HF 转场全量 / visual_bible / 介质路由 / H3 Fill-Idle / sung | ⬜ P2 | 未做 |
+
+> 剩余真正开放的高 ROI P1/P2：首帧毒化·静帧压缩晋升 style_lock 默认硬锁、5090 统一调度器、HF 转场全量、visual_bible 自动、介质自动路由、H3 Fill-Idle 自动派单、sung 自动生成、长片 SOP 固化。
 
 ---
 
