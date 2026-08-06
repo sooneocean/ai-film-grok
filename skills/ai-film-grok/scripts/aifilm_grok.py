@@ -354,6 +354,7 @@ from cli_misc_ops import (  # noqa: E402
     cmd_review_ui,
     cmd_route,
     cmd_still_challenge,
+    cmd_upscale,
     cmd_team,
     cmd_truth,
     cmd_vibevoice_asr,
@@ -798,10 +799,12 @@ def build_parser() -> argparse.ArgumentParser:
     from cli_comfy import add_comfy_parsers
     from cli_h3 import add_h3_parsers
     from cli_still_challenge import add_still_challenge_parsers
+    from cli_upscale import add_upscale_parsers
 
     add_comfy_parsers(sub)
     add_h3_parsers(sub)
     add_still_challenge_parsers(sub)
+    add_upscale_parsers(sub)
     from cli_node import add_node_parsers
 
     add_node_parsers(sub)
@@ -953,6 +956,7 @@ def main(argv: list[str] | None = None) -> int:
             "comfy": cmd_comfy,
             "h3": cmd_h3,
             "still-challenge": cmd_still_challenge,
+            "upscale": cmd_upscale,
             "node": cmd_node,
             "weapon": cmd_weapon,
             "route": cmd_route,

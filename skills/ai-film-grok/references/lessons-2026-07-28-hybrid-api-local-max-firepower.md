@@ -19,7 +19,7 @@
 | **MiniMax H3 I2V**（`minimax-h3-i2v-pilot`） | 人物/肉戏/敏感 I2V（pilot） | 免费 · 中速 |
 | **MiniMax H3 T2V** | 本地环境/气氛（可与 FRW 并行策略择一） | 免费 · 中速 |
 | MiniMax H3 R2V | 多 ref 锁脸/风格（ref2va pilot 已 canary） | 免费 · 较慢 |
-| （日后）本地 upscale | selects 后抬分辨率 | 免费 |
+| **Real-ESRGAN formal upscale**（research→formal） | selects 后抬清晰度（默认 off） | 免费；见 [realesrgan-formal-upscale](realesrgan-formal-upscale.md) |
 
 **独占理由**：尺度、无审核、无限重试、脸+衣着可控。
 

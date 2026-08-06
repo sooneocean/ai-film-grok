@@ -564,20 +564,31 @@ def ensure_h3_delivery_geometry(
     *,
     min_width: int = _H3_MIN_WIDTH,
     min_height: int = _H3_MIN_HEIGHT,
+    mode: str | None = None,
 ) -> dict[str, Any]:
     """Upscale H3 output to ≥704×1280 9:16 when the local model emits small frames.
 
     H3 film-lane canaries historically decode near 352×608; register/final gates
     expect short-form floor geometry. Deterministic scale+pad, no crop of heads.
+
+    mode: ``ffmpeg`` (default) | ``realesrgan`` | ``auto``.
+    ``auto`` uses Real-ESRGAN only when backend ready, GPU free, and
+    ``AIFILM_H3_GEOMETRY=realesrgan|auto`` or explicit mode=realesrgan.
     """
+    import os
+
     src = Path(src).expanduser().resolve()
     dest = Path(dest).expanduser().resolve()
+    resolved_mode = (mode or os.environ.get("AIFILM_H3_GEOMETRY") or "ffmpeg").strip().lower()
+    if resolved_mode not in {"ffmpeg", "realesrgan", "auto"}:
+        resolved_mode = "ffmpeg"
     meta: dict[str, Any] = {
         "ok": True,
         "source": str(src),
         "upscaled": False,
         "min_width": min_width,
         "min_height": min_height,
+        "geometry_mode": resolved_mode,
     }
     if not src.is_file():
         raise H3WorkflowError(f"H3 geometry source missing: {src}")
@@ -600,6 +611,65 @@ def ensure_h3_delivery_geometry(
         meta["deliver_path"] = str(src)
         meta["reason"] = "already_meets_floor"
         return meta
+
+    use_esrgan = False
+    if resolved_mode == "realesrgan":
+        use_esrgan = True
+    elif resolved_mode == "auto":
+        try:
+            from realesrgan_upscale import backend_status, gpu_busy
+
+            st = backend_status()
+            busy, _ = gpu_busy(root=None)
+            use_esrgan = bool(st.get("backend_ready")) and not busy
+            meta["esrgan_auto"] = {
+                "backend_ready": st.get("backend_ready"),
+                "gpu_busy": busy,
+            }
+        except Exception as exc:  # noqa: BLE001
+            meta["esrgan_auto_error"] = str(exc)[:160]
+            use_esrgan = False
+
+    if use_esrgan:
+        try:
+            from realesrgan_upscale import upscale_video
+
+            rec = upscale_video(
+                src,
+                dest,
+                target_width=min_width,
+                target_height=min_height,
+                force_gpu=resolved_mode == "realesrgan",
+            )
+            if rec.get("ok") and dest.is_file():
+                meta["upscaled"] = True
+                meta["deliver_path"] = str(dest)
+                meta["upscaled_path"] = str(dest)
+                meta["reason"] = f"realesrgan_from_{width}x{height}"
+                meta["realesrgan"] = {
+                    k: rec.get(k)
+                    for k in (
+                        "model",
+                        "scale",
+                        "wall_sec",
+                        "output_sha256",
+                        "audio_policy",
+                    )
+                }
+                try:
+                    from media_qa import analyze_media
+
+                    qa2 = analyze_media(dest, require_audio=False, require_motion=False)
+                    meta["width"] = int(qa2.get("width") or min_width)
+                    meta["height"] = int(qa2.get("height") or min_height)
+                except Exception:  # noqa: BLE001
+                    meta["width"] = min_width
+                    meta["height"] = min_height
+                return meta
+            meta["esrgan_fallback"] = rec.get("reason") or rec.get("error") or "not_ok"
+        except Exception as exc:  # noqa: BLE001
+            meta["esrgan_fallback"] = str(exc)[:200]
+
     dest.parent.mkdir(parents=True, exist_ok=True)
     vf = (
         f"scale={min_width}:{min_height}:force_original_aspect_ratio=decrease,"

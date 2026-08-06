@@ -771,6 +771,16 @@ def cmd_still_challenge(args: argparse.Namespace) -> int:
     return 0 if report.get("ok") is not False else 1
 
 
+def cmd_upscale(args: argparse.Namespace) -> int:
+    """Real-ESRGAN formal upscale (selects-after; no auto-promote)."""
+    from cli_upscale import run_upscale_cli
+    from core.emit import emit
+
+    report = run_upscale_cli(args)
+    emit(report)
+    return 0 if report.get("ok") is not False else 1
+
+
 def cmd_workflow(args: argparse.Namespace) -> int:
     """Wave A–C throughput: closeout / pilot-pack / bulk-preflight / lease / tunnel."""
     from cli_workflow import run_workflow_cmd

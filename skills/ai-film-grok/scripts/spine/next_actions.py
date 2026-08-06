@@ -877,6 +877,20 @@ def build_next_actions(
                     "后期 owner 未锁 — 机读过闸后进 final 需要",
                 )
             return actions
+        # Optional formal AI upscale (default off; only when film-spec enables)
+        try:
+            from realesrgan_upscale import film_upscale_enabled
+
+            if film_upscale_enabled(root) and not (root / "receipts" / "upscale-batch.json").is_file():
+                add(
+                    "upscale-formal",
+                    f'aifilm upscale plan --root "{r}"\n'
+                    f'# then: aifilm upscale run --root "{r}" --execute --max 5 --i-own-the-gpu\n'
+                    f'# promote: aifilm upscale promote --root "{r}" --shot-id <id>',
+                    "film-spec upscale.enabled — selects 后 formal Real-ESRGAN（禁静默 promote）",
+                )
+        except Exception:
+            pass
         preview_ok = _preview_ok(root)
         rehearse_ok = _tts_rehearse_ok(root)
         require_reh = bool(spec.get("tts_rehearsal_required") is True) if spec else False

@@ -1530,6 +1530,62 @@
       ]
     },
     {
+      "id": "realesrgan-animevideo-research",
+      "display_name": "Real-ESRGAN anime video formal upscale research",
+      "status": "experimental",
+      "readiness": "ncnn_canary_ok_formal_optional",
+      "latest_canary_receipt_path": "registry/evidence/realesrgan-canary-ab-20260806.json",
+      "provider": "local_or_comfy_lan",
+      "node": "rtx5090-main",
+      "intents": [
+        "video-upscale-research",
+        "formal-upscale-after-selects"
+      ],
+      "allowed_stages": [
+        "research",
+        "formal"
+      ],
+      "license_scope": "BSD-3-Clause_verify_model_and_output_rights_before_release",
+      "upstream": "https://github.com/xinntao/Real-ESRGAN",
+      "spec_path": "references/realesrgan-formal-upscale.md",
+      "preferred_models": [
+        "realesr-animevideov3",
+        "RealESRGAN_x4plus_anime_6B"
+      ],
+      "bounded_canary_candidates": [
+        "realesr-animevideov3.pth",
+        "RealESRGAN_x4plus_anime_6B.pth"
+      ],
+      "requirements": {
+        "minimum_vram_mib": 4096,
+        "weights_preinstalled_and_fingerprinted": true,
+        "source_media_hash_required": true,
+        "selects_or_preferred_only": true,
+        "gfpgan_face_enhance_default": false
+      },
+      "restrictions": [
+        "no_auto_download",
+        "no_auto_execute",
+        "no_auto_promotion",
+        "not_bulk_default",
+        "not_final_without_human_review",
+        "preserve_source_fps_and_duration",
+        "copy_audio_or_partial_honest",
+        "no_gpu_hog_during_h3_bulk",
+        "motion_gate_red_still_blocks_promote",
+        "no_upscale_after_hardburn_captions"
+      ],
+      "probe_command": "./scripts/runtime-python scripts/realesrgan_probe.py",
+      "promotion_requirements": [
+        "weight_fingerprints",
+        "ab_vs_ffmpeg_geometry_canary",
+        "temporal_consistency_review",
+        "face_hand_text_oversharpen_review",
+        "mean_not_used_as_quality_proxy",
+        "human_review"
+      ]
+    },
+    {
       "id": "wan22-s2v-performance-research",
       "display_name": "Wan 2.2 sound-conditioned performance research",
       "status": "experimental",

@@ -45,7 +45,12 @@ def _metrics(*, root: str, passed: bool = True, challenger: str | None = None) -
 def test_program_has_named_challengers_audio_lanes_and_single_post_owner(tmp_path: Path) -> None:
     program = init_program(tmp_path)
 
-    assert set(program["challengers"]) == {"infinitetalk", "ltx-fast", "hunyuan-720p-sr"}
+    assert set(program["challengers"]) == {
+        "infinitetalk",
+        "ltx-fast",
+        "hunyuan-720p-sr",
+        "realesrgan-animevideo",
+    }
     assert set(program["audio_lanes"]) == {"qwen3-tts", "ace-step", "stable-audio", "mmaudio"}
     assert program["post_policy"]["allowed_owners"] == ["hyperframes", "remotion"]
     assert len(program["weekly_metrics"]) == 10

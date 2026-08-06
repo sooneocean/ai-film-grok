@@ -546,6 +546,28 @@ def cmd_doctor(args: argparse.Namespace) -> int:
         i2v_providers = {"ok": False, "error": str(exc)[:200]}
     report["i2v_providers"] = i2v_providers
 
+    # Real-ESRGAN formal upscale (soft; default off — never blocks doctor)
+    realesrgan_info: dict[str, Any] = {"ok": False, "execution_ready": False}
+    try:
+        sys.path.insert(0, str(skill_dir / "scripts"))
+        from realesrgan_upscale import backend_status, fingerprint_assets
+
+        st = backend_status()
+        fps = fingerprint_assets()
+        realesrgan_info = {
+            "ok": True,
+            "backend_ready": bool(st.get("backend_ready")),
+            "execution_ready": bool(st.get("backend_ready") and fps),
+            "preferred_backend": st.get("preferred_backend"),
+            "ncnn_binary": st.get("ncnn_binary"),
+            "fingerprint_count": len(fps),
+            "default_enabled": False,
+            "cli": "aifilm upscale plan|run|promote|canary",
+        }
+    except Exception as exc:  # noqa: BLE001 — soft probe
+        realesrgan_info = {"ok": False, "error": str(exc)[:200]}
+    report["realesrgan"] = realesrgan_info
+
     # Cross-modality weapon inventory (soft; never blocks core_readiness alone)
     weapon_inventory: dict[str, Any] = {"ok": False}
     try:

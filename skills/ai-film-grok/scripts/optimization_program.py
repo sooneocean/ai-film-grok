@@ -32,6 +32,18 @@ CHALLENGERS = {
         "allowed_stage": "formal",
         "requires": ["720p_decode", "sr_artifact_review", "human_visual_review"],
     },
+    "realesrgan-animevideo": {
+        "role": "formal_upscale",
+        "allowed_stage": "formal",
+        "requires": [
+            "selects_or_preferred",
+            "source_media_hash",
+            "sr_artifact_review",
+            "temporal_consistency_review",
+            "human_visual_review",
+            "no_auto_promotion",
+        ],
+    },
 }
 
 AUDIO_LANES = {

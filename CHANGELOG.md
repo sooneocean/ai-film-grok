@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.40.37] - 2026-08-06
+
+### Added (Real-ESRGAN formal upscale · canary → CLI → hooks)
+- **Canary A/B 绿**：`aifilm upscale canary`；证据 `registry/evidence/realesrgan-canary-ab-20260806.json`（352×608→704×1280，ncnn `realesr-animevideov3`×2，~5.8s/1.5s@M1，audio copy；A=ffmpeg 0.27s）。
+- **CLI**：`aifilm upscale plan|run|promote|canary` — 默认不 promote；GPU busy 零 submit；`--i-own-the-gpu` 显式放行。
+- **核心**：`media/realesrgan_upscale.py`（ncnn 帧超分 + pad 到目标画布 + receipt）。
+- **挂钩**：doctor soft `realesrgan`；next 在 `upscale.enabled` 时推 formal；H3 `ensure_h3_delivery_geometry(mode=ffmpeg|realesrgan|auto)` / env `AIFILM_H3_GEOMETRY`（**默认仍 ffmpeg**）。
+- **测试**：`test_realesrgan_upscale.py` + probe；默认生产 **off**。
+- **策略脚手架**：hard-defaults + memory + weapon `realesrgan-animevideo-research` + optimization challenger。
+
 ## [2.40.36] - 2026-08-06
 
 ### Changed (senior-dev 代码质量把控 · Phase 4 测试缺口补漏 · P4-1 续)

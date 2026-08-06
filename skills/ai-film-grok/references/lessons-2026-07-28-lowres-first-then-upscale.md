@@ -7,15 +7,16 @@
 
 ## 铁律
 1. **Bulk / 通片优先墙钟时间**：I2V 默认先 **低压**（如 480×832 9:16、turbo 4-step），不默认 720/1080 吃满 5090。
-2. **先齐 30 镜可剪可审**，再挑 hero/肉戏/定器做 **二轮升画质**（更高 res、adult-motion 20-step、或 topaz/Comfy upscale）。
+2. **先齐 30 镜可剪可审**，再挑 hero/肉戏/定器做 **二轮升画质**（更高 res、adult-motion 20-step、或 **Real-ESRGAN / Comfy upscale**）。
 3. **不要**在未通片前为「单镜更清」拖慢整批。
 4. 升画质只针对：**selects 通过的镜 / 成片可见硬伤 / 用户点名**。
+5. **2026-08-06**：AI 超分候选 = Real-ESRGAN（视频 `realesr-animevideov3`）；规范 [realesrgan-formal-upscale](realesrgan-formal-upscale.md)。H3 几何 floor 今日仍是 ffmpeg，**不等于** formal AI 超分。
 
 ## 本集默认（ch04 shelter）
 | 阶段 | 设置 |
 |---|---|
 | 通片 bulk | Wan `official+turbo` · **480×832** · 3–4s · bare KF 源 |
-| 二轮（可选） | 同 still 再跑 720×1280 或 adult-motion quality；或输出后 upscale |
+| 二轮（可选） | 同 still 再跑 720×1280 或 adult-motion quality；或输出后 **Real-ESRGAN formal** |
 | 静帧 | 仍 720×1280 keyframe（I2V 输入可压；源图可保留高） |
 
 ## 工程挂钩

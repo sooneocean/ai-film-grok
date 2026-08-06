@@ -1,0 +1,81 @@
+{
+  "ok": true,
+  "kind": "ai-film-upscale-canary-ab",
+  "schema_version": 1,
+  "created_at": "2026-08-06T11:01:14+00:00",
+  "source": {
+    "path": "/Users/dex/.grok/plugins/ai-film-grok/skills/ai-film-grok/artifacts/realesrgan-canary/src_352x608.mp4",
+    "width": 352,
+    "height": 608,
+    "fps": 24.0,
+    "duration_sec": 1.5,
+    "has_audio": true,
+    "sha256": "29046d9c8143254924b8f392969ecac7a21133839f30089b699c938dd38a208e"
+  },
+  "A_ffmpeg": {
+    "path": "/Users/dex/.grok/plugins/ai-film-grok/skills/ai-film-grok/artifacts/realesrgan-canary/a_ffmpeg_704x1280.mp4",
+    "width": 704,
+    "height": 1280,
+    "fps": 24.0,
+    "duration_sec": 1.5,
+    "has_audio": true,
+    "sha256": "059f3567ac5501271dfd07751eade9feb541855fa82aa0b621d2c23125c755d7",
+    "backend": "ffmpeg_geometry",
+    "wall_sec": 0.267,
+    "source": "/Users/dex/.grok/plugins/ai-film-grok/skills/ai-film-grok/artifacts/realesrgan-canary/src_352x608.mp4"
+  },
+  "B_realesrgan": {
+    "ok": true,
+    "schema_version": 1,
+    "kind": "ai-film-upscale-receipt",
+    "created_at": "2026-08-06T11:01:14+00:00",
+    "backend": "ncnn",
+    "model": "realesr-animevideov3",
+    "scale": 2,
+    "source_path": "/Users/dex/.grok/plugins/ai-film-grok/skills/ai-film-grok/artifacts/realesrgan-canary/src_352x608.mp4",
+    "source_sha256": "29046d9c8143254924b8f392969ecac7a21133839f30089b699c938dd38a208e",
+    "source_width": 352,
+    "source_height": 608,
+    "output_path": "/Users/dex/.grok/plugins/ai-film-grok/skills/ai-film-grok/artifacts/realesrgan-canary/b_realesrgan_s2.mp4",
+    "output_sha256": "e964af3d314213844dd0ae5a14c7f7afc5a18c472e1fea7ad767a5fb0cb60386",
+    "width": 704,
+    "height": 1280,
+    "fps": 24.0,
+    "duration_sec": 1.5,
+    "audio_policy": "copy",
+    "frames": 36,
+    "wall_sec": 5.833,
+    "gpu_busy_skipped": false,
+    "promoted": false,
+    "fingerprints": {
+      "realesr-animevideov3.pth": "b8a8376811077954d82ca3fcf476f1ac3da3e8a68a4f4d71363008000a18b75d",
+      "RealESRGAN_x4plus_anime_6B.pth": "f872d837d3c90ed2e05227bed711af5671a6fd1c9f7d7e91c911a61f155e99da",
+      "realesr-animevideov3-x2.bin": "548a36f9c3f4ab8da56cd3b13badf23968bee207b396dad14d04b830e5f2ab2d",
+      "realesr-animevideov3-x2.param": "b88ff4f00ebf019a7fdac17fdd45a7fd3665d37509efc5baf2e4da2e24420a04",
+      "realesr-animevideov3-x4.bin": "548a36f9c3f4ab8da56cd3b13badf23968bee207b396dad14d04b830e5f2ab2d",
+      "realesrgan-x4plus-anime.bin": "fe01c269cfd10cdef8e018ab66ebe750cf79c7af4d1f9c16c737e1295229bacc"
+    },
+    "target_width": 704,
+    "target_height": 1280
+  },
+  "fingerprints": {
+    "realesr-animevideov3.pth": "b8a8376811077954d82ca3fcf476f1ac3da3e8a68a4f4d71363008000a18b75d",
+    "RealESRGAN_x4plus_anime_6B.pth": "f872d837d3c90ed2e05227bed711af5671a6fd1c9f7d7e91c911a61f155e99da",
+    "realesr-animevideov3-x2.bin": "548a36f9c3f4ab8da56cd3b13badf23968bee207b396dad14d04b830e5f2ab2d",
+    "realesr-animevideov3-x2.param": "b88ff4f00ebf019a7fdac17fdd45a7fd3665d37509efc5baf2e4da2e24420a04",
+    "realesr-animevideov3-x4.bin": "548a36f9c3f4ab8da56cd3b13badf23968bee207b396dad14d04b830e5f2ab2d",
+    "realesrgan-x4plus-anime.bin": "fe01c269cfd10cdef8e018ab66ebe750cf79c7af4d1f9c16c737e1295229bacc"
+  },
+  "backend": {
+    "ncnn_binary": "/Users/dex/.cache/realesrgan/ncnn/realesrgan-ncnn-vulkan",
+    "ncnn_models": "/Users/dex/.cache/realesrgan/ncnn/models",
+    "weights_dir": "/Users/dex/.cache/realesrgan/weights",
+    "inference_script": null,
+    "backend_ready": true,
+    "preferred_backend": "ncnn"
+  },
+  "verdict_notes": [
+    "Human must compare sharpness/flicker/face; mean should not drive promote",
+    "B should be >=704x1280 after pad; native SR may be 704x1216 before pad"
+  ]
+}
