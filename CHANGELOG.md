@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.40.31] - 2026-08-06
+
+### Changed (senior-dev 代码质量把控 · Phase 4 测试缺口补漏 · P4-1 续)
+- **零覆盖基座再补漏（P4-1）**：`util/validators.py`（`slugify` / `aspect_dims`，全局输入校验地基、此前零单测）补 `tests/test_util_validators.py`（10 用例，纯函数、零依赖、确定性）：`slugify` 大小写/空白/下划线/斜杠归一、连字符折叠、首尾去杠、CJK 保留、空串兜底为 `film`；`aspect_dims` 查表 5 档 + 不支持抛 `FilmError` 且错误信息含可用档。`ruff` 经 `--fix` 干净。
+- **路线图**：P4-1 继续覆盖 `util`(subprocess/errors)、`core`(film_io/paths/constants/media_ops)、`node`(GPU 适配)、`final`(单元层)；P4-2 跟进校验类 `film_spec*`/`story_contract`/`subtitle_typesetter`/`edit_policy_*`。
+
 ## [2.40.30] - 2026-08-06
 
 ### Changed (senior-dev 代码质量把控 · Phase 3 迁移 & 去重 · P3-1 续)
