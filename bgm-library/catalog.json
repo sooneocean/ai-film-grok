@@ -1,7 +1,7 @@
 {
   "schema": "aifilm-bgm-library-v1",
-  "revision": 152,
-  "updated_at": "2026-08-06T01:52:56.449467+00:00",
+  "revision": 172,
+  "updated_at": "2026-08-06T02:32:30.986601+00:00",
   "assets": {
     "rnb-5900-7255568d10": {
       "schema": "aifilm-bgm-asset-v1",
@@ -823,9 +823,9 @@
         "approved_at": "2026-07-28T10:22:09.521973+00:00"
       },
       "license_note": "Locally generated with ACE-Step-1.5 on the private RTX 5090 node; approved by Dex for the project library; software MIT license is not a legal warranty for output use.",
-      "use_count": 0,
-      "last_used_at": null,
-      "last_used_film_id": null,
+      "use_count": 2,
+      "last_used_at": "2026-08-06T02:32:30.986601+00:00",
+      "last_used_film_id": "",
       "created_at": "2026-07-28T09:50:30.145136+00:00"
     },
     "sensual-6101-6a7972c8b2": {
@@ -1318,9 +1318,9 @@
         "approved_at": "2026-07-28T10:22:12.021610+00:00"
       },
       "license_note": "Locally generated with ACE-Step-1.5 on the private RTX 5090 node; approved by Dex for the project library; software MIT license is not a legal warranty for output use.",
-      "use_count": 0,
-      "last_used_at": null,
-      "last_used_film_id": null,
+      "use_count": 2,
+      "last_used_at": "2026-08-06T02:32:30.445318+00:00",
+      "last_used_film_id": "",
       "created_at": "2026-07-28T09:54:00.992939+00:00"
     },
     "dark-6200-9df3e64099": {
@@ -1483,9 +1483,9 @@
         "approved_at": "2026-07-28T10:22:01.766023+00:00"
       },
       "license_note": "Locally generated with ACE-Step-1.5 on the private RTX 5090 node; approved by Dex for the project library; software MIT license is not a legal warranty for output use.",
-      "use_count": 0,
-      "last_used_at": null,
-      "last_used_film_id": null,
+      "use_count": 2,
+      "last_used_at": "2026-08-06T02:32:28.783475+00:00",
+      "last_used_film_id": "",
       "created_at": "2026-07-28T09:55:17.916657+00:00"
     },
     "dark-6201-3e9a2d4889": {
@@ -1648,9 +1648,9 @@
         "approved_at": "2026-07-28T10:22:02.585492+00:00"
       },
       "license_note": "Locally generated with ACE-Step-1.5 on the private RTX 5090 node; approved by Dex for the project library; software MIT license is not a legal warranty for output use.",
-      "use_count": 0,
-      "last_used_at": null,
-      "last_used_film_id": null,
+      "use_count": 2,
+      "last_used_at": "2026-08-06T02:32:29.011255+00:00",
+      "last_used_film_id": "",
       "created_at": "2026-07-28T09:56:36.948127+00:00"
     },
     "dark-6202-45ccd1cfa8": {
@@ -1978,9 +1978,9 @@
         "approved_at": "2026-07-28T10:22:04.861866+00:00"
       },
       "license_note": "Locally generated with ACE-Step-1.5 on the private RTX 5090 node; approved by Dex for the project library; software MIT license is not a legal warranty for output use.",
-      "use_count": 0,
-      "last_used_at": null,
-      "last_used_film_id": null,
+      "use_count": 2,
+      "last_used_at": "2026-08-06T02:32:28.528250+00:00",
+      "last_used_film_id": "",
       "created_at": "2026-07-28T09:58:46.718213+00:00"
     },
     "warm-6300-5dee332847": {
@@ -2803,9 +2803,9 @@
         "approved_at": "2026-07-28T10:22:06.447365+00:00"
       },
       "license_note": "Locally generated with ACE-Step-1.5 on the private RTX 5090 node; approved by Dex for the project library; software MIT license is not a legal warranty for output use.",
-      "use_count": 0,
-      "last_used_at": null,
-      "last_used_film_id": null,
+      "use_count": 2,
+      "last_used_at": "2026-08-06T02:32:29.741355+00:00",
+      "last_used_film_id": "",
       "created_at": "2026-07-28T10:06:05.361072+00:00"
     },
     "playful-6401-aaed2b88b9": {
@@ -2968,9 +2968,9 @@
         "approved_at": "2026-07-28T10:22:07.309101+00:00"
       },
       "license_note": "Locally generated with ACE-Step-1.5 on the private RTX 5090 node; approved by Dex for the project library; software MIT license is not a legal warranty for output use.",
-      "use_count": 0,
-      "last_used_at": null,
-      "last_used_film_id": null,
+      "use_count": 2,
+      "last_used_at": "2026-08-06T02:32:30.008351+00:00",
+      "last_used_film_id": "",
       "created_at": "2026-07-28T10:07:01.017105+00:00"
     },
     "playful-6402-62a915eb17": {
@@ -3298,9 +3298,9 @@
         "approved_at": "2026-07-28T10:22:08.874183+00:00"
       },
       "license_note": "Locally generated with ACE-Step-1.5 on the private RTX 5090 node; approved by Dex for the project library; software MIT license is not a legal warranty for output use.",
-      "use_count": 0,
-      "last_used_at": null,
-      "last_used_film_id": null,
+      "use_count": 2,
+      "last_used_at": "2026-08-06T02:32:29.245585+00:00",
+      "last_used_film_id": "",
       "created_at": "2026-07-28T10:08:29.001065+00:00"
     },
     "rnb-6500-f4f3539404": {
@@ -3463,9 +3463,9 @@
         "approved_at": "2026-07-28T10:47:05.362738+00:00"
       },
       "license_note": "Locally generated with ACE-Step-1.5 on the private RTX 5090 node; approved by Dex for the project library; software MIT license is not a legal warranty for output use.",
-      "use_count": 0,
-      "last_used_at": null,
-      "last_used_film_id": null,
+      "use_count": 2,
+      "last_used_at": "2026-08-06T02:32:30.241587+00:00",
+      "last_used_film_id": "",
       "created_at": "2026-07-28T10:24:11.007437+00:00"
     },
     "rnb-6501-7334fe1fba": {
@@ -4123,9 +4123,9 @@
         "approved_at": "2026-07-28T10:47:07.891077+00:00"
       },
       "license_note": "Locally generated with ACE-Step-1.5 on the private RTX 5090 node; approved by Dex for the project library; software MIT license is not a legal warranty for output use.",
-      "use_count": 59,
-      "last_used_at": "2026-08-06T01:52:56.449467+00:00",
-      "last_used_film_id": "第一回：精液铸币，原初的子宫洗礼",
+      "use_count": 61,
+      "last_used_at": "2026-08-06T02:32:28.340581+00:00",
+      "last_used_film_id": "",
       "created_at": "2026-07-28T10:27:51.763405+00:00"
     },
     "rnb-6505-7f179e59e9": {

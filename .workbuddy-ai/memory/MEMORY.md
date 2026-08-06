@@ -9,7 +9,7 @@
 ## bgm-library
 - `catalog.json`：46 资产（revision 152，round6 闭环 60 fill 缺口前为 92）。`technical.fingerprint` 为 101 维声纹。
 - `similarity_cluster`：全部 46 资产已填（曾 3 个 pending 为 null，已修）。聚类规则 = 同 mood 内对 fingerprint 做余弦相似度、阈值 0.95 贪心归组。新增资产后需重跑聚类。
-- `gap-queue.jsonl`：缺口生命周期 `status` ∈ {open, routed_generate, filled, rejected}；`action` ∈ {fill, generate}；`routed_backend` / `generation_job_id` 在 routed_generate 时填。当前 **100 缺口 = 60 filled(fill) + 10 routed_generate(acep-step) + 30 open(generate·coverage_gap，其中 6 个 no-capable-backend 死路)**（round7 `coverage --emit-generate --apply` 前瞻排产 30 入队）。**关键发现（round6 审计）：原 60 个 open fill 缺口全部 `suggested_asset_id` 指向 approved 资产——此前无任何自动化闭环（只能人手 `fill_gap.py`），已于 round6 经 `fill_open_gaps.py --apply` 一次闭环（rev 92→152，仅 2 个资产被 60 次复用）；全部 generate 缺口原缺 `duration`，已 `reconcile --fix` 按 to-generate.jsonl 回填 30s。**
+- `gap-queue.jsonl`：缺口生命周期 `status` ∈ {open, routed_generate, filled, rejected}；`action` ∈ {fill, generate}；`routed_backend` / `generation_job_id` 在 routed_generate 时填。当前 **100 缺口 = 80 filled + 20 routed_generate(acep-step·submitted)**（round7 前瞻排产 30 coverage_gap：20 被现有资产复用填充、10 路由待生成；6 个 `pulse` 死路已通过给后端补 `pulse` stem_profiles 解锁）。**关键发现（round6 审计）：原 60 个 open fill 缺口全部 `suggested_asset_id` 指向 approved 资产——此前无任何自动化闭环（只能人手 `fill_gap.py`），已于 round6 经 `fill_open_gaps.py --apply` 一次闭环（rev 92→152，仅 2 个资产被 60 次复用）；全部 generate 缺口原缺 `duration`，已 `reconcile --fix` 按 to-generate.jsonl 回填 30s。**
 - `generators.json`（schema aifilm-generators-v1）：声音生成后端能力注册表（acestep local active / ltx23 api active / grok15 api active 角色待定 / h3 pending）。新增声音源 = 加一条目，router/generate_loop 不变。
 - `generation-jobs.jsonl`：generate 回路台账（job_id/source_gap_id/backend/ext_id/status/spec）。
 - 修改前备份：`catalog.json.bak`、`gap-queue.jsonl.bak`（已被 .gitignore 忽略）。
@@ -64,9 +64,9 @@
 - 已批准母带已转 FLAC（无损，省 ~213MB 磁盘），catalog 路径/sha256/codec 已同步；可 flac→wav 还原。下游若只认 wav 需告知（当时未确认）。
 
 ## 未决
-- `use_count` 已由 round6 闭环 60 fill 缺口起跳（仅 2 个资产被 60 次复用）；`reconcile --fix` 已回填全部 generate 缺口 duration（10 ambient + 30 coverage_gap）。实时仓库现状：rev 152、gaps 100 = 60 filled + 10 routed_generate(acep-step) + 30 open(coverage_gap，6 死路)。
+- `use_count` 已由 round6 闭环 60 fill 缺口 + round7 submit 复用 20 次起跳；`reconcile --fix` 已回填全部 generate 缺口 duration（10 ambient + 30 coverage_gap）。实时仓库现状：rev 172、gaps 100 = 80 filled + 20 routed_generate(acep-step·submitted，0 open)，6 个 `pulse` 死路已解锁（generators 补 pulse stem_profiles）。
 - 外部依赖（closure 路径已就绪，差真实凭据/命令）：
-  - acestep `invocation.cmd` 仍是 `REPLACE_ME` 占位；`run_acestep.py --pending` 会检测并跳过，操作员配好真实 5090 ACE-Step CLI 后即可落 wav。配好后 `generate_loop.py --poll --auto-approve` 闭合 10 缺口（见 RUNBOOK.md）。
+  - acestep `invocation.cmd` 仍是 `REPLACE_ME` 占位（generators 已补 pulse 能力）；`run_acestep.py --pending` 检测 `REPLACE_ME` 会跳过，操作员配好真实 5090 ACE-Step CLI 后即可落 wav。配好后 `run_acestep.py --pending` → `generate_loop.py --poll --auto-approve` 闭合 20 工单（10 ambient + 10 coverage，见 RUNBOOK.md）。cmd 模板变量：`{seed}{mood}{stem}{duration}{out}{job_id}`，`out`=`bgm-library/pending/{job_id}.wav`。
   - ltx23 / grok15 的 `endpoint`/`auth_env` 仍是 `REPLACE_ME`；`ApiBackend` 已实现（重试/退避/鉴权），填好即用，填前建议把 `status` 置 `pending` 避免 failover+熔断。`grok15` 角色仍待定（垫乐 vs 配音）；若是配音应走 TTS 车道（`asset_kind:"tts"`）而非 BGM 生成。
   - H3 接口待补（capabilities 为空、status pending）。
 - melo-cache 模型缓存应移出资产库；approve 当前 wav→approved 保留 wav，FLAC 转码未接（可选）。

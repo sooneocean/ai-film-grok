@@ -1,6 +1,6 @@
 {
   "schema": "aifilm-generators-v1",
-  "updated_at": "2026-08-05T09:59:00+00:00",
+  "updated_at": "2026-08-06T10:30:00+00:00",
   "note": "Backend-agnostic generator registry. Adding a sound source = adding one entry here; the router and generate_loop never change. status mirrors tts-evaluations engine status (active | pending | archived_failed) so a credit-exhausted backend (like fish was) is auto-excluded from routing.",
   "backends": {
     "acestep": {
@@ -11,13 +11,13 @@
       "cost": "free (local GPU)",
       "capabilities": {
         "moods": ["ambient", "rnb", "dark", "warm", "playful", "sensual"],
-        "stem_profiles": ["pad", "full", "thin"],
+        "stem_profiles": ["pad", "full", "thin", "pulse"],
         "loopable": true,
         "max_duration": 60
       },
       "invocation": {
         "type": "command",
-        "cmd": "REPLACE_ME: ace-step --seed {seed} --mood {mood} --stem {stem} --duration {duration} --out {out}",
+        "cmd": "REPLACE_ME <real ACE-Step cmd keeping {seed}{mood}{stem}{duration}{out}{job_id} placeholders, e.g. ace-step --seed {seed} --mood {mood} --stem {stem} --duration {duration} --out {out} --job-id {job_id}>",
         "watch_dir": "bgm-library/pending",
         "out_pattern": "{job_id}.wav"
       },
@@ -31,7 +31,7 @@
       "cost": "API or self-hosted",
       "capabilities": {
         "moods": ["ambient", "rnb", "dark", "warm", "playful", "sensual"],
-        "stem_profiles": ["pad", "full", "thin"],
+        "stem_profiles": ["pad", "full", "thin", "pulse"],
         "loopable": true,
         "max_duration": 30
       },
