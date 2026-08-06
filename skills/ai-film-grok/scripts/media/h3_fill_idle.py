@@ -1620,6 +1620,33 @@ def fill_idle_until_empty(
             break
         if skipped == "capacity_not_ready" and stop_on_capacity:
             if bool(free_first) or capacity_wait_sec > 0:
+                # Heartbeat so ops don't read a stale final receipt mid-wait.
+                try:
+                    from util import write_json as _wj
+
+                    _hb = {
+                        "schema_version": 1,
+                        "kind": "ai-film-fill-idle-until-empty",
+                        "ok": True,
+                        "root": str(base),
+                        "execute": True,
+                        "until_empty": True,
+                        "in_progress": True,
+                        "stop_reason": "capacity_waiting",
+                        "at": utc_now(),
+                        "free_first": bool(free_first),
+                        "capacity_wait_sec": capacity_wait_sec,
+                        "cycles_run": len(cycles),
+                        "jobs_ran_total": total_ran,
+                        "pending_after": run_rep.get("pending_after"),
+                        "next_after": run_rep.get("next_after"),
+                        "note": "mid-loop wait; free_first never cancels foreign",
+                    }
+                    _path = base / "receipts" / "fill-idle-until-empty.json"
+                    _path.parent.mkdir(parents=True, exist_ok=True)
+                    _wj(_path, _hb)
+                except Exception:
+                    pass
                 recover = recover_capacity_contention(
                     free_first=bool(free_first),
                     capacity_wait_sec=capacity_wait_sec,

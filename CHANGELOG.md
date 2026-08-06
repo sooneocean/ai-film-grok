@@ -1,5 +1,10 @@
 # Changelog
 
+## [2.39.85] - 2026-08-06
+
+### Fixed (C1 ops heartbeat)
+- until-empty writes mid-loop `stop_reason=capacity_waiting` receipt so ops do not read a stale `run_failed` while free-first waits for foreign GPU.
+
 ## [2.39.84] - 2026-08-06
 
 ### Fixed (C1 capacity wait clamp)
