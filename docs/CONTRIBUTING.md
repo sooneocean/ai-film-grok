@@ -63,7 +63,7 @@ make -C "$ROOT" install-hooks
 1. **JSON I/O:** `util.read_json` (soft) / `util.require_json` (hard). No new private `_read_json*` for ordinary film JSON. Secure nofollow reads: `util.read_json_source` only for index/security paths.
 2. **Volume / loudness probe:** `core.media_ops.probe_native_audio_mean_volume` — do not paste ffmpeg `volumedetect` again. Promote decisions must go through `composition_anti_hijack` (never mean/volume alone).
 3. **Retry/backoff:** prefer `util.retry` when adding new loops.
-4. **Public `aifilm` subcommand strings** stay stable; package moves keep hard-compat shims + tests.
+4. **Public `aifilm` subcommand strings** stay stable; package moves keep hard-compat shims + tests — see [`SHIM_POLICY.md`](./SHIM_POLICY.md).
 5. **No silent policy change** on heat / pilot GO / `i2v_provider`.
 6. **No vanity “everything &lt;1500 LOC” peels** — peel only when a bug forces you into a monolith.
 

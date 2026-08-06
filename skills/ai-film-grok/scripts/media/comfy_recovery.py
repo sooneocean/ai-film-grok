@@ -329,13 +329,28 @@ def recover_comfy(
             "remote_service_restarted": False,
         }
 
-    remote_healthy = False
-    for attempt in range(3):
+    class _RemoteNotReady(RuntimeError):
+        """Internal: remote probe not healthy yet — util.retry only."""
+
+    def _probe_remote_once() -> bool:
         if remote_probe(checked):
-            remote_healthy = True
-            break
-        if attempt < 2:
-            sleeper(1)
+            return True
+        raise _RemoteNotReady("remote ComfyUI not healthy")
+
+    from util.retry import retry_call
+
+    try:
+        retry_call(
+            _probe_remote_once,
+            attempts=3,
+            delay_sec=1.0,
+            backoff=1.0,
+            retry_on=(_RemoteNotReady,),
+            sleep=sleeper,
+        )
+        remote_healthy = True
+    except _RemoteNotReady:
+        remote_healthy = False
 
     service_restarted = False
     if not remote_healthy:

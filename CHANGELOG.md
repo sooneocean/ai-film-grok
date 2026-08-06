@@ -1,10 +1,22 @@
 # Changelog
 
-## [2.39.93] - 2026-08-06
+## [2.39.95] - 2026-08-06
 
 ### Quality / tooling (close the local gate-trust gap, cont.)
 - `scripts/check-all.sh`: added **step 7 coverage gate** — `coverage run` over the fast path (`-m "not slow"`), then `coverage report --fail-under=58` plus per-file floors (`media_qa.py` 45 / `quality_evidence.py` 80 / `continuity.py` 85), mirroring CI `validate-core`. Local `make check-all` now fully ≡ CI green line (validate + ruff + doctor + pytest not-slow + secret-scan + hotpath + coverage 58%).
 - `Makefile`: updated `help` / header to reflect the new coverage step.
+
+## [2.39.94] - 2026-08-06
+
+### Added / Refactored (quality round 4)
+- **Shim policy**: `docs/SHIM_POLICY.md` (linked from CONTRIBUTING); tests cover `edit_policy_shared` thin shim + cycle-free heat import.
+- **frw_rate_limit** exclusive lock wait → `util.retry.retry_call` (constant 50ms backoff, 120s budget).
+
+## [2.39.93] - 2026-08-06
+
+### Fixed / Refactored (quality round 3)
+- **Cycle-free heat/policy**: `narrative/edit_policy_shared.py` holds `PolicyError` + coitus markers; `edit_policy_heat` no longer uses `sys.modules` probe; top-level shim `edit_policy_shared`.
+- **comfy_recovery** remote probe loop → `util.retry.retry_call` (injectable sleeper preserved).
 
 ## [2.39.92] - 2026-08-06
 

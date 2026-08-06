@@ -36,10 +36,30 @@ def test_gates_and_plan_shims() -> None:
 
 
 def test_shim_modules_are_thin() -> None:
-    for name in ("visual_bible.py", "dispatch.py", "next_actions.py", "preflight.py", "beat_spine.py"):
+    for name in (
+        "visual_bible.py",
+        "dispatch.py",
+        "next_actions.py",
+        "preflight.py",
+        "beat_spine.py",
+        "edit_policy_shared.py",
+    ):
         text = (SCRIPTS / name).read_text(encoding="utf-8")
         assert "_sys.modules[__name__]" in text or "sys.modules[__name__]" in text
         assert len(text.splitlines()) < 30
+
+
+def test_edit_policy_shared_shim_and_cycle_free_heat() -> None:
+    """Shared leaf breaks heat↔policy cycle; shim identity matches package."""
+    import edit_policy_shared as shim
+    import narrative.edit_policy_shared as pkg
+    import edit_policy_heat as heat
+    import edit_policy as policy
+
+    assert shim is pkg
+    assert heat.PolicyError is policy.PolicyError is pkg.PolicyError
+    heat_src = (SCRIPTS / "narrative" / "edit_policy_heat.py").read_text(encoding="utf-8")
+    assert "sys.modules.get" not in heat_src.split("HEAT_SCALES")[0]
 
 
 def test_w7_cli_package_and_shim_identity() -> None:
