@@ -1,6 +1,6 @@
 # Plugin 优化点全表（从 memory 反查 · 2026-08-06）
 
-**范围：** 主仓 `ai-film-grok` plugin（`~/.grok/plugins/ai-film-grok`）；记忆 active **~39**（2026-08-06 归档 ~47 → `memory/archive/`）+ session 索引 + 既有 plan。plugin **2.39.98**。  
+**范围：** 主仓 `ai-film-grok` plugin（`~/.grok/plugins/ai-film-grok`）；记忆 active **~39**（2026-08-06 归档 ~47 → `memory/archive/`）+ session 索引 + 既有 plan。plugin **2.40.12**。  
 **读法：** 记忆里的「优化」分三类，**不要混成同一待办清单**：
 
 | 类 | 含义 | 该怎么用 |
@@ -30,12 +30,12 @@
 |----|--------|-----------|------|--------|
 | **C1** | until-empty 真烧到 `queue_empty` | `2026-08-06-c1-*` · AF7 | **OPEN_OPS** | 用户独占 + `--i-own-the-gpu` + variety 绿片 |
 | **C2** | free-first 不杀 foreign + 禁默认 hog | multi-agent-gpu-no-hog | **机读 ship 2.39.98**；真片仍纪律 | exclusive flag + 回执 |
-| **C3** | 正牌 final plate vs master 在交付文案 | `2026-08-06-suse-ep01-official-final-iron` | 代码 A5 ship | 新片强制看 `official-final-report.json` |
+| **C3** | 正牌 final plate vs master 在交付文案 | `2026-08-06-suse-ep01-official-final-iron` | **ship 2.40.12** | 新片强制看 `official-final-report.json` + `test_suse_final_iron.py` 回归 |
 | **C4** | rnb 仅 license 无 wav → procedural 诚实 | 同上 · A4 | ship | 有 wav 再换库 |
 | **C5** | 模型极限勿硬上 / soft-max 档 | `2026-08-06-wardrobe-no-redress-fullnude-fallback` · scale_fallback | 码+receipt ship | promote 路径再压一轮真片 |
 | **C6** | 构图防抢走 multi-seed | `2026-08-05-composition-anti-hijack` | gate 在 | shortlist/pk **禁只比 mean** 纪律 |
 | **C7** | Material fidelity 闭环纪律 | `2026-08-05-material-fidelity-loop` | M0–M6 ship | 每 restricted 镜 request.json |
-| **C8** | Fill-Idle 真烧 + 人 promote | `2026-08-04-h3-fill-idle` · session-wrap | dry 多 · execute 常 capacity/variety | 绿片 + idle 5090 |
+| **C8** | Fill-Idle 真烧 + 人 promote | `2026-08-04-h3-fill-idle` · session-wrap | **OPEN_OPS + evidence** | 绿片 + idle 5090 |
 | **C15** | 时长目标 vs H3 镜数 | savani · Q4.1 | **ship 2.39.81** | bulk `duration_target` |
 | **C16** | h3 ship-native plate | savani · Q5.1 | **ship 2.39.81** | 叠 hardburn 仍待 final |
 | **C17** | crop-master still 告警 | savani · Q1.4 | **ship 2.39.82** | 真片再压 |
@@ -222,4 +222,4 @@ P3  C11–C14 deferred / optional
 
 ---
 
-_Generated 2026-08-06 from ~80 memory cards + session indexes + active plans. Status of C1 row: PARTIAL (L4_INSERT_LOW / film-specific)._
+_Generated 2026-08-06 from ~80 memory cards + session indexes + active plans. Status of C1 row: OPEN_OPS (L4_INSERT_LOW / capacity-safe); C3 now ship-aligned with `test_suse_final_iron.py` checks._

@@ -1,20 +1,27 @@
-# 若我来优化：ai-film-grok 代码库 Todo Plan（2026-08-06 · v2.40.9）
+# 若我来优化：ai-film-grok 代码库 Todo Plan（2026-08-06 · v2.40.12）
 
-**Status:** **ACTIVE 单一执行板 · 2026-08-06 closeout 2.40.10**  
+**Status:** **ACTIVE 单一执行板 · 2026-08-06 closeout 2.40.12（执行中）**  
 W0–W1.5 · W4 诚实 except · W5 纪律卡 · W6 archive **SHIPPED** · W2 tunnel **up** + capacity canary（until-empty **DEFERRED_SAFE** 默认 max5）· W3 巨石仍 bug-driven only  
+**副导演工序板：** [2026-08-06-ad-process-optimization-todoplan.md](2026-08-06-ad-process-optimization-todoplan.md)（Wave A–D 2.40.11）  
 **Repo:** `/Users/dex/.grok/plugins/ai-film-grok`
 
 **结论先行：** 这不是「缺功能」的仓库，而是 **片厂已建完、规章已上墙、车间仍塞着几个 3k–4k 行总控台** 的成熟产线。下一轮优化应以 **诚实出片 + 可维护热路径 + 运维吞吐** 为主，**禁止**再开「全员压到 1500 行」或「再写一套 IRON 散文」。
 
 | 项 | 现状（本机探针） |
 |----|------------------|
-| 版本 | `plugin.json` **2.40.9** |
+| 版本 | `plugin.json` **2.40.12** |
 | 脚本 | ~**637** `.py` · scripts 树合计 ~**163k** LOC（含 shim） |
 | 测试 | ~**406** `test_*.py` · 体量很大，绿线靠 `make check-all` |
 | 文档税 | references ~**172** · memory active ~**42** · `docs/plans/*` 优化板 **20+** |
 | 最大石 | `edit_policy_heat` **4024** · `film_spec` **3147** · `render_final` **2985** · `story_plan` **2948** · `export_composition` **2804** |
 | 包边界 | W0–W7 **已 ship**（`core/post/narrative/audio/media/plan/cli…` + hard-compat shim） |
 | 今日已 ship | 内容质量 P0 五门 · final 诚实/watchdog · shortform · GPU no-hog 机读 · 字幕 CJK · motion mean · BGM fatigue… |
+
+## 0.1 A/B/C 执行映射（本轮快照）
+
+- **A（已定性已收口）**：final 交付语义与 manifest 字段源已统一（`delivery_class`/`delivery_source`/`delivery_visibility`/`master_lock`），并且 queue `run-next` 缺条件有固定 `halt_reason_code + open_ops` 产出。
+- **B（已增强可回放）**：`test_fill_idle_run_next_ledger.py` 与 `test_h3_until_empty.py` 已覆盖 run-next/ until-empty 的关键分支（busy、capacity、dry-run、执行成功路径）；`test_suse_final_iron.py` 新增 OFFICIAL_FINAL_PLATE 与 TECHNICAL_FINAL 语义回归。
+- **C（本轮可执行块）**：把 C1 queue 真烧改为 `queue_empty` 收口（需独占 GPU 条件满足）、并保持文档状态与 tests 对齐后继续执行 W3 巨石 bug-driven peel。
 
 **与旧板关系：** 本 plan 是 **「独立诊断 + 下一轮执行序」**，不取代历史档案；已 CLOSED 的板只当证据，不重开。
 
@@ -101,12 +108,12 @@ W0–W1.5 · W4 诚实 except · W5 纪律卡 · W6 archive **SHIPPED** · W2 tu
 
 | ID | Todo | 做法 | 验收 |
 |----|------|------|------|
-| **W0.1** | **单一执行板钉死** | 确认本 plan 落 `docs/plans/2026-08-06-next-optimization-todoplan.md`（或刷新既有 08-06-optimization header 状态到 2.40.9） | ✅ 旧板 RESIDUAL POINTER → 本档 |
-| **W0.2** | **刷新巨石 LOC 表** | residual-monolith 表改为本机数字（heat 4024 / film_spec 3147 / render_final 2985…） | ✅ 2.40.9 `wc -l` |
+| **W0.1** | **单一执行板钉死** | 确认本 plan 落 `docs/plans/2026-08-06-next-optimization-todoplan.md`（或刷新既有 08-06-optimization header 状态到 2.40.12） | ✅ 旧板 RESIDUAL POINTER → 本档 |
+| **W0.2** | **刷新巨石 LOC 表** | residual-monolith 表改为本机数字（heat 4024 / film_spec 3147 / render_final 2985…） | ✅ 2.40.12 `wc -l` |
 | **W0.3** | **双 checkout 纪律一页** | AGENTS 已有；加「本 session `git rev-parse` 自检」到 CONTRIBUTING 或 doctor 提示 | ✅ CONTRIBUTING |
 | **W0.4** | **OPEN 清单冻结** | 从 memory inventory 抽出 ≤15 条 C 类 → 本 plan §4；其余标 deferred | ✅ §4 即冻结集 |
 
-**W0 SHIPPED（2.40.10 closeout）.**
+**W0 SHIPPED（2.40.12 closeout）.**
 
 ---
 
@@ -116,11 +123,11 @@ W0–W1.5 · W4 诚实 except · W5 纪律卡 · W6 archive **SHIPPED** · W2 tu
 
 | ID | Todo | 做法 | 验收 |
 |----|------|------|------|
-| **W1.1** | **final 入口契约测常驻** | 确保 `test_final_hotpath` / shim→main 断言在 CI hotpath；缺则补 | ✅ `test_suse_final_iron` A3 + `test_final_hotpath_contracts`（43 passed 本轮） |
+| **W1.1** | **final 入口契约测常驻** | 确保 `test_final_hotpath` / shim→main 断言在 CI hotpath；缺则补 | ✅ `test_suse_final_iron` A3 + `test_final_hotpath_contracts` |
 | **W1.2** | **短 H3 源 + sex floor 回归** | fixture：~5s take + low ratio → **不**静默 10s 不可 stretch 槽 | ✅ `test_suse_final_iron` + `plan/film_spec_sex_floor` |
 | **W1.3** | **口白窗三角回归** | `tts ≤ cue ≤ slot` 失败路径给 next_cmd | ✅ `check_vo_window_triangle` 单测 |
-| **W1.4** | **plate vs master closeout** | gate 红 / skip → 强制 PARTIAL 字段；禁 final_complete | ✅ shortform S1.4 已 ship；真片纪律待 W1.5 |
-| **W1.5** | **真片抽检清单（文档）** | stages/post 或 deliver 短指针：official-final-report / final-timeout / BGM source | ✅ deliver.md 1 屏 + post 指针 |
+| **W1.4** | **plate vs master closeout** | gate 红 / skip → 强制 PARTIAL 字段；禁 final_complete | ✅ shortform S1.4 已 ship；`official_final` 语义回归见 `test_suse_final_iron.py` |
+| **W1.5** | **真片抽检清单（文档）** | stages/post 或 deliver 短指针：official-final-report / final-timeout / BGM source | ✅ deliver.md + `test_suse_final_iron.py` 已覆盖 `OFFICIAL_FINAL_PLATE`/`TECHNICAL_FINAL` 字段 |
 
 **不做：** 重写 render_final 整文件。
 
@@ -253,4 +260,4 @@ Iron：public CLI 不变 · shim hard-compat · 每 peel 独测 · 与行为变�
 
 ---
 
-*分析基线：plugins checkout `ai-film-grok` @ 2.40.9 · 2026-08-06 · 只读探针，未改业务代码。*
+*分析基线：plugins checkout `ai-film-grok` @ 2.40.12 · 2026-08-06 · 只读探针，未改业务代码。*

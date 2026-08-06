@@ -215,6 +215,36 @@ class OfficialFinalPlateTests(unittest.TestCase):
         self.assertFalse(rep["partial"])
         self.assertFalse(rep["master_lock"])
 
+    def test_delivery_fields_official_final_visibility(self) -> None:
+        from final.delivery_class import delivery_fields_from_official_final
+
+        fields = delivery_fields_from_official_final(
+            {
+                "status": "OFFICIAL_FINAL_PLATE",
+                "delivery_class": "OFFICIAL_FINAL_PLATE",
+                "delivery_visibility": "visible_plate",
+                "master_lock": False,
+            }
+        )
+        self.assertEqual(fields["delivery_class"], "OFFICIAL_FINAL_PLATE")
+        self.assertEqual(fields["delivery_source"], "official_final_report")
+        self.assertEqual(fields["delivery_visibility"], "visible_plate")
+        self.assertFalse(fields["master_lock"])
+
+    def test_delivery_fields_technical_visibility_and_master_lock_passthrough(self) -> None:
+        from final.delivery_class import delivery_fields_from_official_final
+
+        fields = delivery_fields_from_official_final(
+            {
+                "status": "TECHNICAL_FINAL",
+                "master_lock": True,
+                "delivery_visibility": "technical_final_visible",
+            }
+        )
+        self.assertEqual(fields["delivery_class"], "TECHNICAL_FINAL")
+        self.assertEqual(fields["delivery_visibility"], "technical_final_visible")
+        self.assertTrue(fields["master_lock"])
+
     def test_write_official_final_report(self) -> None:
         from final.delivery_class import (
             classify_official_final,
@@ -228,6 +258,27 @@ class OfficialFinalPlateTests(unittest.TestCase):
             self.assertTrue(path.is_file())
             data = json.loads(path.read_text(encoding="utf-8"))
             self.assertEqual(data["status"], "OFFICIAL_FINAL_PLATE")
+
+    def test_manifest_entry_follows_official_final_fields(self) -> None:
+        from post.render_final import build_final_film_manifest_entry
+
+        entry = build_final_film_manifest_entry(
+            final_path=Path("/tmp/final.mp4"),
+            output_sha256="abc123",
+            duration_sec=12.34,
+            report_path=Path("/tmp/final-delivery.json"),
+            technical_qa={"ok": True},
+            official_final={
+                "status": "OFFICIAL_FINAL_PLATE",
+                "delivery_class": "OFFICIAL_FINAL_PLATE",
+                "delivery_visibility": "visible_plate",
+                "master_lock": True,
+            },
+        )
+        self.assertEqual(entry["delivery_class"], "OFFICIAL_FINAL_PLATE")
+        self.assertEqual(entry["delivery_source"], "official_final_report")
+        self.assertEqual(entry["delivery_visibility"], "visible_plate")
+        self.assertTrue(entry["master_lock"])
 
 
 class SexFloorPeelTests(unittest.TestCase):
