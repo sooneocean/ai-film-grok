@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.40.91] - 2026-08-07
+
+### Fixed / Changed (C6.5 mypy dual-module unblock + core seed)
+- **style_lock dual-module:** import real packages (`from assets import style_lock|face_identity`) in `core/gates` + `cli_media` (no `from scripts import …` / top-level shim).
+- **mypy config:** `follow_imports=silent`; exclude top-level hard-compat shims `style_lock.py` / `face_identity.py` (package impls under `assets/` remain typed when listed).
+- **`core/paths`:** import `util.security_policy` / `util.runtime_policy` (same pattern as C6.5 util fix).
+- **`make type` seed:** + `core/constants` · `core/emit` · `core/paths` (**15 modules**, zero errors).
+
 ## [2.40.90] - 2026-08-07
 
 ### Fixed (C6.1 residual guard · eng closeout honesty)

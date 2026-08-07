@@ -44,7 +44,7 @@ def recompute_gates(root: Path, manifest: dict[str, Any]) -> dict[str, Any]:
     style_reference_ok = True
     if style_reference:
         try:
-            from scripts import style_lock as sl
+            from assets import style_lock as sl
 
             style_check = sl.validate_style_lock_bible(style)
             style_reference_ok = not any(

@@ -303,7 +303,7 @@ def cmd_continuity_chain(args: argparse.Namespace) -> int:
 
 def cmd_face_identity(args: argparse.Namespace) -> int:
     """Pixel face fingerprints: enroll / verify / audit / status."""
-    from scripts import face_identity as fi
+    from assets import face_identity as fi
 
     action = str(getattr(args, "face_identity_cmd", "") or "").strip()
     root = Path(args.root).expanduser().resolve() if getattr(args, "root", None) else None
@@ -388,7 +388,7 @@ def cmd_face_identity(args: argparse.Namespace) -> int:
 
 def cmd_style_lock(args: argparse.Namespace) -> int:
     """Input-ref → medium fingerprint → cast_locks plan/apply/check/prompt."""
-    from scripts import style_lock as sl
+    from assets import style_lock as sl
 
     action = str(getattr(args, "style_lock_cmd", "") or "").strip()
     root = Path(args.root).expanduser().resolve() if getattr(args, "root", None) else None
@@ -507,7 +507,7 @@ def cmd_lock_style(args: argparse.Namespace) -> int:
     # Optional: auto-apply pending style-lock plan before locking
     style_plan = None
     if bool(getattr(args, "from_plan", False)):
-        from scripts import style_lock as sl
+        from assets import style_lock as sl
 
         style_plan = sl.read_plan(root)
         if style_plan:
@@ -579,7 +579,7 @@ def cmd_lock_style(args: argparse.Namespace) -> int:
         style["cast_master_sha256"] = sha256(cdest)
         # Pixel face-identity enroll (best-effort)
         try:
-            from scripts import face_identity as fi
+            from assets import face_identity as fi
 
             fi.enroll(root, char_id, cdest, label=char_id)
             if char_id != "hero":
@@ -590,7 +590,7 @@ def cmd_lock_style(args: argparse.Namespace) -> int:
     # Medium flag → fingerprint if missing
     medium_flag = getattr(args, "medium", None)
     if medium_flag:
-        from scripts import style_lock as sl
+        from assets import style_lock as sl
 
         mk = sl.infer_medium(explicit=str(medium_flag))
         fp = sl.build_style_fingerprint(
@@ -629,7 +629,7 @@ def cmd_lock_style(args: argparse.Namespace) -> int:
     if not style.get("canonical_style_path"):
         raise FilmError("lock-style requires --canonical style master image")
 
-    from scripts import style_lock as sl
+    from assets import style_lock as sl
 
     check = sl.validate_style_lock_bible(style)
     # A reference-first flow must fail closed: otherwise an old/incomplete
@@ -905,7 +905,7 @@ def cmd_register_still(args: argparse.Namespace) -> int:
         # Pixel face-identity check when cast enrolled
         face_id_result = None
         try:
-            from scripts import face_identity as fi
+            from assets import face_identity as fi
 
             char_guess = str(getattr(args, "char_id", None) or "").strip()
             if not char_guess:
