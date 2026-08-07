@@ -241,12 +241,14 @@ def select_asset(
     # enforcement still lives in the pipeline's own gates.
     try:
         from gate_panel import collect_gates
-    except Exception:  # noqa: BLE001 -- gate module missing: do not block on it
+    except Exception as exc:  # noqa: BLE001 -- gate module missing: do not block on it
+        _log.warning("gate_panel import soft-fail (allow select): %s", exc)
         collect_gates = None
     if collect_gates is not None:
         try:
             gates = collect_gates(base)
-        except Exception:  # noqa: BLE001 -- never let the panel crash selection
+        except Exception as exc:  # noqa: BLE001 -- never let the panel crash selection
+            _log.warning("collect_gates soft-fail (allow select): %s", exc)
             gates = None
         if gates and gates.get("blocking"):
             raise WebConsoleForbidden(

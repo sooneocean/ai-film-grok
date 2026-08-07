@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.41.36] - 2026-08-07
+
+### Fixed (director-center · quality closeout S2/S4/S5/S8)
+- **S2**: smoke + pytest assert `POST /api/select` returns `revision` + `canonical_binding.bound` + `manifest_binding`.
+- **S4**: `asset_picker` soft-fail paths log warnings; `console_state.degraded[]` when sub-sources fail.
+- **S5**: console re-sync on `visibilitychange` (visible).
+- **S8**: `review_ui` loopback-only security invariant documented.
+
 ## [2.41.35] - 2026-08-07
 
 ### Added (edit-director · Round 5 final desk gate)

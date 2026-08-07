@@ -1129,6 +1129,13 @@ function startSync(){
     // light poll backup every 15s even with SSE
     syncTimer = setInterval(syncState, 15000);
   }
+  // S5: re-sync when tab becomes visible (skip work while hidden)
+  if (!window._visSyncBound) {
+    window._visSyncBound = true;
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') syncState();
+    });
+  }
 }
 
 // ---- onboarding wizard v2 (brief -> thinking -> plan) ----

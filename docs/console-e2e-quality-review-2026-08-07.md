@@ -10,7 +10,7 @@
 
 - ✅ **功能可上线**：扩展后的 `make smoke-console` 在真实 `aifilm review-ui serve` 进程上跑通了 **33 项检查**（原 10 + 新增 23），覆盖"打开→工作台并行加载 6 类素材→选声线→锁定角色并落盘规范文件→选道具→选 BGM→写路径边界"的完整浏览器操作流程。
 - ✅ **CI 门禁未破**：`ruff` 通过；`pytest -m console` 77 passed。
-- ⚠️ **S2/S4 仍可跟进**（见 §2）。**S1 allSettled · S3 CSP** 已在 director-center Phase E（2.41.32）落地；**E4 Shot Card** 在 2.41.34。
+- ✅ **质量项收口**：S1 allSettled · S3 CSP（2.41.32）· E4 Shot Card（2.41.34）· **S2 POST shape · S4 可观测降级 · S5 visibility · S8 loopback 注释（2.41.36）**。
 
 ---
 
@@ -116,4 +116,4 @@ pytest -m console           # 单测/集成（77 passed）
 
 - 功能现状：**已上线**（console.html 已在 `f3a96ade` 推送）。本次 e2e 提供"可上线"的客观证据。
 - 本次改动：`scripts/smoke_console.py`（扩展真实操作 e2e + 契约守护）。CI `console` 门禁将继续跑它。
-- 待跟进：§2 S1/S2/S3 建议本迭代修；S4/S5/S8 为后续技术债。
+- 待跟进：无阻塞项。残余可观测性可在运维侧开 `aifilm.web.asset_picker` WARNING 日志。

@@ -2866,7 +2866,7 @@
     },
     {
       "path": "scripts/post/review_ui.py",
-      "sha256": "f3571f09be04c08b1888d53e279668cb0422b4682804a134026b05634ce05573"
+      "sha256": "86d0ba3448688d752f6e643bcb8e6782ab66c7c5698c83ea084bc679c70971d8"
     },
     {
       "path": "scripts/post/show_package.py",
@@ -3494,7 +3494,7 @@
     },
     {
       "path": "scripts/web/asset_picker.py",
-      "sha256": "61fc2019fc32e13e3dd79867049994eefc4fdd5b886b7e39660e87dff1b34abe"
+      "sha256": "811347bca9fc9a513df19064fa41fa30379a45bf682a96c92c0e6bd6258b076a"
     },
     {
       "path": "scripts/web/director_center.py",
@@ -3530,7 +3530,7 @@
     },
     {
       "path": "scripts/web/smoke_console.py",
-      "sha256": "e60030750e493b42f6ed301648fd44f45dbef5d0742b863ccf538f15118cf734"
+      "sha256": "4eb593c8a91228f06575e78665fddb058a2c76332f78f49f8c5849c0015adfea"
     },
     {
       "path": "scripts/web/sse_stream.py",

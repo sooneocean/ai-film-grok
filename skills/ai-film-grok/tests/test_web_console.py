@@ -109,8 +109,14 @@ def test_select_is_hash_bound_and_conflict_safe(film_root):
             body={"kind": "voice", "asset_id": "f", "expected_revision": 0},
         )
         assert status == 200, payload
-        rev = json.loads(payload)["revision"]
+        body = json.loads(payload)
+        rev = body["revision"]
         assert rev == 1
+        # S2: permanent contract fields read by console.html pick()
+        assert isinstance(body.get("canonical_binding"), dict)
+        assert "bound" in body["canonical_binding"]
+        assert "manifest_binding" in body
+        assert body.get("ok") is True
         # stale revision must be rejected with 409
         _, payload2 = _request(
             server, "POST", "/api/select",

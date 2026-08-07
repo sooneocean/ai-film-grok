@@ -366,7 +366,6 @@ def make_handler(root: Path, token: str):
             if parsed.path == "/api/takes":
                 try:
                     from web import takes_api
-                    from web_core import WebConsoleError
 
                     shot = (parse_qs(parsed.query).get("shot") or [None])[0]
                     if shot:
@@ -381,7 +380,6 @@ def make_handler(root: Path, token: str):
             if parsed.path == "/api/shot-card":
                 try:
                     from web import shot_card_api
-                    from web_core import WebConsoleError
 
                     qs = parse_qs(parsed.query)
                     shot = (qs.get("shot") or [None])[0]
