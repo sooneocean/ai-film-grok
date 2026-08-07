@@ -12,6 +12,11 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
+try:
+    from util.logger import log
+except Exception:  # pragma: no cover
+    log = None  # type: ignore[assignment]
+
 # Canonical paths from AGENTS.md (macOS dex layout; overridable via env later if needed)
 DEFAULT_PLUGIN = Path.home() / ".grok" / "plugins" / "ai-film-grok"
 DEFAULT_DEV = Path.home() / ".grok" / "ai-film-grok"
@@ -29,6 +34,8 @@ def _run_git(cwd: Path, *args: str, timeout: float = 8.0) -> tuple[int, str, str
         )
         return proc.returncode, (proc.stdout or "").strip(), (proc.stderr or "").strip()
     except (OSError, subprocess.TimeoutExpired) as exc:
+        if log is not None:
+            log.debug("checkout_drift git failed cwd=%s args=%s err=%s", cwd, args, exc)
         return 127, "", str(exc)[:200]
 
 
@@ -150,6 +157,14 @@ def check_checkout_drift(
 
     report["status"] = "drift" if heads_differ else "dirty"
     report["ok"] = True
+    if log is not None:
+        log.info(
+            "checkout_drift status=%s heads_differ=%s dirty_p=%s dirty_d=%s",
+            report["status"],
+            heads_differ,
+            len(dirty_p),
+            len(dirty_d),
+        )
     report["warn"] = bool(heads_differ)  # only HEAD mismatch escalates to doctor warning
     report["note"] = "; ".join(bits) or "checkout state noted"
     report["next"] = [

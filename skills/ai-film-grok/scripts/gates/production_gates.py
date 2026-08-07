@@ -58,7 +58,14 @@ def _env_skip_armed(
             film_root=root,
             call_site=call_site,
         )
-    except Exception:
+    except Exception as exc:
+        # C5.1 · surface fallback path (legacy direct env read)
+        try:
+            from util.logger import log
+
+            log.debug("skip_flag unavailable for %s at %s: %s", name, call_site, exc)
+        except Exception:
+            pass
         return os.environ.get(name, "").strip().lower() in {"1", "true", "yes", "on"}
 
 

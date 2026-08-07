@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.40.74] - 2026-08-07
+
+### Added (CTO C5.1 logging pilot)
+- **util.logger** pilot wired into honesty hot path: `core/skip_audit` (skip armed WARNING + ledger write fail), `production_gates._env_skip_armed` fallback DEBUG, `core/checkout_drift` git fail DEBUG + drift INFO.
+- **util package export:** `from util import log, set_level`.
+- **Tests:** `tests/test_util_logger.py` (stderr routing / set_level / skip_flag log).
+- Library logs stay on **stderr** (CLI JSON stdout contract intact). Env: `AIFILM_LOG_LEVEL`.
+
 ## [2.40.73] - 2026-08-07
 
 ### Fixed / Added (go-all · A1 residual + G0.4/D7.4 + A2.1 + B3 canary)

@@ -178,7 +178,7 @@
 
 | ID | Todo | 做法 | 验收 |
 |----|------|------|------|
-| **C5.1** | **项目 logging** | `util.logger`；库代码禁 `print`；CLI 保留 stdout | 热路径 1–2 包试点 |
+| **C5.1** | **项目 logging** | `util.logger`；库代码禁 `print`；CLI 保留 stdout | 热路径 1–2 包试点 | ✅ 2.40.74 pilot skip_audit/gates/checkout_drift |
 | **C5.2** | **FilmError 统一（增量）** | 新异常必继承；触达旧 `*Error` 时改基类 | 无大爆炸 PR |
 | **C5.3** | **JSON I/O 唯一入口** | 删本地 `read_json` 副本；`util.read_json` / `require_json` | grep 无新副本 |
 | **C5.4** | **except Exception 纪律** | 必须 log+重抛或显式 partial；CR blocker | REVIEW_CHECKLIST 一条 |
@@ -252,7 +252,7 @@
 | 4 | 真片 ship-prep 人链 / 诚实 PARTIAL | A2 | **P0** · honesty-rail R1 partial (`skip_audit` closeout) 2.40.67 |
 | 5 | 5090 drain 或 OPEN_OPS | B3 | **P0 ops** |
 | 6 | 触达式 peel：final / validate / preflight | C4 | **P1** |
-| 7 | logging + FilmError + JSON I/O 增量 | C5 | **P1** |
+| 7 | logging + FilmError + JSON I/O 增量 | C5 | **P1** · C5.1 pilot ✅ 2.40.74 |
 | 8 | legacy 迁 5–10/周 + 基座测 | C6 | **P1** |
 | 9 | CI 版本指针 + mypy 扩 | D7 | **P1** |
 | 10 | subprocess timeout 触达补 | C5.5 | **P1 冻结** |

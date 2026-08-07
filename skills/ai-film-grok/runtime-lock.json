@@ -1014,7 +1014,7 @@
     },
     {
       "path": "scripts/core/checkout_drift.py",
-      "sha256": "7e4ba0316ae00a9317e4152ef9aba369168bd995b53367fdc87703413dc37c63"
+      "sha256": "34ea48cbf2b66d17fa40ccc6c6f6df5e9a30bbf76b19b48d0a192b94fb846674"
     },
     {
       "path": "scripts/core/constants.py",
@@ -1042,7 +1042,7 @@
     },
     {
       "path": "scripts/core/skip_audit.py",
-      "sha256": "b9bc024d7a8982d77466c07bf6feb56e956ff6144ffa268578c5c0eb9ab380e6"
+      "sha256": "428052dedf36eb104af845b98ba99f52d7e431443a58128324532dfb88462d16"
     },
     {
       "path": "scripts/craft_spine.py",
@@ -1450,7 +1450,7 @@
     },
     {
       "path": "scripts/gates/production_gates.py",
-      "sha256": "ac23424a84ffced4c55841e5143105edd6c85d215b54d73a2e1b9fc1a70ad0ad"
+      "sha256": "64befa6668f61c095d9fd75dd90a22cff9694c2a32e6b6da9314319617fa0265"
     },
     {
       "path": "scripts/gates/quality_evidence.py",
@@ -1503,10 +1503,6 @@
     {
       "path": "scripts/h3_mode.py",
       "sha256": "101124905b67810f03f09c9b19b59398c25da62d24910144c5df2fa1e8aa915b"
-    },
-    {
-      "path": "scripts/h3_official_prompt.py",
-      "sha256": "c045985b60e6f47003f0d7fb62b61efc9220c2cc6bab508bc89c2e2a7398e00c"
     },
     {
       "path": "scripts/h3_ship_native.py",
@@ -1719,10 +1715,6 @@
     {
       "path": "scripts/media/h3_mode.py",
       "sha256": "f39c960dd4180ec85c042fceb04944dec5e2de2cb6aa8e116401dba0d4530794"
-    },
-    {
-      "path": "scripts/media/h3_official_prompt.py",
-      "sha256": "3691d12467a0f09abe46e5f502b3fb5769c2785653e0bfeaa659afaa999341d0"
     },
     {
       "path": "scripts/media/h3_ship_native.py",
@@ -3086,7 +3078,7 @@
     },
     {
       "path": "scripts/util/__init__.py",
-      "sha256": "af10839fbb5914c90602956610ff346594f53ec741bfe30203eaa882c7fbabcd"
+      "sha256": "7d54cfcf2bda3f7234b140631f9db7deb9ecc364469f9e32680ec7950f4033b6"
     },
     {
       "path": "scripts/util/config_loader.py",

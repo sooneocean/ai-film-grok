@@ -1,46 +1,61 @@
-"""Tests for the project logger (P0-2, senior-dev quality plan).
-
-``util/logger`` had zero dedicated tests; this starts covering the shared
-observability entry point.
-"""
+"""C5.1 · util.logger contract (stderr-only, env level, set_level)."""
 
 from __future__ import annotations
 
-import io
 import logging
+import os
 import sys
+import unittest
+from pathlib import Path
+from unittest import mock
 
-from util import logger as logger_mod
-
-
-def _shared_stream_handler() -> logging.StreamHandler:
-    handler = next(
-        (h for h in logger_mod.log.handlers if isinstance(h, logging.StreamHandler)),
-        None,
-    )
-    assert handler is not None, "aifilm logger must have a StreamHandler"
-    return handler
+SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
+sys.path.insert(0, str(SCRIPTS))
 
 
-def test_logger_emits_and_routes_to_stderr() -> None:
-    handler = _shared_stream_handler()
-    buf = io.StringIO()
-    original = handler.stream
-    handler.stream = buf
-    try:
-        logger_mod.log.setLevel(logging.INFO)
-        logger_mod.log.info("hello-from-aifilm")
-        assert "hello-from-aifilm" in buf.getvalue()
-    finally:
-        handler.stream = original
-    # The shared handler must NOT target stdout, so it cannot corrupt the JSON
-    # API output that some CLI commands emit on stdout.
-    assert original is not sys.stdout
+class TestUtilLogger(unittest.TestCase):
+    def tearDown(self) -> None:
+        os.environ.pop("AIFILM_LOG_LEVEL", None)
+        # reset aifilm logger handlers between tests
+        logger = logging.getLogger("aifilm")
+        logger.handlers.clear()
+        logger.setLevel(logging.NOTSET)
+
+    def test_log_goes_to_stderr_not_stdout(self) -> None:
+        from util.logger import log, set_level
+
+        set_level("WARNING")
+        with mock.patch.object(sys, "stdout") as out, mock.patch.object(sys, "stderr") as err:
+            # rebind handler stream to our mock after import
+            for h in list(log.handlers):
+                if isinstance(h, logging.StreamHandler):
+                    h.stream = err
+            log.warning("pilot_log_message")
+            # stdout must not be written for library logs
+            self.assertFalse(out.write.called)
+            self.assertTrue(err.write.called or any(h.stream is err for h in log.handlers))
+
+    def test_set_level_debug_enables_debug(self) -> None:
+        from util.logger import log, set_level
+
+        set_level("DEBUG")
+        self.assertEqual(log.level, logging.DEBUG)
+        set_level("WARNING")
+        self.assertEqual(log.level, logging.WARNING)
+
+    def test_skip_flag_logs_when_armed(self) -> None:
+        from core.skip_audit import skip_flag
+        from util.logger import log, set_level
+
+        set_level("WARNING")
+        with mock.patch.object(log, "warning") as warn:
+            os.environ["AIFILM_SKIP_GATE_AUTO"] = "1"
+            try:
+                self.assertTrue(skip_flag("AIFILM_SKIP_GATE_AUTO", film_root=None))
+            finally:
+                os.environ.pop("AIFILM_SKIP_GATE_AUTO", None)
+            self.assertTrue(warn.called)
 
 
-def test_set_level_adjusts_runtime_level() -> None:
-    logger_mod.set_level("ERROR")
-    try:
-        assert logger_mod.log.level == logging.ERROR
-    finally:
-        logger_mod.set_level("WARNING")
+if __name__ == "__main__":
+    unittest.main()

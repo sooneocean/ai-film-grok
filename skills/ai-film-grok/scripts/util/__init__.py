@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import Any
 
 from util.errors import FilmError
+from util.logger import log, set_level  # noqa: F401  · C5.1 project logging pilot
 from util.subprocess import run, run_compose_env, run_ffmpeg  # noqa: F401
 from util.time import utc_now  # noqa: F401
 from util.validators import (  # noqa: F401

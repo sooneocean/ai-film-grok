@@ -12,6 +12,11 @@ import os
 from pathlib import Path
 from typing import Any
 
+try:
+    from util.logger import log
+except Exception:  # pragma: no cover - ultra-early import path
+    log = None  # type: ignore[assignment]
+
 # IRON-class escapes: closeout refuses cert / forces PARTIAL when used without reason.
 IRON_SKIP_FLAGS: frozenset[str] = frozenset(
     {
@@ -142,9 +147,10 @@ def record_skip_usage(
         from util import write_json
 
         write_json(base / USAGE_REL, payload)
-    except (OSError, ValueError, TypeError):
+    except (OSError, ValueError, TypeError) as exc:
         # never break the gate path on ledger I/O; caller still gets bool
-        pass
+        if log is not None:
+            log.warning("skip_usage ledger write failed: %s", exc)
     return payload
 
 
@@ -169,6 +175,15 @@ def skip_flag(
             origin=origin,
             reason=reason or os.environ.get("AIFILM_SKIP_REASON"),
             call_site=call_site,
+        )
+    if log is not None:
+        log.warning(
+            "AIFILM skip armed name=%s origin=%s iron=%s call_site=%s root=%s",
+            canon,
+            origin,
+            canon in IRON_SKIP_FLAGS,
+            call_site,
+            film_root,
         )
     return True
 
