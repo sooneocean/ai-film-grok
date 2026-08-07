@@ -14,7 +14,7 @@ from importlib import metadata
 from pathlib import Path
 from typing import Any
 
-from security_policy import minimal_subprocess_env
+from util.security_policy import minimal_subprocess_env
 
 LOCKED_PACKAGES = ("numpy", "Pillow", "edge-tts", "jsonschema")
 DEFAULT_SCRIPTS = (

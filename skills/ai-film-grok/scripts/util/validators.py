@@ -30,7 +30,7 @@ def aspect_dims(aspect: str) -> tuple[int, int]:
 
 
 def film_output_path(root: Path, name: str, *, field: str = "output name") -> Path:
-    from security_policy import SecurityPolicyError, safe_output_path, safe_workspace_directory
+    from util.security_policy import SecurityPolicyError, safe_output_path, safe_workspace_directory
 
     try:
         out_dir = safe_workspace_directory(root, "out", field="film output directory")
@@ -40,7 +40,7 @@ def film_output_path(root: Path, name: str, *, field: str = "output name") -> Pa
 
 
 def valid_shot_id(value: str) -> str:
-    from security_policy import SecurityPolicyError, validate_identifier
+    from util.security_policy import SecurityPolicyError, validate_identifier
 
     try:
         return validate_identifier(value, field="shot id")

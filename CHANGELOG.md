@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.40.83] - 2026-08-07
+
+### Fixed / Changed (CTO C6.5 mypy incremental expand)
+- **Import path:** `util/{validators,subprocess,json_io,runtime_policy}` import `util.security_policy` (not hard-compat shim) so mypy sees real attributes.
+- **`make type` list expanded:** errors · validators · time · paths · logger · json_io · subprocess · retry · security_policy (zero errors).
+- Restores green `make type` seed after shim static-analysis breakage.
+
 ## [2.40.81] - 2026-08-07
 
 ### Changed (CTO C5.6 path externalization)

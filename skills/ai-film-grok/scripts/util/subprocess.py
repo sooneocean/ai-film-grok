@@ -15,7 +15,7 @@ def run(
     timeout: int | float | None = 60,
 ) -> subprocess.CompletedProcess[str]:
     """Canonical subprocess runner. ``timeout=None`` → 60s (C5.5 hang protection)."""
-    from security_policy import minimal_subprocess_env
+    from util.security_policy import minimal_subprocess_env
 
     if timeout is None:
         timeout = 60
@@ -35,7 +35,7 @@ def run_ffmpeg(
     check: bool = True,
 ) -> subprocess.CompletedProcess[str]:
     """FFmpeg wrapper: injects ``-nostdin`` and applies ``AIFILM_FFMPEG_TIMEOUT``."""
-    from security_policy import minimal_subprocess_env
+    from util.security_policy import minimal_subprocess_env
 
     argv = list(cmd)
     if "-nostdin" not in argv:
@@ -68,7 +68,7 @@ def run_compose_env(
 
     ``timeout=None`` → 60s so thin facades cannot disable hang protection (C5.5).
     """
-    from security_policy import minimal_subprocess_env
+    from util.security_policy import minimal_subprocess_env
 
     if timeout is None:
         timeout = 60

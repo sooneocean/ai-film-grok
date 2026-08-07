@@ -123,7 +123,16 @@ sync:
 # P5-1 incremental typing gate (mypy). Scoped to the already-clean modules;
 # extend the file list as more modules are typed. Full-tree typing is iterative.
 type:
-	cd "$(SKILL)" && env -u PYTHONPATH "$$($(RUNTIME_PYTHON))" -m mypy scripts/util/validators.py scripts/util/errors.py
+	cd "$(SKILL)" && env -u PYTHONPATH "$$($(RUNTIME_PYTHON))" -m mypy \
+		scripts/util/errors.py \
+		scripts/util/validators.py \
+		scripts/util/time.py \
+		scripts/util/paths.py \
+		scripts/util/logger.py \
+		scripts/util/json_io.py \
+		scripts/util/subprocess.py \
+		scripts/util/retry.py \
+		scripts/util/security_policy.py
 
 install-hooks:
 	@git -C "$(ROOT)" config core.hooksPath .githooks
