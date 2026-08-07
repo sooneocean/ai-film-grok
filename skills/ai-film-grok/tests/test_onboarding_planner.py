@@ -34,8 +34,15 @@ def test_heuristic_detects_lead_and_support(tmp_path):
     assert plan["bgm_mood"]
 
 
-def test_heuristic_infers_adult_max(tmp_path):
+def test_heuristic_infers_adult_hot_plot_driven(tmp_path):
     brief = {"story_text": "成人肉戏在夜色里展开，两人缠绵。", "hints": []}
+    plan = onboarding_planner.deterministic_decompose(brief)
+    assert plan["genre"] == "adult"
+    assert plan["heat_scale"] == "hot"
+
+
+def test_heuristic_infers_adult_max_on_explicit_pull(tmp_path):
+    brief = {"story_text": "尺度拉满办事戏，两人缠绵。", "hints": []}
     plan = onboarding_planner.deterministic_decompose(brief)
     assert plan["genre"] == "adult"
     assert plan["heat_scale"] == "max"

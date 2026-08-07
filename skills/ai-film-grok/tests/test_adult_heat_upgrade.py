@@ -33,12 +33,13 @@ class HeatSignalTests(unittest.TestCase):
         self.assertIsNone(h["heat_scale"])
         self.assertEqual(h["spine"], "default")
 
-    def test_normalize_adult_genre_pins_max(self) -> None:
-        """genre=adult default pins heat max even without explicit 办事 markers."""
+    def test_normalize_adult_genre_plot_driven_hot(self) -> None:
+        """genre=adult default is plot-driven hot (2026-08-07), not silent max."""
         norm = normalize_story("雨夜出租车里的一次对话", title_hint="雨夜")
         self.assertEqual(norm.get("genre"), "adult")
-        self.assertEqual(norm["heat_signals"]["heat_scale"], "max")
-        self.assertEqual(norm["heat_signals"].get("spice_level"), "extreme")
+        self.assertEqual(norm["heat_signals"]["heat_scale"], "hot")
+        self.assertEqual(norm["heat_signals"].get("pinned_by"), "plot_driven")
+        self.assertNotEqual(norm["heat_signals"].get("spice_level"), "extreme")
         spine = select_beat_spine(norm["heat_signals"], genre=norm["genre"])
         phases = [b.get("heat_phase") for b in spine]
         self.assertIn("act", phases)
@@ -47,6 +48,7 @@ class HeatSignalTests(unittest.TestCase):
     def test_adult_max_from_brief(self) -> None:
         h = detect_heat_signals("成人办事短剧，尺度拉满，落锁加演")
         self.assertEqual(h["heat_scale"], "max")
+        self.assertEqual(h.get("pinned_by"), "explicit_max")
         self.assertEqual(h["spine"], "adult_max")
         self.assertFalse(h["hardcore"])
 

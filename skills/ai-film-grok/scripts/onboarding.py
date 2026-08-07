@@ -316,7 +316,7 @@ def _persist_canonical_v2(
     """Persist a decomposed plan into the canonical pipeline shapes (v2 flow)."""
     out: dict[str, str] = {}
     genre = str(plan.get("genre") or "").strip() or "adult"
-    heat_scale = str(plan.get("heat_scale") or "").strip() or "max"
+    heat_scale = str(plan.get("heat_scale") or "").strip() or "hot"
 
     # film-spec.json — merge, never clobber other keys (so gates can read it).
     spec = read_json(base / "film-spec.json")

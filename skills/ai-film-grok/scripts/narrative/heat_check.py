@@ -28,6 +28,22 @@ def _flat_shots(spec: dict[str, Any]) -> list[dict[str, Any]]:
     return shots
 
 
+
+def _is_explicit_max_spec(spec: dict[str, Any]) -> bool:
+    """True only when user/plan explicitly pulled max IRON (not plot-driven hot)."""
+    pin = str(spec.get("heat_pinned_by") or spec.get("pinned_by") or "").strip().lower()
+    scale = str(spec.get("heat_scale") or "").strip().lower()
+    if pin in {"plot_driven", "user_soft"}:
+        return False
+    if pin == "explicit_max":
+        return True
+    if scale == "max" and pin not in {"plot_driven", "user_soft"}:
+        return True
+    if spec.get("challenge_max_scale") is True and scale == "max":
+        return True
+    return False
+
+
 def heat_check(root: Path) -> dict[str, Any]:
     root = Path(root).expanduser().resolve()
     spec = read_json(root / "film-spec.json") or {}
@@ -37,18 +53,23 @@ def heat_check(root: Path) -> dict[str, Any]:
     intent = spec.get("director_intent") if isinstance(spec.get("director_intent"), dict) else {}
     audience = intent.get("audience_profile") or spec.get("audience_profile")
     heat_scale = spec.get("heat_scale")
+    explicit_max = _is_explicit_max_spec(spec)
+    # Plot-driven hot: force advise path (lint treats non-max softer; never pretend max)
+    lint_scale = str(heat_scale) if heat_scale else None
+    if not explicit_max and str(heat_scale or "").lower() == "max":
+        lint_scale = "hot"
     cg = spec.get("coitus_grammar") if isinstance(spec.get("coitus_grammar"), dict) else None
     craft = spec.get("edit_craft")
     craft_list = craft if isinstance(craft, list) else ([craft] if craft else None)
     rep = lint_heat_arc(
         shots,
-        heat_scale=str(heat_scale) if heat_scale else None,
+        heat_scale=lint_scale,
         intimacy_min_ratio=spec.get("intimacy_min_ratio"),
         setup_max_ratio=spec.get("setup_max_ratio"),
-        sex_min_duration_ratio=spec.get("sex_min_duration_ratio"),
+        sex_min_duration_ratio=spec.get("sex_min_duration_ratio") if explicit_max else None,
         audience_profile=str(audience) if audience else None,
         advise=True,
-        coitus_grammar=cg,
+        coitus_grammar=cg if explicit_max else None,
         spice_level=spec.get("spice_level"),
         edit_craft=craft_list,
     )
@@ -68,7 +89,7 @@ def heat_check(root: Path) -> dict[str, Any]:
         heat_rep=rep,
     )
     sensory: dict[str, Any] | None = None
-    if str(heat_scale or "").lower() == "max":
+    if explicit_max and str(heat_scale or "").lower() == "max":
         try:
             from adult_max_director import build_evidence
 
@@ -94,7 +115,7 @@ def heat_check(root: Path) -> dict[str, Any]:
         heat_scale=str(heat_scale) if heat_scale else None,
         heat_rep=rep,
         impact=boost_impact,
-        target_score=90.0,
+        target_score=90.0 if explicit_max else 75.0,
     )
     ecchi = lint_ecchi_checklist(shots, heat_scale=str(heat_scale) if heat_scale else None)
     mute_adv = mute_frame_advisory(shots, heat_scale=str(heat_scale) if heat_scale else None)
@@ -132,6 +153,7 @@ def heat_check(root: Path) -> dict[str, Any]:
         "sex_sfx_accents": sex_sfx,
     }
     # Queue/final hard_fail must not treat HEAT_ADVISORY_* as hard (advisory = soft).
+    # Plot-driven (non explicit_max): all heat ratio / max IRON codes are advisory only.
     hard_codes = [
         c
         for c in (rep.get("codes") or [])
@@ -149,11 +171,14 @@ def heat_check(root: Path) -> dict[str, Any]:
             or c == "SEX_POSE_STALE"
         )
     ]
-    if sensory and not sensory.get("ok"):
+    if not explicit_max:
+        hard_codes = []
+    if sensory and not sensory.get("ok") and explicit_max:
         hard_codes.extend(str(code) for code in sensory.get("codes") or [])
     # max + ecchi_checklist_strict: thin checklist hard-fails heat check
     if (
-        str(heat_scale or "").lower() == "max"
+        explicit_max
+        and str(heat_scale or "").lower() == "max"
         and spec.get("ecchi_checklist_strict") is True
         and not ecchi.get("ok")
     ):
@@ -162,16 +187,20 @@ def heat_check(root: Path) -> dict[str, Any]:
     detail = rep.get("detail_cu") or {}
     codes_all = list(rep.get("codes") or [])
     codes_all.extend(ecchi.get("codes") or [])
+    ok_plot = True if not explicit_max else bool(rep.get("ok"))
     return {
-        "ok": bool(rep.get("ok"))
+        "ok": ok_plot
         and (sensory is None or bool(sensory.get("ok")))
         and (
-            spec.get("ecchi_checklist_strict") is not True
+            not explicit_max
+            or spec.get("ecchi_checklist_strict") is not True
             or bool(ecchi.get("ok"))
             or str(heat_scale or "").lower() != "max"
         ),
         "root": str(root),
         "heat_scale": heat_scale,
+        "heat_pinned_by": spec.get("heat_pinned_by") or spec.get("pinned_by"),
+        "explicit_max": explicit_max,
         "audience_profile": audience,
         "shot_count": len(shots),
         "sex_duration_ratio": rep.get("sex_duration_ratio"),
@@ -329,10 +358,23 @@ def heat_agent_status(root: Path) -> dict[str, Any]:
     if not spec:
         return {"active": False, "ok": True, "reason": "no_spec"}
     heat = str(spec.get("heat_scale") or "").strip().lower()
-    if heat not in {"max", "hot"}:
+    if heat not in {"max", "hot", "high"}:
         return {"active": False, "ok": True, "reason": "not_adult_max"}
     if spec.get("adult_max_iron") is False:
         return {"active": False, "ok": True, "reason": "adult_max_iron_false"}
+    explicit_max = _is_explicit_max_spec(spec)
+    # Plot-driven hot: advisory only — never hard-block bulk for max IRON floors
+    if not explicit_max:
+        return {
+            "active": True,
+            "ok": True,
+            "advisory": True,
+            "reason": "plot_driven_heat",
+            "heat_scale": heat,
+            "heat_pinned_by": spec.get("heat_pinned_by") or "plot_driven",
+            "why": "plot-driven heat: max IRON floors advisory; no bulk hard-fail",
+            "next_cmd": f'aifilm heat check --root "{root}"',
+        }
 
     # Prefer cached write-spec scorecard; fall back to full heat_check (may be heavy)
     impact = spec.get("_erotic_impact") if isinstance(spec.get("_erotic_impact"), dict) else None

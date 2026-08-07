@@ -1,5 +1,16 @@
 # Changelog
 
+## [2.41.0] - 2026-08-07
+
+### Changed (Heat plot-driven · highest ROI)
+- **Policy:** `genre=adult` no longer silent-pins `heat_scale=max`. Default is **`hot` + `pinned_by=plot_driven`**. Full max IRON only on **explicit** pull (办事/尺度拉满/hardcore/dual/`heat_scale=max`).
+- **Plan:** `derive_heat_scale` three-state; `detect_heat_signals` splits `_EXPLICIT_MAX_MARKERS` vs `_ADULT_INTENSITY_MARKERS`; target lift only for explicit_max (H3-nominal multiples).
+- **Project:** plot-driven skips `challenge_max_scale` / sex_floor hard; keeps wardrobe no-redress product hard.
+- **Gates:** `heat_check` / `heat_agent_status` hard-fail only when `heat_pinned_by=explicit_max` (or legacy max without plot_driven pin).
+- **Onboarding:** heuristic adult → `hot`; default persist scale `hot`.
+- **Docs:** hard-defaults adult pin row updated (covers 2026-07-29 silent-max).
+- **Tests:** `test_heat_plot_driven.py` + adult heat / onboarding expectations.
+
 ## [2.40.112] - 2026-08-07
 
 ### Added (Film Production OS · W0–W2)

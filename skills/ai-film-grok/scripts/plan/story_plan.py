@@ -55,36 +55,52 @@ DEFAULT_SPEC: dict[str, Any] = {"sex_floor_strict": True}
 # for existing readers. This marker describes the graph nesting contract.
 STORY_PLAN_SCHEMA_VERSION = 2
 
-# Brief signals → heat (adult max IRON · 2026-07-24: pin max when adult evidence)
-_HEAT_MAX_MARKERS: tuple[str, ...] = (
-    "成人",
+# Brief signals → heat (2026-08-07 · plot-driven default; explicit max only when user pulls)
+# Explicit max IRON markers — user wants full scale, not mere adult genre.
+_EXPLICIT_MAX_MARKERS: tuple[str, ...] = (
+    "尺度拉满",
+    "尺度拉到最高",
+    "拉到最高",
+    "拉满",
+    "办事戏完整",
+    "办事戏",
+    "完整办事",
+    "heat max",
+    "heat_scale=max",
+    "heat_scale:max",
     "办事",
+    "做爱",
+    "性交",
+    "hentai",
+    "porn",
+    "hardcore max",
+)
+# Adult intensity / genre evidence → plot-driven hot (not max IRON)
+_ADULT_INTENSITY_MARKERS: tuple[str, ...] = (
+    "成人",
     "性爱",
     "里番",
     "色气",
     "大尺度",
-    "尺度拉满",
     "脱衣",
     "裸",
     "露点",
     "肉戏",
-    "heat max",
-    "heat_scale=max",
-    "heat_scale:max",
     "18+",
     "r18",
-    "hentai",
     "ecchi",
-    "porn",
     "nsfw",
-    "做爱",
-    "性交",
     "高潮",
     "沉腰",
     "nude",
     "undress",
     "strip",
+    "缠绵",
+    "情欲",
+    "暧昧",
 )
+# Backward-compat alias (tests / callers may still import the old name)
+_HEAT_MAX_MARKERS: tuple[str, ...] = _EXPLICIT_MAX_MARKERS + _ADULT_INTENSITY_MARKERS
 _HARDCORE_MARKERS: tuple[str, ...] = (
     "重口",
     "男向",
@@ -291,12 +307,49 @@ def preserve_user_nar(
     return nar
 
 
+def _marker_hit(raw: str, low: str, markers: tuple[str, ...]) -> bool:
+    return any(m.lower() in low or m in raw for m in markers)
+
+
+def derive_heat_scale(
+    raw_heat: dict[str, Any] | None,
+    *,
+    genre: str | None = None,
+) -> tuple[str | None, str | None]:
+    """Three-state heat policy (2026-08-07 · plot-driven default).
+
+    Returns ``(heat_scale, pinned_by)`` where pinned_by ∈
+    ``{explicit_max, plot_driven, user_soft}`` or None when scale is unset
+    and genre is not adult.
+    """
+    h = dict(raw_heat or {})
+    scale = str(h.get("heat_scale") or "").strip().lower() or None
+    if scale in {"soft", "medium"}:
+        return scale, "user_soft"
+    if (
+        scale == "max"
+        or h.get("evidence_max")
+        or h.get("hardcore")
+        or h.get("dual_climax")
+        or str(h.get("pinned_by") or "") == "explicit_max"
+    ):
+        return "max", "explicit_max"
+    if scale in {"hot", "high"}:
+        return "hot", str(h.get("pinned_by") or "plot_driven")
+    if (genre or "").strip().lower() == "adult":
+        # Adult genre without explicit pull → plot-driven hot (not max IRON)
+        return "hot", "plot_driven"
+    if scale:
+        return scale, str(h.get("pinned_by") or "") or None
+    return None, None
+
+
 def detect_heat_signals(text: str) -> dict[str, Any]:
     """Parse brief for heat_scale / hardcore.
 
-    Adult max IRON (2026-07-24): adult markers → heat_scale=max + spice extreme intent.
-    Explicit soft/medium/hot in text still wins as non-max (caller may pass genre).
-    Empty brief does not silent-pin max (genre=adult default handles plan path).
+    2026-08-07 plot-driven: only **explicit** max markers / hardcore / dual
+    pin ``heat_scale=max``. Generic adult intensity → ``hot`` (not max).
+    Explicit soft/medium still wins. Empty non-adult brief leaves scale None.
     """
     raw = (text or "").strip()
     low = raw.lower()
@@ -313,6 +366,8 @@ def detect_heat_signals(text: str) -> dict[str, Any]:
             "不要色",
             "全年龄",
             "全年齢",
+            "纯爱",
+            "轻喜剧",
         )
     ):
         return {
@@ -323,11 +378,27 @@ def detect_heat_signals(text: str) -> dict[str, Any]:
             "dual_climax": False,
             "evidence_max": False,
             "spice_level": None,
+            "pinned_by": "user_soft",
         }
-    hardcore = any(m.lower() in low or m in raw for m in _HARDCORE_MARKERS)
-    dual = any(m.lower() in low or m in raw for m in _DUAL_CLIMAX_MARKERS)
-    want_max = hardcore or dual or any(m.lower() in low or m in raw for m in _HEAT_MAX_MARKERS)
-    heat_scale = "max" if want_max else None
+    hardcore = _marker_hit(raw, low, _HARDCORE_MARKERS)
+    dual = _marker_hit(raw, low, _DUAL_CLIMAX_MARKERS)
+    want_max = hardcore or dual or _marker_hit(raw, low, _EXPLICIT_MAX_MARKERS)
+    adult_intensity = _marker_hit(raw, low, _ADULT_INTENSITY_MARKERS)
+    if want_max:
+        heat_scale: str | None = "max"
+        pinned_by = "explicit_max"
+        evidence_max = True
+        spice: str | None = "extreme"
+    elif adult_intensity:
+        heat_scale = "hot"
+        pinned_by = "plot_driven"
+        evidence_max = False
+        spice = "explicit"
+    else:
+        heat_scale = None
+        pinned_by = None
+        evidence_max = False
+        spice = None
     audience_profile = "hardcore_male" if hardcore else None
     spine = "default"
     if dual:
@@ -336,14 +407,17 @@ def detect_heat_signals(text: str) -> dict[str, Any]:
         spine = "hardcore_male"
     elif want_max:
         spine = "adult_max"
+    elif adult_intensity:
+        spine = "adult_max"  # structural adult beats; gates soft when not max
     return {
         "heat_scale": heat_scale,
         "audience_profile": audience_profile,
         "spine": spine,
         "hardcore": hardcore or dual,
         "dual_climax": dual,
-        "evidence_max": want_max,
-        "spice_level": "extreme" if want_max else None,
+        "evidence_max": evidence_max,
+        "spice_level": spice,
+        "pinned_by": pinned_by,
     }
 
 
@@ -371,7 +445,14 @@ def detect_genre(
 
     # Adult heat signals take priority over other genre markers
     h = heat or {}
-    if h.get("evidence_max") or h.get("heat_scale") == "max" or h.get("hardcore"):
+    scale_h = str(h.get("heat_scale") or "").strip().lower()
+    pin_h = str(h.get("pinned_by") or "").strip().lower()
+    if (
+        h.get("evidence_max")
+        or scale_h in {"max", "hot", "high"}
+        or h.get("hardcore")
+        or pin_h in {"explicit_max", "plot_driven"}
+    ):
         return {
             "genre": "adult",
             "evidence": "heat_signals",
@@ -904,25 +985,41 @@ def normalize_story(
     heat = detect_heat_signals(raw)
     genre_info = detect_genre(raw, heat=heat)
     genre = genre_info["genre"]
-    # genre=adult pins max + extreme unless brief explicitly soft/medium (P0 · 2026-07-29)
-    scale_now = str(heat.get("heat_scale") or "").strip().lower()
-    if genre == "adult" and scale_now not in {"soft", "medium"}:
-        if scale_now != "max":
-            spine = str(heat.get("spine") or "default")
-            if spine in {"", "default"}:
-                spine = "adult_max"
+    # 2026-08-07: three-state — explicit_max | plot_driven | user_soft (no silent genre→max)
+    scale_now, pinned_by = derive_heat_scale(heat, genre=genre)
+    if scale_now:
+        spine = str(heat.get("spine") or "default")
+        if genre == "adult" and spine in {"", "default"} and scale_now != "soft":
+            spine = "adult_max"
+        if pinned_by == "explicit_max":
             heat = {
                 **heat,
                 "heat_scale": "max",
                 "spice_level": heat.get("spice_level") or "extreme",
-                "spine": spine,
+                "spine": spine if spine != "default" else "adult_max",
                 "evidence_max": True,
-                "pinned_by": "genre_adult_default",
+                "pinned_by": "explicit_max",
             }
-        elif not heat.get("spice_level"):
-            heat = {**heat, "spice_level": "extreme"}
+        elif pinned_by == "user_soft":
+            heat = {
+                **heat,
+                "heat_scale": scale_now,
+                "evidence_max": False,
+                "pinned_by": "user_soft",
+            }
+        else:
+            # plot_driven hot (or high)
+            heat = {
+                **heat,
+                "heat_scale": scale_now or "hot",
+                "spice_level": heat.get("spice_level") or "explicit",
+                "spine": spine,
+                "evidence_max": False,
+                "pinned_by": "plot_driven",
+            }
         warnings.append(
-            f"adult genre pin → spine={heat.get('spine')} heat_scale={heat.get('heat_scale')} "
+            f"adult heat pin → pinned_by={heat.get('pinned_by')} "
+            f"spine={heat.get('spine')} heat_scale={heat.get('heat_scale')} "
             f"spice={heat.get('spice_level')}"
         )
     elif heat.get("evidence_max"):
@@ -1061,15 +1158,31 @@ def build_planned_graph(
 
     target_requested = float(target_duration)
     heat_target_lift: str | None = None
-    if heat.get("dual_climax") and target_duration < 90:
-        target_duration = 100.0
+    # U2 · 2026-08-07: paper target lift only for explicit_max (not plot_driven hot)
+    pinned = str(heat.get("pinned_by") or "")
+    is_explicit_max = (
+        pinned == "explicit_max"
+        or bool(heat.get("evidence_max"))
+        or bool(heat.get("hardcore"))
+        or bool(heat.get("dual_climax"))
+        or (
+            str(heat.get("heat_scale") or "").lower() == "max"
+            and pinned != "plot_driven"
+        )
+    )
+    # Prefer H3-nominal multiples over magic 55/60/100 paper constants
+    nom = float(H3_NOMINAL_CLIP_SEC)
+    if is_explicit_max and heat.get("dual_climax") and target_duration < 90:
+        target_duration = max(float(target_duration), round(19 * nom, 1))
         heat_target_lift = "dual_climax"
-    elif heat.get("hardcore") and target_duration < 60:
-        target_duration = 60.0
+    elif is_explicit_max and heat.get("hardcore") and target_duration < 60:
+        target_duration = max(float(target_duration), round(12 * nom, 1))
         heat_target_lift = "hardcore"
-    elif heat.get("heat_scale") == "max" and target_duration < 50:
-        target_duration = 55.0
-        heat_target_lift = "heat_scale_max"
+    elif is_explicit_max and str(heat.get("heat_scale") or "").lower() == "max":
+        floor_sec = round(10 * nom, 1)
+        if target_duration + 1e-9 < floor_sec:
+            target_duration = floor_sec
+            heat_target_lift = "heat_scale_max"
     # S0.4 placeholder; finalized after shot_i known (AD A1/A2)
     duration_density = finalize_duration_density(
         target_duration_requested=target_requested,
@@ -2356,37 +2469,54 @@ def project_graph_to_film_spec(
     if raw_ex:
         spec["source_excerpt"] = raw_ex[:4000]
         spec["user_source_fidelity_strict"] = True
-    # genre=adult without heat: still pin max (escape only soft/medium)
+    # genre=adult without heat: plot-driven hot (2026-08-07); max only if already explicit
     genre_proj = str(spec.get("genre") or "adult")
-    if (
-        not heat.get("heat_scale")
-        and genre_proj == "adult"
-        and str(heat.get("heat_scale") or "") not in {"soft", "medium"}
-    ):
+    scale_proj, pin_proj = derive_heat_scale(heat, genre=genre_proj)
+    if scale_proj and not heat.get("heat_scale"):
         heat = {
             **heat,
-            "heat_scale": "max",
-            "spice_level": "extreme",
-            "spine": heat.get("spine") or "adult_max",
-            "evidence_max": True,
-            "pinned_by": "project_adult_default",
+            "heat_scale": scale_proj,
+            "spice_level": (
+                "extreme"
+                if pin_proj == "explicit_max"
+                else (heat.get("spice_level") or "explicit")
+            ),
+            "spine": heat.get("spine") or ("adult_max" if genre_proj == "adult" else "default"),
+            "evidence_max": pin_proj == "explicit_max",
+            "pinned_by": pin_proj or "plot_driven",
         }
+    elif scale_proj and not heat.get("pinned_by"):
+        heat = {**heat, "pinned_by": pin_proj}
+    if heat.get("pinned_by"):
+        spec["heat_pinned_by"] = heat["pinned_by"]
     if heat.get("heat_scale"):
         spec["heat_scale"] = heat["heat_scale"]
         spec["heat_phase_auto"] = True
-        spec["sex_floor_strict"] = True
-        spec["sex_wardrobe_strict"] = True
-        spec["sex_vo_strict"] = True
-        spec["heat_arc_strict"] = True
-        if heat.get("heat_scale") == "max":
-            spec["challenge_max_scale"] = True  # 持续挑战尺度最大
+        is_max = str(heat.get("heat_scale") or "").lower() == "max"
+        is_explicit = (
+            str(heat.get("pinned_by") or "") == "explicit_max"
+            or bool(heat.get("evidence_max"))
+            or is_max
+        )
+        # Hard IRON flags only on explicit max; plot-driven hot stays advisory-friendly
+        if is_explicit and is_max:
+            spec["sex_floor_strict"] = True
+            spec["sex_wardrobe_strict"] = True
+            spec["sex_vo_strict"] = True
+            spec["heat_arc_strict"] = True
+            spec["challenge_max_scale"] = True
             spec["erotic_impact_strict"] = True
             spec["sex_arc_strict"] = True
             spec["sex_detail_cu_strict"] = True
             spec["both_undress_strict"] = True
-        # max IRON: spice always extreme when max
+        elif str(heat.get("heat_scale") or "").lower() in {"hot", "high"}:
+            # plot-driven: phase auto + soft floors, no challenge_max / impact hard
+            spec["sex_floor_strict"] = False
+            spec["sex_wardrobe_strict"] = True  # no-redress still product hard
+            spec["sex_vo_strict"] = False
+            spec["heat_arc_strict"] = False
         spec["spice_level"] = heat.get("spice_level") or (
-            "extreme" if heat.get("heat_scale") == "max" or heat.get("hardcore") else "explicit"
+            "extreme" if is_max or heat.get("hardcore") else "explicit"
         )
         if heat.get("hardcore"):
             spec["sex_min_duration_ratio"] = 0.55
@@ -2396,14 +2526,13 @@ def project_graph_to_film_spec(
             spec["pose_strict"] = True
             spec["sex_vo_motion_strict"] = True
             spec["audience_profile"] = "hardcore_male"
-        else:
-            # max adult IRON: sex floor 50% (overrideable)
+        elif is_max:
             if spec.get("sex_min_duration_ratio") is None:
                 spec["sex_min_duration_ratio"] = 0.50
-        if coitus_beats:
+        if coitus_beats and (is_max or genre_proj == "adult"):
             spec["coitus_grammar"] = {
                 "enabled": True,
-                "mute_frame_test": True,
+                "mute_frame_test": bool(is_max),
                 "beats": coitus_beats,
             }
     spec["narrative_policy"] = dict(graph.get("narrative_policy") or {})

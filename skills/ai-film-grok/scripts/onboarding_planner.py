@@ -28,9 +28,13 @@ ADULT_KEYWORDS = (
     "成人", "情欲", "肉", "做爱", "做愛", "性", "裸", "床戏",
     "暧昧", "调情", "缠绵", "私密", "湿",
 )
+# 2026-08-07: generic adult → plot-driven hot; only explicit pull → max
 HEAT_HINTS = {
-    "成人": "max", "情欲": "max", "肉": "max", "做爱": "max", "性": "max",
-    "热辣": "max", "甜宠": "mild", "纯爱": "mild", "治愈": "mild", "清水": "mild",
+    "尺度拉满": "max", "尺度拉到最高": "max", "办事": "max", "做爱": "max",
+    "重口": "max", "硬核": "max", "heat_scale=max": "max",
+    "成人": "hot", "情欲": "hot", "肉": "hot", "性": "hot", "热辣": "hot",
+    "缠绵": "hot", "肉戏": "hot",
+    "甜宠": "mild", "纯爱": "mild", "治愈": "mild", "清水": "mild",
 }
 GENRE_HINTS = {
     "成人": "adult", "爱情": "romance", "悬疑": "thriller", "甜宠": "romance",
@@ -172,7 +176,7 @@ def _infer_genre_heat(story: str, hints: list[str]) -> tuple[str, str]:
             genre = GENRE_HINTS.get(h, "adult")
             return genre, heat
     if any(k in story for k in ADULT_KEYWORDS):
-        return "adult", "max"
+        return "adult", "hot"  # plot-driven default (explicit max only via HEAT_HINTS)
     return "drama", "mild"
 
 
@@ -361,7 +365,7 @@ def _normalize_plan(plan: dict[str, Any], brief: dict[str, Any]) -> dict[str, An
     return {
         "title": str(plan.get("title") or _infer_title(brief.get("story_text", ""))),
         "genre": str(plan.get("genre") or "adult"),
-        "heat_scale": str(plan.get("heat_scale") or "max"),
+        "heat_scale": str(plan.get("heat_scale") or "hot"),
         "theme": str(plan.get("theme") or ""),
         "tone": str(plan.get("tone") or ""),
         "characters": norm_chars,

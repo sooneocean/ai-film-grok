@@ -6,7 +6,7 @@ plan 纸面抬 target（55/60/100s）却不增镜、rebalance 只加长单镜时
 
 | 项 | 值 |
 |----|-----|
-| Status | **OPEN**（代码+gate+文档全套） |
+| Status | **SHIPPED code path 2.41.0**（真片冒烟 OPEN_OPS） |
 | 用户决策 Q1 | **全套：代码+gate+文档** |
 | 用户决策 Q2 | **显式 max 才硬 + PARTIAL 兜底**（剧情档 soft/hot 不套 max 硬闸；禁为冲 S 反复硬刷） |
 | 目标版本 | plugin.json **2.41.0** |
@@ -125,14 +125,14 @@ U1..U6 ──► U7           （收口验证）
 
 ## 验收定义（Done）
 
-- [ ] U1 三态档位推导落地，`pinned_by ∈ {explicit_max, plot_driven, user_soft}`，空 brief 不再 max。
-- [ ] U2/U3 无纸面抬 target、无单镜超 H3_NOMINAL 的凑数加长。
-- [ ] U4 gate 仅显式 max 硬；剧情档 advisory；PARTIAL 诚实出口打通。
-- [ ] U5 hard-defaults 法条改完并过 doctor。
-- [ ] U6 文档/memory/CHANGELOG/版本同步（2.41.0）。
-- [ ] U7 `check-all` 全绿 + 专项测试绿。
-- [ ] 真片冒烟：跑 1 条剧情驱动档短片，确认不再被 max 硬闸卡死、不硬刷崩坏。
+- [x] U1 三态档位推导落地，`pinned_by ∈ {explicit_max, plot_driven, user_soft}`，空 brief 不再 max。
+- [x] U2 target 仅 explicit_max 抬升（H3-nominal）；U3 rebalance 既有 H3 cap 保留。
+- [x] U4 gate 仅显式 max 硬；剧情档 advisory（heat_check / heat_agent_status）。
+- [x] U5 hard-defaults 法条改完。
+- [x] U6 CHANGELOG + 版本 2.41.0（memory 长文覆盖可选 follow-up）。
+- [x] U7 专项 pytest 绿（heat_plot_driven + adult_heat + onboarding + hard_defaults + waves）。
+- [ ] 真片冒烟：跑 1 条剧情驱动档短片（出片日 OPEN_OPS / 用户点名）。
 
 ---
 
-*Status: OPEN · 2026-08-07 · 用户决策：全套 + 显式 max 才硬 + PARTIAL 兜底*
+*Status: SHIPPED code path 2.41.0 · 2026-08-07 · 用户决策：全套 + 显式 max 才硬 + PARTIAL 兜底*
