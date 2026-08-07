@@ -175,7 +175,7 @@ S3 Stage peel → 编排函数只剩：load ctx → stage1()…stageN() → rece
 - [x] **W1.5** **dialogue stems · H3 native primary** → `final/stages_dialogue_stems.py`：lane plan + silent/caption-clock；**Edge 仅 post_tts 逃生**（有 H3 原声不默认 TTS）  
 - [x] **W1.6** peel **stretch/concat/join** → `final/stages_picture_concat.py`（stretch + title/end + join concat）  
 - [x] **W1.7** (mux leaf + official finalize leaf) peel **mux + delivery_class / master_lock 诚实字段**（A5 · plate≠master）  
-- [ ] **W1.8** `render_final()` 只编排；`main` 不变；shim `main()` 仍进真实现
+- [x] **W1.8** `render_final()` 以 stage 序列为主（~456 行 · voice/audio_prep/dual_mix/delivery leaves）；`main`/shim 不变
 
 **Verify（每子波）：**
 ```bash

@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.41.14] - 2026-08-07
+
+### Changed (monolith orchestrator relief · W1.8 orchestration)
+- **`render_final` ~456 lines** stage sequence (was 1155+): voice timeline · audio prep · dual mix · delivery report leaves.
+- **Leaves:** `stages_voice_timeline` · `stages_audio_prep` · `stages_dual_mix.run_dual_track_mix_stage` · `stages_delivery_report`.
+- **Guard:** mega-fn allowlist drops `render_final` (under 800).
+- **Tests:** `tests/test_stages_w18_orchestration.py`.
+
 ## [2.41.13] - 2026-08-07
 
 ### Changed (H3 native chain close-the-loop)

@@ -413,297 +413,74 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
     transition_style = _pic["transition_style"]
     xfade_plan = _pic["xfade_plan"]
 
-    # 5) Build narration track with title/end silence + acrossfade matching video
-    sil_t = work / "sil_t.wav"
-    sil_e = work / "sil_e.wav"
-    silence_wav(sil_t, title_dur)
-    silence_wav(sil_e, end_dur)
-    voice_inputs = [sil_t] + [item["wav"] for item in shot_audio] + [sil_e]
-    # convert each to same format and pad to exact segment durations
-    voice_parts: list[Path] = []
-    segs_durs = [title_dur] + [item["target"] for item in shot_audio] + [end_dur]
-    for i, (src, dur) in enumerate(zip(voice_inputs, segs_durs, strict=False)):
-        part = work / f"vo_part_{i:02d}.wav"
-        # pad/trim to exact duration
-        run(
-            [
-                "ffmpeg",
-                "-y",
-                "-i",
-                str(src),
-                "-af",
-                f"apad=pad_dur={dur:.3f},atrim=0:{dur:.3f},asetpts=PTS-STARTPTS",
-                "-ar",
-                str(SR),
-                "-ac",
-                "1",
-                "-c:a",
-                "pcm_s16le",
-                str(part),
-            ]
-        )
-        voice_parts.append(part)
-    try:
-        voice_cat = safe_output_path(
-            audio_dir, "narration.wav", suffixes={".wav"}, field="narration output"
-        )
-    except SecurityPolicyError as exc:
-        raise RenderError(str(exc)) from exc
-    active_transition = transition_sec if xfade_plan.get("enabled") else 0.0
-    audio_join_intents = (
-        full_join_intents if xfade_plan.get("enabled") else ["hard"] * max(0, len(segs_durs) - 1)
-    )
-    # Placeholder to keep following code structure: voice_cat filled by acrossfade
-    afade_plan = concat_audio_segments(
-        voice_parts,
-        voice_cat,
-        transition_sec=active_transition,
-        segment_durs=segs_durs,
-        join_intents=audio_join_intents if xfade_plan.get("enabled") else None,
-    )
-    log(f"audio concat method={afade_plan.get('method')}")
-    total_dur = pdur(voice_cat)
-    native_track = build_native_track(
-        shot_audio,
-        title_duration=title_dur,
-        end_duration=end_dur,
+    # 5) Narration + native tracks (leaf: final.stages_voice_timeline)
+    from final.stages_voice_timeline import build_narration_and_native_tracks
+
+    _vo = build_narration_and_native_tracks(
         work=work,
         audio_dir=audio_dir,
-        transition_sec=active_transition,
-        join_intents=audio_join_intents if xfade_plan.get("enabled") else None,
+        shot_audio=shot_audio,
+        title_dur=float(title_dur),
+        end_dur=float(end_dur),
+        transition_sec=float(transition_sec),
+        xfade_plan=xfade_plan,
+        full_join_intents=full_join_intents,
+        silence_wav=silence_wav,
     )
+    voice_cat = _vo["voice_cat"]
+    afade_plan = _vo["afade_plan"]
+    total_dur = _vo["total_dur"]
+    native_track = _vo["native_track"]
+    active_transition = _vo["active_transition"]
+    audio_join_intents = _vo["audio_join_intents"]
+    segs_durs = _vo["segs_durs"]
 
-    # 6) Music
-    try:
-        music_path = safe_output_path(
-            audio_dir, "bgm_procedural.wav", suffixes={".wav"}, field="BGM output"
-        )
-    except SecurityPolicyError as exc:
-        raise RenderError(str(exc)) from exc
-    mix_spotting: dict[str, Any] = {
-        "mood": mood,
-        "bed": True,
-        "applied_events": [],
-        "total_duration": float(total_dur),
-        "event_count": 0,
-        "bed_applied": True,
-        "voice_tracks": {
-            "nar_gain": vo_gain,
-            "vocal_color_gain": film_vocal_color_gain,
-            "native_audio_volume": native_audio_volume,
-            "policy": voice_policy,
-        },
-        "scene_sound_reconcile": scene_sound_report,
-    }
-    # Spotting map shared by procedural + user music (mute/duck/sfx on bed)
-    spot_shot_targets = [float(item["target"]) for item in shot_audio]
-    spot_tl = film_segment_timeline(
-        title_duration=title_dur,
-        shot_targets=spot_shot_targets,
-        end_duration=end_dur,
-        transition_sec=active_transition,
-        story_join_intents=list(story_intents) if story_intents is not None else None,
-        default_intent=default_intent if active_transition > 0 else "hard",
-    )
-    shot_start_map = {
-        str(item["id"]): float(spot_tl["shot_starts"][i]) for i, item in enumerate(shot_audio)
-    }
-    # film_segment_timeline returns shot_starts only; durations stay in spot_shot_targets
-    shot_end_map = {
-        str(item["id"]): float(spot_tl["shot_starts"][i] + spot_shot_targets[i])
-        for i, item in enumerate(shot_audio)
-    }
-    shot_duration_map = {str(item["id"]): float(item["target"]) for item in shot_audio}
-    # Legacy cue sidecar remains byte-compatible.  v1 is opt-in and carries
-    # all eight event types plus source/license/overlap validation.
-    audio_timeline = compile_audio_timeline(shots, shot_starts=shot_start_map)
-    # Do not claim unrendered foley/ambience/music was mixed. This is the
-    # renderer-local cue receipt, distinct from the production audio timeline.
-    audio_timeline_path = audio_dir / "audio-cues-timeline.json"
-    formal_timeline: dict[str, Any] | None = None
-    formal_silence_windows: list[dict[str, Any]] = []
-    event_voice_stem: dict[str, Any] | None = None
-    use_event_tts = bool(spec.get("audio_timeline_v1_event_tts", False))
-    if bool(spec.get("audio_timeline_v1", False)):
-        try:
-            stored_timeline = (
-                read_json(audio_dir / "audio-timeline.json") if use_event_tts else None
-            )
-            formal_timeline = (
-                stored_timeline
-                if isinstance(stored_timeline, dict)
-                else compile_audio_timeline_v1(spec)
-            )
-            formal_timeline = rebase_to_rendered_shots(
-                formal_timeline, shot_start_map, shot_durations=shot_duration_map
-            )
-            formal_timeline["duration_sec"] = round(float(total_dur), 3)
-            execution_plan = build_mix_execution_plan(formal_timeline)
-            formal_silence_windows = list(execution_plan.get("silence_windows") or [])
-        except AudioTimelineError as exc:
-            raise RenderError(str(exc)) from exc
-        write_json(audio_timeline_path, formal_timeline)
-        write_json(audio_dir / "audio-mix-execution-plan.json", execution_plan)
-    else:
-        write_json(audio_timeline_path, {"version": 1, "cues": audio_timeline})
-    mix_spotting["audio_timeline"] = {
-        "path": str(audio_timeline_path),
-        "cue_count": len(formal_timeline["events"]) if formal_timeline else len(audio_timeline),
-        "schema": "audio-timeline" if formal_timeline else "legacy-audio-cues",
-        "sha256": audio_timeline_hash(formal_timeline)
-        if formal_timeline
-        else sha256(audio_timeline_path),
-        "execution_plan": str(audio_dir / "audio-mix-execution-plan.json")
-        if formal_timeline
-        else None,
-    }
-    mix_spotting["formal_silence_windows"] = formal_silence_windows
-    if use_event_tts:
-        if formal_timeline is None:
-            raise RenderError("audio_timeline_v1_event_tts requires audio_timeline_v1")
-        event_voice_path = audio_dir / "event-voices.wav"
-        event_manifest = read_json(audio_dir / "tts-manifest.json")
-        if not isinstance(event_manifest, dict):
-            raise RenderError("audio_timeline_v1_event_tts requires audio/tts-manifest.json")
-        try:
-            event_voice_stem = render_event_voice_stem(
-                root,
-                formal_timeline,
-                event_manifest,
-                duration_sec=float(total_dur),
-                out=event_voice_path,
-            )
-        except EventVoiceStemError as exc:
-            raise RenderError(str(exc)) from exc
-        voice_cat = event_voice_path
-        mix_spotting["event_voice_stem"] = event_voice_stem
-    scene_sound_path = audio_dir / "scene_sound_stereo.wav"
-    ambience_path = audio_dir / "ambience_stereo.wav"
-    if formal_timeline is not None:
-        try:
-            scene_sound = render_scene_sound_stem(
-                root,
-                formal_timeline,
-                duration_sec=float(total_dur),
-                out=scene_sound_path,
-                sample_rate=48000,
-                ambience_out=ambience_path,
-            )
-        except SceneSoundError as exc:
-            raise RenderError(str(exc)) from exc
-    else:
-        silence_wav(scene_sound_path, float(total_dur))
-        silence_wav(ambience_path, float(total_dur))
-        scene_sound = {
-            "path": str(scene_sound_path),
-            "event_count": 0,
-            "events": [],
-            "ambience": {"path": str(ambience_path), "event_count": 0, "events": []},
-        }
-    mix_spotting["scene_sound"] = scene_sound
-    ambience_volume = (
-        0.0
-        if bool(getattr(args, "mute_ambience", False))
-        else float(getattr(args, "ambience_volume", 1.0))
-    )
-    ambience_volume = max(0.0, min(2.0, ambience_volume))
-    mix_spotting["ambience"] = {
-        **(scene_sound.get("ambience") or {}),
-        "volume": ambience_volume,
-        "muted": ambience_volume == 0.0,
-        "ducking": "preserved_under_narration",
-    }
-    sound_plan = spec.get("sound_plan") if isinstance(spec.get("sound_plan"), dict) else None
-    if sound_plan is None:
-        sound_plan = {}
-    try:
-        validate_sfx_scene_bindings(
-            sound_plan,
-            [shot for shot in flatten_shots(spec) if isinstance(shot, dict)],
-        )
-    except NarrativeTimelineError as exc:
-        raise RenderError(str(exc)) from exc
-    # Auto light SFX accents from dramatic_function when author left events empty
-    flat = {str(s["id"]): s for s in flatten_shots(spec) if isinstance(s, dict) and s.get("id")}
-    shot_dicts = [flat.get(str(item["id"]), {"id": item["id"]}) for item in shot_audio]
-    try:
-        from music_director import apply_bgm_to_shots, load_plan
+    # 6a) Audio prep: spotting / timeline / scene stems (leaf: final.stages_audio_prep)
+    from final.stages_audio_prep import prepare_audio_mix_context
 
-        _md_plan = load_plan(root)
-        if _md_plan is not None:
-            _n_bgm = apply_bgm_to_shots(shot_dicts, _md_plan)
-            mix_spotting["music_director_bgm"] = {
-                "ok": True,
-                "patched_shots": _n_bgm,
-                "default_mood": (_md_plan.get("bgm") or {}).get("default_mood"),
-            }
-    except Exception as exc:  # noqa: BLE001
-        mix_spotting["music_director_bgm"] = {"ok": False, "error": str(exc)[:160]}
-    heat_scale = str(spec.get("heat_scale") or "").strip().lower() or None
-    sound_plan = inject_auto_sfx_if_empty(sound_plan, shot_dicts, heat_scale=heat_scale)
-    # sound_cues on shots → extra sfx_accent events (声景轨，不进旁白)
-    if sound_cues_to_sfx_kinds is not None and isinstance(sound_plan, dict):
-        cue_events: list[dict[str, Any]] = list(sound_plan.get("events") or [])
-        added = 0
-        for sh in shot_dicts:
-            if not isinstance(sh, dict):
-                continue
-            kinds = sh.get("_sfx_kinds_from_cues") or sound_cues_to_sfx_kinds(
-                sh.get("sound_cues") or []
-            )
-            for kind in list(kinds)[:2]:
-                cue_events.append(
-                    {
-                        "type": "sfx_accent",
-                        "shot_id": sh.get("id"),
-                        "kind": kind,
-                        "source": "sound_cues",
-                    }
-                )
-                added += 1
-        if added:
-            sound_plan = {**sound_plan, "events": cue_events}
-            notes = list(sound_plan.get("_notes") or [])
-            notes.append(f"sound_cues: injected {added} sfx_accent(s)")
-            sound_plan["_notes"] = notes
-
-    # vocal_color timeline stem (after shot_starts known); default off → None
-    color_track = build_vocal_color_track(
-        shot_audio,
-        shot_start_map=shot_start_map,
-        total_duration=float(total_dur),
+    _prep = prepare_audio_mix_context(
+        root=root,
         work=work,
         audio_dir=audio_dir,
+        args=args,
+        spec=spec if isinstance(spec, dict) else {},
+        shots=shots,
+        shot_audio=shot_audio,
+        mood=mood,
+        vo_gain=float(vo_gain),
+        film_vocal_color_gain=float(film_vocal_color_gain),
+        native_audio_volume=float(native_audio_volume),
+        voice_policy=voice_policy if isinstance(voice_policy, dict) else {},
+        scene_sound_report=scene_sound_report if isinstance(scene_sound_report, dict) else {},
+        title_dur=float(title_dur),
+        end_dur=float(end_dur),
+        active_transition=float(active_transition),
+        story_intents=list(story_intents) if story_intents is not None else None,
+        default_intent=default_intent,
+        total_dur=float(total_dur),
+        voice_cat=voice_cat,
+        silence_wav=silence_wav,
+        sound_cues_to_sfx_kinds=sound_cues_to_sfx_kinds,
     )
-    if color_track is not None:
-        mix_spotting["vocal_color_track"] = str(color_track)
-        mix_spotting["vocal_color_shots"] = [
-            {
-                "id": it.get("id"),
-                "text": it.get("color_text"),
-                "gain": it.get("color_gain"),
-                "source": it.get("color_source"),
-            }
-            for it in shot_audio
-            if it.get("color_wav")
-        ]
-        log(f"vocal_color track: {len(mix_spotting['vocal_color_shots'])} stem(s)")
-    else:
-        mix_spotting["vocal_color_track"] = None
-        mix_spotting["vocal_color_shots"] = []
-        log("vocal_color track: off (nar+BGM dominate; opt-in via voice_tracks.enabled)")
-
-    def _apply_spotting_and_convert_to_stereo(
-        float_bed: np.ndarray,
-    ) -> tuple[np.ndarray, np.ndarray, dict[str, Any]]:
-        from final.bgm_spotting import apply_spotting_and_convert_to_stereo as _spot
-        return _spot(
-            float_bed,
-            sound_plan=sound_plan,
-            shot_start_map=shot_start_map,
-            total_dur=float(total_dur),
-        )
-
+    music_path = _prep["music_path"]
+    mix_spotting = _prep["mix_spotting"]
+    shot_start_map = _prep["shot_start_map"]
+    shot_end_map = _prep["shot_end_map"]
+    shot_duration_map = _prep["shot_duration_map"]
+    audio_timeline_path = _prep["audio_timeline_path"]
+    formal_timeline = _prep["formal_timeline"]
+    formal_silence_windows = _prep["formal_silence_windows"]
+    event_voice_stem = _prep["event_voice_stem"]
+    use_event_tts = _prep["use_event_tts"]
+    voice_cat = _prep["voice_cat"]
+    scene_sound_path = _prep["scene_sound_path"]
+    ambience_path = _prep["ambience_path"]
+    scene_sound = _prep["scene_sound"]
+    ambience_volume = _prep["ambience_volume"]
+    sound_plan = _prep["sound_plan"]
+    shot_dicts = _prep["shot_dicts"]
+    color_track = _prep["color_track"]
+    _apply_spotting_and_convert_to_stereo = _prep["apply_spotting"]
 
     # W1.2 · music seed / anti-fatigue / bed materialize (leaf: final.stages_music_bed)
     from final.stages_music_bed import (
@@ -781,416 +558,48 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
     bgm_source_receipt = bed["bgm_source_receipt"]
     mood = bed["mood"]
 
-    # 7) Dual-track mix: VO primary + BGM always audible (两条音轨)
-    # Sidechain: rnb default longer release so groove returns in VO pauses (Phase E)
-    try:
-        mixed = safe_output_path(
-            audio_dir, "mixed.wav", suffixes={".wav"}, field="mixed audio output"
-        )
-    except SecurityPolicyError as exc:
-        raise RenderError(str(exc)) from exc
-    music_vol = float(args.music_volume)
-    performance_bgm = (
-        summarize_bgm_response(spec.get("shots") or [])
-        if summarize_bgm_response is not None
-        else {"shots": 0, "mean_intensity": 0.0, "music_gain": 1.0, "duck_db": -2.0}
-    )
-    music_vol = max(0.02, min(1.0, music_vol * float(performance_bgm.get("music_gain", 1.0))))
-    mix_spotting["performance_bgm"] = performance_bgm
-    # Recipe bed_gain also nudges mix music_volume once (author CLI still wins base)
-    try:
-        bg_hint = float(
-            (sound_plan or {}).get("bed_gain_hint")
-            or (spec.get("_audio_routing") or {}).get("mean_bed_gain")
-            or 1.0
-        )
-        if abs(bg_hint - 1.0) > 0.02:
-            music_vol = max(0.02, min(1.0, music_vol * bg_hint))
-            mix_spotting["music_vol_after_recipe"] = music_vol
-    except (TypeError, ValueError):
-        pass
-    if isinstance(spec.get("_audio_routing"), dict):
-        mix_spotting["audio_routing_counts"] = (spec.get("_audio_routing") or {}).get("counts")
-        mix_spotting["audio_policy"] = (spec.get("audio_policy") or {}).get("mode")
-    sc_overrides = {
-        "threshold": getattr(args, "sidechain_threshold", None),
-        "ratio": getattr(args, "sidechain_ratio", None),
-        "attack_ms": getattr(args, "sidechain_attack", None),
-        "release_ms": getattr(args, "sidechain_release", None),
-    }
-    try:
-        sidechain = resolve_sidechain(
-            sound_plan if isinstance(sound_plan, dict) else None,
-            mood=mood,
-            overrides=sc_overrides,
-        )
-    except SoundPlanError as exc:
-        raise RenderError(str(exc)) from exc
-    mix_spotting["sidechain"] = sidechain
-    if performance_bgm.get("shots"):
-        sidechain["performance_duck_db"] = performance_bgm.get("duck_db")
-    sc_frag = sidechain_filter_fragment(sidechain)
-    filters_help = run(["ffmpeg", "-filters"], check=False).stdout
-    # I1.4 · default broadband duck (no acrossover) — leaf: final.stages_dual_mix
-    from final.stages_dual_mix import apply_mix_path_env_policy
+    # 7) Dual-track mix + loudnorm (leaf: final.stages_dual_mix)
+    from final.stages_dual_mix import run_dual_track_mix_stage
 
-    filters_help = apply_mix_path_env_policy(filters_help, mix_spotting=mix_spotting)
-
-    try:
-        from acoustic_policy import resolve_acoustic_space
-
-        v_motifs = (spec.get("director_intent") or {}).get("visual_motifs") or []
-        loc_tags = [str(x) for x in v_motifs]
-        ac = resolve_acoustic_space(loc_tags)
-        # P0 · 2026-07-23: aecho on full ~60s stems hung ffmpeg 50+ min (wall clock).
-        # Keep EQ only; reverb can be opt-in via film-spec acoustic_reverb=true later.
-        sfx_dsp = f"highpass=f={ac['highpass']},lowpass=f={ac['lowpass']}"
-        if bool((spec.get("audio_policy") or {}).get("acoustic_reverb")) or bool(
-            os.environ.get("AIFILM_SFX_REVERB", "").strip() in {"1", "true", "yes"}
-        ):
-            sfx_dsp += f",aecho=1.0:1.0:{ac['reverb_time'] * 1000}:{ac['wet_level']}"
-    except Exception:
-        sfx_dsp = "anull"
-    mix_spotting["sfx_dsp_applied"] = sfx_dsp
-
-    use_color = color_track is not None and Path(str(color_track)).is_file()
-    color_in_gain = 1.0  # per-stem gain already applied in build_vocal_color_track
-
-    mix_sample_rate = 48000 if bool(spec.get("audio_timeline_v1", False)) else SR
-    fc_parts = [
-        f"[0:a]volume={vo_gain:.3f},aformat=sample_fmts=fltp:sample_rates={mix_sample_rate}:channel_layouts=stereo[narr]",
-        f"[1:a]volume={music_vol:.3f},aformat=sample_fmts=fltp:sample_rates={mix_sample_rate}:channel_layouts=stereo[mus]",
-        f"[2:a]volume={native_audio_volume:.3f},aformat=sample_fmts=fltp:sample_rates={mix_sample_rate}:channel_layouts=stereo[native]",
-        f"[3:a]volume=1.0,aformat=sample_fmts=fltp:sample_rates={mix_sample_rate}:channel_layouts=stereo,{sfx_dsp}[sfx]",
-        f"[4:a]volume=1.0,aformat=sample_fmts=fltp:sample_rates={mix_sample_rate}:channel_layouts=stereo[scene]",
-        f"[5:a]volume={ambience_volume:.3f},aformat=sample_fmts=fltp:sample_rates={mix_sample_rate}:channel_layouts=stereo[ambience]",
-    ]
-    if use_color:
-        fc_parts.append(
-            f"[6:a]volume={color_in_gain:.3f},aformat=sample_fmts=fltp:sample_rates={mix_sample_rate}:channel_layouts=stereo[color]"
-        )
-
-    controlled_labels = {
-        "music": "mus",
-        "native": "native",
-        "sfx": "sfx",
-        "scene_sound": "scene",
-        "ambience": "ambience",
-    }
-    for window_index, window in enumerate(formal_silence_windows):
-        scope = str(window.get("scope") or "bed")
-        targets = (
-            ("music", "native", "sfx", "scene_sound", "ambience") if scope == "bed" else (scope,)
-        )
-        for target in targets:
-            incoming = controlled_labels[target]
-            outgoing = f"{target}_silence_{window_index}"
-            fc_parts.append(
-                f"[{incoming}]volume=0:enable='between(t,{float(window['start_sec']):.3f},{float(window['end_sec']):.3f})'[{outgoing}]"
-            )
-            controlled_labels[target] = outgoing
-    music_label = controlled_labels["music"]
-    native_label = controlled_labels["native"]
-    sfx_label = controlled_labels["sfx"]
-    scene_label = controlled_labels["scene_sound"]
-    ambience_label = controlled_labels["ambience"]
-
-    if "sidechaincompress" in filters_help and "acrossover" in filters_help:
-        # Native I2V audio is the main picture sound.  Route it through the
-        # same narration sidechain as BGM, so that it returns to full level in
-        # gaps but does not bury narration or character dialogue.
-        fc_parts.append(
-            f"[{music_label}][{native_label}][{scene_label}]amix=inputs=3:duration=longest:normalize=0[picture_bed]"
-        )
-        fc_parts.append("[picture_bed]acrossover=split=300 4000[mus_l][mus_m][mus_h]")
-        fc_parts.append("[narr]asplit[narr_main][narr_sc]")
-        fc_parts.append(f"[mus_m][narr_sc]{sc_frag}[mus_m_ducked]")
-        fc_parts.append(
-            "[mus_l][mus_m_ducked][mus_h]amix=inputs=3:duration=longest:normalize=0[mus_ducked]"
-        )
-        fc_parts.append(
-            f"[mus_ducked][{sfx_label}][{ambience_label}]amix=inputs=3:duration=longest:normalize=0[bed]"
-        )
-        final_amix_count = 2 + (1 if use_color else 0)
-        color_in = "[color]" if use_color else ""
-        fc_parts.append(
-            f"[narr_main][bed]{color_in}amix=inputs={final_amix_count}:duration=first:normalize=0,alimiter=limit=0.95[aout]"
-        )
-        mix_spotting["sidechain_applied"] = "dynamic_eq"
-    elif "sidechaincompress" in filters_help:
-        fc_parts.append(
-            f"[{music_label}][{native_label}][{scene_label}]amix=inputs=3:duration=longest:normalize=0[picture_bed]"
-        )
-        fc_parts.append(f"[picture_bed][narr]{sc_frag}[ducked]")
-        fc_parts.append(
-            f"[ducked][{sfx_label}][{ambience_label}]amix=inputs=3:duration=longest:normalize=0[bed]"
-        )
-        final_amix_count = 2 + (1 if use_color else 0)
-        color_in = "[color]" if use_color else ""
-        fc_parts.append(
-            f"[narr][ducked]{color_in}amix=inputs={final_amix_count}:duration=first:normalize=0,alimiter=limit=0.95[aout]"
-        )
-        mix_spotting["sidechain_applied"] = "broadband"
-    else:
-        final_amix_count = 6 + (1 if use_color else 0)
-        color_in = "[color]" if use_color else ""
-        fc_parts.append(
-            f"[narr][{music_label}][{native_label}][{sfx_label}][{scene_label}][{ambience_label}]{color_in}amix=inputs={final_amix_count}:duration=first:normalize=0,alimiter=limit=0.95[aout]"
-        )
-        mix_spotting["sidechain_applied"] = False
-
-    if build_music_mix_review is not None:
-        mix_spotting["music_mix_review"] = build_music_mix_review(
-            (sound_plan or {}).get("music_timeline") or [],
-            sidechain_applied=mix_spotting["sidechain_applied"],
-        )
-
-    fc = ";".join(fc_parts)
-    mix_spotting["mix_inputs"] = [
-        "narration",
-        "bgm",
-        "native",
-        "sfx",
-        "scene_sound",
-        "ambience",
-    ] + (["vocal_color"] if use_color else [])
-    preserved_native_shots = primary_native_shot_ids(shot_audio)
-    suppressed_native_shots = [
-        item["id"] for item in shot_audio if item.get("native_audio_suppressed_for_tts")
-    ]
-    native_dialogue_shots = [
-        item["id"] for item in shot_audio if item.get("dialogue_audio_lane") == "native"
-    ]
-    post_tts_dialogue_shots = [
-        item["id"] for item in shot_audio if item.get("dialogue_audio_lane") == "post_tts"
-    ]
-    # Fail-closed bookkeeping: same shot must never keep native + audible TTS.
-    from final.stages_dual_mix import dialogue_xor_violations
-
-    xor_violations = dialogue_xor_violations(shot_audio)
-    if xor_violations:
-        raise RenderError(
-            "dialogue audio XOR violated (native + TTS both audible) for: "
-            + ", ".join(xor_violations)
-        )
-    mix_spotting["native_audio"] = {
-        "role": (
-            "primary_video_sound"
-            if preserved_native_shots
-            else "suppressed_for_tts"
-            if suppressed_native_shots
-            else "unavailable"
-        ),
-        "volume": native_audio_volume,
-        "preserved_shots": preserved_native_shots,
-        "suppressed_for_tts_shots": suppressed_native_shots,
-        "dialogue_xor": True,
-        "native_dialogue_shots": native_dialogue_shots,
-        "post_tts_dialogue_shots": post_tts_dialogue_shots,
-        "xor_violations": [],
-        "shot_lanes": {
-            item["id"]: {
-                "lane": item.get("dialogue_audio_lane"),
-                "tts_mix_gain": item.get("tts_mix_gain"),
-                "caption_clock_only": item.get("caption_clock_only"),
-            }
-            for item in shot_audio
-        },
-        "gain_plan": {
-            item["id"]: item["native_audio_gain"] for item in shot_audio if item.get("native_audio")
-        },
-        "ducked_under_narration": "sidechaincompress" in filters_help,
-    }
-
-    try:
-        mix_report_path = safe_output_path(
-            audio_dir, "mix_report.json", suffixes={".json"}, field="mix report"
-        )
-        atomic_write_text(
-            mix_report_path,
-            json.dumps(mix_spotting, ensure_ascii=False, indent=2) + "\n",
-        )
-        mix_spotting["report_path"] = str(mix_report_path)
-    except SecurityPolicyError as exc:
-        raise RenderError(str(exc)) from exc
-
-    mix_cmd = [
-        "ffmpeg",
-        "-y",
-        "-i",
-        str(voice_cat),
-        "-i",
-        str(music_path),
-        "-i",
-        str(native_track),
-        "-i",
-        str(sfx_stereo_path),
-        "-i",
-        str(scene_sound_path),
-        "-i",
-        str(ambience_path),
-    ]
-    if use_color:
-        mix_cmd.extend(["-i", str(color_track)])
-    mix_cmd.extend(
-        [
-            "-filter_complex",
-            fc,
-            "-map",
-            "[aout]",
-            "-ar",
-            str(mix_sample_rate),
-            "-ac",
-            "2",
-            "-c:a",
-            "pcm_s16le",
-            str(mixed),
-        ]
-    )
-    # Wave D · sidechain can hang or fail mid-plate → simple amix PARTIAL (not silent)
-    _hb("audio_mix", "sidechain_or_amix")
-    from final.stages_dual_mix import run_sidechain_mix_with_amix_fallback
-
-    run_sidechain_mix_with_amix_fallback(
-        mix_cmd=mix_cmd,
-        voice_cat=voice_cat,
+    _mix = run_dual_track_mix_stage(
+        root=root,
+        work=work,
+        audio_dir=audio_dir,
+        args=args,
+        spec=spec if isinstance(spec, dict) else {},
+        shot_audio=shot_audio,
+        mood=mood,
+        vo_gain=float(vo_gain),
+        native_audio_volume=float(native_audio_volume),
         music_path=music_path,
+        voice_cat=voice_cat,
         native_track=native_track,
         sfx_stereo_path=sfx_stereo_path,
         scene_sound_path=scene_sound_path,
         ambience_path=ambience_path,
-        color_track=color_track if use_color else None,
-        use_color=use_color,
-        mixed=mixed,
-        mix_sample_rate=mix_sample_rate,
+        ambience_volume=float(ambience_volume),
+        color_track=color_track,
         mix_spotting=mix_spotting,
-        root=root,
+        sound_plan=sound_plan if isinstance(sound_plan, dict) else None,
+        formal_silence_windows=formal_silence_windows,
+        formal_timeline=formal_timeline,
         run=run,
-        log=log,
-        write_partial_receipt=write_final_mix_partial_receipt,
-        render_error_cls=RenderError,
+        write_final_mix_partial_receipt=write_final_mix_partial_receipt,
+        summarize_bgm_response=summarize_bgm_response,
+        build_music_mix_review=build_music_mix_review,
+        probe_mixed_loudness=probe_mixed_loudness,
+        sha256=sha256,
+        heartbeat=_hb,
+        sample_rate_default=SR,
     )
-
-    # Phase F/G: loudness probe + optional/auto loudnorm toward shortform target
-    try:
-        loud_policy = resolve_loudnorm(
-            sound_plan if isinstance(sound_plan, dict) else None,
-            mode=getattr(args, "loudnorm", None),
-            target_lufs=getattr(args, "target_lufs", None),
-        )
-    except SoundPlanError as exc:
-        raise RenderError(str(exc)) from exc
-    mix_spotting["loudnorm_policy"] = loud_policy
-    try:
-        loud = probe_mixed_loudness(mixed)
-        if loud:
-            mix_spotting["loudness_before"] = loud
-            mix_spotting["loudness"] = loud
-            if build_music_mix_review is not None:
-                mix_spotting["music_mix_review"] = build_music_mix_review(
-                    (sound_plan or {}).get("music_timeline") or [],
-                    sidechain_applied=mix_spotting.get("sidechain_applied", False),
-                    loudness=loud,
-                )
-        measured = (loud or {}).get("integrated_lufs") if loud else None
-        apply_ln, ln_reason = should_apply_loudnorm(loud_policy, measured)
-        mix_spotting["loudnorm_decision"] = {"apply": apply_ln, "reason": ln_reason}
-        if apply_ln:
-            tgt = float(loud_policy["target_lufs"])
-            normed = work / "mixed_loudnorm.wav"
-            log(f"loudnorm apply → I={tgt:.1f} LUFS ({ln_reason})")
-            ln_proc = run(
-                [
-                    "ffmpeg",
-                    "-y",
-                    "-i",
-                    str(mixed),
-                    "-af",
-                    f"loudnorm=I={tgt:.1f}:TP=-1.5:LRA=11",
-                    "-ar",
-                    str(mix_sample_rate),
-                    "-ac",
-                    "2",
-                    "-c:a",
-                    "pcm_s16le",
-                    str(normed),
-                ],
-                check=False,
-            )
-            if ln_proc.returncode == 0 and normed.is_file() and normed.stat().st_size > 1000:
-                import shutil as _shutil
-
-                _shutil.copy2(normed, mixed)
-                mix_spotting["loudnorm_applied"] = True
-                loud_after = probe_mixed_loudness(mixed)
-                if loud_after:
-                    mix_spotting["loudness_after"] = loud_after
-                    mix_spotting["loudness"] = loud_after
-            else:
-                mix_spotting["loudnorm_applied"] = False
-                mix_spotting["loudnorm_error"] = (
-                    ln_proc.stderr or ln_proc.stdout or "loudnorm failed"
-                )[-400:]
-        else:
-            mix_spotting["loudnorm_applied"] = False
-        if build_music_mix_review is not None:
-            mix_spotting["music_mix_review"] = build_music_mix_review(
-                (sound_plan or {}).get("music_timeline") or [],
-                sidechain_applied=mix_spotting.get("sidechain_applied", False),
-                loudness=mix_spotting.get("loudness"),
-            )
-        mix_spotting["artifacts"] = {
-            "narration": {"path": str(voice_cat), "sha256": sha256(voice_cat)},
-            "bgm": {"path": str(music_path), "sha256": sha256(music_path)},
-            "native": {"path": str(native_track), "sha256": sha256(native_track)},
-            "sfx": {"path": str(sfx_stereo_path), "sha256": sha256(sfx_stereo_path)},
-            "scene_sound": {"path": str(scene_sound_path), "sha256": sha256(scene_sound_path)},
-            "ambience": {"path": str(ambience_path), "sha256": sha256(ambience_path)},
-            "mixed": {"path": str(mixed), "sha256": sha256(mixed)},
-        }
-        if bool(getattr(args, "export_stems", False)):
-            stems_dir = audio_dir / "stems"
-            if stems_dir.is_symlink():
-                raise RenderError("audio stems directory cannot be a symbolic link")
-            stems_dir.mkdir(parents=True, exist_ok=True)
-            exported_stems: dict[str, dict[str, str]] = {}
-            for name, source in (
-                ("narration.wav", voice_cat),
-                ("bgm.wav", music_path),
-                ("native.wav", native_track),
-                ("sfx.wav", sfx_stereo_path),
-                ("scene_sound.wav", scene_sound_path),
-                ("ambience.wav", ambience_path),
-            ):
-                target = safe_output_path(stems_dir, name, suffixes={".wav"}, field="audio stem")
-                shutil.copy2(source, target)
-                exported_stems[name.removesuffix(".wav")] = {
-                    "path": str(target),
-                    "sha256": sha256(target),
-                }
-            if use_color:
-                target = safe_output_path(
-                    stems_dir, "vocal_color.wav", suffixes={".wav"}, field="audio stem"
-                )
-                shutil.copy2(color_track, target)
-                exported_stems["vocal_color"] = {"path": str(target), "sha256": sha256(target)}
-            mix_spotting["exported_stems"] = exported_stems
-        if mix_spotting.get("report_path"):
-            atomic_write_text(
-                Path(str(mix_spotting["report_path"])),
-                json.dumps(mix_spotting, ensure_ascii=False, indent=2) + "\n",
-            )
-        validate_audio_tracks_contract(spec, audio_dir=audio_dir, require_artifacts=True)
-    except SoundPlanError:
-        raise
-    except Exception as exc:  # pragma: no cover — probe must never fail final
-        mix_spotting["loudness_error"] = str(exc)[:200]
-        if mix_spotting.get("report_path"):
-            with contextlib.suppress(Exception):
-                atomic_write_text(
-                    Path(str(mix_spotting["report_path"])),
-                    json.dumps(mix_spotting, ensure_ascii=False, indent=2) + "\n",
-                )
+    mixed = _mix["mixed"]
+    mix_spotting = _mix["mix_spotting"]
+    music_vol = _mix["music_vol"]
+    filters_help = _mix["filters_help"]
+    preserved_native_shots = _mix["preserved_native_shots"]
+    suppressed_native_shots = _mix["suppressed_native_shots"]
+    use_color = _mix["use_color"]
+    mix_sample_rate = _mix["mix_sample_rate"]
 
     # 8) Subtitle cues + SRT + optional PIL burn (leaf: final.stages_subs)
     from final.stages_subs import materialize_subs_stage
@@ -1237,172 +646,64 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
         render_error_cls=RenderError,
     )
 
-    timeline_path = root / "timeline.json"
-    mix_report_path = root / "audio" / "mix_report.json"
-    try:
-        bound_transition_ops = bind_transition_operations_to_timeline(
-            list(spec.get("transition_ops") or []), film_timeline=film_tl
-        )
-    except TransitionOperationError as exc:
-        raise RenderError(f"transition operation timing: {exc}") from exc
-    report = {
-        "schema_version": 2,
-        "created_at": utc_now(),
-        "title": title_text,
-        "output": str(final_path),
-        "output_sha256": sha256(final_path),
-        "duration_sec": pdur(final_path),
-        "width": width,
-        "height": height,
-        "fps": fps,
-        "vo_mode": vo_mode,
-        "voice": voice,
-        "transition": {
-            "sec": transition_sec,
-            "active_sec": active_transition,
-            "story_intents": story_intents,
-            "full_join_intents": full_join_intents,
-            "default_intent": default_intent,
-            "video": xfade_plan,
-            "audio": afade_plan,
-            "operations": bound_transition_ops,
-            "film_timeline": {
-                "shot_starts": film_tl.get("shot_starts"),
-                "output_duration": film_tl.get("output_duration"),
-                "use_ts": film_tl.get("use_ts"),
-                "enabled": film_tl.get("enabled"),
-                "join_intents": film_tl.get("full_join_intents") or film_tl.get("join_intents"),
-            },
-        },
-        "sound_spotting": mix_spotting,
-        "dialogue_broll": broll_edit_report,
-        "dialogue_broll_report_sha256": broll_edit_report_sha256,
-        "tts": {
-            "backend_requested": tts_backend,
-            "cast_tts_backends": cast_tts_backends,
-            "probe": tts_info,
-            "shots": [item.get("tts") for item in shot_audio],
-        },
-        "narration": {"path": str(voice_cat), "sha256": sha256(voice_cat)},
-        "music": {
-            "path": str(music_path),
-            "sha256": sha256(music_path) if Path(music_path).is_file() else None,
-            "license_or_source": license_note,
-            "volume": music_vol,
-            "ducked_under_narration": "sidechaincompress" in filters_help,
-            "mood": mood,
-            "bed_source": mix_spotting.get("bed_source"),
-            "bgm_source": bgm_source_receipt,
-            "honest_limits": (bgm_source_receipt or {}).get("honest_limits") or [],
-        },
-        "native_audio": {
-            "path": str(native_track),
-            "sha256": sha256(native_track),
-            "volume": native_audio_volume,
-            "role": mix_spotting["native_audio"]["role"],
-            "ducked_under_narration": "sidechaincompress" in filters_help,
-            "preserved_shots": preserved_native_shots,
-            "suppressed_for_tts_shots": suppressed_native_shots,
-        },
-        "audio_provenance": {
-            "mix_report": str(mix_report_path) if mix_report_path.is_file() else None,
-            "mix_report_sha256": sha256(mix_report_path) if mix_report_path.is_file() else None,
-            "audio_timeline": str(audio_timeline_path) if audio_timeline_path.is_file() else None,
-            "audio_timeline_sha256": sha256(audio_timeline_path)
-            if audio_timeline_path.is_file()
-            else None,
-            "audio_mix_execution_plan": str(audio_dir / "audio-mix-execution-plan.json")
-            if formal_timeline
-            else None,
-        },
-        "timeline": {
-            "path": str(timeline_path) if timeline_path.is_file() else None,
-            "sha256": sha256(timeline_path) if timeline_path.is_file() else None,
-        },
-        "subtitles": {
-            "srt": str(srt_path),
-            "srt_stable": str(srt_stable) if srt_stable != srt_path else None,
-            "srt_sha256": sha256(srt_path),
-            "cue_count": len(cues),
-            "burned_in": subs_mode == "burn",
-            "mode": subs_mode,
-            "audio_event_bindings": timeline_caption_bindings(formal_timeline)
-            if formal_timeline
-            else None,
-        },
-        "shots": [
-            {
-                "id": item["id"],
-                "text": item["text"],
-                "vo_dur": item["vo_dur"],
-                "raw_vo_dur": item.get("raw_vo_dur"),
-                "target": item["target"],
-                "stretch_plan": item.get("stretch_plan"),
-                "vo_atempo_plan": item.get("vo_atempo_plan"),
-                "visual_fit": item.get("visual_fit"),
-                "vo_fit": item.get("vo_fit"),
-                "tts": item.get("tts"),
-            }
-            for item in shot_audio
-        ],
-        "provider_visual": "grok-imagine",
-        "post_engine": "ai-film-grok/render_final.py",
-        "lipsync": {
-            "mode": "off",
-            "frozen": True,
-            "shots": lipsync_report,
-        },
-    }
-    try:
-        report_path = safe_output_path(
-            out_dir, "final-delivery.json", suffixes={".json"}, field="delivery report"
-        )
-    except SecurityPolicyError as exc:
-        raise RenderError(str(exc)) from exc
-    write_json(report_path, report)
+    # 9b) Technical delivery report (leaf: final.stages_delivery_report)
+    from final.stages_delivery_report import write_technical_delivery
+    from audio_timeline import caption_bindings as timeline_caption_bindings
 
-    try:
-        technical_qa = analyze_media(final_path, require_audio=True, require_motion=True)
-    except MediaQAError as exc:
-        raise RenderError(str(exc)) from exc
-    if not technical_qa.get("ok"):
-        raise RenderError(f"Final MP4 failed technical QA: {technical_qa.get('errors')}")
-    report["technical_qa"] = technical_qa
-    if str(spec.get("production_mode") or "shortform") == "longform":
-        from longform import LongformError, materialize_unit_masters
-
-        try:
-            report["longform_unit_masters"] = materialize_unit_masters(
-                root,
-                final_path=final_path,
-                film_timeline=film_tl,
-                shots=shot_audio,
-            )
-        except LongformError as exc:
-            raise RenderError(f"longform unit masters: {exc}") from exc
-    write_json(report_path, report)
-
-    try:
-        from timeline_clock import persist_film_timeline
-
-        report["film_timeline_receipt"] = str(persist_film_timeline(root, film_tl))
-        write_json(report_path, report)
-    except Exception as tl_exc:  # noqa: BLE001
-        report["film_timeline_receipt_error"] = str(tl_exc)[:160]
-
-    # Update manifest gates (default technical final truth, overwritten after official final check).
-    manifest.setdefault("outputs", {})["final_film"] = build_final_film_manifest_entry(
+    _del = write_technical_delivery(
+        root=root,
+        out_dir=out_dir,
+        audio_dir=audio_dir,
         final_path=final_path,
-        output_sha256=report["output_sha256"],
-        duration_sec=report["duration_sec"],
-        report_path=report_path,
-        technical_qa=technical_qa,
-        official_final={"delivery_visibility": "technical_final_visible", "status": "TECHNICAL_FINAL"},
+        args=args,
+        spec=spec if isinstance(spec, dict) else {},
+        manifest=manifest if isinstance(manifest, dict) else {},
+        film_tl=film_tl,
+        title_text=str(title_text),
+        width=width,
+        height=height,
+        fps=fps,
+        vo_mode=vo_mode,
+        voice=voice,
+        transition_sec=float(transition_sec),
+        active_transition=float(active_transition),
+        story_intents=list(story_intents) if story_intents is not None else None,
+        full_join_intents=full_join_intents,
+        default_intent=default_intent,
+        xfade_plan=xfade_plan,
+        afade_plan=afade_plan,
+        mix_spotting=mix_spotting,
+        broll_edit_report=broll_edit_report,
+        broll_edit_report_sha256=broll_edit_report_sha256,
+        tts_backend=str(tts_backend),
+        cast_tts_backends=cast_tts_backends if isinstance(cast_tts_backends, dict) else {},
+        tts_info=tts_info if isinstance(tts_info, dict) else {},
+        shot_audio=shot_audio,
+        voice_cat=voice_cat,
+        music_path=music_path,
+        license_note=str(license_note),
+        music_vol=float(music_vol),
+        filters_help=str(filters_help or ""),
+        mood=mood,
+        bgm_source_receipt=bgm_source_receipt,
+        native_track=native_track,
+        native_audio_volume=float(native_audio_volume),
+        preserved_native_shots=preserved_native_shots,
+        suppressed_native_shots=suppressed_native_shots,
+        audio_timeline_path=audio_timeline_path,
+        formal_timeline=formal_timeline,
+        srt_path=srt_path,
+        srt_stable=srt_stable,
+        cues=cues,
+        subs_mode=subs_mode,
+        lipsync_report=lipsync_report,
+        sha256=sha256,
+        timeline_caption_bindings=timeline_caption_bindings,
     )
-    # Technical success is not human/agent end-to-end approval.
-    manifest.setdefault("gates", {})["final_complete"] = False
-    manifest["updated_at"] = utc_now()
-    write_json(root / "manifest.json", manifest)
+    report = _del["report"]
+    report_path = _del["report_path"]
+    technical_qa = _del["technical_qa"]
+    manifest = _del["manifest"]
 
     # A5 · 2026-08-06: plate vs master — never auto master_lock (leaf)
     from final.stages_official_finalize import apply_official_final_classification

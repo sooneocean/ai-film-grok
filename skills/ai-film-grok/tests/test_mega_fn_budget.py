@@ -18,7 +18,6 @@ BUDGET_LINES = 800
 ALLOWLIST: frozenset[tuple[str, str]] = frozenset(
     {
         # P0 orchestrators (Wave 1–3 targets)
-        ("post/render_final.py", "render_final"),
         ("plan/film_spec_validate.py", "validate_film_spec"),
         ("gates/preflight.py", "run_preflight"),
         # Secondary mega-fns discovered 2026-08-07 probe (Wave 6 watch)
@@ -100,7 +99,6 @@ def test_no_new_mega_functions_without_allowlist() -> None:
     )
     # Known P0 mega-fns must still be present (don't silently delete files)
     for required in (
-        ("post/render_final.py", "render_final"),
         ("plan/film_spec_validate.py", "validate_film_spec"),
         ("gates/preflight.py", "run_preflight"),
     ):
