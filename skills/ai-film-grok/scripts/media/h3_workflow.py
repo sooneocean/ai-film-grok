@@ -167,11 +167,11 @@ def _prompt_for_shot(
 
     Dialects (``resolve_prompt_dialect``):
 
-    * **official** — MiniMax ``h3-prompt-writing`` structure
-      (``integrated_multimodal_description`` / soundscape / music, or Ref2VA six-section).
-      Env: ``AIFILM_H3_PROMPT_DIALECT=official`` or ``dsl.prompt_format=official``.
-    * **legacy** (default until O3 canary) — temporal ``[Xs-Ys]`` segments for
-      ``h3_primary`` / ``hybrid_h3``, or flat spine otherwise.
+    * **auto** (default after O3 canary 2026-08-07) — dialogue → official;
+      high-motion → legacy timeline energy; else official structure.
+    * **official** — always MiniMax three-field / Ref2VA six-section.
+    * **legacy** — force temporal ``[Xs-Ys]`` (or flat when not 5090 profile).
+      Env: ``AIFILM_H3_PROMPT_DIALECT=auto|official|legacy`` or ``dsl.prompt_format``.
 
     When 2V + reference images are available on the *legacy* path, the prompt
     may include a Grok reference-composition stage before timeline segments.

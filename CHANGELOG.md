@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.40.84] - 2026-08-07
+
+### Added (H3 official prompt dialect · O3 canary → auto)
+- **`h3_official_prompt`:** MiniMax `h3-prompt-writing` serializer (`integrated_multimodal_description` / soundscape / music; Ref2VA six-section; `<d>[Lang]` dialogue).
+- **Default dialect `auto`:** dialogue → official; high-motion → legacy timeline (canary mean); else official. Force via `AIFILM_H3_PROMPT_DIALECT=official|legacy`.
+- **Round-2 high-motion densify** in official path (half-second pose thrash + strong camera + energetic soundscape).
+- **Wiring:** `h3_workflow._prompt_for_shot` dialect switch; vendor pin `references/vendor/minimax-h3/`; hard-defaults + h3-core-day.
+- **Evidence:** `skills/ai-film-grok/artifacts/2026-08-07-h3-official-ab-canary.json` (6/6 seed 20260807).
+- **Tests:** `tests/test_h3_official_prompt.py`.
+
 ## [2.40.83] - 2026-08-07
 
 ### Fixed / Changed (CTO C6.5 mypy incremental expand)
