@@ -7,8 +7,6 @@ This is the designed-post bridge: captions, title cards, overlays, preview Studi
 
 from __future__ import annotations
 
-from util.errors import FilmError
-
 import argparse
 import html
 import json
@@ -30,6 +28,9 @@ from edit_policy import (
 from export_cues import expand_cues_phrase_split  # noqa: F401
 from export_helpers import (  # noqa: F401
     caption_clock_offset_for,
+    format_caption_lines,
+    narration_en_for_shot,
+    narration_for_shot,
     parse_srt,
     remotion_captions,
     resolve_compose_preset,
@@ -49,6 +50,7 @@ from transition_ops import (
     bind_transition_operations_to_timeline,
 )
 from util import require_json_as, utc_now, write_json
+from util.errors import FilmError
 
 SCHEMA_VERSION = 1
 ENGINES = ("hyperframes", "remotion", "both")
@@ -97,51 +99,6 @@ def flatten_shots(spec: dict[str, Any]) -> list[dict[str, Any]]:
             if isinstance(shot, dict) and shot.get("id"):
                 shots.append(shot)
     return shots
-
-
-def narration_for_shot(shot: dict[str, Any]) -> str:
-    for key in ("nar", "narration", "vo", "text"):
-        val = shot.get(key)
-        if isinstance(val, str) and val.strip():
-            return val.strip()
-    return ""
-
-
-def narration_en_for_shot(shot: dict[str, Any]) -> str:
-    for key in ("nar_en", "narration_en", "vo_en", "text_en"):
-        val = shot.get(key)
-        if isinstance(val, str) and val.strip():
-            return val.strip()
-    return ""
-
-
-def format_caption_lines(
-    zh: str,
-    en: str = "",
-    *,
-    mode: str = "zh",
-) -> dict[str, str]:
-    """Split caption into primary/secondary lines for designed-post dual subs.
-
-    Returns {text, zh, en, mode} where ``text`` is display (single or dual joined).
-    """
-    zh_s = (zh or "").strip()
-    en_s = (en or "").strip()
-    m = (mode or "zh").strip().lower()
-    if m not in {"zh", "zh_en", "en"}:
-        m = "zh"
-    if m == "en":
-        primary = en_s or zh_s
-        return {"text": primary, "zh": zh_s, "en": en_s, "mode": m, "html_kind": "single"}
-    if m == "zh_en" and en_s:
-        return {
-            "text": f"{zh_s}\n{en_s}",
-            "zh": zh_s,
-            "en": en_s,
-            "mode": m,
-            "html_kind": "dual",
-        }
-    return {"text": zh_s, "zh": zh_s, "en": en_s, "mode": "zh", "html_kind": "single"}
 
 
 # HF designed captions: one short phrase per card (matches render_final.split_units)

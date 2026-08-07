@@ -6,6 +6,55 @@ from pathlib import Path
 from typing import Any
 
 COMPOSE_PRESET_RESOLVED = ("ecchi-rnb", "minimal")
+
+
+def format_caption_lines(
+    zh: str,
+    en: str = "",
+    *,
+    mode: str = "zh",
+) -> dict[str, str]:
+    """Split caption into primary/secondary lines for designed-post dual subs.
+
+    Returns {text, zh, en, mode} where ``text`` is display (single or dual joined).
+    """
+    zh_s = (zh or "").strip()
+    en_s = (en or "").strip()
+    m = (mode or "zh").strip().lower()
+    if m not in {"zh", "zh_en", "en"}:
+        m = "zh"
+    if m == "en":
+        primary = en_s or zh_s
+        return {"text": primary, "zh": zh_s, "en": en_s, "mode": m, "html_kind": "single"}
+    if m == "zh_en" and en_s:
+        return {
+            "text": f"{zh_s}\n{en_s}",
+            "zh": zh_s,
+            "en": en_s,
+            "mode": m,
+            "html_kind": "dual",
+        }
+    return {"text": zh_s, "zh": zh_s, "en": en_s, "mode": "zh", "html_kind": "single"}
+
+
+def narration_for_shot(shot: dict[str, Any]) -> str:
+    """Return narrator text for a shot dict."""
+    for key in ("nar", "narration", "vo", "text"):
+        val = shot.get(key)
+        if isinstance(val, str) and val.strip():
+            return val.strip()
+    return ""
+
+
+def narration_en_for_shot(shot: dict[str, Any]) -> str:
+    """Return English narrator text for a shot dict."""
+    for key in ("nar_en", "narration_en", "vo_en", "text_en"):
+        val = shot.get(key)
+        if isinstance(val, str) and val.strip():
+            return val.strip()
+    return ""
+
+
 def _err(msg: str) -> Exception:
     try:
         from export_composition import ComposeExportError as E

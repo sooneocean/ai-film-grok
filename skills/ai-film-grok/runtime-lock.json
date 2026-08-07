@@ -2662,7 +2662,7 @@
     },
     {
       "path": "scripts/post/export_composition.py",
-      "sha256": "6365ede83199809175445659f511a68c2c5da40259f14a852dc2f24d0139be6e"
+      "sha256": "6406222a02be7be177f26afea89d73915536d896b76fb4f7ace04b358195e53b"
     },
     {
       "path": "scripts/post/export_cues.py",
@@ -2670,7 +2670,7 @@
     },
     {
       "path": "scripts/post/export_helpers.py",
-      "sha256": "af6956226533394bcfe43864bf29c3710ef727a451b04b624f6a3a48b63b60aa"
+      "sha256": "d1cc38397ec8d1cffc82b54186777a725cbec4684bb6a4d1113dfc2ddcd6d7a6"
     },
     {
       "path": "scripts/post/external_review.py",
