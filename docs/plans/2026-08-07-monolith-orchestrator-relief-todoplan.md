@@ -130,7 +130,7 @@ S3 Stage peel → 编排函数只剩：load ctx → stage1()…stageN() → rece
 | Subtitle burn / SRT clock | `final/stages_subs.py` |
 | Mux + manifest delivery_class | `final/stages_mux_manifest.py` |
 
-**RenderContext 草案（概念，非本轮必写代码）：**  
+**RenderContext（已落地 `final/render_context.py`）：**  
 `root, paths, args, spec, manifest, shots, vo_cfg, work_dirs, receipts` 显式对象，避免 80 个局部变量闭包。
 
 ---
@@ -168,7 +168,7 @@ S3 Stage peel → 编排函数只剩：load ctx → stage1()…stageN() → rece
 | 9 | 2543–2855 | Mux · manifest · delivery_class | `final/stages_mux_manifest.py` | A5 plate≠master |
 
 - [x] **W1.0** stage 地图（上表）  
-- [x] **W1.1** (partial: helpers→render_helpers; full RenderContext deferred) 引入 `final/render_context.py`（或 `post/render_context.py`）：装载路径/spec/vo_cfg；**行为零变**  
+- [x] **W1.1** `final/render_context.py` + `load_render_context` 已挂 `render_final`；helpers→`render_helpers`；**行为零变**  
 - [ ] **W1.2** peel **music/spotting 残留** 进既有 music leaf（最纯）  
 - [x] **W1.3** peel **dual mix + partial receipt**（已有 `mix_partial` / sidechain 诚实语义 · 禁改 PARTIAL 语义）  
 - [ ] **W1.4** peel **subs burn / caption clock**  
@@ -255,7 +255,7 @@ python -m pytest tests/test_final_hotpath_contracts.py tests/test_render_core_he
 
 ### Wave 7 · 防复发与文档税（持续）
 
-- [ ] **W7.1** mega-fn 白名单测（见 W0.4）  
+- [x] **W7.1** mega-fn 白名单测（见 W0.4 · `test_mega_fn_budget`）  
 - [ ] **W7.2** 新代码禁止在顶层加厚实现（只许 shim 或 hub 路由）  
 - [ ] **W7.3** 结构 peel 完成后：本档勾选 + metabolism inventory 一行刷新 · **禁**再开第三份 monolith plan  
 - [ ] **W7.4** 双 checkout：改前 `git rev-parse --show-toplevel` 自检写进 PR 模板一句（可选）
@@ -281,6 +281,8 @@ python -m pytest tests/test_final_hotpath_contracts.py tests/test_render_core_he
 默认结构 go（无触达）：
   W0 落档 + 指针 · 不要硬拆 heat / workflow_pack / story_plan
 ```
+
+**Dispatch 地图（α.2）：** [2026-08-07-dispatch-stage-map.md](2026-08-07-dispatch-stage-map.md)
 
 **Top-5 ROI：**  
 1) final stage 序列化  

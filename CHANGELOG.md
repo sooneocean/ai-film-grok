@@ -1,5 +1,22 @@
 # Changelog
 
+## [2.41.6] - 2026-08-07
+
+### Changed (monolith orchestrator relief · follow-through)
+- **W1.1:** `final/render_context.py` / `load_render_context` (shipped in prior commit on 2.41.5 line; documented here).
+- **Tests:** `tests/test_final_stages_peel.py` (helpers, dual-mix, mux, context exports).
+- **Docs:** `docs/plans/2026-08-07-dispatch-stage-map.md` · orchestrator relief W1.1 full.
+
+## [2.41.6] - 2026-08-07
+
+### Added (Music Director · H3 native desk)
+- **`audio/music_director.py`**: draft / normalize / merge / apply / review for BGM + native voice (mute windows, mute_entire, peak_fix).
+- **CLI** `aifilm music-director draft|apply|review` — plan at `audio/music-director-plan.json`; stems at `audio/native_directed/`.
+- **final**: prefer directed native stems when apply receipt matches; overlay plan BGM duck on music_cue path.
+- **Stages/memory/hard-defaults** pointers; tests `test_music_director_plan.py`.
+- Wrong-line v1 = **audio mute** (picture unchanged).
+
+
 ## [2.41.5] - 2026-08-07
 
 ### Changed (monolith orchestrator relief · W1 peels)
