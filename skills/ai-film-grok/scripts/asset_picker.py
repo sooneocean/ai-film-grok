@@ -512,7 +512,7 @@ def console_state(root: Path | str) -> dict[str, Any]:
         if isinstance(s, dict)
     ]
 
-    return {
+    state = {
         "kind": "console-state",
         "ledger_revision": int(ledger.get("revision", 0)),
         "selection_counts": counts,
@@ -523,3 +523,11 @@ def console_state(root: Path | str) -> dict[str, Any]:
         "onboarding": onboarding_progress,
         "recent_selections": recent,
     }
+    try:
+        from console_projection import enrich_console_state
+
+        return enrich_console_state(base, state)
+    except Exception:  # noqa: BLE001 — overview must never 500 on projection soft-fail
+        state["dispatch_projection"] = {"available": False, "hint": "dispatch 投影不可用"}
+        state["queue_snapshot"] = {"available": False}
+        return state

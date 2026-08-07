@@ -105,6 +105,11 @@
   .muted { color: var(--muted); }
   canvas#hero { position: fixed; inset: 0; z-index: -1; opacity: .35; pointer-events: none; }
   .more-btn { margin: 1rem auto 0; display: block; }
+  /* B1 review pane: iframe fills viewport under sticky header */
+  #review-frame {
+    width: 100%; min-height: calc(100vh - 7rem); height: 78vh; border: 0;
+    border-radius: 14px; background: #0b1020; border: 1px solid var(--panel-brd);
+  }
   /* Respect reduced-motion preference (WCAG 2.1 / accessibility) */
   @media (prefers-reduced-motion: reduce) {
     * { transition: none !important; animation: none !important; }
@@ -153,15 +158,16 @@
 <body>
 <canvas id="hero"></canvas>
 <header>
-  <div class="brand">AI Film 控制台<small>验片 · 选素材 · 门禁</small></div>
+  <div class="brand">AI Film 工作台<small>起步 · 选素材 · 验片 · 门禁 · 仪表</small></div>
   <div class="spacer"></div>
   <nav class="tabs" role="tablist" aria-label="控制台分区">
-    <button class="tab magnetic" role="tab" data-tab="onboarding" aria-controls="onboarding" aria-selected="false">起步 Onboarding</button>
+    <button class="tab magnetic" role="tab" data-tab="onboarding" aria-controls="onboarding" aria-selected="false">起步</button>
     <button class="tab magnetic" role="tab" data-tab="assets" aria-controls="assets" aria-selected="true">选素材</button>
+    <button class="tab magnetic" role="tab" data-tab="review" aria-controls="review" aria-selected="false">验片</button>
     <button class="tab magnetic" role="tab" data-tab="gates" aria-controls="gates" aria-selected="false">门禁</button>
-    <button class="tab magnetic" role="tab" data-tab="overview" aria-controls="overview" aria-selected="false">状态总览</button>
-    <a class="tab magnetic" href="/" style="text-decoration:none">验片 ↗</a>
+    <button class="tab magnetic" role="tab" data-tab="overview" aria-controls="overview" aria-selected="false">仪表</button>
   </nav>
+  <a class="ghost-btn magnetic" id="review-popout" href="/review" target="_blank" rel="noopener" title="在新标签打开验片专页" aria-label="新标签打开验片">↗</a>
   <button class="ghost-btn magnetic" id="theme" title="切换主题" aria-label="切换深/浅色主题">🌓</button>
 </header>
 
@@ -182,6 +188,13 @@
     </div>
   </section>
 
+  <section id="review" class="tabpane hidden" role="tabpanel" aria-labelledby="tab-review">
+    <div class="panel" style="padding:.6rem">
+      <h3 style="margin:.2rem .4rem .5rem;font-size:1rem">验片 <span class="muted" style="font-weight:400;font-size:.8rem">队列 · 批准/驳回 · 终片审核 · 内嵌同源页</span></h3>
+      <iframe id="review-frame" title="验片控制台" loading="lazy" referrerpolicy="same-origin"></iframe>
+    </div>
+  </section>
+
   <section id="gates" class="tabpane hidden" role="tabpanel" aria-labelledby="tab-gates">
     <div class="panel">
       <h3 style="margin-top:0">门禁面板 <span class="muted" style="font-weight:400;font-size:.8rem">（硬门禁失败即拒绝批准/选择）</span></h3>
@@ -193,8 +206,17 @@
 
   <section id="overview" class="tabpane hidden" role="tabpanel" aria-labelledby="tab-overview">
     <div class="panel">
-      <h3 style="margin-top:0">状态总览 <span class="muted" style="font-weight:400;font-size:.8rem">选择计数 · 门禁 · manifest · 起步进度 · 审计</span></h3>
+      <h3 style="margin-top:0">生产仪表 <span class="muted" style="font-weight:400;font-size:.8rem">选择 · 门禁 · dispatch 投影（只读）· 审计</span></h3>
       <div id="ov-stats" class="stats"></div>
+      <div id="ov-dispatch" class="panel" style="margin-top:1rem;margin-bottom:0;padding:.9rem 1rem">
+        <h4 style="margin:.1rem 0 .5rem">生产仪表 · dispatch 投影 <span class="muted" style="font-weight:400;font-size:.78rem">只读 · 来自 receipts/dispatch.json</span></h4>
+        <p id="ov-dispatch-body" class="muted" style="margin:.2rem 0">载入中…</p>
+        <div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;margin-top:.6rem">
+          <code id="ov-copy-cmd" style="flex:1;min-width:12rem;font-size:.78rem;word-break:break-all;background:var(--bg2);padding:.45rem .6rem;border-radius:10px;border:1px solid var(--panel-brd)"></code>
+          <button type="button" class="ghost-btn" id="ov-copy-btn" aria-label="复制下一命令">复制命令</button>
+        </div>
+        <p id="ov-queue" class="muted" style="margin:.55rem 0 0;font-size:.8rem"></p>
+      </div>
       <div class="audit">
         <h4 style="margin:.2rem 0">最近选择（审计）</h4>
         <ul id="ov-recent" class="muted" style="font-size:.82rem"></ul>
@@ -285,13 +307,33 @@
 <div id="toast" role="status" aria-live="polite"></div>
 
 <script>
-const token = new URLSearchParams(location.search).get('token');
-if (token) history.replaceState(null, '', location.pathname);
+const tokenFromUrl = new URLSearchParams(location.search).get('token');
+if (tokenFromUrl) {
+  try { sessionStorage.setItem('AIFILM_REVIEW_TOKEN', tokenFromUrl); } catch (_) {}
+  history.replaceState(null, '', location.pathname);
+}
+let token = tokenFromUrl;
+try { if (!token) token = sessionStorage.getItem('AIFILM_REVIEW_TOKEN'); } catch (_) {}
 const h = token ? { 'X-Review-Token': token } : {};
 const KIND_LABEL = { bgm: 'BGM', character: '角色', voice: '声线', shot: '镜头', scene: '场景', prop: '道具' };
 const READONLY_KINDS = new Set(['scene', 'prop']);
 const ZH_VOICES = ['zh-CN-XiaoyiNeural','zh-CN-YunxiNeural','zh-CN-YunyangNeural','zh-CN-XiaoxiaoNeural','zh-CN-liaoning-XiaobeiNeural'];
 let expectedRevision = 0;
+let reviewFrameLoaded = false;
+function reviewSrc(){
+  return token ? ('/review?token=' + encodeURIComponent(token)) : '/review';
+}
+function ensureReviewFrame(){
+  const frame = document.getElementById('review-frame');
+  if (!frame || reviewFrameLoaded) return;
+  frame.src = reviewSrc();
+  reviewFrameLoaded = true;
+}
+// pop-out keeps token for the dedicated review page
+(function(){
+  const a = document.getElementById('review-popout');
+  if (a) a.href = reviewSrc();
+})();
 
 function esc(s){ return String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 async function api(p, o={}) {
@@ -315,6 +357,7 @@ function activateTab(b){
   document.getElementById(b.dataset.tab).classList.remove('hidden');
   if (b.dataset.tab === 'gates') loadGates();
   if (b.dataset.tab === 'overview') loadOverview();
+  if (b.dataset.tab === 'review') ensureReviewFrame();
 }
 tabButtons.forEach((b, i) => {
   b.onclick = () => activateTab(b);
@@ -513,7 +556,62 @@ function renderOverview(s){
   document.getElementById('ov-recent').innerHTML = recent.length
     ? recent.map(r => `<li>${esc(r.recorded_at||'')} · ${esc(KIND_LABEL[r.kind]||r.kind)} · ${esc(r.asset_id)}</li>`).join('')
     : '<li>暂无选择记录。</li>';
+  renderDispatchProjection(s);
 }
+function renderDispatchProjection(s){
+  const d = s.dispatch_projection || {};
+  const q = s.queue_snapshot || {};
+  const body = document.getElementById('ov-dispatch-body');
+  const cmdEl = document.getElementById('ov-copy-cmd');
+  const qEl = document.getElementById('ov-queue');
+  if (!body || !cmdEl) return;
+  if (!d.available) {
+    body.innerHTML = `<span class="muted">${esc(d.hint || '尚无 dispatch 回执。')}</span>`;
+  } else {
+    const stage = d.stage_public || d.craft_stage || d.pipeline_stage || '—';
+    const blocked = Array.isArray(d.blocked_by) && d.blocked_by.length
+      ? d.blocked_by.map(b => typeof b === 'string' ? b : (b && (b.id || b.reason) ? `${b.id||''}:${b.reason||''}` : JSON.stringify(b))).join(' · ')
+      : '';
+    body.innerHTML = `
+      <div><b>阶段</b> ${esc(String(stage))}
+        ${d.next_id ? ` · <b>next</b> <code>${esc(String(d.next_id))}</code>` : ''}
+        ${d.route_catalog_id ? ` · <span class="muted">catalog ${esc(String(d.route_catalog_id))}</span>` : ''}
+      </div>
+      ${d.next_why ? `<div style="margin-top:.35rem">${esc(d.next_why)}</div>` : ''}
+      ${d.weapon_line ? `<div class="muted" style="margin-top:.35rem;font-size:.8rem">武器 · ${esc(d.weapon_line)}</div>` : ''}
+      ${blocked ? `<div style="margin-top:.35rem;color:var(--danger);font-size:.85rem">blocked · ${esc(blocked)}</div>` : ''}
+      ${d.at ? `<div class="muted" style="margin-top:.35rem;font-size:.75rem">回执时间 ${esc(String(d.at))}</div>` : ''}`;
+  }
+  cmdEl.textContent = d.copy_cmd || 'aifilm dispatch --root <film>';
+  if (qEl) {
+    if (q.available) {
+      const jc = q.job_counts || {};
+      const jcStr = Object.keys(jc).length ? Object.entries(jc).map(([k,v])=>`${k}:${v}`).join(' · ') : '空队列';
+      const takes = (q.takes_count == null) ? '' : ` · takes 文件 ${q.takes_count}`;
+      qEl.textContent = `队列 running=${q.running||0} unknown=${q.unknown||0} · ${jcStr}${takes}`;
+    } else {
+      qEl.textContent = '队列快照暂不可用（无 media-queue / takes）。';
+    }
+  }
+}
+async function copyNextCmd(){
+  const cmdEl = document.getElementById('ov-copy-cmd');
+  const text = (cmdEl && cmdEl.textContent || '').trim();
+  if (!text) { toast('没有可复制的命令', true); return; }
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(text);
+    } else {
+      const ta = document.createElement('textarea');
+      ta.value = text; document.body.appendChild(ta); ta.select();
+      document.execCommand('copy'); ta.remove();
+    }
+    toast('已复制下一命令到剪贴板');
+  } catch (e) {
+    toast('复制失败：' + e.message, true);
+  }
+}
+document.getElementById('ov-copy-btn')?.addEventListener('click', copyNextCmd);
 
 // multi-tab sync (P8): poll console-state; if another tab/external changed the
 // ledger revision, refresh our base + surface a toast so two reviewers don't clash.

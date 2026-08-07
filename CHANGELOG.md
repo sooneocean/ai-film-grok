@@ -1,5 +1,34 @@
 # Changelog
 
+## [2.40.104] - 2026-08-07
+
+### Added / Changed (WebUI workbench · Wave B1 single shell)
+- **Single shell nav:** 起步 · 选素材 · **验片** · 门禁 · **仪表** in `console.html` (no split external link as primary).
+- **验片 tab:** lazy iframe → `/review` (token via sessionStorage); ↗ pop-out to dedicated page.
+- **stdlib pages:** `/` and `/console` serve shell; `/review` serves review `_PAGE`; invite 303 → `/console`; serve URL → `/console?token=…`.
+- **FastAPI serve URL** aligned to `/console?token=…`.
+- **Tests / smoke:** shell tabs + `/review` page checks.
+- **Docs:** `web-review-console.md` B1 page map.
+
+## [2.40.103] - 2026-08-07
+
+### Added (WebUI workbench · Wave B2 dispatch projection)
+- **`console_projection.py`:** read-only `project_dispatch_for_console` (from `receipts/dispatch.json`, never rebuilds dispatch on GET) + `project_queue_snapshot` (media-queue + takes count).
+- **`console_state`:** embeds `dispatch_projection` + `queue_snapshot` (fail-soft).
+- **`console.html` overview:** production meter, next_cmd/why/weapon/blocked, **copy next CLI** button (clipboard only).
+- **Tests:** `tests/test_console_projection.py`.
+- **Docs:** `web-review-console.md` B2 fields.
+
+## [2.40.102] - 2026-08-07
+
+### Added / Changed (WebUI workbench · Wave A contract + FastAPI review parity)
+- **`scripts/web_routes.py`:** single route table for stdlib + FastAPI (`handler_id`, domain, loopback flags); unified `error_body` → `{error, detail}`.
+- **FastAPI `web_api` review parity:** `/api/status|action|settings|advance|final-review-*` + `/media/*`; exception handler emits dual error keys.
+- **VALID_KINDS single source:** gateway no longer hardcodes a subset; `asset_picker.list_assets` owns kinds (incl. scene/prop).
+- **stdlib `review_ui`:** error JSON also fills `detail` for parity.
+- **Tests:** `tests/test_web_routes.py` (contract + openapi coverage + error body + status).
+- **Docs:** `references/web-review-console.md` full route table; onboarding plan status → 主体已落地.
+
 ## [2.40.101] - 2026-08-07
 
 ### Changed (lock-face + edit transitions · default HARD)

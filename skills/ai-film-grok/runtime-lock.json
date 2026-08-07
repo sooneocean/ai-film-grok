@@ -138,7 +138,7 @@
     },
     {
       "path": "scripts/asset_picker.py",
-      "sha256": "68d006872005669d611f272e473a5d8cd37e41ee156c977f921e2c9d5f4c0b15"
+      "sha256": "61fc2019fc32e13e3dd79867049994eefc4fdd5b886b7e39660e87dff1b34abe"
     },
     {
       "path": "scripts/asset_registry.py",
@@ -981,6 +981,10 @@
       "sha256": "bda173dc14b385969a64f0fe944e71c2eaaa650ceda8607f3906cc5dbc462735"
     },
     {
+      "path": "scripts/console_projection.py",
+      "sha256": "93e56b9f161a362dd73ec5edb609b4f9e402ee1848e92eec51e5af9e39b5aead"
+    },
+    {
       "path": "scripts/content_channels.py",
       "sha256": "f0404c810ba94d57afa6f28f3fb3565207ed5049606190e7ee7d6d54fa62240d"
     },
@@ -1454,11 +1458,11 @@
     },
     {
       "path": "scripts/gates/preflight.py",
-      "sha256": "949dbd78694d096784466084eb133a9198015207df01613048f8316e0d2d29da"
+      "sha256": "c0c0cbb6f8e316d38b462cbec4986238a6b8abfacbd54171536c65b13c6c3e57"
     },
     {
       "path": "scripts/gates/production_gates.py",
-      "sha256": "9d005124e344b5070ab1ccdc243306edce167a40de3e0f7a3ce37c1e095a7fc2"
+      "sha256": "edaa379bdc19a354e3499f74500e51ab59d1e681860214e285f9f36c6e84bbe8"
     },
     {
       "path": "scripts/gates/quality_evidence.py",
@@ -2634,7 +2638,7 @@
     },
     {
       "path": "scripts/post/review_ui.py",
-      "sha256": "896dcc701188599d345d1a169d45ddf32f46df8e58b2a4348d693a4435a921e2"
+      "sha256": "8f8e821b6d6b2156ef1b2d44740a196747d8c364701e8552772574479a09b2ba"
     },
     {
       "path": "scripts/post/show_package.py",
@@ -2906,7 +2910,7 @@
     },
     {
       "path": "scripts/smoke_console.py",
-      "sha256": "e9a35f5963494f924e5b5f188520c41e370857287f789910510e9cf2ae74bef8"
+      "sha256": "b6a12e64a32eab1cbaeb4f525e9146ba41954605ecc25c15eccb470e83c02996"
     },
     {
       "path": "scripts/sound_plan.py",
@@ -3222,11 +3226,15 @@
     },
     {
       "path": "scripts/web_api.py",
-      "sha256": "a61b526d3ed66f15cbac64265a0ca8f239ffbb9e0fa05a951ecebaff74bac842"
+      "sha256": "2e11faae14e32cce6f1e9804ef93b895f9079f6cdee9f0a9e0656d46ab6c57e3"
     },
     {
       "path": "scripts/web_core.py",
       "sha256": "5588510470b1df68b594918d0457113b6b788b2f13d07ab0669155dedb94d43e"
+    },
+    {
+      "path": "scripts/web_routes.py",
+      "sha256": "e27f2f015da27e2865c237ab1d3eb9b8d6fb8ee37765d0a723617376ba9f78ff"
     },
     {
       "path": "scripts/workflow_pack.py",
