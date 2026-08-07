@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.41.19] - 2026-08-07
+
+### Added (effect ROI · E1–E5 default muscle)
+- **`gates/effect_roi.py`:** still-feed veto · soft-still lint · effect scorecard · weak-take reburn · face-lock promote assert.
+- **dispatch:** fill/face/source red → **no** `h3-run-next` primary; still-challenge / ensure_fill first.
+- **select-shortlist:** ban below-floor promote; face-lock triple hard legs block promote.
+- **ship-prep:** writes `receipts/effect-scorecard.json` + `weak-take-reburn.json`; prefer_native auto `music-director draft`.
+- **H3:** CLI `--mode` override requires `AIFILM_H3_MODE_OVERRIDE_REASON` or `AIFILM_ALLOW_H3_MODE_OVERRIDE=1`.
+- **prompt:** dialogue/soft densify mouth + micro-life energy (family blend).
+- **Docs:** hard-defaults row · stages/visual · plan · memory · iron-status gates.
+- **Tests:** `tests/test_effect_roi_e1_e5.py`.
+
 ## [2.41.18] - 2026-08-07
 
 ### Added / Closed (H3 native chain · go to end)

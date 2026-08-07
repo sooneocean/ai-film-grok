@@ -1374,7 +1374,7 @@
     },
     {
       "path": "scripts/final/stages_dual_mix.py",
-      "sha256": "9fd5c8e966bf4beb0465a7914d652c35ad409b0f60bfd8786eafb8077abaf38d"
+      "sha256": "95f64a8fd40c76ad0fbffc6c10c0ec635b0122e4c599e572611d29f7e3e1c250"
     },
     {
       "path": "scripts/final/stages_music_bed.py",
@@ -1534,7 +1534,7 @@
     },
     {
       "path": "scripts/gates/iron_status.py",
-      "sha256": "af2c8e10748851fa82d0032db2b8978a3853ae10becddbec6a19f50bd6bcdd22"
+      "sha256": "5b7d47ca14828ae82cc1640d1fdd89f5b669e99270477b7a93b3e47e819728c2"
     },
     {
       "path": "scripts/gates/manifest_truth.py",
@@ -1554,7 +1554,7 @@
     },
     {
       "path": "scripts/gates/preflight.py",
-      "sha256": "4de6800b5de84ba1e6174bf0fd2e51798ed7410dcf1aa36e4bfc3b0fa968bce2"
+      "sha256": "32a3b25e237b1dd06e98fc9101820eeebf8b818584e20342cd5142899f2bf610"
     },
     {
       "path": "scripts/gates/preflight_issues.py",
@@ -1562,7 +1562,7 @@
     },
     {
       "path": "scripts/gates/preflight_premium.py",
-      "sha256": "fabc100bfa04cacebaaf84a536b737717bb5b4a2f364ea4ee2c7b49b81abc0dc"
+      "sha256": "1ca37e397cd1f6f60ce9374fe5389a2d4742be4c6b49859d91aa95109b79ae89"
     },
     {
       "path": "scripts/gates/production_gates.py",
@@ -1850,7 +1850,7 @@
     },
     {
       "path": "scripts/media/h3_official_prompt.py",
-      "sha256": "de00a1ae17ed72531e7a108e28e231971eb549e1c79b80b8ecd1c5e25fb4e3f5"
+      "sha256": "50fdd750e09236fd37b6576bcbb25272e9fc33f80e09d93106e8704f60aa922b"
     },
     {
       "path": "scripts/media/h3_ship_native.py",
@@ -2426,7 +2426,11 @@
     },
     {
       "path": "scripts/plan/film_spec_validate.py",
-      "sha256": "c2e9248069f9d260f1f0ba0d590bdfe91e63139b2f176dd55a46f80e21b73215"
+      "sha256": "d28e6168dc52ab863b27c107727e5c8b5bd6fb3e088c10a71d85255fe2e66e81"
+    },
+    {
+      "path": "scripts/plan/film_spec_validate_body.py",
+      "sha256": "01d3b010bedccefaa8dafca9825cccd26f69af1531cf1da14fc3b410017878f5"
     },
     {
       "path": "scripts/plan/film_spec_validate_heat.py",
@@ -3478,7 +3482,7 @@
     },
     {
       "path": "scripts/workflow_pack.py",
-      "sha256": "94b1488d3d791000899148e69160880e6435c55cec43c80964e8c00fc1da8db6"
+      "sha256": "c656dbadd3b46e14adbd00420556e40e556ec34dd4562c92658f4ae18fb0dabf"
     },
     {
       "path": "scripts/workflow_spine.py",

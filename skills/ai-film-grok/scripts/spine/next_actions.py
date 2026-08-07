@@ -51,6 +51,9 @@ _ACTION_STAGE: dict[str, str] = {
     "frw-ltx23-audio-unit": "visual",
     "still-challenge-repair": "visual",
     "still-challenge-weak-mean": "visual",
+    "composition-fill-ensure": "visual",
+    "still-feed-gate": "visual",
+    "state-index": "visual",
     "pilot-window": "visual",
     "tts-rehearse": "voice",
     "compose-preview": "design",
@@ -731,52 +734,88 @@ def build_next_actions(
                     ),
                 )
             if h3_enabled:
+                # E1 · still-feed veto: bad fill/face/source → ban h3-run-next primary
+                still_feed_block = False
+                try:
+                    from gates.effect_roi import still_feed_blocks_h3
+
+                    sf = still_feed_blocks_h3(root)
+                    still_feed_block = bool(sf.get("blocked"))
+                    if still_feed_block:
+                        act_id = str(sf.get("primary_action") or "still-feed-gate")
+                        add(
+                            act_id,
+                            str(
+                                sf.get("next_cmd")
+                                or (
+                                    f'aifilm still-challenge next --root "{r}"  # still feed red'
+                                )
+                            ),
+                            _with_primary(
+                                sf.get("why")
+                                or "静帧喂料未绿 — 禁 H3 主烧；先满幅/身份/状态照"
+                            ),
+                        )
+                        add(
+                            "still-challenge-repair",
+                            f'aifilm still-challenge next --root "{r}"\n'
+                            f"# ensure_fill / face bind / anatomy-safe → 再 h3 run-next",
+                            _with_primary(
+                                "仍帧未绿：still-challenge / composition-fill 先验后生"
+                            ),
+                        )
+                except Exception:
+                    still_feed_block = False
                 if is_h3_primary:
                     # Default multi-agent safe: batch only. Overnight drain needs exclusive flag.
-                    add(
-                        "h3-run-next",
-                        f'aifilm h3 run-next --root "{r}" --execute --max 5',
-                        _with_primary(
-                            "h3_primary 主产线：单批 5 镜（多 agent 默认；禁默认 until-empty 占满 5090）"
-                        ),
-                    )
-                    add(
-                        "h3-fill-idle",
-                        f'aifilm h3 cycle --root "{r}" --execute --max 5',
-                        _with_primary(
-                            "Fill-Idle 一循环：evidence→run-next→pk peek（永不 auto-promote）"
-                        ),
-                    )
+                    if not still_feed_block:
+                        add(
+                            "h3-run-next",
+                            f'aifilm h3 run-next --root "{r}" --execute --max 5',
+                            _with_primary(
+                                "h3_primary 主产线：单批 5 镜（多 agent 默认；禁默认 until-empty 占满 5090）"
+                            ),
+                        )
+                        add(
+                            "h3-fill-idle",
+                            f'aifilm h3 cycle --root "{r}" --execute --max 5',
+                            _with_primary(
+                                "Fill-Idle 一循环：evidence→run-next→pk peek（永不 auto-promote）"
+                            ),
+                        )
                     add(
                         "h3-capacity-plan",
                         f'aifilm h3 capacity-plan --root "{r}"',
                         _with_primary("全片 H3 backlog ETA（按 I2V/FLF/R2V/T2V）"),
                     )
-                    add(
-                        "h3-until-empty",
-                        (
-                            f'aifilm h3 cycle --root "{r}" --until-empty --execute '
-                            f"--i-own-the-gpu --max 5"
-                        ),
-                        _with_primary(
-                            "仅用户点名独占 5090 时：until-empty 排水（须 --i-own-the-gpu）"
-                        ),
-                    )
+                    if not still_feed_block:
+                        add(
+                            "h3-until-empty",
+                            (
+                                f'aifilm h3 cycle --root "{r}" --until-empty --execute '
+                                f"--i-own-the-gpu --max 5"
+                            ),
+                            _with_primary(
+                                "仅用户点名独占 5090 时：until-empty 排水（须 --i-own-the-gpu）"
+                            ),
+                        )
                     add(
                         "h3-lane",
                         f'aifilm h3 list --root "{r}"; aifilm h3 next --root "{r}"',
                         _with_primary(
                             "h3_primary：list/next 看模式+队列；云 bulk 默认硬拦"
+                            + ("；still feed 红时勿 run" if still_feed_block else "")
                         ),
                     )
-                    add(
-                        "queue-or-register",
-                        f"# cloud opt-in only under h3_primary\n"
-                        f'AIFILM_ALLOW_CLOUD_RESTRICTED=1 media-queue add --root "{r}" …',
-                        _with_primary(
-                            "镜头未齐：主轨 aifilm h3 run；Grok 云仅 escape 后可选"
-                        ),
-                    )
+                    if not still_feed_block:
+                        add(
+                            "queue-or-register",
+                            f"# cloud opt-in only under h3_primary\n"
+                            f'AIFILM_ALLOW_CLOUD_RESTRICTED=1 media-queue add --root "{r}" …',
+                            _with_primary(
+                                "镜头未齐：主轨 aifilm h3 run；Grok 云仅 escape 后可选"
+                            ),
+                        )
                 elif is_ltx23_adult:
                     add(
                         "h3-lane-meat",

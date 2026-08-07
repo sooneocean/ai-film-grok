@@ -13,6 +13,8 @@
 | **镜头分型** | `aifilm shot-lane --root` → setup/dialogue/meat/env/continue/`poison_blocked` + mode |
 | **对白 still** | on_camera：speaker 脸 MCU/CU；禁 WS/fullbody 挂台词（register + preflight） |
 | **首帧满幅** | h3 run / queue 硬拦 composition-fill（可 auto-remedy）；plan 显示 advisory |
+| **静帧喂料否决（E1）** | fill/face/source 红 → dispatch **禁** `h3-run-next`；先 still-challenge / ensure_fill |
+| **效果记分卡（E3）** | `ship-prep` → `receipts/effect-scorecard.json` + weak reburn；禁 pure-mean promote |
 | **续镜 endframe** | poison/回穿/满幅失败 → `safe_for_continue=false`；禁当下一镜 first |
 | **分型 canary** | 8 镜类合成绿：`artifacts/2026-08-07-shot-lane-canary.json` · `test_shot_lane_canary_wave6` |
 | 主武器 | 默认 `h3_primary`；`h3 run-next --max 5`；until-empty 须 `--i-own-the-gpu` |

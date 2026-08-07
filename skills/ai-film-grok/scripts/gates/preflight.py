@@ -1111,6 +1111,25 @@ def run_preflight(root: Path) -> dict[str, Any]:
                             hard.append(item)
                         else:
                             soft.append(item)
+                    # E1.4 · soft still recipe (half-undress · solo · ban dual hardcore thrash)
+                    try:
+                        from gates.effect_roi import lint_soft_still_recipe
+
+                        sr = lint_soft_still_recipe(sh)
+                        if not sr.get("ok") and sr.get("hard"):
+                            soft.append(
+                                _issue(
+                                    "soft",
+                                    "soft_still_recipe",
+                                    f"soft still thrash codes={sr.get('codes')} shot={sh.get('id')}",
+                                    fix=str(
+                                        sr.get("next_cmd")
+                                        or "half-undress shoulder afterglow solo; ban dual hardcore"
+                                    ),
+                                )
+                            )
+                    except Exception:
+                        pass
         except Exception as exc:
             # A1 · when speaker-frame is hard mode, probe failure must hard-block
             try:

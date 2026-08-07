@@ -1103,12 +1103,26 @@ def run_h3_shot(
         plan["source_endpoint"] = H3_MODE_ENDPOINT[mode_norm]
         plan["requires_still"] = mode_norm in {"i2v", "flf", "r2v"}
         plan["requires_last"] = mode_norm == "flf"
-        # E5 · CLI --mode overrode list/plan resolve → durable receipt (no silent cover)
+        # E5 · CLI --mode overrode list/plan resolve → receipt required (fail-closed)
         if resolved and mode_norm != resolved:
+            reason = (os.environ.get("AIFILM_H3_MODE_OVERRIDE_REASON") or "").strip()
+            allow = os.environ.get("AIFILM_ALLOW_H3_MODE_OVERRIDE", "").strip().lower() in {
+                "1",
+                "true",
+                "yes",
+                "on",
+            }
+            if not reason and not allow:
+                raise H3WorkflowError(
+                    f"H3 mode override {resolved}→{mode_norm} for {shot_id} requires "
+                    "AIFILM_H3_MODE_OVERRIDE_REASON='energy|pilot|...' "
+                    "or AIFILM_ALLOW_H3_MODE_OVERRIDE=1 (ban silent full-film --mode i2v)"
+                )
             plan["mode_cli_override"] = {
                 "resolved": resolved,
                 "cli": mode_norm,
                 "shot_id": str(shot_id),
+                "reason": reason or "AIFILM_ALLOW_H3_MODE_OVERRIDE",
                 "note": "CLI --mode overrode h3 list/plan resolve; prefer resolve unless energy fail",
             }
             try:
@@ -1117,7 +1131,7 @@ def run_h3_shot(
                     shot_id=str(shot_id),
                     resolved=resolved,
                     cli=mode_norm,
-                    reason=os.environ.get("AIFILM_H3_MODE_OVERRIDE_REASON"),
+                    reason=reason or "AIFILM_ALLOW_H3_MODE_OVERRIDE",
                 )
             except Exception:
                 pass

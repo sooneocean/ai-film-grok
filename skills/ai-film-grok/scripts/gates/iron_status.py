@@ -41,6 +41,24 @@ _IRON_GATES: list[tuple[str, str, str, str]] = [
         "register-still / H3 / generation_ready",
     ),
     (
+        "still_feed_h3",
+        "still feed veto: fill/face/source red → no h3-run-next primary",
+        "AIFILM_SKIP_STILL_FEED_GATE",
+        "dispatch next_actions / effect_roi",
+    ),
+    (
+        "effect_scorecard",
+        "ship-prep multi-axis scorecard + weak reburn; ban pure-mean / below-floor promote",
+        "AIFILM_ALLOW_BELOW_FLOOR_PROMOTE",
+        "select-shortlist / ship-prep effect_roi",
+    ),
+    (
+        "h3_mode_override",
+        "CLI --mode override needs reason receipt (ban silent)",
+        "AIFILM_ALLOW_H3_MODE_OVERRIDE",
+        "h3 run; also AIFILM_H3_MODE_OVERRIDE_REASON",
+    ),
+    (
         "identity_generation",
         "one cast generation / no archive mix / verified honesty",
         "AIFILM_SKIP_IDENTITY_GEN",

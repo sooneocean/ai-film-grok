@@ -278,18 +278,28 @@ def _action(shot: dict[str, Any]) -> str:
         )
         return f"{base}; {densify}" if base else densify
     if tier == "soft":
+        # E4.1 · family densify: soft keeps micro-life energy (legacy mean winner fused)
         micro = (
             "continuous micro-life every half-second: soft blinks, breath lifts the chest, "
-            "tiny head sway and hair drift; never freeze into a still photo"
+            "tiny head sway and hair drift; shoulder/cloth micro-flutter; "
+            "never freeze into a still photo; gentle living portrait energy"
         )
         return f"{base}; {micro}" if base else micro
-    if base:
-        return base
     if _collect_dialogue_events(shot):
+        # E4.1 · dialogue official shell + legacy-grade motion densify (mouth + head energy)
+        dlg_motion = (
+            "clear articulatory mouth motion matching the spoken line; jaw and lips change "
+            "shape every half-second; natural head micro-nods and gaze shifts; "
+            "breath between phrases; never freeze into a mute portrait"
+        )
+        if base:
+            return f"{base}; {dlg_motion}"
         return (
             "the subject begins from the start-frame pose, articulates speech with "
-            "natural head micro-motion, and settles into a clear end expression"
+            f"{dlg_motion}, and settles into a clear end expression"
         )
+    if base:
+        return base
     return "continuous natural body motion from the start frame to a clear end pose"
 
 

@@ -1538,6 +1538,11 @@ def select_shortlist(
                 continue
             if preferred.get("composition_hijack") and preferred.get("composition_ok") is False:
                 continue
+            # E3 · ban silent promote of below-floor meat/weak takes (reburn first)
+            if below_floor and os.environ.get(
+                "AIFILM_ALLOW_BELOW_FLOOR_PROMOTE", ""
+            ).strip().lower() not in {"1", "true", "yes", "on"}:
+                continue
             prev = clips.get(sid) if isinstance(clips.get(sid), dict) else {}
             new_clip = {
                 **(prev or {}),
@@ -1560,6 +1565,34 @@ def select_shortlist(
                     "composition_hijack": preferred.get("composition_hijack"),
                 }
             )
+
+    # E2.1 · face-lock hard legs block promote (master claim honesty)
+    face_promote: dict[str, Any] = {"ok": True, "promote_blocked": False}
+    if promote:
+        try:
+            from gates.effect_roi import assert_face_lock_allows_promote
+
+            face_promote = assert_face_lock_allows_promote(root, promote=True)
+            if face_promote.get("promote_blocked"):
+                # roll back any clip path writes from this promote pass
+                promoted.clear()
+                # restore clips from disk
+                man_disk = read_json(root / "manifest.json") or {}
+                clips_disk = (
+                    man_disk.get("clips")
+                    if isinstance(man_disk, dict) and isinstance(man_disk.get("clips"), dict)
+                    else {}
+                )
+                if isinstance(clips_disk, dict):
+                    clips.clear()
+                    clips.update(clips_disk)
+        except Exception as exc:  # noqa: BLE001
+            face_promote = {
+                "ok": False,
+                "promote_blocked": True,
+                "codes": ["FACE_LOCK_PROMOTE_PROBE_FAILED"],
+                "error": str(exc)[:120],
+            }
 
     # AD C2 / N1.3 / I1.1 · multi-seed: anti-hijack before mean; fail-closed when gate missing
     multi_take_rows = [r for r in rows if int(r.get("take_count") or 0) >= 2]
@@ -1611,6 +1644,13 @@ def select_shortlist(
         promote_blocked = True
         if "SHORTLIST_PROMOTE_BLOCKED_MEAN_ONLY" not in codes:
             codes.append("SHORTLIST_PROMOTE_BLOCKED_MEAN_ONLY")
+    if promote and face_promote.get("promote_blocked"):
+        promote_blocked = True
+        for c in face_promote.get("codes") or ["FACE_LOCK_PROMOTE_BLOCKED"]:
+            if c not in codes:
+                codes.append(str(c))
+        if "FACE_LOCK_PROMOTE_BLOCKED" not in codes:
+            codes.append("FACE_LOCK_PROMOTE_BLOCKED")
 
     did_promote = False
     if promote and promoted and not promote_blocked:
@@ -1626,8 +1666,15 @@ def select_shortlist(
     )
     if mean_only_risk and not ah_skip_intentional:
         shortlist_ok = False
+    if promote and face_promote.get("promote_blocked"):
+        shortlist_ok = False
     next_cmd: str | None
-    if promote_blocked or mean_only_risk:
+    if face_promote.get("promote_blocked"):
+        next_cmd = str(
+            face_promote.get("next_cmd")
+            or f'aifilm face-identity audit --root "{root}"'
+        )
+    elif promote_blocked or mean_only_risk:
         next_cmd = (
             f'unset AIFILM_SKIP_ANTI_HIJACK; aifilm anti-hijack --root "{root}"; '
             f'aifilm select-shortlist --root "{root}" --promote'
@@ -1647,6 +1694,7 @@ def select_shortlist(
         "promote": promote,
         "promote_blocked": promote_blocked,
         "did_promote": did_promote,
+        "face_lock_promote": face_promote,
         "anti_hijack_enabled": anti_hijack_on,
         "anti_hijack_skip_intentional": ah_skip_intentional,
         "multi_take_count": len(multi_take_rows),
@@ -1657,6 +1705,8 @@ def select_shortlist(
             "escape": "AIFILM_SKIP_ANTI_HIJACK=1 (explicit; still logs SHORTLIST_MEAN_ONLY_*)",
             "mean_only_ok": False,
             "promote_requires_anti_hijack": True,
+            "promote_requires_face_lock_triple": True,
+            "ban_below_floor_promote": True,
         },
         "note": (
             "PROMOTE BLOCKED: multi-seed without anti-hijack or hijack-only takes — "
@@ -1864,6 +1914,103 @@ def ship_prep(
             "codes": list(sel.get("codes") or []),
         }
     )
+
+    # E3 · effect scorecard + weak-take reburn queue (after shortlist means)
+    try:
+        from gates.effect_roi import build_effect_scorecard
+
+        esc = build_effect_scorecard(root, write=write, shortlist=sel)
+        weak_n = int(esc.get("weak_count") or 0)
+        steps.append(
+            {
+                "id": "effect_scorecard",
+                "ok": bool(esc.get("ok")),
+                "hard": False,
+                "advisory": True,
+                "detail": (
+                    f"weak={weak_n} pure_mean_risk={esc.get('pure_mean_risk_shots')} "
+                    f"face_master={esc.get('face_master_eligible')}"
+                )[:220],
+                "next_cmd": esc.get("next_cmd"),
+                "weak_count": weak_n,
+                "path": esc.get("path"),
+            }
+        )
+        if weak_n:
+            steps.append(
+                {
+                    "id": "weak_take_reburn",
+                    "ok": True,
+                    "advisory": True,
+                    "detail": f"P1 reburn queue n={weak_n} (meat mean<20 / AH fail)",
+                    "next_cmd": (
+                        f'aifilm h3 run-next --root "{root}" --execute --max 5  # weak reburn'
+                    ),
+                    "path": esc.get("reburn_path"),
+                }
+            )
+    except Exception as exc:  # noqa: BLE001
+        steps.append(
+            {
+                "id": "effect_scorecard",
+                "ok": True,
+                "advisory": True,
+                "detail": f"skip:{str(exc)[:140]}",
+                "next_cmd": None,
+            }
+        )
+
+    # E4.2 · music-director draft for prefer_native (advisory; draft when missing)
+    try:
+        from music_director import draft_and_save, plan_path
+
+        _spec_md = read_json(root / "film-spec.json") or {}
+        ap = _spec_md.get("audio_policy") if isinstance(_spec_md, dict) else None
+        h3b = _spec_md.get("h3") if isinstance(_spec_md, dict) else None
+        policy = ""
+        if isinstance(ap, dict):
+            policy = str(ap.get("mode") or ap.get("audio_policy") or "")
+        elif isinstance(ap, str):
+            policy = ap
+        if not policy and isinstance(h3b, dict):
+            policy = str(h3b.get("audio_policy") or "")
+        policy = policy.strip().lower() or "prefer_native"
+        prefer_native = "native" in policy or policy in {"prefer_native", "film_native"}
+        md_path = plan_path(root)
+        has_plan = md_path.is_file()
+        detail = f"policy={policy}"
+        if prefer_native and not has_plan and write:
+            try:
+                draft_and_save(root)
+                has_plan = md_path.is_file()
+                detail = "drafted music-director plan (prefer_native)"
+            except Exception as exc:
+                detail = f"draft fail:{str(exc)[:100]}"
+        elif prefer_native and has_plan:
+            detail = "music-director plan present"
+        steps.append(
+            {
+                "id": "music_director",
+                "ok": True,
+                "advisory": True,
+                "detail": detail[:200],
+                "next_cmd": (
+                    None
+                    if has_plan or not prefer_native
+                    else f'aifilm music-director draft --root "{root}"'
+                ),
+            }
+        )
+    except Exception as exc:  # noqa: BLE001
+        steps.append(
+            {
+                "id": "music_director",
+                "ok": True,
+                "advisory": True,
+                "detail": f"skip:{str(exc)[:120]}",
+                "next_cmd": None,
+            }
+        )
 
     # Fill-Idle / multi-take PK advisory (never hard-fail; never auto-promote)
     pk_env_skip = bool(skip_pk)
