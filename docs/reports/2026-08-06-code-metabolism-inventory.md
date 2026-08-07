@@ -48,3 +48,9 @@
 ## Iron
 
 Public `aifilm` subcommand strings · hard-compat shims · dual-checkout discipline · no vanity LOC sprint.
+
+## Closeout note 2.40.85
+
+- C6.3 Lane A re-scan: **0** non-shim zero-importer delete candidates.
+- Shims retained on purpose (hard-compat).
+- Timestamp: 2026-08-07T04:56:36.632550+00:00

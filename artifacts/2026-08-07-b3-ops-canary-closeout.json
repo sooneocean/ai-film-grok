@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "kind": "b3-ops-canary",
+  "at": "2026-08-07T12:56:02+08:00",
+  "version": "2.40.84",
+  "open_ops_status": "OPEN_OPS",
+  "open_ops_reason": "eng_day_closeout_no_film_drain",
+  "comfy_tunnel": {
+    "expected": "localhost:18188→8188",
+    "probe": "up"
+  },
+  "checks": {
+    "until_empty_requires": "--i-own-the-gpu",
+    "default_batch": "h3 run-next --max 5"
+  },
+  "notes": [
+    "CTO closeout eng-day: no exclusive 5090 ownership requested",
+    "Honesty: OPEN_OPS counts as B3 success without GPU drain",
+    "comfy 18188 probe: up",
+    "until-empty still requires --i-own-the-gpu"
+  ],
+  "ok": true,
+  "partial": true
+}

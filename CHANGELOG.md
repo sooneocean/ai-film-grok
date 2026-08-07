@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.40.85] - 2026-08-07
+
+### Added (CTO eng closeout · D7.2 + C6.3 empty + B3 OPEN_OPS)
+- **D7.2 CI typecheck:** new `typecheck` job runs `make type` (scoped util mypy seed); included in `merge-gate` AND of required jobs.
+- **C6.3 Lane A:** re-scan top-level non-shim modules → **0** safe-delete candidates (queue already drained; hard-compat shims retained).
+- **B3 closeout canary:** `artifacts/2026-08-07-b3-ops-canary-closeout.json` — Comfy 18188 up; eng-day no exclusive drain → **OPEN_OPS** (honest partial success).
+- **OPEN reconcile:** C5 full · C6.1/3/4/5 · D7.2/4 · B3 OPEN_OPS closed for eng-day; C4 remains **bug-driven only**; content P8 / B3.4 deferred.
+
 ## [2.40.84] - 2026-08-07
 
 ### Added (H3 official prompt dialect · O3 canary → auto)
