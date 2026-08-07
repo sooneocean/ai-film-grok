@@ -36,13 +36,15 @@
 | E4 | stages 卡 · memory · tests · bump | ✅ |
 | **R2** | ship-prep 自动 draft · post-doctor 路由对账 · final 读 plan · closeout next_cmd | ✅ |
 | **R3** | apply↔post-plan 同步 · editorial EDL/trims · checklist | ✅ |
+| **R4** | trims→film-spec plate · gate-auto 读 desk · verify 收工 | ✅ |
 
 ## CLI
 
 ```bash
-aifilm edit-director draft|normalize|status|set|apply|run|checklist --root <film>
+aifilm edit-director draft|normalize|status|set|apply|run|checklist|verify --root <film>
 # run 默认 --dry-run 安全；真跑须 --execute
-# apply 会 ensure/对齐 post-plan.json owner = design
+# apply 会 ensure/对齐 post-plan.json owner = design，并 bind trims → in_point/out_point
+# verify = status+checklist+post-doctor+trims（不渲片）
 ```
 
 ## 反模式

@@ -277,6 +277,78 @@ def test_snapshot_activate_and_audit(tmp_path: Path) -> None:
     assert (tmp_path / "receipts" / "edit-director-audit.json").is_file()
 
 
+def test_apply_trims_to_film_spec(tmp_path: Path) -> None:
+    from edit_director import apply_plan, draft_and_save, set_plan_fields
+
+    clip = tmp_path / "takes" / "sh01.mp4"
+    clip.parent.mkdir(parents=True)
+    clip.write_bytes(b"fake")
+    (tmp_path / "film-spec.json").write_text(
+        json.dumps(_mini_spec("sh01")), encoding="utf-8"
+    )
+    (tmp_path / "manifest.json").write_text(
+        json.dumps(
+            {
+                "clips": {
+                    "sh01": {
+                        "path": str(clip),
+                        "status": "approved",
+                        "state": "active",
+                        "duration_sec": 5.0,
+                    }
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    edl_dir = tmp_path / "edit"
+    edl_dir.mkdir()
+    (edl_dir / "edl.json").write_text(
+        json.dumps({"ranges": [{"shot_id": "sh01", "in": 0.2, "out": 4.0}]}),
+        encoding="utf-8",
+    )
+    draft_and_save(tmp_path, force=True)
+    receipt = apply_plan(tmp_path)
+    assert receipt.get("trims", {}).get("applied") or receipt.get("trims", {}).get("ok")
+    spec = json.loads((tmp_path / "film-spec.json").read_text(encoding="utf-8"))
+    shot = spec["scenes"][0]["shots"][0]
+    assert shot.get("in_point_sec") == 0.2
+    assert shot.get("out_point_sec") == 4.0
+    assert shot.get("edit_trim_source") == "edit-director"
+    assert (tmp_path / "receipts" / "edit-director-trims.json").is_file()
+
+
+def test_verify_desk(tmp_path: Path) -> None:
+    from edit_director import draft_and_save, verify_desk
+
+    clip = tmp_path / "takes" / "sh01.mp4"
+    clip.parent.mkdir(parents=True)
+    clip.write_bytes(b"x")
+    (tmp_path / "film-spec.json").write_text(
+        json.dumps(_mini_spec("sh01")), encoding="utf-8"
+    )
+    (tmp_path / "manifest.json").write_text(
+        json.dumps(
+            {
+                "clips": {
+                    "sh01": {
+                        "path": str(clip),
+                        "status": "approved",
+                        "state": "active",
+                        "duration_sec": 4.0,
+                    }
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    draft_and_save(tmp_path, force=True)
+    rep = verify_desk(tmp_path, write=True)
+    assert (tmp_path / "receipts" / "edit-director-verify.json").is_file()
+    assert "checklist" in rep
+    assert rep.get("status") is not None
+
+
 def test_sync_post_plan_on_apply(tmp_path: Path) -> None:
     from edit_director import apply_plan, draft_and_save
 

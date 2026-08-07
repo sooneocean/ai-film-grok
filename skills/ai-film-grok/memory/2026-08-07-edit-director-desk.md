@@ -25,3 +25,4 @@
 - 姊妹桌：`music-director`（mute 不剪画面）
 - R2：`workflow_pack.ship_prep` · `post_doctor` · `cmd_final` · `closeout._final_next_cmd`
 - R3：`apply` 同步 post-plan · editorial EDL/trims · `checklist`
+- R4：trims→`in_point_sec`/`out_point_sec`（plate 真裁）· gate-auto 读 desk · `verify`

@@ -365,6 +365,104 @@ def design_to_post_owner(design: str) -> str:
     return "hyperframes"
 
 
+def trims_by_shot(plan: dict[str, Any] | None) -> dict[str, dict[str, float]]:
+    """Map shot_id → {in_sec, out_sec} from plan.editorial.trims."""
+    out: dict[str, dict[str, float]] = {}
+    if not isinstance(plan, dict):
+        return out
+    ed = plan.get("editorial") if isinstance(plan.get("editorial"), dict) else {}
+    for row in ed.get("trims") or []:
+        if not isinstance(row, dict):
+            continue
+        sid = str(row.get("shot_id") or "").strip()
+        if not sid:
+            continue
+        try:
+            in_sec = float(row.get("in_sec") if row.get("in_sec") is not None else 0)
+            out_sec = float(row.get("out_sec") if row.get("out_sec") is not None else 0)
+        except (TypeError, ValueError):
+            continue
+        if out_sec > in_sec >= 0:
+            out[sid] = {"in_sec": in_sec, "out_sec": out_sec}
+    return out
+
+
+def apply_trims_to_film_spec(
+    root: Path | str,
+    plan: dict[str, Any] | None = None,
+    *,
+    write: bool = True,
+) -> dict[str, Any]:
+    """Bind editorial trims onto film-spec shot in_point_sec/out_point_sec for plate.
+
+    render_final / stages_tts_stems already honor these fields on each shot.
+    """
+    base = Path(root).expanduser().resolve()
+    if plan is None:
+        plan = load_plan(base, required=False)
+    if not plan:
+        return {"ok": False, "error": "no edit-director plan", "applied": 0}
+    trims = trims_by_shot(plan)
+    if not trims:
+        return {
+            "ok": True,
+            "applied": 0,
+            "skipped": True,
+            "reason": "no_trims",
+            "note": "full-take plate (no in/out)",
+        }
+    spec = read_json(base / "film-spec.json") or {}
+    if not isinstance(spec, dict):
+        return {"ok": False, "error": "film-spec missing", "applied": 0}
+    applied: list[dict[str, Any]] = []
+    missing: list[str] = []
+    for scene in spec.get("scenes") or []:
+        if not isinstance(scene, dict):
+            continue
+        for shot in scene.get("shots") or []:
+            if not isinstance(shot, dict):
+                continue
+            sid = str(shot.get("id") or "").strip()
+            if sid not in trims:
+                continue
+            t = trims[sid]
+            shot["in_point_sec"] = float(t["in_sec"])
+            shot["out_point_sec"] = float(t["out_sec"])
+            shot["edit_trim_source"] = "edit-director"
+            applied.append(
+                {
+                    "shot_id": sid,
+                    "in_point_sec": shot["in_point_sec"],
+                    "out_point_sec": shot["out_point_sec"],
+                }
+            )
+    for sid in trims:
+        if sid not in {a["shot_id"] for a in applied}:
+            missing.append(sid)
+    if write and applied:
+        write_json(base / "film-spec.json", spec)
+        rec = {
+            "schema": "aifilm-edit-director-trims-v1",
+            "kind": "edit-director-trims",
+            "at": utc_now(),
+            "applied": applied,
+            "missing_shots": missing,
+            "ok": not missing,
+        }
+        path = base / "receipts" / "edit-director-trims.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        write_json(path, rec)
+        rec["path"] = str(path)
+        return rec
+    return {
+        "ok": not missing,
+        "applied": len(applied),
+        "rows": applied,
+        "missing_shots": missing,
+        "written": bool(write and applied),
+    }
+
+
 def sync_post_plan(
     root: Path | str,
     plan: dict[str, Any],
@@ -813,6 +911,7 @@ def apply_plan(root: Path | str, *, write_route: bool = True) -> dict[str, Any]:
             route_receipt = {"ok": False, "error": str(exc)[:200]}
 
     post_plan_sync = sync_post_plan(base, refreshed, write=True)
+    trims_receipt = apply_trims_to_film_spec(base, refreshed, write=True)
 
     receipt = {
         "schema": "aifilm-edit-director-apply-v1",
@@ -831,11 +930,13 @@ def apply_plan(root: Path | str, *, write_route: bool = True) -> dict[str, Any]:
         },
         "post_route": route_receipt,
         "post_plan_sync": post_plan_sync,
+        "trims": trims_receipt,
         "plan_path": str(PLAN_REL),
         "ok": not bool(refreshed.get("errors"))
         and bool((editor_report or {}).get("ok"))
         and (route_receipt is None or route_receipt.get("ok") is not False)
-        and bool(post_plan_sync.get("ok", True)),
+        and bool(post_plan_sync.get("ok", True))
+        and bool(trims_receipt.get("ok", True)),
     }
     # route write_json returns path dict without ok sometimes
     if isinstance(route_receipt, dict) and "path" in route_receipt and "error" not in route_receipt:
@@ -1465,6 +1566,63 @@ def export_checklist(
         report["path_json"] = str(json_path)
         report["path_md"] = str(md_path)
     report["markdown"] = md
+    return report
+
+
+def verify_desk(root: Path | str, *, write: bool = True) -> dict[str, Any]:
+    """End-to-end dry-run verify: status + checklist + post-doctor + trims bind.
+
+    Does not render media. Suitable for pre-final acceptance of the desk.
+    """
+    base = Path(root).expanduser().resolve()
+    plan = load_plan(base, required=False)
+    st = status(base)
+    cl = export_checklist(base, write=write)
+    doctor: dict[str, Any] | None = None
+    try:
+        from post_doctor import run_post_doctor
+
+        doctor = run_post_doctor(base, write=write)
+    except Exception as exc:  # noqa: BLE001
+        doctor = {"ok": None, "error": str(exc)[:160]}
+    trims = apply_trims_to_film_spec(base, plan, write=write) if plan else {"skipped": True}
+    hard: list[str] = []
+    if st.get("blocked_by"):
+        hard.extend([str(x) for x in (st.get("blocked_by") or []) if x])
+    if isinstance(doctor, dict) and doctor.get("ok") is False:
+        for item in doctor.get("hard") or []:
+            if isinstance(item, dict) and item.get("code"):
+                hard.append(str(item["code"]))
+    if trims.get("ok") is False and not trims.get("skipped"):
+        hard.append("TRIMS_BIND_FAILED")
+    if plan is None:
+        hard.append("no_edit_director_plan")
+    report = {
+        "schema": "aifilm-edit-director-verify-v1",
+        "kind": "edit-director-verify",
+        "at": utc_now(),
+        "ok": not hard,
+        "hard": hard,
+        "status": st,
+        "checklist": {
+            "ok": cl.get("ok"),
+            "steps": cl.get("steps"),
+            "path_md": cl.get("path_md"),
+        },
+        "post_doctor": {
+            "ok": doctor.get("ok") if isinstance(doctor, dict) else None,
+            "hard_count": len((doctor or {}).get("hard") or [])
+            if isinstance(doctor, dict)
+            else 0,
+        },
+        "trims": trims,
+        "next_cmd": st.get("final_cmd") or st.get("next_cmd") or cl.get("final_cmd"),
+    }
+    if write:
+        path = base / "receipts" / "edit-director-verify.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        write_json(path, report)
+        report["path"] = str(path)
     return report
 
 

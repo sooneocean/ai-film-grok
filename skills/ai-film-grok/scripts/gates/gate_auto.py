@@ -397,6 +397,48 @@ def run_gate_auto(
     r = str(base)
     (base / "receipts").mkdir(parents=True, exist_ok=True)
 
+    # 0) edit-director desk (advisory; hard only on post-route mismatch)
+    try:
+        from edit_director import draft_and_save, plan_path, status as edit_director_status
+
+        if write and not plan_path(base).is_file():
+            try:
+                draft_and_save(base, force=False)
+            except Exception:
+                pass
+        ed_st = edit_director_status(base)
+        blocked = ed_st.get("blocked_by") or []
+        if isinstance(blocked, str):
+            blocked = [blocked]
+        mismatch = "post_route_mismatch" in blocked
+        steps.append(
+            _step(
+                "edit_director",
+                ok=not mismatch,
+                hard=bool(mismatch),
+                detail=(
+                    f"cut={ed_st.get('cut_state')} "
+                    f"blocked={blocked or None} "
+                    f"route={((ed_st.get('engine_route') or {}).get('caption_path'))}"
+                )[:200],
+                next_cmd=(
+                    ed_st.get("next_cmd")
+                    if not ed_st.get("ok") or mismatch
+                    else None
+                ),
+                codes=list(blocked) if mismatch else [],
+            )
+        )
+    except Exception as exc:  # noqa: BLE001
+        steps.append(
+            _step(
+                "edit_director",
+                ok=True,
+                hard=False,
+                detail=f"skip:{str(exc)[:120]}",
+            )
+        )
+
     # 1) five_track defaults + sex_sfx auto inject
     try:
         from five_track import ensure_five_track_defaults, plan_five_track

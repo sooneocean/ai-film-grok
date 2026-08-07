@@ -154,6 +154,31 @@ def run_post_doctor(root: Path | str, *, write: bool = True) -> dict[str, Any]:
                     fix=f'aifilm edit-director status --root "{base}"',
                 )
             )
+        # R4 · trims bound into film-spec for plate in/out
+        ed_ed = (
+            ed_plan.get("editorial") if isinstance(ed_plan.get("editorial"), dict) else {}
+        )
+        trims = ed_ed.get("trims") if isinstance(ed_ed.get("trims"), list) else []
+        if trims:
+            trim_rec = read_json(base / "receipts" / "edit-director-trims.json") or {}
+            bound = len(trim_rec.get("applied") or []) if isinstance(trim_rec, dict) else 0
+            if bound < len(trims):
+                soft.append(
+                    _issue(
+                        "soft",
+                        "EDIT_DIRECTOR_TRIMS_UNBOUND",
+                        f"plan trims={len(trims)} bound={bound} — run apply to write in_point/out_point",
+                        fix=f'aifilm edit-director apply --root "{base}"',
+                    )
+                )
+            else:
+                soft.append(
+                    _issue(
+                        "soft",
+                        "EDIT_DIRECTOR_TRIMS_BOUND",
+                        f"trims bound to film-spec ({bound})",
+                    )
+                )
     else:
         soft.append(
             _issue(

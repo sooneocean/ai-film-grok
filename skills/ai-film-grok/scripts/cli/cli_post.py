@@ -1677,6 +1677,7 @@ def cmd_edit_director(args: argparse.Namespace) -> int:
         set_plan_fields,
         snapshot_cut,
         status,
+        verify_desk,
     )
 
     root = Path(args.root).expanduser().resolve()
@@ -1748,6 +1749,12 @@ def cmd_edit_director(args: argparse.Namespace) -> int:
             return 0
         if action == "checklist":
             report = export_checklist(
+                root, write=not bool(getattr(args, "no_write", False))
+            )
+            emit(report)
+            return 0 if report.get("ok") else 2
+        if action == "verify":
+            report = verify_desk(
                 root, write=not bool(getattr(args, "no_write", False))
             )
             emit(report)
@@ -2734,6 +2741,12 @@ def add_post_parsers(sub: argparse._SubParsersAction[argparse.ArgumentParser]) -
     )
     ed_check.add_argument("--root", required=True)
     ed_check.add_argument("--no-write", action="store_true")
+    ed_ver = ed_sub.add_parser(
+        "verify",
+        help="Desk verify: status+checklist+post-doctor+bind trims (no media render)",
+    )
+    ed_ver.add_argument("--root", required=True)
+    ed_ver.add_argument("--no-write", action="store_true")
 
     rf = sub.add_parser(
         "register-final",
