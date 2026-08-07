@@ -55,3 +55,10 @@
 - hard-defaults 表行「禁半帧复合 / FLF 同代 / 原声轻处理」  
 - [partner-cast-master](2026-08-07-partner-cast-master-iron.md) · [identity-generation-lock](2026-08-07-identity-generation-lock-no-mix.md) · [native-speech-iso](2026-08-07-h3-native-speech-isolate.md)（后者 **修正**：狠 gate 非默认）  
 - `aifilm h3 enrich-last` · continue-handoff
+
+
+## 追加 · 25s 性别互换（2026-08-07）
+
+- **现象**：sh05 仍是女主 Q 脸，sh06 电梯变成「红眼长发男性 + 陌生黑发女」。  
+- **铁**：`珍珠发箍+红眼+长青绿发` **只能是女主**；`短黑发+棕眼` **只能是里昂**。H3 前目视双人镜，**性别互换 = 毒 still 禁 I2V**。  
+- 修复：整帧重出 sh05–07 + 重 H3；交付 `film_native_stable`。

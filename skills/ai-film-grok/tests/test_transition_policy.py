@@ -146,11 +146,11 @@ class TransitionPolicyAssertTests(unittest.TestCase):
             **extra,
         )
 
-    def test_soft_by_default(self):
-        out = assert_transition_policy(spec=self._violating_spec())
-        self.assertTrue(out["ok"])  # soft, never raises
-        self.assertTrue(out["soft"])
-        self.assertIn("HF_TRANSITION_CONTINUE_NOT_HARD", out["codes"])
+    def test_hard_by_default(self):
+        """Continue soft-intent is always hard (接戏铁律 + default hard policy)."""
+        with self.assertRaises(ProductionGateError) as ctx:
+            assert_transition_policy(spec=self._violating_spec())
+        self.assertIn("HF_TRANSITION_CONTINUE_NOT_HARD", str(ctx.exception))
 
     def test_hard_under_strict(self):
         with self.assertRaises(ProductionGateError):
@@ -159,6 +159,23 @@ class TransitionPolicyAssertTests(unittest.TestCase):
     def test_hard_under_adult_max_heat(self):
         with self.assertRaises(ProductionGateError):
             assert_transition_policy(spec=self._violating_spec(heat_scale="max"))
+
+    def test_continue_hard_even_when_soft_opt_out(self):
+        with self.assertRaises(ProductionGateError):
+            assert_transition_policy(spec=self._violating_spec(transition_policy_soft=True))
+
+    def test_non_continue_soft_when_opt_out(self):
+        # scene whip is non-continue; soft opt-out → advisory only
+        spec = _spec(
+            [("a", "s0", None, None, None), ("b", "s1", None, None, None)],
+            intents=["soft"],
+            styles=["whip"],
+            transition_policy_soft=True,
+        )
+        out = assert_transition_policy(spec=spec)
+        self.assertTrue(out["ok"])
+        self.assertTrue(out["soft"])
+        self.assertIn("HF_TRANSITION_SCENE_FLASHY_STYLE", out["codes"])
 
     def test_escape_env(self):
         try:
@@ -177,12 +194,41 @@ class TransitionPolicyAssertTests(unittest.TestCase):
         self.assertTrue(out["skipped"])
 
     def test_from_root_spec_file(self):
-        spec = self._violating_spec(transition_policy_strict=True)
+        spec = self._violating_spec()
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)
             (root / "film-spec.json").write_text(json.dumps(spec), encoding="utf-8")
             with self.assertRaises(ProductionGateError):
                 assert_transition_policy(root=str(root))
+
+
+class TransitionSoftSoupTests(unittest.TestCase):
+    def test_soft_soup_detected(self):
+        # 4 soft joins all fade under auto fluency (max 3) → soup on 4th
+        rows = [(f"s{i}", "sc0", None, None, None) for i in range(5)]
+        spec = _spec(rows, intents=["soft"] * 4, styles=["fade"] * 4)
+        rep = transition_policy_report(spec)
+        self.assertFalse(rep["ok"], rep)
+        self.assertIn("HF_TRANSITION_SOFT_SOUP", rep["codes"])
+
+    def test_rotated_soft_styles_ok(self):
+        rows = [(f"s{i}", "sc0", None, None, None) for i in range(5)]
+        styles = ["fade", "dissolve", "smoothleft", "hblur"]
+        spec = _spec(rows, intents=["soft"] * 4, styles=styles)
+        rep = transition_policy_report(spec)
+        self.assertTrue(rep["ok"], rep)
+        self.assertNotIn("HF_TRANSITION_SOFT_SOUP", rep["codes"])
+
+    def test_punchy_max_two(self):
+        rows = [(f"s{i}", "sc0", None, None, None) for i in range(4)]
+        spec = _spec(
+            rows,
+            intents=["soft"] * 3,
+            styles=["dissolve"] * 3,
+            transition_fluency="punchy",
+        )
+        rep = transition_policy_report(spec)
+        self.assertIn("HF_TRANSITION_SOFT_SOUP", rep["codes"])
 
 
 if __name__ == "__main__":

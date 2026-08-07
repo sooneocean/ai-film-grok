@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.40.101] - 2026-08-07
+
+### Changed (lock-face + edit transitions · default HARD)
+- **Face identity default hard:** with `cast_masters`, missing enroll/audit receipt and enroll gaps raise at preflight (`assert_face_identity_passed`). Proven drift remains always hard. Legacy soft: `face_identity_soft: true` or `AIFILM_SKIP_FACE_IDENTITY_GATE=1`.
+- **Transition policy / export read-back default hard:** continue soft-intent always hard; scene flashy / paragraph bad / soft-soup hard by default. Legacy soft: `transition_policy_soft: true` (continue still hard). Soft-style soup: `HF_TRANSITION_SOFT_SOUP` (punchy max run 2, auto/silk max 3).
+- **Preflight** severity aligned with the above.
+- **Tests:** FaceIdentityGateTests + transition policy/assert/readback + soft-soup cases.
+- **Docs:** `docs/plans/2026-08-07-codebase-opt-face-transition-todoplan.md` · hard-defaults rows.
+
 ## [2.40.100] - 2026-08-07
 
 ### Added / Changed (H3 official P3.5 real-burn canary)

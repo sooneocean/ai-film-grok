@@ -51,6 +51,7 @@
 | heat_phase | 可选；`heat_phase_auto` 时从 dramatic_function 填，**不猜 climax** |
 | 女主 | **默认 single**；multi 仅证据（Prompt/多图/显式字段）；勿臆造 |
 | 定妆 | style-v1 + cast masters + lookbook → pilot 3 镜用户批准 → bulk |
+| **锁脸默认 hard（P0 · 2026-08-07 · 必要）** | 有 `cast_masters` 时：无 `face-identity` 收据 / enroll 缺口 / post_audit 漂移 → **preflight hard**（不只 soft 劝告）。漂移向来 hard。**逃生**：`face_identity_soft:true`（旧片）或 `AIFILM_SKIP_FACE_IDENTITY_GATE=1`（须 skip 记账）。register 已 enroll 角色 verify 失败默认 reject。**机读**：`assert_face_identity_passed` · `register_still`。见 [plan](../../../docs/plans/2026-08-07-codebase-opt-face-transition-todoplan.md) · [identity-gen](../memory/2026-08-07-identity-generation-lock-no-mix.md) |
 | **身份代际锁 · 禁混代出片（P0 · 2026-08-07 · abroad 漂移 · 不准再犯）** | **一代一脸一集**：同一 film root active timeline **只许一个 cast generation**（restyle/换男主锚/换定妆 = 新 gen）。**禁止** `_archive_*` / 旧 gen takes 与新 gen **混剪成 final**；缺镜 **重 I2V**，禁 silent restore archive 填洞。`face-identity.verified≠true` → 禁声称角色稳定；技术 plate 须 **IDENTITY_PARTIAL** 诚实。final 前 identity drift 审计；worst 先 re-I2V。有声干净 ≠ 脸对。**机读**：`gates/identity_generation_lock.py` → closeout step `identity_generation` · `receipts/cast-generation.json`；escape `AIFILM_SKIP_IDENTITY_GEN=1`。见 [memory](../memory/2026-08-07-identity-generation-lock-no-mix.md) |
 | **配角/男主定妆锁（P0 · 2026-08-07 · abroad 里昂 · 不准再犯）** | 凡上镜角色（含 partner）**立项日**须 `cast_master`+`face_lock` 图；文字 identity 不算锁。双人镜 prompt 必须有 `Character <id>:` + master 路径；禁只写 hero。`style.locked` 假绿：须全 cast 有 master，不能只认女主/style-v1。Imagine 裸双人易 moderated → **整帧** restyle（禁半帧贴脸）再 H3。**机读**：`gates/partner_cast_gate.py` · closeout `partner_cast` · escape `AIFILM_SKIP_PARTNER_CAST=1`。见 [memory](../memory/2026-08-07-partner-cast-master-iron.md) |
 | **H3 原声只留语音（P0 · 2026-08-07 · 禁错位 TTS · 轻处理默认）** | 用户要原声口型 → **禁 TTS 替换**；native XOR post_tts。**默认轻处理**：`hp+afftdn(nr≤12)+adeclick+loudnorm`；**禁默认 agate/双 arnndn**（狠 gate 仅显式 flag + 抽听 receipt，产物标 BROKEN）。交付优先 `film_native_stable`；禁 `film_watchable` 当交付。机读：`identity_generation` / closeout 不替代抽听。见 [memory](../memory/2026-08-07-h3-native-speech-isolate.md) · [no-midframe](../memory/2026-08-07-no-midframe-composite-flf-audio-iron.md) |
@@ -99,7 +100,8 @@
 | 口白·动作 | `nar` 动词 = `dsl.action` = `dsl.motion` 首要运动 |
 | 防腻 | 连续 3 镜 ≥2 维变化（景别·主动词·`camera_axis`） |
 | 长片接戏 | Continuity Chain；continue **hard**；`cut_on: mid_motion`；字节 promote |
-| 转场 | silk；continue 强制 hard；满 60s 靠加镜 |
+| 转场 | silk；**continue 永远 hard**；**策略/export read-back 默认 hard**（旧片 `transition_policy_soft:true`）；soft 同风格连跑 → `HF_TRANSITION_SOFT_SOUP`；场景禁 whip/grid；章间 soft fade/dissolve。机读 `transition_policy_report` · `assert_transition_policy` · [plan](../../../docs/plans/2026-08-07-codebase-opt-face-transition-todoplan.md) · [hf-transition-policy](hf-transition-policy.md) |
+| 转场（短） | 满 60s 靠加镜，不靠 dissolve 糊接戏 |
 | 立场 | `focal_character` + `viewpoint` + `look_axis` |
 | 双字幕 | `caption_mode: zh\|zh_en\|en`；`nar_en` 可只上字幕 |
 | **零旁白 IRON（P0 · 2026-08-04 · 真门 2.36.4）** | `dialogue_drama` 默认 `zero_narration_strict:true`：全片第三人称 `nar` 占比硬底 **0%**。代码：`film_spec.zero_narration_gate` → `validate_film_spec` 报 **`NAR_BUDGET_VIOLATION`**。**替代**：① 角色对白/潜台词；② 道具特写 `dramatic_function: sensory/insert`；③ Foley。逃生：`zero_narration_strict:false` 或镜级 `silent_scene+narration_reason`。解封后回落 `narration_budget_ratio`（默认 5%）。测：`tests/test_zero_narration_gate.py`（真函数，非 stand-in）。 |
