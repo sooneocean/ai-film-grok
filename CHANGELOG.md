@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.40.97] - 2026-08-07
+
+### Changed (H3 official · soft densify live canary DONE)
+- **Live burn DONE:** `s_soft_portrait_official` seed `202608074` ~70s; mean **1.28** vs legacy **4.13** (−2.84) vs O3 official **1.47**.
+- **Auto soft → legacy** (micro-life energy; densify did not close mean gap). High stays official densify; dialogue stays official.
+- **Evidence:** `skills/ai-film-grok/artifacts/2026-08-07-h3-official-soft-live-canary.json`.
+- **Escape:** force soft official via `AIFILM_H3_PROMPT_DIALECT=official`.
+
 ## [2.40.96] - 2026-08-07
 
 ### Added / Changed (Onboarding v2 · 闭环 + 启发式增强)
