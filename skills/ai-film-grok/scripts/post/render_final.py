@@ -279,137 +279,59 @@ from final.render_helpers import (  # noqa: E402, F401
 
 
 def render_final(args: argparse.Namespace) -> dict[str, Any]:
-    root = Path(args.root).expanduser().resolve()
-    bgm_source_receipt: dict[str, Any] | None = None
-    _hb_stage = "start"
+    # W1.1 · bootstrap paths/spec/vo/workspace (leaf: final.render_context)
+    from final.render_context import load_render_context
 
-    def _hb(stage: str, detail: str | None = None) -> None:
-        nonlocal _hb_stage
-        _hb_stage = stage
-        try:
-            from final.heartbeat import write_final_heartbeat
-
-            write_final_heartbeat(root, stage=stage, detail=detail)
-        except Exception:
-            pass
-
-    try:
-        from final.heartbeat import apply_final_ffmpeg_timeout_env
-
-        ff_to = apply_final_ffmpeg_timeout_env()
-        _hb("start", f"render_final enter ffmpeg_timeout={ff_to}s")
-    except Exception:
-        _hb("start", "render_final enter")
-    try:
-        paths = resolve_render_paths(root, args.out_name)
-    except RenderWorkspaceError as exc:
-        raise RenderError(str(exc)) from exc
-    out_dir = paths["out_dir"]
-    final_path = paths["final"]
-    if not shutil.which("ffmpeg") or not shutil.which("ffprobe"):
-        raise RenderError("ffmpeg/ffprobe required")
-
-    if tts_synthesize is None:
-        raise RenderError("tts_backend.py missing next to render_final.py")
-
-    manifest = read_json(root / "manifest.json")
-    spec = read_json(root / "film-spec.json")
-    scene_sound_report = reconcile_scene_sound(root, write=True)
-    if bool(spec.get("audio_timeline_v1", False)) and scene_sound_report["status"] == "blocked":
-        raise RenderError(
-            "scene-sound required assets missing: "
-            + ", ".join(scene_sound_report["blocking_shot_ids"])
-        )
-    audio_contract = validate_audio_tracks_contract(spec)
-    for warning in audio_contract.get("warnings") or []:
-        log(f"audio contract warning: {warning}")
-    # Hard gate: long VO on short plates → stream_loop (boring). Split nars first.
-    from production_gates import ProductionGateError, assert_no_loop_risk
-
-    try:
-        assert_no_loop_risk(root, force=bool(getattr(args, "allow_loop_risk", False)))
-    except ProductionGateError as exc:
-        raise RenderError(str(exc)) from exc
-    timeline = read_json(root / "timeline.json") if (root / "timeline.json").is_file() else {}
-    width = resolve_render_dimension(args.width, timeline.get("width"), manifest.get("width"), default=720)
-    height = resolve_render_dimension(args.height, timeline.get("height"), manifest.get("height"), default=1280)
-    fps = resolve_render_dimension(args.fps, timeline.get("fps"), default=30)
-    # Film-spec / CLI → VO strategy (peeled leaf)
-    _vm = resolve_final_voice_mix_config(args, spec)
-    vo_mode = _vm["vo_mode"]
-    voice = _vm["voice"]
-    cast_voices = _vm["cast_voices"]
-    vo_rate = _vm["vo_rate"]
-    vo_pitch = _vm["vo_pitch"]
-    vo_tts_vol = _vm["vo_tts_vol"]
-    tts_backend = _vm["tts_backend"]
-    tts_allow_network_fallback = _vm["tts_allow_network_fallback"]
-    cast_tts_backends = _vm["cast_tts_backends"]
-    vo_gain = _vm["vo_gain"]
-    voice_policy = _vm["voice_policy"]
-    native_audio_volume = _vm["native_audio_volume"]
-    film_vocal_color_gain = _vm["film_vocal_color_gain"]
-    mood = _vm["mood"]
-    lipsync_mode = _vm["lipsync_mode"]
-    tts_info = tts_probe() if tts_probe else {}
-    log(
-        f"vo_mode={vo_mode} tts={tts_backend}->{tts_info.get('active')} voice={voice} "
-        f"rate={vo_rate} pitch={vo_pitch} vo_gain={vo_gain} music_vol={args.music_volume} "
-        f"mood={mood} lipsync={lipsync_mode}"
+    ctx = load_render_context(
+        args,
+        tts_synthesize=tts_synthesize,
+        tts_probe=tts_probe,
+        resolve_font=resolve_font,
+        enforce_dialogue_lipsync=enforce_dialogue_lipsync,
+        lipsync_error_cls=LipSyncError,
     )
-    font_path = resolve_font()
-
-    shots = flatten_shots(spec, film_root=root)
-    if enforce_dialogue_lipsync is None:
-        if lipsync_mode != "off":
-            raise RenderError(
-                "post lipsync removed (v2.40); use --lipsync off and prefer_native dialogue"
-            )
-    else:
-        try:
-            lipsync_mode = enforce_dialogue_lipsync(
-                vo_mode=vo_mode,
-                shots=shots,
-                requested=lipsync_mode,
-            )
-        except (LipSyncError, Exception) as exc:
-            raise RenderError(str(exc)) from exc
-    try:
-        # The validator runs in flatten_shots; this makes the renderer's TTS
-        # selection explicit and refuses ambiguous multi-turn shots.
-        shot_voice_cues = {str(shot["id"]): primary_voice_cue(shot) for shot in shots}
-    except AudioCueError as exc:
-        raise RenderError(str(exc)) from exc
-    clips_map = manifest.get("clips") or {}
-    try:
-        prepare_render_workspace(paths)
-    except RenderWorkspaceError as exc:
-        raise RenderError(str(exc)) from exc
-    clips_dir = paths["clips_dir"]
-    audio_dir = paths["audio_dir"]
-    native_dir = paths["native_dir"]
-    work = paths["work"]
-    overlays_dir = work / "overlays"
-    checkpoint = CheckpointManager(root)
-    if bool(getattr(args, "force", False)):
-        checkpoint.clear()
-    resume = bool(getattr(args, "resume", False))
-
-    dialogue_spoken_lang = str(
-        spec.get("dialogue_spoken_lang")
-        or (spec.get("voice_policy") or {}).get("dialogue_spoken_lang")
-        or "zh"
-    )
-    if dialogue_spoken_lang.strip().lower() in {"ja", "jp", "japanese"}:
-        raise RenderError(
-            "Japanese dialogue is retired; set dialogue_spoken_lang=zh (Chinese-only product)"
-        )
-    dialogue_spoken_lang = "zh"
-    narration_spoken_lang = str(
-        spec.get("narration_spoken_lang")
-        or (spec.get("voice_policy") or {}).get("narration_spoken_lang")
-        or "zh"
-    )
+    root = ctx.root
+    paths = ctx.paths
+    out_dir = ctx.out_dir
+    final_path = ctx.final_path
+    manifest = ctx.manifest
+    spec = ctx.spec
+    scene_sound_report = ctx.scene_sound_report
+    timeline = ctx.timeline
+    width = ctx.width
+    height = ctx.height
+    fps = ctx.fps
+    vo_mode = ctx.vo_mode
+    voice = ctx.voice
+    cast_voices = ctx.cast_voices
+    vo_rate = ctx.vo_rate
+    vo_pitch = ctx.vo_pitch
+    vo_tts_vol = ctx.vo_tts_vol
+    tts_backend = ctx.tts_backend
+    tts_allow_network_fallback = ctx.tts_allow_network_fallback
+    cast_tts_backends = ctx.cast_tts_backends
+    vo_gain = ctx.vo_gain
+    voice_policy = ctx.voice_policy
+    native_audio_volume = ctx.native_audio_volume
+    film_vocal_color_gain = ctx.film_vocal_color_gain
+    mood = ctx.mood
+    lipsync_mode = ctx.lipsync_mode
+    tts_info = ctx.tts_info
+    font_path = ctx.font_path
+    shots = ctx.shots
+    shot_voice_cues = ctx.shot_voice_cues
+    clips_map = ctx.clips_map
+    clips_dir = ctx.clips_dir
+    audio_dir = ctx.audio_dir
+    native_dir = ctx.native_dir
+    work = ctx.work
+    overlays_dir = ctx.overlays_dir
+    checkpoint = ctx.checkpoint
+    resume = ctx.resume
+    dialogue_spoken_lang = ctx.dialogue_spoken_lang
+    narration_spoken_lang = ctx.narration_spoken_lang
+    _hb = ctx.heartbeat
+    bgm_source_receipt: dict[str, Any] | None = ctx.bgm_source_receipt
 
     # 1) Per-shot TTS
     validate_voice_language_locks(shots, dialogue_spoken_lang=dialogue_spoken_lang)
