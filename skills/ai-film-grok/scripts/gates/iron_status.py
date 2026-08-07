@@ -59,6 +59,18 @@ _IRON_GATES: list[tuple[str, str, str, str]] = [
         "closeout / ship-prep; plate if not master_eligible",
     ),
     (
+        "still_face_lock_bind",
+        "still binds current face-lock enroll; ban archive still for H3",
+        "AIFILM_SKIP_STILL_FACE_LOCK",
+        "generation_ready / generation_request",
+    ),
+    (
+        "plate_transition_align",
+        "plate xfade styles match transition_ops.picture",
+        "AIFILM_SKIP_TRANSITION_POLICY_GATE",
+        "render_final concat",
+    ),
+    (
         "transition_frame_audit",
         "final+delivery requires non-stale transition-frame-audit",
         "AIFILM_SKIP_TRANSITION_FRAME_AUDIT",

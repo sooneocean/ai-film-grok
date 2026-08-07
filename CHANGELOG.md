@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.40.108] - 2026-08-07
+
+### Added (F3 still face-lock bind · T4 plate transition_ops align)
+- **`gates/still_face_lock_bind.py`**: archive still path hard-ban; cast enroll required before H3; pixel drift soft unless strict/max heat. Wired into `assert_still_source_safe` + `generation_request` + `generation_ready`.
+- **`plan/plate_transition_align.py`**: align plate xfade styles to `transition_ops.picture`; continue ops must hard_cut; hard fail on missing style / continue-not-hard. Wired into `render_final` concat.
+- **Tests:** `test_still_face_lock_bind_f3.py` (bind + plate align).
+- **Docs:** hard-defaults F3/T4 · face-transition plan progress.
+
 ## [2.40.107] - 2026-08-07
 
 ### Changed (WebUI/router closeout · C3/C4/D1)
