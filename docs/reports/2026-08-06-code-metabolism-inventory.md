@@ -1,7 +1,8 @@
 # Code metabolism inventory — TERMINAL residual freeze
 
 **Generated:** 2026-08-07  
-**Latest batch:** 2.40.90 (onboarding_planner residual allowlist + eng closeout green)  
+**Latest batch:** 2.41.21 (code slim: Wan/FrwWan tombstone · Seedance allow-gate · composition_fill_gate → gates/)  
+**Slim board:** [2026-08-07-code-slim-consolidation-todoplan.md](../plans/2026-08-07-code-slim-consolidation-todoplan.md)  
 **Structure status:** **SAFE QUEUE DONE** · C6.1 migrate empty · **C6.3 Lane A empty** (no safe whole-file deletes)  
 **Guards:**  
 - `tests/test_c6_migrate_queue_empty.py` — thick top-level residual set  

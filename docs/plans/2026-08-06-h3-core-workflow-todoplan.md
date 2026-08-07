@@ -1,5 +1,7 @@
 # 5090 H3 核心产线 · 重头打通优化 Todo Plan
 
+> **Slim board (structure/docs deadcode):** [2026-08-07-code-slim-consolidation-todoplan.md](2026-08-07-code-slim-consolidation-todoplan.md) — do not reopen package vanity / whole-file delete waves here.
+
 **Status:** **DOC+OPS 闭环 · 2026-08-07**（真烧 OPEN_OPS：5090 他会话占用）  
 **进度：** H0–H1 · H6 **SHIPPED** · H2–H5 纪律卡在 · **H3 真烧** 见 canary  
 **Canary：** [artifacts/2026-08-07-h3-core-workflow-canary.json](../../artifacts/2026-08-07-h3-core-workflow-canary.json) · 片 `0806/abroad-slut-manhua-h3`  

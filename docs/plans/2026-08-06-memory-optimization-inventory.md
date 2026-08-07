@@ -1,5 +1,7 @@
 # Plugin 优化点全表（从 memory 反查 · 2026-08-06）
 
+> **Slim board (structure/docs deadcode):** [2026-08-07-code-slim-consolidation-todoplan.md](2026-08-07-code-slim-consolidation-todoplan.md) — do not reopen package vanity / whole-file delete waves here.
+
 **范围：** 主仓 `ai-film-grok` plugin（`~/.grok/plugins/ai-film-grok`）；记忆 active **~39**（2026-08-06 归档 ~47 → `memory/archive/`）+ session 索引 + 既有 plan。plugin **2.40.12**。  
 **读法：** 记忆里的「优化」分三类，**不要混成同一待办清单**：
 

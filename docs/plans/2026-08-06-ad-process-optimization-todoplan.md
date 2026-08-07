@@ -1,5 +1,7 @@
 # 副导演流程盘点 + 优化 Todo Plan（2026-08-06）
 
+> **Slim board (structure/docs deadcode):** [2026-08-07-code-slim-consolidation-todoplan.md](2026-08-07-code-slim-consolidation-todoplan.md) — do not reopen package vanity / whole-file delete waves here.
+
 **Status:** **SHIPPED 2.40.11**（A–C 代码+阶段卡 · D OPEN_OPS canary）· 2026-08-06  
 **结论先行：** 你的片厂已经不是「缺规章、缺门禁」——**法条 IRON + 质量五门 + final 诚实契约大多已上墙且有测**。真正拖片的是三类事：**(1) 计划时长与 H3 实源仍系统性偏短**；(2) **5090 有用烧满率靠运维日，不靠再写代码**；(3) **交付语义在真片肌肉记忆还不够（plate≠master、门绿≠好看）**。本轮已把 A–C 工序机读化；D 无独占 GPU 诚实 OPEN_OPS。
 

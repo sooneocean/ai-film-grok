@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.41.21] - 2026-08-07
+
+### Changed (code slim · dead-logic consolidation)
+- **Wan22 / FRW Wan:** `LocalComfyWan22Provider` + `FrwWanProvider` collapsed to construction tombstones (dead probe/generate bodies removed; still not registered).
+- **Seedance mild gate:** `seedance` `generate()` requires `AIFILM_ALLOW_SEEDANCE=1`; subclasses `frw-api-i2v` / `frw-ltx23` unchanged.
+- **composition_fill_gate:** implementation → `gates/composition_fill_gate.py` + thin top-level shim + `main()`.
+- **Docs tax:** active slim board `docs/plans/2026-08-07-code-slim-consolidation-todoplan.md`; superseded pointers on major plans; `artifacts/README.md` + gitignore ops noise patterns.
+- **Tests:** tombstone + Seedance allow gate; C6 residual no longer lists fill_gate as thick top-level.
+
 ## [2.41.20] - 2026-08-07
 
 ### Changed (monolith orchestrator relief · go next 到最后 · closeout)

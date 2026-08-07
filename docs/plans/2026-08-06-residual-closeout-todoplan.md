@@ -1,5 +1,7 @@
 # Residual 收口 Todo Plan（2026-08-06 · 四条尾巴）
 
+> **Slim board (structure/docs deadcode):** [2026-08-07-code-slim-consolidation-todoplan.md](2026-08-07-code-slim-consolidation-todoplan.md) — do not reopen package vanity / whole-file delete waves here.
+
 **Status:** PARTIAL SHIPPED（机跑段完成 · 人门仍红）  
 **Note:** 片上证据在 **film root receipts**（不依赖 git 分支）。结构账实见 [monolith-closeout](2026-08-06-monolith-closeout.md)（若本分支无此档则以 LOC 探针为准）。
 

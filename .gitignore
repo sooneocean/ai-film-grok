@@ -110,3 +110,18 @@ backups-skills/
 
 # local launchd noise
 artifacts/comfy-tunnel-launchd.*
+
+# ---- ops canaries / drain logs (not source; keep README only) ----
+artifacts/**/*.log
+artifacts/**/*.pid
+artifacts/**/*canary*.json
+artifacts/**/*until-empty*.json
+artifacts/**/*drain*
+artifacts/**/*reshot*.log
+artifacts/**/*waiter*.log
+artifacts/**/*monitor*.log
+artifacts/**/*supervisor*.log
+artifacts/session-wrap-*.md
+artifacts/session-wrap-*.txt
+!artifacts/README.md
+!artifacts/**/README.md

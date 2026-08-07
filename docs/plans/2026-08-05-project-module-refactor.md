@@ -1,4 +1,6 @@
-# Project module refactor — ACTIVE tracker (2026-08-05)
+# Project module refactor — tracker (2026-08-05)
+
+**Status:** **SUPERSEDED for new structure work** → [2026-08-07-code-slim-consolidation-todoplan.md](2026-08-07-code-slim-consolidation-todoplan.md) · W0–W7 + safe migrate queue DONE · do not reopen vanity moves
 
 **Metabolism batch 2.40.39:** 8 more P3-1 moves + plate-slot sites + `core.emit` tests · **2.40.38:** [inventory](../reports/2026-08-06-code-metabolism-inventory.md) · migrate+shim 5 modules + golden_suite/color_grade shims · peel `resolve_plate_slot_sec`
 **Metabolism batch 2.40.41:** P3-1×10 + coerce_optional_float + core.constants tests

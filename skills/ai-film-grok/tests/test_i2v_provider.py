@@ -263,3 +263,25 @@ def test_h3_primary_quality_failure_does_not_switch_to_grok() -> None:
                 plan_sha256="a" * 64,
             )
 
+
+
+def test_seedance_generate_requires_explicit_allow(tmp_path) -> None:
+    """Default spine blocks Seedance bulk unless AIFILM_ALLOW_SEEDANCE=1."""
+    import config_loader as cl
+    from i2v_provider import SeedanceProvider
+
+    key = tmp_path / "k.png"
+    key.write_bytes(b"\x89PNG\r\n\x1a\n" + b"0" * 32)
+    prov = SeedanceProvider()
+    with mock.patch.dict(os.environ, {"AIFILM_ALLOW_SEEDANCE": ""}, clear=False):
+        with pytest.raises(I2VProviderError, match="SEEDANCE_RETIRED"):
+            prov.generate(keyframe=key, prompt="x", out=tmp_path / "o.mp4")
+
+
+def test_wan22_and_frw_wan_are_construction_tombstones() -> None:
+    from i2v_provider import FrwWanProvider, LocalComfyWan22Provider
+
+    with pytest.raises(I2VProviderError, match="WAN22_I2V_RETIRED"):
+        LocalComfyWan22Provider()
+    with pytest.raises(I2VProviderError, match="FRW_WAN_I2V_RETIRED"):
+        FrwWanProvider()

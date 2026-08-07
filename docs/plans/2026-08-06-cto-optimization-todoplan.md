@@ -1,5 +1,7 @@
 # CTO 全面优化 Todo Plan · ai-film-grok
 
+> **Slim board (structure/docs deadcode):** [2026-08-07-code-slim-consolidation-todoplan.md](2026-08-07-code-slim-consolidation-todoplan.md) — do not reopen package vanity / whole-file delete waves here.
+
 **结论先行：** 这不是「缺功能」的仓库，而是 **片厂已建完、规章已上墙、车间仍塞着几个 2k–2.5k 行总控台** 的成熟产线（v**2.40.38**）。下一轮优化应以 **诚实出片 + 闸门 fail-closed + 可维护热路径 + 运维吞吐** 为主；**禁止**再开虚荣 LOC 冲刺、绿地 IRON 散文、或重做已 ship 的包边界/A1–A5。
 
 | 项 | 本机探针（2026-08-06 · plugins checkout） |

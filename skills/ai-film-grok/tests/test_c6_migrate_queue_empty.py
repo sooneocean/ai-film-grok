@@ -22,7 +22,6 @@ INTENTIONAL_RESIDUAL = frozenset(
         "gate_panel.py",
         "onboarding.py",
         "onboarding_planner.py",  # onboarding v2 auto-decompose (console entry)
-        "composition_fill_gate.py",  # thick gate leaf; peel only bug-driven
     }
 )
 

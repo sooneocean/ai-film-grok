@@ -27,7 +27,6 @@ import json
 import os
 import re
 import subprocess
-import sys
 import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -80,6 +79,10 @@ ACTION_PROVIDER_PRIORITY = ("frw-ltx23", "frw-api-i2v", "grok")
 H3_PRIMARY_PROVIDER_PRIORITY = ("comfy-h3", "grok")
 # Paid-cloud Grok bulk (grok_primary) and hybrid soft lane.
 GROK_PRIMARY_PROVIDER_PRIORITY = ("grok",)
+
+
+def _env_truthy(name: str) -> bool:
+    return str(os.environ.get(name) or "").strip().lower() in {"1", "true", "yes", "on"}
 
 
 def is_technical_failure(error: object) -> bool:
@@ -642,6 +645,13 @@ class SeedanceProvider(I2VProvider):
 
     def generate(self, *, keyframe: Path, prompt: str, **kwargs: Any) -> dict[str, Any]:
         """Upload local inputs before invoking FRW; never pass local paths as URLs."""
+        # Seedance bulk is retired from default spine (h3_primary / grok).
+        # Subclasses (frw-api-i2v, frw-ltx23) keep working; only name==seedance is gated.
+        if self.name == "seedance" and not _env_truthy("AIFILM_ALLOW_SEEDANCE"):
+            raise I2VProviderError(
+                "SEEDANCE_RETIRED: not on default spine (use comfy-h3 / grok). "
+                "Escape only with AIFILM_ALLOW_SEEDANCE=1 for explicit recovery."
+            )
         from frw_upload import upload_typed_inputs
 
         params = dict(kwargs)
@@ -804,309 +814,59 @@ class FrwLtx23AudioProvider(SeedanceProvider):
         ]
 
 
-class FrwWanProvider(SeedanceProvider):
-    """FRW-managed I2V accepted only when the response proves a Wan backend.
-
-    The current public FRW CLI exposes a generic ``img2video`` command, not a
-    model selector.  This lane therefore stays unavailable until a film-scoped
-    canary and every generation response both identify Wan explicitly.
-    """
+class FrwWanProvider(I2VProvider):
+    """Tombstone — FRW Wan lane retired; use frw-api-i2v or comfy-h3."""
 
     name = "frw-wan"
     endpoints = frozenset({"frw_wan_i2v"})
 
     def __init__(self) -> None:
-        raise I2VProviderError("FRW_WAN_I2V_RETIRED: use frw-api-i2v instead")
+        raise I2VProviderError("FRW_WAN_I2V_RETIRED: use frw-api-i2v or comfy-h3 instead")
 
     def probe(self, *, root: Path | None = None) -> CapabilityReport:
-        if root is None:
-            return CapabilityReport(
-                provider=self.name,
-                ok=False,
-                available=False,
-                reason="FRW Wan requires a film-scoped model-identity canary.",
-                models=["wan"],
-                profile="frw_wan_fallback",
-                detail={"canary_required": True},
-            )
-        receipt = root / "receipts" / "frw-wan-i2v-canary.json"
-        from util import soft_json
-
-        data = soft_json(receipt)
-        model = str(data.get("provider_model") or data.get("model") or "").lower()
-        approved = bool(
-            data.get("ok")
-            and _has_wan_model_identity(model)
-            and _canary_output_is_bound(root, data)
-            and data.get("full_decode_ok") is True
-            and data.get("human_review") == "approved"
-        )
+        del root
         return CapabilityReport(
             provider=self.name,
-            ok=approved,
-            available=approved,
-            reason=(
-                "FRW Wan I2V canary approved."
-                if approved
-                else "FRW Wan model identity is not exposed or the canary is not approved."
-            ),
-            models=["wan"],
-            profile="frw_wan_fallback",
-            detail={"canary_required": True, "receipt": str(receipt), **data},
+            ok=False,
+            available=False,
+            reason="FRW_WAN_I2V_RETIRED",
+            models=[],
+            profile="retired",
         )
 
     def build_command(
         self, *, keyframe: Path, prompt: str, duration_sec: int = 5, **kwargs: Any
     ) -> list[str]:
-        del duration_sec
-        dispatch = Path(__file__).resolve().parent.parent / "frw_dispatch.py"
-        return [
-            sys.executable,
-            str(dispatch),
-            "img2video",
-            "--img-url",
-            str(kwargs.get("img_url") or keyframe),
-            "--prompt",
-            prompt,
-            "--width",
-            str(kwargs.get("width", 704)),
-            "--height",
-            str(kwargs.get("height", 1280)),
-            "--wait",
-        ]
-
-    def generate(self, *, keyframe: Path, prompt: str, **kwargs: Any) -> dict[str, Any]:
-        result = super().generate(keyframe=keyframe, prompt=prompt, **kwargs)
-        payload: dict[str, Any] = {}
-        for line in reversed(str(result.get("stdout") or "").splitlines()):
-            try:
-                parsed = json.loads(line)
-            except ValueError:
-                continue
-            if isinstance(parsed, dict):
-                payload = parsed
-                break
-        data = payload.get("data") if isinstance(payload.get("data"), dict) else {}
-        model = str(
-            data.get("model") or data.get("provider_model") or payload.get("model") or ""
-        ).lower()
-        if result.get("ok") and not _has_wan_model_identity(model):
-            result["ok"] = False
-            result["stderr"] = "FRW_WAN_MODEL_IDENTITY_UNVERIFIED"
-        result["provider_model"] = model or None
-        return result
+        del keyframe, prompt, duration_sec, kwargs
+        raise I2VProviderError("FRW_WAN_I2V_RETIRED: use frw-api-i2v or comfy-h3 instead")
 
 
 class LocalComfyWan22Provider(I2VProvider):
-    """Explicit private-LAN Wan 2.2 I2V lane on the user's RTX 5090."""
+    """Tombstone — local Wan 2.2 I2V removed; motion primary is MiniMax H3."""
 
     name = "comfy-wan22"
-    command_timeout_sec = 1830
+    command_timeout_sec = 30
     endpoints = frozenset({"local_wan22_i2v"})
 
     def __init__(self) -> None:
         raise I2VProviderError("WAN22_I2V_RETIRED: local Wan 2.2 I2V has been removed")
 
-    def _base_url(self) -> str:
-        from config_loader import get_config
-
-        return get_config().comfyui_base_url.strip()
-
-    @staticmethod
-    def _resolve_profile_name(kwargs: dict[str, Any]) -> str:
-        from comfy_video import resolve_wan22_profile
-
-        profile = resolve_wan22_profile(
-            str(kwargs.get("profile") or "auto"),
-            intent=str(kwargs.get("weapon_intent") or "general"),
-            stage=str(kwargs.get("production_stage") or "production"),
-            allow_experimental=bool(kwargs.get("allow_experimental")),
-        )
-        return str(profile["name"])
-
     def probe(self, *, root: Path | None = None) -> CapabilityReport:
         del root
-        base_url = self._base_url()
-        if not base_url:
-            return CapabilityReport(
-                provider=self.name,
-                ok=False,
-                available=False,
-                reason="AIFILM_COMFYUI_BASE_URL is not configured.",
-                models=[],
-                profile="explicit_local",
-            )
-        try:
-            from comfy_video import probe, submission_capacity
-
-            detail = probe(base_url)
-            capacity = submission_capacity(base_url)
-        except Exception as exc:
-            return CapabilityReport(
-                provider=self.name,
-                ok=False,
-                available=False,
-                reason=f"private ComfyUI probe failed: {exc}",
-                models=[],
-                profile="explicit_local",
-            )
-        models = list((detail.get("models") or {}).get("official") or [])
-        available = bool(detail.get("ok") and capacity.get("ok"))
         return CapabilityReport(
             provider=self.name,
-            ok=available,
-            available=available,
-            reason=(
-                "Private RTX 5090 Wan 2.2 is ready."
-                if available
-                else "Private Wan 2.2 assets or submission capacity are unavailable."
-            ),
-            models=models,
-            profile="explicit_local",
-            detail={**detail, "submission_capacity": capacity},
+            ok=False,
+            available=False,
+            reason="WAN22_I2V_RETIRED",
+            models=[],
+            profile="retired",
         )
 
     def build_command(
         self, *, keyframe: Path, prompt: str, duration_sec: int = 5, **kwargs: Any
     ) -> list[str]:
-        base_url = self._base_url()
-        if not base_url:
-            raise I2VProviderError("AIFILM_COMFYUI_BASE_URL is required for comfy-wan22")
-        out = kwargs.get("out")
-        if not out:
-            raise I2VProviderError("comfy-wan22 requires an explicit output path")
-        try:
-            profile_name = self._resolve_profile_name(kwargs)
-        except Exception as exc:
-            raise I2VProviderError(str(exc)) from exc
-        script = Path(__file__).resolve().parent / "comfy_video.py"
-        command = [
-            sys.executable,
-            str(script),
-            "generate",
-            "--base-url",
-            base_url,
-            "--image",
-            str(Path(keyframe).expanduser().resolve()),
-            "--prompt",
-            prompt,
-            "--out",
-            str(Path(out).expanduser().resolve()),
-            "--duration",
-            str(duration_sec),
-            "--timeout",
-            str(kwargs.get("timeout_sec", 1800)),
-            "--width",
-            str(kwargs.get("width", 480)),
-            "--height",
-            str(kwargs.get("height", 704)),
-            "--seed",
-            str(kwargs.get("seed", 123456)),
-            "--profile",
-            profile_name,
-        ]
-        if kwargs.get("turbo"):
-            command.append("--turbo")
-        if kwargs.get("subject_basis"):
-            command.extend(("--subject-basis", str(kwargs["subject_basis"])))
-        return command
-
-    def generate(self, *, keyframe: Path, prompt: str, **kwargs: Any) -> dict[str, Any]:
-        input_path = Path(keyframe).expanduser().resolve()
-        expected_input_sha = sha256_file(input_path) if input_path.is_file() else None
-        result = super().generate(keyframe=keyframe, prompt=prompt, **kwargs)
-        out = Path(kwargs["out"]).expanduser().resolve()
-        receipt = out.with_suffix(out.suffix + ".receipt.json")
-        result["receipt"] = str(receipt)
-        if result.get("ok") and receipt.is_file():
-            try:
-                from comfy_video import (
-                    WAN22_ADULT_ACTION_EXPERIMENTAL_PROFILE,
-                    WAN22_ADULT_PROFILE,
-                    WAN22_GENERAL_ADULT_EXPERIMENTAL_PROFILE,
-                    WAN22_OFFICIAL_PROFILE,
-                )
-                from util import soft_json
-
-                detail = soft_json(receipt)
-                profile_name = self._resolve_profile_name(kwargs)
-                profile = {
-                    WAN22_ADULT_PROFILE["name"]: WAN22_ADULT_PROFILE,
-                    WAN22_ADULT_ACTION_EXPERIMENTAL_PROFILE[
-                        "name"
-                    ]: WAN22_ADULT_ACTION_EXPERIMENTAL_PROFILE,
-                    WAN22_GENERAL_ADULT_EXPERIMENTAL_PROFILE[
-                        "name"
-                    ]: WAN22_GENERAL_ADULT_EXPERIMENTAL_PROFILE,
-                }.get(profile_name, WAN22_OFFICIAL_PROFILE)
-                expected_models = [profile["high"], profile["low"]]
-                expected_loras = (
-                    [name for name in (profile.get("high_lora"), profile.get("low_lora")) if name]
-                    if kwargs.get("turbo") or profile_name.endswith("-experimental")
-                    else []
-                )
-                output_detail = detail.get("output") or {}
-                verification_errors: list[str] = []
-                if detail.get("schema_version") != 1:
-                    verification_errors.append("schema version mismatch")
-                if detail.get("kind") != "local-wan22-generation":
-                    verification_errors.append("receipt kind mismatch")
-                if expected_input_sha is None:
-                    verification_errors.append("input file was missing before launch")
-                elif detail.get("input_sha256") != expected_input_sha:
-                    verification_errors.append("input SHA-256 mismatch")
-                if not out.is_file():
-                    verification_errors.append("output file is missing")
-                else:
-                    if output_detail.get("sha256") != sha256_file(out):
-                        verification_errors.append("output SHA-256 mismatch")
-                    if output_detail.get("bytes") != out.stat().st_size:
-                        verification_errors.append("output byte count mismatch")
-                if Path(str(output_detail.get("path") or "")).expanduser().resolve() != out:
-                    verification_errors.append("output path mismatch")
-                if detail.get("provider") != self.name or detail.get("ok") is not True:
-                    verification_errors.append("provider receipt identity mismatch")
-                if detail.get("profile") != profile_name:
-                    verification_errors.append("profile mismatch")
-                if detail.get("models") != expected_models:
-                    verification_errors.append("model identity mismatch")
-                if list(detail.get("loras") or []) != expected_loras:
-                    verification_errors.append("LoRA identity mismatch")
-                expected_lora_sha256 = {
-                    name: str(profile[hash_key])
-                    for name, hash_key in (
-                        (profile.get("high_lora"), "high_lora_sha256"),
-                        (profile.get("low_lora"), "low_lora_sha256"),
-                    )
-                    if name and hash_key in profile
-                }
-                if dict(detail.get("lora_sha256") or {}) != expected_lora_sha256:
-                    verification_errors.append("LoRA SHA-256 mismatch")
-                if (
-                    profile_name.endswith("-experimental")
-                    and detail.get("experimental_assets_promoted") is not False
-                ):
-                    verification_errors.append("experimental promotion state mismatch")
-                if not detail.get("prompt_id"):
-                    verification_errors.append("prompt_id is missing")
-                if profile_name.startswith("adult-"):
-                    if detail.get("subject_basis") != kwargs.get("subject_basis"):
-                        verification_errors.append("adult subject basis mismatch")
-                    if detail.get("adult_attestation") is not True:
-                        verification_errors.append("adult attestation is missing")
-                if verification_errors:
-                    raise ValueError("; ".join(verification_errors))
-                result["prompt_id"] = detail.get("prompt_id")
-                result["input_sha256"] = detail.get("input_sha256")
-                result["output_sha256"] = output_detail.get("sha256")
-                result["models"] = detail.get("models") or []
-            except (OSError, ValueError) as exc:
-                result["ok"] = False
-                result["stderr"] = f"comfy-wan22 receipt verification failed: {exc}"
-        elif result.get("ok"):
-            result["ok"] = False
-            result["stderr"] = "comfy-wan22 did not write a generation receipt"
-        return result
+        del keyframe, prompt, duration_sec, kwargs
+        raise I2VProviderError("WAN22_I2V_RETIRED: local Wan 2.2 I2V has been removed")
 
 
 # ---------------------------------------------------------------------------
