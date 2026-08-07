@@ -350,18 +350,19 @@
 
 ---
 
-## Eng closeout stamp (2026-08-07 · 2.40.85)
+## Eng closeout stamp (2026-08-07 · 2.40.90)
 
 | 轨 | 状态 |
 |----|------|
 | 出片诚实 R0–R5 | CLOSED 2.40.75 |
 | C5 工程纪律 | CLOSED 2.40.81 |
-| C6 代谢（安全队列） | CLOSED 2.40.85（C6.2/C4 仅 bug 驱动） |
-| D7.2 mypy CI | CLOSED 2.40.85 |
-| B3 ops | OPEN_OPS 诚实 canary 2.40.85；真 burn 待独占 5090 |
+| C6 代谢（安全队列） | CLOSED 2.40.90（C6.1 residual + Lane A guard；C6.2/C4 仅 bug 驱动） |
+| D7.2 mypy CI | CLOSED 2.40.85（typecheck ∈ merge-gate） |
+| B3 ops | OPEN_OPS 诚实 canary 2.40.85；真 burn 待 film root + 独占 5090 |
+| H3 official prompt | SHIPPED 2.40.84–89（GUIDE / dialect auto / Ref2VA densify） |
+| Onboarding v2 | SHIPPED 2.40.86–88（planner residual allowlist 2.40.90） |
 | C4 peel | 非目标本轮 · 触达才拆 |
 | 内容 P8 / B3.4 | DEFERRED |
 
-> 下一会话：产品日走 A2/I*；运维日有 GPU 再 B3 drain；工程日继续 mypy 扩（core 需解 dual-module）或 bug 驱动 peel。
->
-> **2.40.87：** mypy seed 9→12；Lane A delete scan 守卫测落地。
+> **收工（2026-08-07）：** tip `2.40.90` / `b3c2dac5`。无 GPU 工程链已尽。  
+> 下一会话：产品日 A2/I*；运维日有 film root+独占 5090 再 B3 drain；工程日 mypy 扩 core 或 bug 驱动 peel。
