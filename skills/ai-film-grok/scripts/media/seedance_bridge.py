@@ -1,18 +1,17 @@
 #!/usr/bin/env python3
-"""Seedance prompt bridge — convert cinema_prompt DSL into Seedance structured prompts.
+"""Chinese motion prompt pack (legacy module name: seedance_bridge).
 
-Seedance (songguoxs/seedance-prompt-skill) expects structured Chinese prompts with:
-  - subject + action line (prefixed with @Image1 for I2V)
-  - camera language (move/angle/pacing)
-  - visual style (lighting/palette/grain)
-  - optional negative prompt
-  - timestamp storyboarding for clips >15s (multi-segment stitching)
+**Not a live Seedance production path.** Bulk Seedance spine is retired
+(2026-08-07); motion primary is MiniMax H3 / escape ``frw-api-i2v``.
 
-This module reads ``dsl.camera_prompt`` (produced by ``cinema_prompt``) plus the
-shot's subject/action and composes a single Seedance-ready prompt string, so the
-SeedanceProvider can pass it to ``--prompt`` directly.
+This module only composes deterministic Chinese structured prompts from
+``dsl.camera_prompt`` (cinema_prompt) + subject/action:
+  - subject + action (optional @Image1 marker for I2V-shaped packs)
+  - camera language / style / negatives
+  - optional multi-segment timestamps
 
-Pure deterministic composition — no external LLM, no network.
+Safe to reuse as a **word pack** for any motion backend; do not plan
+``provider=seedance`` from here. Pure local composition — no network.
 """
 
 from __future__ import annotations
@@ -27,7 +26,11 @@ class SeedanceBridgeError(ValueError):
     pass
 
 
-# Seedance negative-prompt vocabulary (defaults; overridable per scene_type)
+# Backend-agnostic alias (prefer motion_prompt_zh_pack in new code).
+MotionPromptZhError = SeedanceBridgeError
+
+
+# Chinese motion negative vocabulary (defaults; overridable per scene_type)
 DEFAULT_NEGATIVES = {
     "short_drama": "模糊, 变形, 多余手指, 低画质, 水印, 字幕, 静帧无运动",
     "ecchi_romance": "崩坏, 多余肢体, 穿脱矛盾, 回穿, 静帧, 口型不同步, 低画质",

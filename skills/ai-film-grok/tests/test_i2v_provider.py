@@ -32,6 +32,7 @@ def test_registry_contains_only_cloud_action_lanes() -> None:
         cl._CONFIG = None
         cl._CONFIG_ENV_FINGERPRINT = None
         assert provider_priority() == ("frw-ltx23", "frw-api-i2v", "grok")
+    assert "seedance" not in all_providers()
     assert "comfy-wan22" not in all_providers()
     assert "frw-wan" not in all_providers()
     assert for_endpoint("local_wan22_i2v") is None
@@ -285,3 +286,13 @@ def test_wan22_and_frw_wan_are_construction_tombstones() -> None:
         LocalComfyWan22Provider()
     with pytest.raises(I2VProviderError, match="FRW_WAN_I2V_RETIRED"):
         FrwWanProvider()
+
+
+def test_get_seedance_hints_retired_without_env() -> None:
+    with mock.patch.dict(os.environ, {"AIFILM_ALLOW_SEEDANCE": ""}, clear=False):
+        # force re-import path is hard; get on clean registry after module load
+        from i2v_provider import all_providers, get
+
+        assert "seedance" not in all_providers()
+        with pytest.raises(I2VProviderError, match="SEEDANCE|retired|comfy-h3"):
+            get("seedance")

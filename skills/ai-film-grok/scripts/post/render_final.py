@@ -248,6 +248,11 @@ def tts_to_wav(*args, **kwargs):
     return _tts_to_wav_impl(*args, **kwargs)
 
 
+def extract_native_audio(*args: Any, **kwargs: Any) -> Path | None:
+    """Hard-compat stub for build_shot_audio_stems (native via register-clip receipts)."""
+    return None
+
+
 def write_final_mix_partial_receipt(
     root: Path | str,
     *,

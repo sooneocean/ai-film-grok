@@ -1,10 +1,21 @@
 # Changelog
 
+## [2.41.23] - 2026-08-07
+
+### Changed (retired weapon clear mind)
+- **Default mind:** `aifilm weapon inventory` defaults to **primary only**; `--tier all|retired|experimental` + `--research` expand; report carries `retired_count` / `mind.retired_do_not_plan`.
+- **Seedance unregister:** `SeedanceProvider` **not** in default registry; escape `AIFILM_ALLOW_SEEDANCE=1` re-registers; `get("seedance")` points to H3 / frw-api-i2v.
+- **Docs:** hard-defaults「已退役勿规划」; weapon-inventory retired table; weapon-lane 退役折叠; memory `2026-08-07-retired-weapon-clear-mind`; plan `docs/plans/2026-08-07-retired-weapon-clear-todoplan.md`.
+- **seedance_bridge:** docstring rebrand as Chinese motion prompt pack (not live Seedance spine).
+- **wan_*_probe:** first-line 非生产 research-only.
+- **Tests:** primary-only listing · retired not in demand_primary_index · seedance not registered · closed_loop expects comfy-h3/frw-api-i2v.
+
 ## [2.41.22] - 2026-08-07
 
 ### Changed (code slim round 2)
 - **`comfy_video` Wan dead path:** `select_wan22_weapon` / `resolve_wan22_profile` / `build_wan22_i2v_prompt` fail-closed; graph body removed (~260 LOC).
 - **`probe`:** connectivity-only (`schema_version` 2, `wan22_retired`); no longer gates H3 on missing Wan weights.
+- **Web console package path fix:** `web_api._console_html` reads sibling `console.html` (not `web/web/`).
 - **Web console package:** `web_core`/`web_api`/`asset_picker`/`gate_panel`/`onboarding`/`onboarding_planner`/`smoke_console` → `scripts/web/` + thin top-level shims.
 - **C6 residual:** intentional top-level only hub + `workflow_pack` (matches metabolism freeze).
 - **Tests:** Wan routing/graph retired assertions; websocket unit test no longer needs real `websocket-client`.

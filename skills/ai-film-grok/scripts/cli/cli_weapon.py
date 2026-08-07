@@ -68,13 +68,18 @@ def add_weapon_parsers(sub: argparse._SubParsersAction[argparse.ArgumentParser])
     )
     inventory.add_argument(
         "--tier",
-        default=None,
-        help="Filter: primary|secondary|experimental|retired",
+        default="primary",
+        help="Filter: primary (default)|secondary|experimental|retired|all",
     )
     inventory.add_argument(
         "--modality",
         default=None,
         help="Filter: text|still|motion|audio",
+    )
+    inventory.add_argument(
+        "--research",
+        action="store_true",
+        help="Attach comfy research_weapons ids (off by default; research cabinet)",
     )
     inventory.add_argument("--receipt", type=Path, default=None)
 
@@ -205,10 +210,11 @@ def run_weapon(args: argparse.Namespace, *, emit: Callable[[dict[str, Any]], Non
 
             try:
                 report = inventory_report(
-                    tier=getattr(args, "tier", None),
+                    tier=getattr(args, "tier", None) or "primary",
                     modality=getattr(args, "modality", None),
                     primary_for_demand=getattr(args, "primary_for", None),
                     validate=True,
+                    include_research=bool(getattr(args, "research", False)),
                 )
                 # Listing always emits; --validate fails closed when cross-check errs.
                 if getattr(args, "validate", False):

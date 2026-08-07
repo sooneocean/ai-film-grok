@@ -11,6 +11,8 @@ sys.path.insert(0, str(SCRIPTS))
 
 from comfy_armory import select_weapon  # noqa: E402
 from generation_request import build_generation_request  # noqa: E402
+import pytest  # noqa: E402
+
 from weapon_inventory import (  # noqa: E402
     inventory_path,
     inventory_summary_line,
@@ -198,12 +200,53 @@ def test_inventory_report_and_router_line(tmp_path: Path) -> None:
     assert rep["ok"] is True
     assert rep["primary_for"]["id"] == "qwen-image-2512-quality"
     assert "still=" in rep["line"]
+    # Default list_tier is primary-only (clear mind / retired not in entries)
+    assert rep.get("list_tier") == "primary"
+    assert all(e.get("tier") == "primary" for e in rep["entries"])
+    assert rep.get("retired_count", 0) >= 1
+    retired = inventory_report(tier="retired", validate=False)
+    assert retired["list_tier"] == "retired"
+    assert all(e.get("tier") == "retired" for e in retired["entries"])
+    assert {e["id"] for e in retired["entries"]} >= {
+        "wan22_local_i2v",
+        "seedance_primary",
+        "elevenlabs_ja_path",
+        "qwen-layered-control",
+    }
     route = build_weapon_route(
         tmp_path,
         workflow={"mode": "professional", "current_stage": "shot_animatic_lock"},
     )
     assert route["inventory_line"]
     assert "motion=" in route["inventory_line"]
+
+
+def test_retired_ids_never_in_demand_primary_index() -> None:
+    from weapon_inventory import iter_entries
+
+    data = load_inventory()
+    retired_ids = {e["id"] for e in iter_entries(data) if e.get("tier") == "retired"}
+    assert retired_ids >= {
+        "wan22_local_i2v",
+        "seedance_primary",
+        "elevenlabs_ja_path",
+        "qwen-layered-control",
+    }
+    for demand, pid in (data.get("demand_primary_index") or {}).items():
+        assert pid not in retired_ids, f"{demand} maps to retired {pid}"
+    assert primary_for("image-to-video")["id"] == "minimax-h3-i2v-pilot"
+    assert primary_for("text-to-image")["id"] == "qwen-image-2512-quality"
+    assert primary_for("tts_zh_ship")["id"] == "edge_tts_zh"
+
+
+def test_seedance_provider_not_registered_by_default() -> None:
+    from i2v_provider import all_providers, get, I2VProviderError
+
+    assert "seedance" not in all_providers()
+    assert "comfy-h3" in all_providers()
+    assert "frw-api-i2v" in all_providers()
+    with pytest.raises(I2VProviderError, match="SEEDANCE|retired|unknown"):
+        get("seedance")
 
 
 def test_compact_exposes_weapon_inventory_line() -> None:

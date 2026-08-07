@@ -1,17 +1,22 @@
 # 武器库全模态盘点（文 · 图 · 影 · 声音）
 
-> 2026-08-05 · **单一真相（机读）**：`registry/weapon-inventory.json`  
+> 2026-08-05 · **2026-08-07 退役清心智** · **单一真相（机读）**：`registry/weapon-inventory.json`  
 > 代码：`scripts/weapon_inventory.py` · 本地 Comfy 细表：`registry/comfy-weapons.json`  
-> 运营矩阵：[weapon-lane-matrix.md](weapon-lane-matrix.md) · 臂章：[comfy-weapon-armory.md](comfy-weapon-armory.md)
+> 运营矩阵：[weapon-lane-matrix.md](weapon-lane-matrix.md) · 臂章：[comfy-weapon-armory.md](comfy-weapon-armory.md)  
+> 清板：[retired-weapon-clear](../../../docs/plans/2026-08-07-retired-weapon-clear-todoplan.md) · [memory](../memory/2026-08-07-retired-weapon-clear-mind.md)
+
+## 默认只看 primary（心智）
+
+**开片只记这些**；`aifilm weapon inventory` **默认**只打 primary（`--tier all|retired|experimental` 才扩）。
 
 ## 分层
 
-| tier | 含义 |
-|------|------|
-| **primary** | 默认首选；与 hard-defaults / select_weapon / ship 一致 |
-| **secondary** | hybrid / 云 escape / free tier |
-| **experimental** | pilot only；禁静默 production |
-| **retired** | 不得再当默认 |
+| tier | 含义 | 默认可见 |
+|------|------|----------|
+| **primary** | 默认首选；与 hard-defaults / select_weapon / ship 一致 | ✅ |
+| **secondary** | hybrid / 云 escape / free tier | `--tier secondary` / `--tier all` |
+| **experimental** | pilot only；禁静默 production | `--tier experimental` / `--all` |
+| **retired** | 不得再当默认；禁规划 | `--tier retired` / `--all` |
 
 ## 5090 主产线 primaries
 
@@ -25,6 +30,17 @@
 | 声 BGM | recipe **rnb** | `final --music-mood rnb` |
 
 Profile：有 5090 → `AIFILM_I2V_PROFILE=h3_primary`。
+
+## 已退役（勿规划 · 仅墓碑）
+
+| id | 含义 |
+|----|------|
+| `wan22_local_i2v` | 本地 Wan 2.2 I2V → 用 H3 |
+| `seedance_primary` | Seedance bulk spine → 用 H3 / frw-api-i2v escape |
+| `elevenlabs_ja_path` | 日文对白路径 → 中文 only |
+| `qwen-layered-control` | registry blocked |
+
+后期 lipsync（LatentSync/MuseTalk/…）= **v2.40 代码墓碑**，见 [lipsync.md](lipsync.md)。
 
 ## 防转换流失
 

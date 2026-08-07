@@ -45,7 +45,8 @@ MAX_UPLOAD = 20 * 1024 * 1024
 
 
 def _console_html() -> bytes:
-    return (Path(__file__).resolve().parent / "web" / "console.html").read_bytes()
+    # Implementation lives under scripts/web/; console.html is a sibling asset.
+    return (Path(__file__).resolve().parent / "console.html").read_bytes()
 
 
 def _media_response(path: Path, request: Request) -> Response:

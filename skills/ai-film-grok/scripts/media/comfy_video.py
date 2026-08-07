@@ -51,37 +51,11 @@ _SSH_TARGET = re.compile(r"^[A-Za-z0-9_.\\-]+@[A-Za-z0-9.:-]+$")
 WAN22_I2V_RETIRED = "WAN22_I2V_RETIRED: local Wan 2.2 I2V cannot be submitted"
 
 
-WAN22_OFFICIAL_PROFILE: dict[str, Any] = {
-    "name": "official",
-    "high": "wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors",
-    "low": "wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors",
-    "high_lora": "wan2.2_i2v_lightx2v_4steps_lora_v1_high_noise.safetensors",
-    "low_lora": "wan2.2_i2v_lightx2v_4steps_lora_v1_low_noise.safetensors",
-}
-
-# Thin aliases kept so historical imports/receipts still resolve names.
-WAN22_ADULT_PROFILE: dict[str, Any] = {
-    "name": "adult-motion",
-    "high": WAN22_OFFICIAL_PROFILE["high"],
-    "low": WAN22_OFFICIAL_PROFILE["low"],
-    "high_lora": "",
-    "low_lora": "",
-}
-WAN22_ADULT_ACTION_EXPERIMENTAL_PROFILE: dict[str, Any] = {
-    "name": "adult-action-experimental",
-    **{k: WAN22_OFFICIAL_PROFILE[k] for k in ("high", "low")},
-    "high_lora": "",
-    "low_lora": "",
-}
-WAN22_GENERAL_ADULT_EXPERIMENTAL_PROFILE: dict[str, Any] = {
-    "name": "adult-general-experimental",
-    **{k: WAN22_OFFICIAL_PROFILE[k] for k in ("high", "low")},
-    "high_lora": "",
-    "low_lora": "",
-}
-
-_WAN22_WEAPON_INTENTS = frozenset({"general", "adult-intimacy", "adult-meat-motion"})
-_WAN22_PRODUCTION_STAGES = frozenset({"pilot", "production"})
+# Historical profile name stubs (imports/receipts only — generation is retired).
+WAN22_OFFICIAL_PROFILE: dict[str, Any] = {"name": "official"}
+WAN22_ADULT_PROFILE: dict[str, Any] = {"name": "adult-motion"}
+WAN22_ADULT_ACTION_EXPERIMENTAL_PROFILE: dict[str, Any] = {"name": "adult-action-experimental"}
+WAN22_GENERAL_ADULT_EXPERIMENTAL_PROFILE: dict[str, Any] = {"name": "adult-general-experimental"}
 
 
 def select_wan22_weapon(
@@ -106,13 +80,6 @@ def resolve_wan22_profile(
     del profile_name, intent, stage, allow_experimental
     raise ComfyVideoError(WAN22_I2V_RETIRED)
 
-WAN22_VAE = "wan_2.1_vae.safetensors"
-WAN22_TEXT_ENCODER = "umt5_xxl_fp8_e4m3fn_scaled.safetensors"
-DEFAULT_NEGATIVE = (
-    "overexposed, static frame, blurry details, subtitles, watermark, low quality, "
-    "jpeg artifacts, malformed anatomy, extra limbs, fused fingers, duplicate people, "
-    "busy background, reverse motion"
-)
 
 _DISALLOWED_MINOR_SIGNALS = (
     re.compile(r"\bunderage\b", re.I),
@@ -225,36 +192,8 @@ def validate_adult_request(*, prompt: str, subject_basis: str) -> None:
             raise ComfyVideoError("adult request rejected: minor or young-looking signal")
 
 
-def _node(class_type: str, title: str, **inputs: Any) -> dict[str, Any]:
-    return {"inputs": inputs, "class_type": class_type, "_meta": {"title": title}}
-
-
-def build_wan22_i2v_prompt(
-    *,
-    image_name: str = "",
-    prompt: str = "",
-    width: int = 0,
-    height: int = 0,
-    duration_sec: int = 0,
-    seed: int = 0,
-    turbo: bool = False,
-    profile: Mapping[str, Any] | None = None,
-    filename_prefix: str = "video/aifilm_wan22",
-    negative_prompt: str = "",
-) -> dict[str, dict[str, Any]]:
+def build_wan22_i2v_prompt(**_kwargs: Any) -> dict[str, dict[str, Any]]:
     """Retired — graph build fails closed (do not submit Wan I2V)."""
-    del (
-        image_name,
-        prompt,
-        width,
-        height,
-        duration_sec,
-        seed,
-        turbo,
-        profile,
-        filename_prefix,
-        negative_prompt,
-    )
     raise ComfyVideoError(WAN22_I2V_RETIRED)
 
 

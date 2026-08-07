@@ -225,20 +225,45 @@ def primary_weapon_id_for_router_operation(operation: str) -> str | None:
     )
 
 
+def _tier_counts(inventory: dict[str, Any] | None = None) -> dict[str, int]:
+    counts: dict[str, int] = {t: 0 for t in sorted(_VALID_TIERS)}
+    for entry in iter_entries(inventory):
+        tier = str(entry.get("tier") or "").lower()
+        if tier in counts:
+            counts[tier] += 1
+        else:
+            counts[tier] = counts.get(tier, 0) + 1
+    return counts
+
+
 def inventory_report(
     *,
     tier: str | None = None,
     modality: str | None = None,
     primary_for_demand: str | None = None,
     validate: bool = True,
+    include_research: bool = False,
 ) -> dict[str, Any]:
-    """CLI/doctor-facing snapshot of the cross-modality inventory."""
+    """CLI/doctor-facing snapshot of the cross-modality inventory.
+
+    Default listing is **primary only** (clear mind). Pass ``tier=all`` /
+    ``tier=retired`` / ``tier=experimental`` / ``tier=secondary`` to expand.
+    ``include_research`` attaches comfy ``research_weapons`` ids (never default).
+    """
     data = load_inventory()
     rows: list[dict[str, Any]] = []
-    want_tier = str(tier or "").strip().lower() or None
+    raw_tier = str(tier or "").strip().lower() or "primary"
+    # Explicit all / * shows every inventory tier (not comfy research unless flag).
+    want_all = raw_tier in {"all", "*", "any"}
+    want_tier = None if want_all else raw_tier
+    if want_tier and want_tier not in _VALID_TIERS and want_tier != "primary":
+        # Unknown tier filter → empty list rather than silent full dump
+        if want_tier not in _VALID_TIERS:
+            want_tier = raw_tier  # still filter; may yield zero rows
     want_mod = str(modality or "").strip().lower() or None
     for entry in iter_entries(data):
-        if want_tier and str(entry.get("tier") or "").lower() != want_tier:
+        entry_tier = str(entry.get("tier") or "").lower()
+        if want_tier and entry_tier != want_tier:
             continue
         if want_mod and str(entry.get("modality") or "").lower() != want_mod:
             continue
@@ -283,6 +308,22 @@ def inventory_report(
     for entry in primaries(data):
         mid = str(entry.get("modality") or "")
         primaries_by_mod.setdefault(mid, []).append(str(entry.get("id")))
+    counts = _tier_counts(data)
+    research: list[dict[str, Any]] = []
+    if include_research:
+        try:
+            armory = json.loads(_COMFY.read_text(encoding="utf-8"))
+            for item in armory.get("research_weapons") or []:
+                if isinstance(item, dict) and item.get("id"):
+                    research.append(
+                        {
+                            "id": item.get("id"),
+                            "status": item.get("status"),
+                            "readiness": item.get("readiness"),
+                        }
+                    )
+        except (OSError, ValueError):
+            research = []
     return {
         "schema_version": 1,
         "kind": "ai-film-weapon-inventory-report",
@@ -290,10 +331,26 @@ def inventory_report(
         "updated_at": data.get("updated_at"),
         "profile_default": data.get("profile_default"),
         "line": inventory_summary_line(data),
+        "list_tier": "all" if want_all else (want_tier or "primary"),
         "primaries": primaries_by_mod,
         "entries": rows,
         "entry_count": len(rows),
+        "tier_counts": counts,
+        "retired_count": int(counts.get("retired") or 0),
+        "experimental_count": int(counts.get("experimental") or 0),
         "primary_for": demand_hit,
         "validation": validation,
         "handoff_chain": data.get("handoff_chain"),
+        "research_weapons": research if include_research else None,
+        "mind": {
+            "default": "primary_only",
+            "retired_do_not_plan": [
+                "wan22_local_i2v",
+                "seedance_primary",
+                "elevenlabs_ja_path",
+                "qwen-layered-control",
+                "post_lipsync",
+            ],
+            "expand": "aifilm weapon inventory --tier all|retired|experimental",
+        },
     }

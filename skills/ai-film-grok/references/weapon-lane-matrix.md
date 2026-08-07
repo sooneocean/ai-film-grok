@@ -1,9 +1,15 @@
 # 武器库双车道矩阵（Grok Video 1.5 + 5090 H3）
 
-> 2026-08-03 · 运营真相 · **2026-08-04 H3 效果最大化补丁** · **2026-08-05 全模态盘点**。  
+> 2026-08-03 · 运营真相 · **2026-08-04 H3 效果最大化补丁** · **2026-08-05 全模态盘点** · **2026-08-07 退役折叠**。  
 > **primary 表**：[weapon-inventory.md](weapon-inventory.md) · `registry/weapon-inventory.json`。  
 > 类比：**Grok = 量产流水线**；**H3 = 重工车间**；**LTX = 对白棚**；**Qwen = 本地修片台**。  
 > 实机课：[lessons-2026-08-04-h3-max-effect.md](lessons-2026-08-04-h3-max-effect.md) · 短卡 `memory/2026-08-04-h3-max-effect.md`
+
+### 退役折叠（3 句 · 勿当主叙事）
+
+1. **Wan 2.2 本地 I2V / Seedance bulk / 后期 lipsync / 日文路径** = 已退役，**禁止**写进 next 可选武器。  
+2. 运动主轨 = **H3**；云 bulk 仅 Grok escape 或显式 `ltx23_adult`。  
+3. 清单与清理板：[weapon-inventory 退役表](weapon-inventory.md) · [retired-weapon-clear](../../../docs/plans/2026-08-07-retired-weapon-clear-todoplan.md)
 
 ## 对白优先（v2.34 · **原音 IRON 2026-08-05**）
 

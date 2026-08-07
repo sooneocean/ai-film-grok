@@ -22,10 +22,10 @@
 | B1 | Wan22 / FrwWan fail-closed thin shells | provider tombstones | **SHIPPED** (2.41.21) |
 | B2 | Seedance/FRW bulk soft-block without explicit allow | mild | **SHIPPED** (2.41.21) |
 | B3 | `media/comfy_video` Wan22 I2V graph/weapon **retire** (fail-closed; keep generic Comfy probe/submit for other tools) | next after B1 | **SHIPPED** (2.41.22) |
-| B4 | Thick top-level → package + shim | fill_gate first when green | **SHIPPED** fill_gate (2.41.21) · more bug-driven |
+| B4 | Thick top-level → package + shim | fill_gate first when green | **SHIPPED** fill_gate (2.41.21) · **web/** console package (2.41.22) |
 | C | ENV/CLI surface docs only | later | pending |
 
-**Next round default:** C (ENV/CLI surface docs) or next thick dead-weapon leaf (no vanity).
+**Next round default:** C (ENV/CLI surface docs) or retired-weapon clear-mind board (no vanity peel).
 
 ## Pointers
 
@@ -39,3 +39,11 @@
 - comfy_video Wan graph/routing retired stubs + probe connectivity
 - web/* package migrate for console surface
 - C6 residual = hub + workflow_pack only
+
+
+## Round 3 closeout (2.41.23)
+
+- FrwRemoteProvider / Seedance unregistered by default
+- motion_prompt_zh_pack alias
+- comfy_video Wan name stubs only
+- retired-weapon-clear M0/M1/M2 core SHIPPED

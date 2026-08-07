@@ -1,12 +1,13 @@
 {
   "schema_version": 1,
   "kind": "ai-film-weapon-inventory",
-  "updated_at": "2026-08-05",
+  "updated_at": "2026-08-07",
   "tiers": ["primary", "secondary", "experimental", "retired"],
   "profile_default": "h3_primary",
   "notes": [
     "Tiers grounded in comfy-weapons status+production_promoted, hard-defaults, shipped routing.",
-    "Ship Chinese VO primary is Edge. config AIFILM_TTS_BACKEND default mimo is secondary free tier."
+    "Ship Chinese VO primary is Edge. config AIFILM_TTS_BACKEND default mimo is secondary free tier.",
+    "2026-08-07 clear mind: CLI inventory defaults to primary only; Seedance name not registered; retired do not plan."
   ],
   "handoff_chain": {
     "visual": [

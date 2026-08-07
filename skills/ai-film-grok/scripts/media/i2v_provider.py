@@ -551,107 +551,15 @@ class GrokI2VProvider(I2VProvider):
         return command
 
 
-class SeedanceProvider(I2VProvider):
-    """FRW Seedance bulk I2V (seedance-2-fast-i2v / pro-flf / pro-lipsync)."""
+class FrwRemoteProvider(I2VProvider):
+    """Shared FRW upload + subprocess runner for live FRW lanes (not Seedance bulk).
 
-    name = "seedance"
-    endpoints = frozenset(
-        {
-            "frw_seedance_i2v",
-            "frw_seedance_flf",
-            "frw_seedance_lipsync",
-        }
-    )
-    MODELS = {
-        "i2v": "seedance-2-fast-i2v",
-        "flf": "seedance-2-pro-flf",
-        "lipsync": "seedance-2-pro-lipsync",
-    }
-
-    def probe(self, *, root: Path | None = None) -> CapabilityReport:
-        # Read FRW canary receipt if root given; otherwise probe frw_dispatch presence.
-        if root is not None:
-            receipt = root / "receipts" / "frw-key-capability.json"
-            if receipt.is_file():
-                try:
-
-                    from util import soft_json
-
-                    data = soft_json(receipt)
-                    code = data.get("code") or data.get("status_code")
-                    available = str(code) == "201" or bool(data.get("success"))
-                    return CapabilityReport(
-                        provider=self.name,
-                        ok=available,
-                        available=available,
-                        reason=f"FRW canary code={code}",
-                        models=list(self.MODELS.values()),
-                        profile="seedance_first" if available else "grok_primary",
-                        detail=data,
-                    )
-                except OSError:
-                    pass
-        # Resolving the adapter is not a provider canary. Keep it unavailable
-        # until a receipt proves the endpoint actually accepted a request.
-        try:
-            from frw_dispatch import resolve_frw_root
-
-            resolve_frw_root()
-            return CapabilityReport(
-                provider=self.name,
-                ok=False,
-                available=False,
-                reason="frwclaw-pro resolvable, but Seedance canary not run.",
-                models=list(self.MODELS.values()),
-                profile="grok_primary",
-                detail={"canary_required": True},
-            )
-        except SystemExit as exc:
-            return CapabilityReport(
-                provider=self.name,
-                ok=False,
-                available=False,
-                reason=str(exc)[:200],
-                models=list(self.MODELS.values()),
-                profile="grok_primary",
-            )
-
-    def build_command(
-        self, *, keyframe: Path, prompt: str, duration_sec: int = 5, **kwargs: Any
-    ) -> list[str]:
-        model = self.MODELS.get(str(kwargs.get("variant") or "i2v"), self.MODELS["i2v"])
-        dispatch = Path(__file__).resolve().parent.parent / "frw_dispatch.py"
-        cmd = [
-            "python3",
-            str(dispatch),
-            "newvideo",
-            "--model",
-            model,
-            "--img-url",
-            str(kwargs.get("img_url") or keyframe),
-            "--prompt",
-            prompt,
-            "--aspect-ratio",
-            str(kwargs.get("aspect", "9:16")),
-            "--resolution",
-            str(kwargs.get("resolution", "720p")),
-            "--duration",
-            str(duration_sec),
-            "--wait",
-        ]
-        if kwargs.get("img2_url"):
-            cmd += ["--img2-url", str(kwargs["img2_url"])]
-        return cmd
+    Subclasses implement :meth:`build_command` only. Seedance bulk is a separate
+    retired class (:class:`SeedanceProvider`) and is **not** registered by default.
+    """
 
     def generate(self, *, keyframe: Path, prompt: str, **kwargs: Any) -> dict[str, Any]:
         """Upload local inputs before invoking FRW; never pass local paths as URLs."""
-        # Seedance bulk is retired from default spine (h3_primary / grok).
-        # Subclasses (frw-api-i2v, frw-ltx23) keep working; only name==seedance is gated.
-        if self.name == "seedance" and not _env_truthy("AIFILM_ALLOW_SEEDANCE"):
-            raise I2VProviderError(
-                "SEEDANCE_RETIRED: not on default spine (use comfy-h3 / grok). "
-                "Escape only with AIFILM_ALLOW_SEEDANCE=1 for explicit recovery."
-            )
         from frw_upload import upload_typed_inputs
 
         params = dict(kwargs)
@@ -682,7 +590,75 @@ class SeedanceProvider(I2VProvider):
         }
 
 
-class FrwImg2VideoProvider(SeedanceProvider):
+class SeedanceProvider(FrwRemoteProvider):
+    """Retired Seedance bulk lane — **not registered** unless AIFILM_ALLOW_SEEDANCE=1.
+
+    Prefer ``comfy-h3`` / ``frw-api-i2v``. Kept for hard-compat imports + escape only.
+    """
+
+    name = "seedance"
+    endpoints = frozenset(
+        {
+            "frw_seedance_i2v",
+            "frw_seedance_flf",
+            "frw_seedance_lipsync",
+        }
+    )
+    MODELS = {
+        "i2v": "seedance-2-fast-i2v",
+        "flf": "seedance-2-pro-flf",
+        "lipsync": "seedance-2-pro-lipsync",
+    }
+
+    def probe(self, *, root: Path | None = None) -> CapabilityReport:
+        del root
+        return CapabilityReport(
+            provider=self.name,
+            ok=False,
+            available=False,
+            reason="SEEDANCE_RETIRED: not on default spine (use comfy-h3 / frw-api-i2v)",
+            models=list(self.MODELS.values()),
+            profile="retired",
+            detail={"retired": True, "escape": "AIFILM_ALLOW_SEEDANCE=1"},
+        )
+
+    def build_command(
+        self, *, keyframe: Path, prompt: str, duration_sec: int = 5, **kwargs: Any
+    ) -> list[str]:
+        model = self.MODELS.get(str(kwargs.get("variant") or "i2v"), self.MODELS["i2v"])
+        dispatch = Path(__file__).resolve().parent.parent / "frw_dispatch.py"
+        cmd = [
+            "python3",
+            str(dispatch),
+            "newvideo",
+            "--model",
+            model,
+            "--img-url",
+            str(kwargs.get("img_url") or keyframe),
+            "--prompt",
+            prompt,
+            "--aspect-ratio",
+            str(kwargs.get("aspect", "9:16")),
+            "--resolution",
+            str(kwargs.get("resolution", "720p")),
+            "--duration",
+            str(duration_sec),
+            "--wait",
+        ]
+        if kwargs.get("img2_url"):
+            cmd += ["--img2-url", str(kwargs["img2_url"])]
+        return cmd
+
+    def generate(self, *, keyframe: Path, prompt: str, **kwargs: Any) -> dict[str, Any]:
+        if not _env_truthy("AIFILM_ALLOW_SEEDANCE"):
+            raise I2VProviderError(
+                "SEEDANCE_RETIRED: not on default spine (use comfy-h3 / grok / frw-api-i2v). "
+                "Escape only with AIFILM_ALLOW_SEEDANCE=1 for explicit recovery."
+            )
+        return super().generate(keyframe=keyframe, prompt=prompt, **kwargs)
+
+
+class FrwImg2VideoProvider(FrwRemoteProvider):
     """Film-scoped FRW API ``img2video`` lane.
 
     FRW exposes this as a generic API, not a Wan/Seedance selector.  A passed
@@ -750,7 +726,7 @@ class FrwImg2VideoProvider(SeedanceProvider):
         ]
 
 
-class FrwLtx23AudioProvider(SeedanceProvider):
+class FrwLtx23AudioProvider(FrwRemoteProvider):
     """FRW LTX 2.3 prompt-conditioned native-audio I2V production lane."""
 
     name = "frw-ltx23"
@@ -814,59 +790,51 @@ class FrwLtx23AudioProvider(SeedanceProvider):
         ]
 
 
+# --- retired providers (not registered; names kept for hard-compat imports) ---
+
+FRW_WAN_I2V_RETIRED = "FRW_WAN_I2V_RETIRED: use frw-api-i2v or comfy-h3 instead"
+WAN22_I2V_RETIRED_MSG = "WAN22_I2V_RETIRED: local Wan 2.2 I2V has been removed; use comfy-h3"
+
+
 class FrwWanProvider(I2VProvider):
-    """Tombstone — FRW Wan lane retired; use frw-api-i2v or comfy-h3."""
+    """Tombstone — FRW Wan lane retired (not registered)."""
 
     name = "frw-wan"
     endpoints = frozenset({"frw_wan_i2v"})
 
     def __init__(self) -> None:
-        raise I2VProviderError("FRW_WAN_I2V_RETIRED: use frw-api-i2v or comfy-h3 instead")
+        raise I2VProviderError(FRW_WAN_I2V_RETIRED)
 
     def probe(self, *, root: Path | None = None) -> CapabilityReport:
         del root
         return CapabilityReport(
-            provider=self.name,
-            ok=False,
-            available=False,
-            reason="FRW_WAN_I2V_RETIRED",
-            models=[],
-            profile="retired",
+            provider=self.name, ok=False, available=False, reason="FRW_WAN_I2V_RETIRED", models=[], profile="retired"
         )
 
-    def build_command(
-        self, *, keyframe: Path, prompt: str, duration_sec: int = 5, **kwargs: Any
-    ) -> list[str]:
+    def build_command(self, *, keyframe: Path, prompt: str, duration_sec: int = 5, **kwargs: Any) -> list[str]:
         del keyframe, prompt, duration_sec, kwargs
-        raise I2VProviderError("FRW_WAN_I2V_RETIRED: use frw-api-i2v or comfy-h3 instead")
+        raise I2VProviderError(FRW_WAN_I2V_RETIRED)
 
 
 class LocalComfyWan22Provider(I2VProvider):
-    """Tombstone — local Wan 2.2 I2V removed; motion primary is MiniMax H3."""
+    """Tombstone — local Wan 2.2 I2V removed (not registered); motion primary is MiniMax H3."""
 
     name = "comfy-wan22"
     command_timeout_sec = 30
     endpoints = frozenset({"local_wan22_i2v"})
 
     def __init__(self) -> None:
-        raise I2VProviderError("WAN22_I2V_RETIRED: local Wan 2.2 I2V has been removed")
+        raise I2VProviderError(WAN22_I2V_RETIRED_MSG)
 
     def probe(self, *, root: Path | None = None) -> CapabilityReport:
         del root
         return CapabilityReport(
-            provider=self.name,
-            ok=False,
-            available=False,
-            reason="WAN22_I2V_RETIRED",
-            models=[],
-            profile="retired",
+            provider=self.name, ok=False, available=False, reason="WAN22_I2V_RETIRED", models=[], profile="retired"
         )
 
-    def build_command(
-        self, *, keyframe: Path, prompt: str, duration_sec: int = 5, **kwargs: Any
-    ) -> list[str]:
+    def build_command(self, *, keyframe: Path, prompt: str, duration_sec: int = 5, **kwargs: Any) -> list[str]:
         del keyframe, prompt, duration_sec, kwargs
-        raise I2VProviderError("WAN22_I2V_RETIRED: local Wan 2.2 I2V has been removed")
+        raise I2VProviderError(WAN22_I2V_RETIRED_MSG)
 
 
 # ---------------------------------------------------------------------------
@@ -884,7 +852,15 @@ def register(provider: I2VProvider) -> I2VProvider:
 
 def get(name: str) -> I2VProvider:
     if name not in _REGISTRY:
-        raise I2VProviderError(f"unknown I2V provider: {name} (registered: {list(_REGISTRY)})")
+        hint = ""
+        if name == "seedance":
+            hint = (
+                " Seedance bulk spine is retired (2026-08-07); use comfy-h3 or frw-api-i2v. "
+                "Escape only: AIFILM_ALLOW_SEEDANCE=1 then re-import/register."
+            )
+        raise I2VProviderError(
+            f"unknown I2V provider: {name} (registered: {list(_REGISTRY)}).{hint}"
+        )
     return _REGISTRY[name]
 
 
@@ -1241,9 +1217,20 @@ class LocalComfyH3Provider(I2VProvider):
         }
 
 
-# Default registrations (importable side-effect)
+# Default registrations (importable side-effect).
+# SeedanceProvider is **not** registered (2026-08-07 clear mind): bulk spine retired.
+# Escape FRW img2video stays as frw-api-i2v; H3 owns motion primary.
+# Class SeedanceProvider remains as base for Frw* providers + AIFILM_ALLOW_SEEDANCE recovery.
 register(GrokI2VProvider())
-register(SeedanceProvider())
 register(FrwImg2VideoProvider())
 register(FrwLtx23AudioProvider())
 register(LocalComfyH3Provider())
+
+
+def _register_seedance_escape_if_allowed() -> None:
+    """Opt-in only: AIFILM_ALLOW_SEEDANCE=1 re-registers name=seedance for recovery."""
+    if _env_truthy("AIFILM_ALLOW_SEEDANCE") and "seedance" not in _REGISTRY:
+        register(SeedanceProvider())
+
+
+_register_seedance_escape_if_allowed()

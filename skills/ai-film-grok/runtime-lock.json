@@ -142,7 +142,7 @@
     },
     {
       "path": "scripts/asset_picker.py",
-      "sha256": "61fc2019fc32e13e3dd79867049994eefc4fdd5b886b7e39660e87dff1b34abe"
+      "sha256": "b9582dbb7fcce33404d1760a5195f961d074c6a586f6774ca9db79a4f8c14723"
     },
     {
       "path": "scripts/asset_registry.py",
@@ -758,7 +758,7 @@
     },
     {
       "path": "scripts/cli/cli_weapon.py",
-      "sha256": "e1648e9e253757cf37a4033e0efb49bd52e74a57228bc76479af3dfbd699ed0d"
+      "sha256": "74ab81b988c88c047047f8be54f99d0169d87227e2da06b285729a577baf08ef"
     },
     {
       "path": "scripts/cli/cli_workflow.py",
@@ -994,7 +994,7 @@
     },
     {
       "path": "scripts/composition_fill_gate.py",
-      "sha256": "94a0dda12f0652b8be55e59804a566de9b8fc881084dc008c2764b61af9b5e1b"
+      "sha256": "63981caa9c85a5b1f985f25878aa2ab992006af46c538e9923b9b31358ddba07"
     },
     {
       "path": "scripts/config_loader.py",
@@ -1470,7 +1470,7 @@
     },
     {
       "path": "scripts/gate_panel.py",
-      "sha256": "db8fa0ce4c8ca975a48b15791b40f5ba7d8e814116c0d0decf3942720198f477"
+      "sha256": "45b99897de027da31c1c08e2d741a244fcb2d75e556920797aaf264e713acf96"
     },
     {
       "path": "scripts/gates/__init__.py",
@@ -1487,6 +1487,10 @@
     {
       "path": "scripts/gates/cinematic_gate.py",
       "sha256": "6cba50f1eda9df9dddf5bc95f782b9247f4ee0a62fd8a7c91fc22130a68a5441"
+    },
+    {
+      "path": "scripts/gates/composition_fill_gate.py",
+      "sha256": "623875e7c375896fc872d813683f989a68822d880dd993f075116165790d4d3e"
     },
     {
       "path": "scripts/gates/continuity_programmatic.py",
@@ -1530,7 +1534,7 @@
     },
     {
       "path": "scripts/gates/input_fidelity.py",
-      "sha256": "bf5f474dbf5fa176d5e86b2535946302d1d7229db8c8292249bb5c15653338aa"
+      "sha256": "9797c1d370b9c4f7cb49da5f8875345f4c02b3767349dda4f5ff35d4a030a3a7"
     },
     {
       "path": "scripts/gates/iron_status.py",
@@ -1786,7 +1790,7 @@
     },
     {
       "path": "scripts/media/comfy_video.py",
-      "sha256": "b93746e3f1534d072ede122d20c72d9d7467da2abaac85099d8a030d2d5b79e8"
+      "sha256": "6ceb74fdc7014ac8df04db40e3292856c0a08e54eb3c9d4b3df774a31bccb050"
     },
     {
       "path": "scripts/media/env_plate.py",
@@ -1870,7 +1874,7 @@
     },
     {
       "path": "scripts/media/i2v_provider.py",
-      "sha256": "b3008708dd51f013c8922d349e97239089e99f49e62df048e215e089eab2ed05"
+      "sha256": "3fa3e06b8d181f99fc5afe427d221bbe0f10e1ed65e096d30e4a3b38e06b52fd"
     },
     {
       "path": "scripts/media/interactive_orchestration.py",
@@ -1938,7 +1942,7 @@
     },
     {
       "path": "scripts/media/seedance_bridge.py",
-      "sha256": "b8bb4fe8e1b526076346591de22bcee895c9189244a2128fcf26366cd1fe6aaa"
+      "sha256": "603184b93572e6915ddce3da4d281dd3de5ac885164488d45c6504897f31a0bc"
     },
     {
       "path": "scripts/media/seedvr2_probe.py",
@@ -1974,19 +1978,19 @@
     },
     {
       "path": "scripts/media/wan_dancer_probe.py",
-      "sha256": "2dc1bfdca78318a6cbfa2a804a590caa678ddb552ae278c32714940a9f67bd2d"
+      "sha256": "7d78a7a287dbf73a654044706a9c9a8249dc031d7bbd8b71f4e0fca5e5c683da"
     },
     {
       "path": "scripts/media/wan_fun_control_probe.py",
-      "sha256": "bc41e1c10b0b4a45f8a579926b0a93eff50045e50887f9b6e2bfe16700a82f8a"
+      "sha256": "e05b9c953cc599521456fab2deb9922bd6a996c8ea781507f77d133f1283f372"
     },
     {
       "path": "scripts/media/wan_s2v_probe.py",
-      "sha256": "aa0dc5ff6f90339301b87648aa3c9938d85dda9d64e2bed75726857f089b9a4f"
+      "sha256": "c354eaed3811a74a23b3f43d087847cd3b3a3d2188a4dfc192592a79cf44bb11"
     },
     {
       "path": "scripts/media/weapon_inventory.py",
-      "sha256": "8ffe9947839d259d97b05f17c77c4661f499c2cf92a7f0cba12333c5a3c10933"
+      "sha256": "411e2252fd4dac06c089f5132c1a284e5d14c9614ae3dd57d6f8394e7055f653"
     },
     {
       "path": "scripts/media/weapon_router.py",
@@ -2230,11 +2234,11 @@
     },
     {
       "path": "scripts/onboarding.py",
-      "sha256": "21483df55017b8dd69aea44e1185a210fc5c6a9d628fc2f5852209fd6212b51d"
+      "sha256": "e31a3279575294a7c53253a0caf66f80c4b9fbbdb450a321e23e0078e2f58509"
     },
     {
       "path": "scripts/onboarding_planner.py",
-      "sha256": "b4c0ca2c5be272d08ec73e25cd6d860c2c4d0cc0bb50915ccf68ba9aa88308da"
+      "sha256": "25ae0d43f564fe626aa0390d6a1f73d1f91e2f4f475b86027eec61869718bf71"
     },
     {
       "path": "scripts/optimization_dashboard.py",
@@ -3130,7 +3134,7 @@
     },
     {
       "path": "scripts/smoke_console.py",
-      "sha256": "833735e1a60ab94088d700a378029dace5ff162c9415e4c075bf358fecaeb967"
+      "sha256": "7c0e6b781607a4f3e81ad83d7b328270da6590075ee5ce25548ba0982dbb4112"
     },
     {
       "path": "scripts/sound_cue_model.py",
@@ -3461,6 +3465,22 @@
       "sha256": "e1b8bbb0f561edf8f73654b5a50fda8071cb5399b678fbde121ca5db205277c9"
     },
     {
+      "path": "scripts/web/asset_picker.py",
+      "sha256": "61fc2019fc32e13e3dd79867049994eefc4fdd5b886b7e39660e87dff1b34abe"
+    },
+    {
+      "path": "scripts/web/gate_panel.py",
+      "sha256": "db8fa0ce4c8ca975a48b15791b40f5ba7d8e814116c0d0decf3942720198f477"
+    },
+    {
+      "path": "scripts/web/onboarding.py",
+      "sha256": "21483df55017b8dd69aea44e1185a210fc5c6a9d628fc2f5852209fd6212b51d"
+    },
+    {
+      "path": "scripts/web/onboarding_planner.py",
+      "sha256": "b4c0ca2c5be272d08ec73e25cd6d860c2c4d0cc0bb50915ccf68ba9aa88308da"
+    },
+    {
       "path": "scripts/web/projection.py",
       "sha256": "93e56b9f161a362dd73ec5edb609b4f9e402ee1848e92eec51e5af9e39b5aead"
     },
@@ -3469,12 +3489,24 @@
       "sha256": "e27f2f015da27e2865c237ab1d3eb9b8d6fb8ee37765d0a723617376ba9f78ff"
     },
     {
+      "path": "scripts/web/smoke_console.py",
+      "sha256": "833735e1a60ab94088d700a378029dace5ff162c9415e4c075bf358fecaeb967"
+    },
+    {
+      "path": "scripts/web/web_api.py",
+      "sha256": "4a2740787d904c27a23d39446b4b6dc5bb2af9740b984ba485aac0a98479a26f"
+    },
+    {
+      "path": "scripts/web/web_core.py",
+      "sha256": "5588510470b1df68b594918d0457113b6b788b2f13d07ab0669155dedb94d43e"
+    },
+    {
       "path": "scripts/web_api.py",
-      "sha256": "2e11faae14e32cce6f1e9804ef93b895f9079f6cdee9f0a9e0656d46ab6c57e3"
+      "sha256": "d7d7c95d5441af901f49cc388a709eabfe949964538d498148c945c263faba0b"
     },
     {
       "path": "scripts/web_core.py",
-      "sha256": "5588510470b1df68b594918d0457113b6b788b2f13d07ab0669155dedb94d43e"
+      "sha256": "47e1ab80edd1c3ffa2c8e6217a5a82b98601a0dd09498090e994596e12697cf1"
     },
     {
       "path": "scripts/web_routes.py",

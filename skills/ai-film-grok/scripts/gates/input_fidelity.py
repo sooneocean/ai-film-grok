@@ -927,11 +927,16 @@ def _craft_onepager(root: Path, variety: dict[str, Any]) -> dict[str, Any]:
     cameras: list[str] = []
     sizes: list[str] = []
     for shot in shots:
-        sp = str(
-            shot.get("speaker")
-            or (shot.get("audio_cues") or {}).get("speaker")
-            or ""
-        ).strip()
+        cues = shot.get("audio_cues")
+        cue_speaker = ""
+        if isinstance(cues, dict):
+            cue_speaker = str(cues.get("speaker") or "").strip()
+        elif isinstance(cues, list):
+            for cue in cues:
+                if isinstance(cue, dict) and cue.get("speaker"):
+                    cue_speaker = str(cue.get("speaker") or "").strip()
+                    break
+        sp = str(shot.get("speaker") or cue_speaker or "").strip()
         if sp:
             speakers.append(sp)
         dsl = shot.get("dsl") if isinstance(shot.get("dsl"), dict) else {}

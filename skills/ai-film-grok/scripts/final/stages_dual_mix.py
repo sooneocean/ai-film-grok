@@ -12,6 +12,8 @@ import subprocess
 from pathlib import Path
 from typing import Any, Callable
 
+from final.native_audio import primary_native_shot_ids
+
 
 def env_flag_on(name: str) -> bool:
     return os.environ.get(name, "").strip().lower() in {"1", "true", "yes", "on"}

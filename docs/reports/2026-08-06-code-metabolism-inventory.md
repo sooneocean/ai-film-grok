@@ -1,7 +1,7 @@
 # Code metabolism inventory — TERMINAL residual freeze
 
 **Generated:** 2026-08-07  
-**Latest batch:** 2.41.22 (code slim: Wan/FrwWan tombstone · Seedance allow-gate · composition_fill_gate → gates/)  
+**Latest batch:** 2.41.23 (code slim: Wan/FrwWan tombstone · Seedance allow-gate · composition_fill_gate → gates/)  
 **Slim board:** [2026-08-07-code-slim-consolidation-todoplan.md](../plans/2026-08-07-code-slim-consolidation-todoplan.md)  
 **Structure status:** **SAFE QUEUE DONE** · C6.1 migrate empty · **C6.3 Lane A empty** (no safe whole-file deletes)  
 **Guards:**  
@@ -18,7 +18,7 @@
 
 ## Intentional residual (IRON · do not vanity-move)
 
-> 2.41.22: web/onboarding/fill_gate migrated; residual truly hub+workflow_pack only.
+> 2.41.23: web/onboarding/fill_gate migrated; residual truly hub+workflow_pack only.
 
 
 | Module | Role | Rule |

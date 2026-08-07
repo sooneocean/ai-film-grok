@@ -60,21 +60,23 @@ class ClosedLoopTests(unittest.TestCase):
             self.assertTrue(cinema_report["ok"])
             self.assertGreater(cinema_report["shots_updated"], 0)
 
-            # 3. Seedance prompt bridge (seedance_bridge)
+            # 3. Chinese motion prompt pack (legacy seedance_bridge name; not Seedance spine)
             bridge_report = bridge_film_spec(root)
             self.assertTrue(bridge_report["ok"])
             self.assertEqual(bridge_report["shots_bridged"], cinema_report["shots_updated"])
-            # Every bridged prompt has @Image1 marker for I2V
+            # Every bridged prompt has @Image1 marker for I2V-shaped packs
             for shot in bridge_report["shots"]:
                 self.assertIn("@Image1", shot["prompt"])
                 self.assertTrue(shot["negative"])
 
-            # 4. I2V provider registry (active provider resolvable)
+            # 4. I2V provider registry (active providers; seedance NOT registered by default)
             active = preferred(root=root)
             self.assertIsNotNone(active)
             reg = registry_report(root=root)
             self.assertIn("grok", reg["registered"])
-            self.assertIn("seedance", reg["registered"])
+            self.assertIn("comfy-h3", reg["registered"])
+            self.assertIn("frw-api-i2v", reg["registered"])
+            self.assertNotIn("seedance", reg["registered"])
 
             # 5. Color grade plan (cinema_prompt palette → ASC CDL)
             grade_report = plan_shot_grades(root)

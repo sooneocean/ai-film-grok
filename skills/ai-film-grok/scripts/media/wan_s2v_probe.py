@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Read-only readiness probe for Wan 2.2 sound-conditioned video research."""
+"""非生产 · research-only readiness probe for Wan 2.2 sound-conditioned video (not film spine)."""
 
 from __future__ import annotations
 
