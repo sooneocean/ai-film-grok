@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.40.68] - 2026-08-07
+
+### Added (CI · web review console permanent gate)
+- **Isolated `console` CI job:** `.github/workflows/ci.yml` now runs `pytest tests/ -m console` as a dedicated, isolated job (parallel to `hotpath`/`test-full`) so web-console regressions are caught independently of the broader suites. Wired into `merge-gate` `needs` so it is a required merge check.
+- Covers stdlib + FastAPI gateways, `asset_picker` hash-bound select (200/409), fail-closed gate 403 (`WebConsoleForbidden`), canonical bindings, onboarding, and `console-state` aggregator.
+
 ## [2.40.67] - 2026-08-07
 
 ### Fixed / Added (A1 heat-final receipt + honesty-rail R0/R1 partial)
