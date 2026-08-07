@@ -20,3 +20,5 @@ def test_make_type_lists_util_seed() -> None:
     text = MAKE.read_text(encoding="utf-8")
     assert "scripts/util/errors.py" in text
     assert "scripts/util/security_policy.py" in text
+    assert "scripts/core/gates.py" in text
+    assert "scripts/core/media_ops.py" in text

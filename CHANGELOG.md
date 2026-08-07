@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.40.93] - 2026-08-07
+
+### Fixed / Changed (C6.5 core package imports + CI coverage floors real impl)
+- **core/** imports real packages for mypy: `util.security_policy`/`runtime_policy`, `plan.director_review`/`film_spec_validate`, `media.*`, `assets.*`, `gates.*` (no top-level shim attr-defined).
+- **`core/media_ops.parse_volume_stats`:** return type includes `raw_text: str`.
+- **`make type` seed:** full core package (**21 modules** incl. film_io/media_ops/skip_audit/attestation/checkout_drift/gates).
+- **CI coverage floors:** point at real impls `media/media_qa.py` · `gates/quality_evidence.py` · `assets/continuity.py` (not 100% shims); guard tests in `test_ci_roi_contract`.
+
 ## [2.40.92] - 2026-08-07
 
 ### Changed (H3 official prompt · densify P2.5 + receipt P3)

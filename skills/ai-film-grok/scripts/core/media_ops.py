@@ -10,8 +10,8 @@ from typing import Any
 
 from core.film_io import load_manifest, save_manifest
 from core.paths import valid_shot_id
-from runtime_policy import sha256
-from security_policy import SecurityPolicyError, safe_output_path
+from util.runtime_policy import sha256
+from util.security_policy import SecurityPolicyError, safe_output_path
 from util import require_json as read_json
 from util import utc_now
 from util.errors import FilmError
@@ -21,7 +21,7 @@ from util.subprocess import run
 def media_duration(path: Path) -> float:
     """Fail-loud duration probe (shared with final/compose — no silent defaults)."""
     try:
-        from media_duration import MediaDurationError, probe_duration_sec
+        from media.media_duration import MediaDurationError, probe_duration_sec
     except ImportError:
         p = Path(path)
         if not p.is_file():
@@ -64,7 +64,7 @@ def parse_max_volume_db(text: str) -> float | None:
     return float(match.group(1)) if match else None
 
 
-def parse_volume_stats(text: str) -> dict[str, float | None]:
+def parse_volume_stats(text: str) -> dict[str, float | str | None]:
     """Parse mean + max volume from volumedetect log text."""
     return {
         "mean_volume_db": parse_mean_volume_db(text),
@@ -214,7 +214,7 @@ def _auto_promote_last_to_next(
     never re-open next still from full cast master on continue/undress chains.
     """
     try:
-        from continuity_chain import (
+        from assets.continuity_chain import (
             flatten_shots,
             next_shot_after,
             should_auto_promote_next,

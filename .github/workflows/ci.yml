@@ -152,7 +152,7 @@ jobs:
           import json
           data = json.load(open("coverage.json"))
           files = data.get("files", {})
-          floors = {"media_qa.py": 45, "quality_evidence.py": 80, "continuity.py": 85}
+          floors = {"media/media_qa.py": 45, "gates/quality_evidence.py": 80, "assets/continuity.py": 85}
           for name, floor in floors.items():
               row = next((value for key, value in files.items() if key.endswith(f"scripts/{name}")), None)
               assert row is not None, f"coverage row missing: {name}"

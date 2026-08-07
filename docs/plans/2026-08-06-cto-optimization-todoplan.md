@@ -4,7 +4,7 @@
 
 | 项 | 本机探针（2026-08-06 · plugins checkout） |
 |----|------------------------------------------|
-| 版本 | `plugin.json` **2.40.91**（mypy dual-module fix + core seed · 本轮） |
+| 版本 | `plugin.json` **2.40.93**（core mypy seed full + CI floor shim fix · 本轮） |
 | 源码 | scripts **~688** `.py` / **~170k** LOC |
 | 巨石函数 ≥200 行 | **74**；最大 `render_final` **2456** / `validate_film_spec` **2322** / `run_preflight` **1937** / `build_dispatch` **1249** |
 | 顶层模块 | ~349（约 **256** 薄 shim + ~**93** 仍厚） |
@@ -197,7 +197,7 @@
 | **C6.2** | **优先厚顶层** | `workflow_pack` / `input_fidelity` / `state_index_gate` / `prompt_injector` / `shortform_director`… | 归属 spine/gates/plan | IRON 禁 vanity；bug-driven peel only |
 | **C6.3** | **Lane A 删除** | 0 import ∧ 0 CLI ∧ 0 test → 删 | 每 batch 报告 | ✅ 2.40.85 empty · 4 intentional residuals allowlisted + guard test |
 | **C6.4** | **基座测试补漏** | `core/*` `util/*` 公共 API | P4 延续；每模块 ≥ 契约测 | ✅ 2.40.78 media_ops/film_spec · 2.40.80 config_loader/gates |
-| **C6.5** | **mypy 增量扩名单** | `make type` 每清一文件加名单；禁一次开全树 | 零新增错误 | ✅ 2.40.83×9 · 2.40.87×12 · **2.40.91×15** + dual-module unblock |
+| **C6.5** | **mypy 增量扩名单** | `make type` 每清一文件加名单；禁一次开全树 | 零新增错误 | ✅ **2.40.93×21** core full + util |
 
 **当前厚顶层观察（启发式）：** `workflow_pack` ~2.2k · `input_fidelity` ~1.1k · `aifilm_grok` ~1k · 若干 prompt/director ~700–850。
 
@@ -350,7 +350,7 @@
 
 ---
 
-## Eng closeout stamp (2026-08-07 · 2.40.90)
+## Eng closeout stamp (2026-08-07 · 2.40.93)
 
 | 轨 | 状态 |
 |----|------|
@@ -366,3 +366,5 @@
 
 > **收工（2026-08-07）：** tip `2.40.90` / `b3c2dac5`。无 GPU 工程链已尽。  
 > 下一会话：产品日 A2/I*；运维日有 film root+独占 5090 再 B3 drain；工程日 mypy 扩 core 或 bug 驱动 peel。
+
+> **2.40.93:** make type 15→21 (full `scripts/core/*`); CI coverage floors hit real package impls not shims.

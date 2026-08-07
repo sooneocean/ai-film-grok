@@ -6,8 +6,8 @@ from pathlib import Path
 from typing import Any
 
 from core.constants import DIRECTOR_NOTES_NAME, GATE_ORDER, MANIFEST_NAME, SCHEMA_VERSION
-from director_review import empty_director_notes
-from security_policy import SecurityPolicyError, safe_workspace_directory
+from plan.director_review import empty_director_notes
+from util.security_policy import SecurityPolicyError, safe_workspace_directory
 from util import require_json as read_json
 from util import utc_now, write_json
 from util.errors import FilmError

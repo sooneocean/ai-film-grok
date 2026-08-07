@@ -1026,15 +1026,15 @@
     },
     {
       "path": "scripts/core/film_io.py",
-      "sha256": "a23277eada34add859dffc203aa2b7e6a3c439a66fa9dfa16497c7f998117e6e"
+      "sha256": "883c204fdff98e539459ea83772ad6ebae0245d65c7aa635e9db5ddfa5f995d9"
     },
     {
       "path": "scripts/core/gates.py",
-      "sha256": "2e0e5b4886dcb27bc026da5bfd708bababc57ac0afd4d687ea999ebe2f860979"
+      "sha256": "ff891e74cb43948aadd62021744a0b76cf6213fbc1ca841ba107e000da5e5f88"
     },
     {
       "path": "scripts/core/media_ops.py",
-      "sha256": "b6e2d3e2dd2f3d03c216e898985287ac80b2bcfdf46a17a944f7af9918ab8371"
+      "sha256": "9be07901bfd2b85e8762d9ad63d3d741be7205faf0e925d270e11bf28b241523"
     },
     {
       "path": "scripts/core/paths.py",
@@ -1722,7 +1722,7 @@
     },
     {
       "path": "scripts/media/h3_official_prompt.py",
-      "sha256": "5a0d0ec46ae8b8f13b7126e4f0ce89b125ec4958bb9b50520f53e2e5c09f6fa8"
+      "sha256": "00f3abdf0412c8c9284a93937a7e8e982b355ec1a7400aa6f4cfb26739ef3722"
     },
     {
       "path": "scripts/media/h3_ship_native.py",
