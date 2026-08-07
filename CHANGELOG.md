@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.40.92] - 2026-08-07
+
+### Changed (H3 official prompt · densify P2.5 + receipt P3)
+- **Base densify:** `_densify_base_action_tail` (half-second pose/fabric life on I2VA path).
+- **Ref2VA densify:** `detailed_description` soft 350–500 words; `official_prompt_word_count`.
+- **Receipt:** `run_h3_shot` writes `*.h3.meta.json` (+ `*.h3.official.txt` when official structure).
+- **P3 reburn:** OPEN_OPS when Comfy queue busy (zero submit); compile progress in `artifacts/2026-08-07-h3-official-p25-p3-progress.json`.
+- **Tests:** densify word-band + base half-second golden.
+
 ## [2.40.91] - 2026-08-07
 
 ### Fixed / Changed (C6.5 mypy dual-module unblock + core seed)

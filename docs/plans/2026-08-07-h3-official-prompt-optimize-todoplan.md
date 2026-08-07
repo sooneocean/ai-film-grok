@@ -1,7 +1,7 @@
 # H3 官方 Prompt 方言对齐 · 优化 Todo Plan
 
 **Status：** **P0–P2.5 SHIP · P3 receipt ✅ / reburn OPEN_OPS · 2026-08-07**  
-**Plugin：** 2.40.91  
+**Plugin：** 2.40.92  
 **上游 base：** https://huggingface.co/MiniMaxAI/MiniMax-H3/blob/main/docs/VIDEO_PROMPT_WRITING_GUIDE_base_en.md  
 **上游 ref：** https://huggingface.co/MiniMaxAI/MiniMax-H3/blob/main/docs/VIDEO_PROMPT_WRITING_GUIDE_ref_en.md  
 **基线 import 板：** [2026-08-07-h3-official-prompt-import-todoplan.md](2026-08-07-h3-official-prompt-import-todoplan.md)（O0–O3）  

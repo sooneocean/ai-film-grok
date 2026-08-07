@@ -2,7 +2,7 @@
   "status": "PARTIAL",
   "ok": false,
   "kind": "h3-official-p25-p3-progress",
-  "plugin": "2.40.91",
+  "plugin": "2.40.92",
   "at": "2026-08-07T05:22:16Z",
   "p25": {
     "ref2va_detailed_word_band": "350-500 soft",
