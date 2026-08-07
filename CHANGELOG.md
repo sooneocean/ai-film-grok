@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.40.111] - 2026-08-07
+
+### Added (Error Internalization & Web Console Integration)
+- **Error Internalization Gates:** `gates/identity_generation_lock.py`, `gates/partner_cast_gate.py`, `gates/still_provenance.py` & `core/skip_audit.py`.
+- **Web Console Deep Integration:** Integrated Onboarding Auto-Decompose, 5090 H3 Pipeline Queue Dashboard, and Delivery Honesty Rail into `console.html` and `review_ui.py`.
+- **Tests:** `test_error_internalization_e1_e4.py`, `test_skip_audit.py`, `test_hard_defaults_memory_links.py`.
+
 ## [2.40.110] - 2026-08-07
 
 ### Changed (Web console UI · 电影工作室美学收尾 T3+T6–T12)
