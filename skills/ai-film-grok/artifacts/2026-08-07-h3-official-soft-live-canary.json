@@ -1,0 +1,57 @@
+{
+  "status": "DONE",
+  "ok": true,
+  "kind": "h3-official-soft-live-canary",
+  "plugin": "2.40.95",
+  "at": "2026-08-07T06:06:52Z",
+  "seed": 202608074,
+  "shot_id": "s_soft_portrait_official",
+  "family": "soft_portrait",
+  "path": "LocalComfyH3Provider+unload_models",
+  "compile": {
+    "word_count_imd": 164,
+    "validate": {
+      "ok": true,
+      "official_mode": "I2VA",
+      "issues": [],
+      "has_dialogue_tag": false
+    }
+  },
+  "burn": {
+    "elapsed_sec": 70.1,
+    "clip": "/Users/dex/.grok/plugins/ai-film-grok/skills/ai-film-grok/artifacts/5090-evaluation/h3-official-ab-20260807/takes/s_soft_portrait_official/s_soft_portrait_official_h3_i2v_202608074.mp4",
+    "queue_end": {
+      "running": 0,
+      "pending": 0,
+      "idle": true
+    },
+    "vram_end": {
+      "free_gib": 3.7,
+      "total_gib": 31.84
+    }
+  },
+  "means": {
+    "legacy_o3": {
+      "path": "/Users/dex/.grok/plugins/ai-film-grok/skills/ai-film-grok/artifacts/5090-evaluation/h3-official-ab-20260807/takes/s_soft_portrait_legacy/s_soft_portrait_legacy_h3_i2v_20260807.mp4",
+      "mean": 4.1262,
+      "size": 364933
+    },
+    "official_o3": {
+      "path": "/Users/dex/.grok/plugins/ai-film-grok/skills/ai-film-grok/artifacts/5090-evaluation/h3-official-ab-20260807/takes/s_soft_portrait_official/s_soft_portrait_official_h3_i2v_20260807.mp4",
+      "mean": 1.4669,
+      "size": 273303
+    },
+    "official_live": {
+      "path": "/Users/dex/.grok/plugins/ai-film-grok/skills/ai-film-grok/artifacts/5090-evaluation/h3-official-ab-20260807/takes/s_soft_portrait_official/s_soft_portrait_official_h3_i2v_202608074.mp4",
+      "mean": 1.2831,
+      "size": 273864
+    }
+  },
+  "compare": {
+    "delta_live_minus_legacy": -2.8430999999999997,
+    "delta_live_minus_o3_official": -0.18380000000000019,
+    "motion_mean_winner": "legacy",
+    "default_flip_ready": false,
+    "note": "soft mean is micro-life only; human look is primary. auto soft already official."
+  }
+}

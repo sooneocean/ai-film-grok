@@ -74,7 +74,9 @@ def test_force_official_and_legacy(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_auto_dialogue_official_high_legacy(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Live canaries: high→official; soft→legacy (mean energy)."""
     monkeypatch.setenv("AIFILM_H3_PROMPT_DIALECT", "auto")
+    monkeypatch.delenv("AIFILM_H3_HIGH_MOTION_OFFICIAL", raising=False)
     assert resolve_prompt_dialect(_dlg_shot()) == "official"
     assert resolve_prompt_dialect(_hi_shot()) == "official"
     soft = {
@@ -82,7 +84,7 @@ def test_auto_dialogue_official_high_legacy(monkeypatch: pytest.MonkeyPatch) -> 
         "dsl": {"action": "soft blink", "prompt_tier": "soft", "style": "cel"},
         "prompt_tier": "soft",
     }
-    assert resolve_prompt_dialect(soft) == "official"
+    assert resolve_prompt_dialect(soft) == "legacy"
 
 
 def test_i2va_fields_and_dialogue_tag() -> None:

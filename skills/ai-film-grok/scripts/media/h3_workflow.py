@@ -380,11 +380,17 @@ def _prompt_for_shot(
     # Wave 2 · dialogue shots must not ship "no speech" custom prompts
     try:
         from dialogue_speaker_frame_gate import assert_dialogue_prompt_allows_speech
-        from production_gates import ProductionGateError
 
-        assert_dialogue_prompt_allows_speech(prompt, work_shot)
-    except ProductionGateError as exc:
-        raise H3WorkflowError(str(exc)) from exc
+        try:
+            from production_gates import ProductionGateError as _PGE
+        except Exception:  # noqa: BLE001 — dual-module / import-path soft
+            _PGE = ()  # type: ignore[assignment,misc]
+        try:
+            assert_dialogue_prompt_allows_speech(prompt, work_shot)
+        except _PGE as exc:  # type: ignore[misc]
+            raise H3WorkflowError(str(exc)) from exc
+    except H3WorkflowError:
+        raise
     except Exception:
         pass
     return prompt
