@@ -198,6 +198,24 @@ def resolve_h3_mode_core(
         or (heat in _RESTRICTED_HEAT and wardrobe in _BARE_WARDROBE)
         or heat in {"act", "climax"}
     )
+    # Wave 5 · env heuristic when shot_role missing (faceless establishing)
+    if role in {"", "hero"}:
+        df = str(
+            intent.get("dramatic_function") or sh.get("dramatic_function") or ""
+        ).strip().lower()
+        spoken_probe = spoken_text_of(sh, intent)
+        castish = bool(
+            sh.get("cast_id")
+            or sh.get("character_id")
+            or sh.get("speaker")
+            or (isinstance(sh.get("dsl"), dict) and (sh["dsl"].get("cast") or sh["dsl"].get("subject")))
+        )
+        if df in {"env", "bridge", "establishing", "atmosphere", "establishing_env"}:
+            role = "env"
+        elif not spoken_probe and not castish and df in {"setup", "transition", "broll", "b-roll"}:
+            size = shot_size_token(sh)
+            if size in {"ws", "wide", "els", "extreme_wide", "ls", "long", "full"}:
+                role = "env"
     if wants_continue is None:
         wants_continue = wants_continue_shot(sh)
     if has_still is None:

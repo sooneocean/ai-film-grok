@@ -1,0 +1,97 @@
+{
+  "schema_version": 1,
+  "kind": "ai-film-shot-lane-canary",
+  "at": "2026-08-07",
+  "plugin_target": "2.40.60",
+  "wave": "0-6",
+  "ok": true,
+  "root_fixture": "/var/folders/r1/qcf057v96lb7nrsdr2yk9dtc0000gn/T/shot-lane-canary-vzovnlrm",
+  "lane_counts": {
+    "setup": 1,
+    "dialogue_safe": 1,
+    "dialogue_restricted": 1,
+    "meat": 1,
+    "insert": 1,
+    "env": 1,
+    "continue": 1,
+    "poison_blocked": 1
+  },
+  "checks": [
+    {
+      "id": "setup",
+      "ok": true,
+      "detail": "setup"
+    },
+    {
+      "id": "dialogue_safe",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "dialogue_restricted",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "meat",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "insert",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "env_t2v",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "continue",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "poison_blocked",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "insert_no_still_block",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "continue_redress_block",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "dialogue_still_recipe",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "no_speech_lint",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "id": "env_mode_t2v",
+      "ok": true,
+      "detail": ""
+    }
+  ],
+  "coverage": [
+    "setup",
+    "dialogue_safe",
+    "dialogue_restricted",
+    "meat",
+    "insert",
+    "env",
+    "continue",
+    "poison_blocked"
+  ],
+  "note": "synthetic unit canary — no GPU; proves lane/gates projection + continue safety"
+}

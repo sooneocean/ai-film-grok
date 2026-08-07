@@ -495,6 +495,9 @@ def classify_primary_h3_shot(
     if wants_continue:
         priority = "P0c"
         reasons.append("continue_endframe")
+        # Wave 5 · after poison/redress parent, still P0c regen but need safe still
+        if shot.get("_continue_handoff_blocked"):
+            reasons.append("continue_handoff_blocked_need_safe_still")
     elif on_cam and close:
         priority = "P0b"
         reasons.append("dialogue_close_restricted")
@@ -633,6 +636,19 @@ def classify_fill_idle_shot(
     )
     poison = _poison_blocked(base, sid)
 
+    # Wave 5 · continue handoff unsafe → flag for P0c reason (still primary regen)
+    cont_blocked = False
+    if wants_continue and not poison:
+        try:
+            from continue_handoff import resolve_continue_handoff
+
+            crep = resolve_continue_handoff(base, sid, shot=shot)
+            if crep.get("wants_continue") and not crep.get("ok"):
+                cont_blocked = True
+                shot = {**shot, "_continue_handoff_blocked": True}
+        except Exception:
+            cont_blocked = False
+
     # First/last media pack: FLF needs end still; R2V uses last as pose ref.
     has_last = False
     last_path: Path | None = None
@@ -688,6 +704,8 @@ def classify_fill_idle_shot(
             floor=floor,
         )
         reasons.extend(primary_added)
+        if cont_blocked and "continue_handoff_blocked_need_safe_still" not in reasons:
+            reasons.append("continue_handoff_blocked_need_safe_still")
     elif below and has_any:
         priority, lane, status = "P1", "challenge_weak", "retry"
         reasons.append("take_below_floor")

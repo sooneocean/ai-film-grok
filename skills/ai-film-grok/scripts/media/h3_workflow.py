@@ -332,6 +332,9 @@ def plan_h3_shot(
     }
     approved = _approved_still(base, shot_id)
     cont = resolve_continue_handoff(base, shot_id, shot=shot, spec=spec)
+    # Wave 5 · only feed endframe when safe_for_continue (no poison/redress)
+    cont_ok = bool(cont.get("ok") and cont.get("safe_for_continue", True))
+    cont_end = cont.get("end_frame") if cont_ok else None
     media_pack = resolve_media_pack(
         base,
         shot_id,
@@ -339,8 +342,8 @@ def plan_h3_shot(
         still_override=still_override,
         last_override=last_override,
         approved_still=approved,
-        continue_end_frame=cont.get("end_frame"),
-        wants_continue=bool(cont.get("wants_continue")),
+        continue_end_frame=cont_end,
+        wants_continue=bool(cont.get("wants_continue")) and cont_ok,
         refs_override=refs_override,
     )
     first = media_pack.get("first") if isinstance(media_pack.get("first"), dict) else None
@@ -361,8 +364,8 @@ def plan_h3_shot(
                 still_override=still,
                 last_override=last_override,
                 approved_still=still,
-                continue_end_frame=cont.get("end_frame"),
-                wants_continue=bool(cont.get("wants_continue")),
+                continue_end_frame=cont_end,
+                wants_continue=bool(cont.get("wants_continue")) and cont_ok,
                 refs_override=refs_override,
             )
             last = media_pack.get("last") if isinstance(media_pack.get("last"), dict) else None

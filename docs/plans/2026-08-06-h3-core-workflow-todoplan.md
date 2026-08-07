@@ -48,7 +48,8 @@
 - 默认 profile = **`h3_primary`** → provider `comfy-h3`；dispatch 优先 `h3-run-next`
 - 模式矩阵：有 last→**FLF** · 无 last→**I2V** · 高动/大嘴→**R2V** · 无脸 env→**T2V**
 - 多 agent 禁 hog；busy 零 submit；进度认 **takes 文件数**
-- 先验后生 / 毒镜禁 I2V / anti-hijack / mean 门 / native XOR TTS / plate≠master
+- 先验后生 / 毒镜禁 I2V / anti-hijack / mean 门 / native XOR TTS / plate≠master  
+- **镜头分型（2026-08-07 Wave 0–6）**：`aifilm shot-lane` · 对白/毒/满幅/variety/续镜安全 · [shot-generation-lane plan](2026-08-07-shot-generation-lane-todoplan.md) · canary `artifacts/2026-08-07-shot-lane-canary.json`
 
 ### 1.2 真痛点（拖片根因）
 
@@ -56,7 +57,7 @@
 |---|------|----------|------|
 | **T1** | 文档/习惯仍混「Grok 铺底 + H3 挑战」与「全片 H3」 | agent 误走 media-queue / hybrid | **金路径 SOP 钉死 h3_primary** |
 | **T2** | 计划秒数/镜数与 H3 实源 ~5.2s 系统性错位 | stretch 炸 / 片长假够 | 菜单=灶上菜（AD A 已有码，**真片纪律**） |
-| **T3** | Still 弱仍烧 H3（crop-master / 毒 / 构图抢） | 废算力 + 难看 take | **先验后生硬停 + still-challenge 先修** |
+| **T3** | Still 弱仍烧 H3（crop-master / 毒 / 构图抢） | 废算力 + 难看 take | **CODE CLOSED 2.40.60** composition_fill+poison+shot-lane · still-challenge 先修 · 真烧纪律仍靠日课 |
 | **T4** | 5090 有用率靠「有没有人独占」 | 队列堆、多会话互抢 | 独占日 until-empty / 平日 max5 两档 |
 | **T5** | 门绿≠好看 · plate 当 master | 交付翻车 | gate-auto + 人审三看 + 报告三字段 |
 | **T6** | 原声可懂中文抽听缺肌肉 | aac 有声听不懂 | ship 前每场 1 句耳朵 |

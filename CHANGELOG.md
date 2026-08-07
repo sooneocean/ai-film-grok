@@ -1,5 +1,29 @@
 # Changelog
 
+## [2.40.60] - 2026-08-07
+
+### Added (shot generation · Wave 6 canary closeout)
+- **Synthetic canary:** `artifacts/2026-08-07-shot-lane-canary.json` — 8 lanes + continue redress + no-speech lint (**ok=true**).
+- **Regression:** `tests/test_shot_lane_canary_wave6.py`.
+- **Plan CLOSED:** [shot-generation-lane](docs/plans/2026-08-07-shot-generation-lane-todoplan.md) Wave 0–6 DONE; H3 day board T3 still-prior CODE CLOSED cross-link.
+
+## [2.40.59] - 2026-08-07
+
+### Fixed (CTO A1 preflight bare except:pass · round 3)
+- **preflight:** bare `except: pass` on VO drag / equal-slot PPT / heat arc+erotic / stance / loop_risk / vml·fch·mm / locations / P4 / continuity / voice_lang / compose-preview → **soft issue** (no silent green).
+- **heat_arc_probe_error:** **hard** when `heat_scale` max|hot|extreme and `adult_max_iron` (default); meaningful_motion / P4 strict flags also hard on probe fail.
+- Helpers: `_append_probe_error` · `_is_heat_max_iron`.
+- **Tests:** `tests/test_opt_round_a1_preflight_pass.py`.
+
+## [2.40.58] - 2026-08-07
+
+### Added (shot generation · Wave 5 continue + env)
+- **Continue handoff safety:** write/resolve mark `safe_for_continue=false` on poison source still, `ENDFRAME_REDRESS_RISK`, or composition-fill fail; next shot will not seed I2V from unsafe endframe.
+- **H3 plan:** only passes continue endframe when resolve ok + safe.
+- **Fill-Idle:** P0c reason `continue_handoff_blocked_need_safe_still` when parent endframe blocked.
+- **Env heuristic:** missing `shot_role` + establishing/bridge DF (or faceless wide setup) → T2V/env lane.
+- **Tests:** `tests/test_wave5_continue_env.py`.
+
 ## [2.40.57] - 2026-08-07
 
 ### Fixed (CTO A1 gates silent-green round 2)

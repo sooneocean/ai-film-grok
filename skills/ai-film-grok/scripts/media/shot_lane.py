@@ -291,6 +291,22 @@ def resolve_shot_lane(
     heat = str(
         intent.get("heat_phase") or sh.get("heat_phase") or ""
     ).strip().lower()
+    # Wave 5 · env heuristic (align h3_mode)
+    if role in {"", "hero"} and not spoken:
+        castish = bool(
+            sh.get("cast_id")
+            or sh.get("character_id")
+            or sh.get("speaker")
+            or (
+                isinstance(sh.get("dsl"), dict)
+                and (sh["dsl"].get("cast") or sh["dsl"].get("subject"))
+            )
+        )
+        if df in {"env", "bridge", "establishing", "atmosphere", "establishing_env"}:
+            role = "env"
+        elif not castish and df in {"setup", "transition", "broll", "b-roll"}:
+            if size in {"ws", "wide", "els", "extreme_wide", "ls", "long", "full"}:
+                role = "env"
 
     # still_challenge is a repair path, not a primary lane (hint only when fill-idle says so)
     still_challenge_hint = False

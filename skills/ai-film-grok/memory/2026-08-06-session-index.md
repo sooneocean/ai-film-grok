@@ -2,6 +2,7 @@
 
 | 主题 | 短卡 | 一句话 |
 |------|------|--------|
+| **镜头分型生成线 Wave 0–6** | [shot-lane-generation](2026-08-07-shot-lane-generation.md) | shot-lane CLI；毒/对白/满幅/续镜；canary 8 镜类绿 |
 | **H3 核心日课重打通** | [h3-core-workflow](2026-08-06-h3-core-workflow.md) | DOC 闭环；真烧 OPEN_OPS busy；canary 08-07 |
 | **多 agent 5090 禁 hog（机读）** | [multi-agent-gpu-no-hog](2026-08-06-multi-agent-gpu-no-hog.md) | until-empty `--execute` 须 `--i-own-the-gpu` |
 | 双片排水 / takes 认进度 | [dual-film-drain](2026-08-06-dual-film-drain-takes-progress.md) | 进度=takes 文件；pending 可假高 |

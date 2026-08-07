@@ -45,6 +45,35 @@ def _issue(level: str, code: str, msg: str, *, fix: str = "") -> dict[str, str]:
     return out
 
 
+def _is_heat_max_iron(spec: dict[str, Any] | None) -> bool:
+    """True when adult max/hot/extreme IRON should fail-closed on heat probes."""
+    if not isinstance(spec, dict):
+        return False
+    hs = str(spec.get("heat_scale") or "").lower()
+    if hs not in {"max", "hot", "extreme"}:
+        return False
+    return spec.get("adult_max_iron") is not False
+
+
+def _append_probe_error(
+    hard: list[dict[str, str]],
+    soft: list[dict[str, str]],
+    *,
+    code: str,
+    exc: BaseException,
+    fix: str = "",
+    hard_mode: bool = False,
+) -> None:
+    """A1 · never swallow probe failures as silent green."""
+    sev = "hard" if hard_mode else "soft"
+    msg = f"{code}: {exc}"[:220]
+    iss = _issue(sev, code, msg, fix=fix or "check preflight probe import / film-spec")
+    if hard_mode:
+        hard.append(iss)
+    else:
+        soft.append(iss)
+
+
 def run_preflight(root: Path) -> dict[str, Any]:
     root = Path(root).expanduser().resolve()
     hard: list[dict[str, str]] = []
@@ -246,8 +275,15 @@ def run_preflight(root: Path) -> dict[str, Any]:
 
         try:
             risk = loop_risk_shots_from_spec(spec, measured_by_shot=measured_map or None, root=root)
-        except Exception:
+        except Exception as exc:
             risk = []
+            _append_probe_error(
+                hard,
+                soft,
+                code="loop_risk_probe_error",
+                exc=exc,
+                fix="check production_gates.loop_risk_shots_from_spec / tts-rehearsal",
+            )
         if risk:
             hard.append(
                 _issue(
@@ -323,8 +359,14 @@ def run_preflight(root: Path) -> dict[str, Any]:
                         ),
                     )
                 )
-        except Exception:
-            pass
+        except Exception as exc:
+            _append_probe_error(
+                hard,
+                soft,
+                code="vo_drag_probe_error",
+                exc=exc,
+                fix="check edit_policy.default_visual_fit / VO drag preflight block",
+            )
 
         # --- Equal-slot PPT risk (Wave γ · 2026-08-04) ---
         try:
@@ -351,8 +393,14 @@ def run_preflight(root: Path) -> dict[str, Any]:
                         fix="set visual_fit:vo (dialogue_drama default) or vary duration_sec / re-I2V",
                     )
                 )
-        except Exception:
-            pass
+        except Exception as exc:
+            _append_probe_error(
+                hard,
+                soft,
+                code="equal_slot_ppt_probe_error",
+                exc=exc,
+                fix="check edit_policy.lint_equal_duration_ppt",
+            )
 
         # --- Sex duration floor (性爱片段 act+climax ≥20% plate · 2026-07-21) ---
         try:
@@ -527,8 +575,16 @@ def run_preflight(root: Path) -> dict[str, Any]:
                             fix=f'aifilm heat boost --root "{root}" --apply',
                         )
                     )
-        except Exception:
-            pass
+        except Exception as exc:
+            # A1 · heat/erotic impact probe must not silent-green under adult max IRON
+            _append_probe_error(
+                hard,
+                soft,
+                code="heat_arc_probe_error",
+                exc=exc,
+                fix="check edit_policy.lint_heat_arc / _heat_arc / erotic impact",
+                hard_mode=_is_heat_max_iron(spec),
+            )
 
         # --- Character stance / multi-POV (角色立场 · 2026-07-20) ---
         try:
@@ -580,8 +636,14 @@ def run_preflight(root: Path) -> dict[str, Any]:
                             fix="run write-spec to inject stance, or set viewpoint/focal_character by hand",
                         )
                     )
-        except Exception:
-            pass
+        except Exception as exc:
+            _append_probe_error(
+                hard,
+                soft,
+                code="character_stance_probe_error",
+                exc=exc,
+                fix="check edit_policy.lint_character_stance",
+            )
 
         tts = str(spec.get("tts_backend") or "auto").lower()
         vo_voice = str(spec.get("vo_voice") or "").strip()
@@ -702,8 +764,14 @@ def run_preflight(root: Path) -> dict[str, Any]:
                     )
                     vml_codes = list(live.get("codes") or [])
                     vml = live
-                except Exception:
-                    pass
+                except Exception as exc:
+                    _append_probe_error(
+                        hard,
+                        soft,
+                        code="vo_motion_link_probe_error",
+                        exc=exc,
+                        fix="check continuity.lint_vo_motion_link",
+                    )
         if vml_codes:
             soft.append(
                 _issue(
@@ -739,8 +807,14 @@ def run_preflight(root: Path) -> dict[str, Any]:
                     )
                     fch_codes = list(live_fc.get("codes") or [])
                     fch = live_fc
-                except Exception:
-                    pass
+                except Exception as exc:
+                    _append_probe_error(
+                        hard,
+                        soft,
+                        code="frame_chain_probe_error",
+                        exc=exc,
+                        fix="check continuity.lint_frame_chain",
+                    )
         if fch_codes:
             soft.append(
                 _issue(
@@ -775,8 +849,15 @@ def run_preflight(root: Path) -> dict[str, Any]:
                     live_mm = lint_meaningful_motion(shots_mm)
                     mm_codes = list(live_mm.get("codes") or [])
                     mm = live_mm
-                except Exception:
-                    pass
+                except Exception as exc:
+                    _append_probe_error(
+                        hard,
+                        soft,
+                        code="meaningful_motion_probe_error",
+                        exc=exc,
+                        fix="check continuity.lint_meaningful_motion",
+                        hard_mode=spec.get("meaningful_motion_strict") is True,
+                    )
         if mm_codes:
             mm_strict = spec.get("meaningful_motion_strict") is True
             mm_msg = (
@@ -1382,8 +1463,14 @@ def run_preflight(root: Path) -> dict[str, Any]:
                             ),
                         )
                     )
-        except Exception:
-            pass
+        except Exception as exc:
+            _append_probe_error(
+                hard,
+                soft,
+                code="scene_location_probe_error",
+                exc=exc,
+                fix="check continuity.lint_locations / assets-registry",
+            )
 
         # --- P4 fulfillment checks (act proportions, pace chart, music spotting) ---
         # Soft by default; hard when respective strict flag is set (premium).
@@ -1455,8 +1542,18 @@ def run_preflight(root: Path) -> dict[str, Any]:
                         fix="修正 music_spotting beat_ref / start_sec / end_sec 与 beats 时间轴对齐",
                     )
                     soft.append(p4_issue)
-        except Exception:
-            pass
+        except Exception as exc:
+            p4_hard = (
+                spec.get("act_structure_strict") is True or spec.get("pace_chart_strict") is True
+            )
+            _append_probe_error(
+                hard,
+                soft,
+                code="p4_fulfillment_probe_error",
+                exc=exc,
+                fix="check rhythm.verify_act_structure / pace_chart / music_spotting",
+                hard_mode=p4_hard,
+            )
         try:
             from continuity_chain import check_continuity_chain, is_long_form
 
@@ -1523,10 +1620,22 @@ def run_preflight(root: Path) -> dict[str, Any]:
                                 fix="continue 缝 byte match + 禁 dissolve 盖缝；见 continuity_programmatic",
                             )
                         )
-                except Exception:
-                    pass
-        except Exception:
-            pass
+                except Exception as exc:
+                    _append_probe_error(
+                        hard,
+                        soft,
+                        code="continuity_programmatic_probe_error",
+                        exc=exc,
+                        fix="check continuity_programmatic.check_continuity_programmatic",
+                    )
+        except Exception as exc:
+            _append_probe_error(
+                hard,
+                soft,
+                code="continuity_chain_probe_error",
+                exc=exc,
+                fix="check continuity_chain.check_continuity_chain",
+            )
 
         # TTS language ping-pong hard (v2.40): no ja cast_voices / ja dialogue_spoken_lang
         try:
@@ -1553,8 +1662,14 @@ def run_preflight(root: Path) -> dict[str, Any]:
                         fix="set dialogue_spoken_lang=zh",
                     )
                 )
-        except Exception:
-            pass
+        except Exception as exc:
+            _append_probe_error(
+                hard,
+                soft,
+                code="voice_lang_probe_error",
+                exc=exc,
+                fix="check cast_voices / dialogue_spoken_lang",
+            )
 
         # signature accessories in identity_lock if style has cast
         id_lock = style.get("identity_lock") if isinstance(style, dict) else None
@@ -1833,8 +1948,14 @@ def run_preflight(root: Path) -> dict[str, Any]:
                         fix=f'aifilm post-plan --root "{root}" init --owner hyperframes',
                     )
                 )
-        except Exception:
-            pass
+        except Exception as exc:
+            _append_probe_error(
+                hard,
+                soft,
+                code="compose_preview_probe_error",
+                exc=exc,
+                fix="check compose_preview.has_valid_preview_receipt",
+            )
     except Exception as exc:
         soft.append(
             _issue(

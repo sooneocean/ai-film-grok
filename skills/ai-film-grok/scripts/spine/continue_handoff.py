@@ -192,11 +192,74 @@ def write_continue_handoff(
         if proc.returncode == 0 and end_png.is_file():
             meta["end_frame"] = str(end_png)
             meta["ok"] = True
+            meta["safe_for_continue"] = True
             meta["sseof_used"] = used_sseof
             meta["note"] = (
                 f"Next shot chain_mode=continue → plan uses {end_png}; "
                 f"AIFILM_CONTINUE_COPY_STILL=1 copies only if stills/<next>.png missing"
             )
+            # Wave 5 · poison / re-dress endframe must not seed next I2V
+            block_codes: list[str] = []
+            try:
+                from shot_lane import is_poison_blocked
+
+                if is_poison_blocked(base, shot_id, shot=shot_d):
+                    block_codes.append("POISON_SOURCE_STILL")
+            except Exception:
+                pass
+            try:
+                from endframe_wardrobe import lint_endframe_no_redress
+
+                wr = lint_endframe_no_redress(
+                    deliver_p,
+                    wardrobe_state=str(
+                        shot_d.get("wardrobe_state")
+                        or (shot_d.get("dsl") or {}).get("wardrobe_state")
+                        or ""
+                    ),
+                    heat_phase=str(shot_d.get("heat_phase") or meta.get("heat_phase") or ""),
+                    shot_id=shot_id,
+                )
+                meta["endframe_wardrobe"] = {
+                    "ok": wr.get("ok"),
+                    "codes": wr.get("codes"),
+                    "skin_drop": wr.get("skin_drop"),
+                    "soft": wr.get("soft"),
+                    "skipped": wr.get("skipped"),
+                }
+                if (
+                    not wr.get("ok")
+                    and not wr.get("soft")
+                    and not wr.get("skipped")
+                    and "ENDFRAME_REDRESS_RISK" in (wr.get("codes") or [])
+                ):
+                    block_codes.append("ENDFRAME_REDRESS_RISK")
+            except Exception as exc:  # noqa: BLE001
+                meta["endframe_wardrobe_error"] = str(exc)[:120]
+            # composition fill on endframe (tiny stamp should not continue)
+            try:
+                from composition_fill_gate import assert_still_path_ready_for_i2v
+
+                fill = assert_still_path_ready_for_i2v(
+                    end_png, mode="chain", auto_remedy=True, shot_id=shot_id
+                )
+                meta["composition_fill"] = {
+                    "ok": fill.get("ok"),
+                    "codes": fill.get("codes"),
+                    "skipped": fill.get("skipped"),
+                }
+                if not fill.get("ok") and not fill.get("skipped"):
+                    block_codes.append("ENDFRAME_COMPOSITION_FILL")
+            except Exception:
+                pass
+            if block_codes:
+                meta["safe_for_continue"] = False
+                meta["ok"] = False
+                meta["block_codes"] = block_codes
+                meta["note"] = (
+                    f"endframe extracted but NOT safe for continue: {block_codes}; "
+                    "archive/re-I2V parent; do not seed next still"
+                )
     except Exception as exc:  # noqa: BLE001
         meta["error"] = str(exc)[:200]
     write_json(handoff_dir / f"{shot_id}.json", meta)
@@ -260,6 +323,36 @@ def resolve_continue_handoff(
         out["note"] = f"missing continue end frame for prev={prev_id}"
         return out
     out["end_frame"] = str(end_png)
+    # Wave 5 · refuse poison / re-dress / unsafe endframe as next first frame
+    safe = True
+    block_codes: list[str] = []
+    if isinstance(meta, dict) and meta:
+        if meta.get("safe_for_continue") is False:
+            safe = False
+            block_codes.extend(str(c) for c in (meta.get("block_codes") or []) if c)
+        if meta.get("ok") is False and meta.get("block_codes"):
+            safe = False
+            for c in meta.get("block_codes") or []:
+                if str(c) not in block_codes:
+                    block_codes.append(str(c))
+    try:
+        from shot_lane import is_poison_blocked
+
+        if is_poison_blocked(base, str(prev_id)):
+            safe = False
+            if "POISON_SOURCE_STILL" not in block_codes:
+                block_codes.append("POISON_SOURCE_STILL")
+    except Exception:
+        pass
+    out["block_codes"] = block_codes
+    out["safe_for_continue"] = safe
+    if not safe:
+        out["ok"] = False
+        out["note"] = (
+            f"prev={prev_id} endframe blocked for continue: {block_codes or ['unsafe']}; "
+            "re-I2V parent or supply new still — do not chain poison/redress"
+        )
+        return out
     out["ok"] = True
     out["prompt_clause"] = (
         "CONTINUE from previous end frame: preserve identity, wardrobe, body pose, "
