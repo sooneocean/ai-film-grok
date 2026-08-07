@@ -15,8 +15,10 @@
 
 **与旧板关系（单一真相）：** 本 plan = **CTO 主执行板**。旧板只当证据，header 应指向本档；**禁止** agent 按过期 plan 重开 A1–A5 / quality P0 / 包边界 W0–W7。
 
-| 旧板 | 角色 |
+| 旧板 / 子板 | 角色 |
 |------|------|
+| **`docs/plans/2026-08-07-iron-internalization-todoplan.md`** | **铁律→代码内化子板（I0–I5）** · 支柱 A 假绿/人证；I0 账实已 ship |
+| `docs/plans/2026-08-06-nutrient-matrix.md` | L3/L4/L5 养分对账（I0 刷新） |
 | `docs/plans/2026-08-06-next-optimization-todoplan.md` | 近期 W0–N 执行板（多数 SHIPPED） |
 | `docs/plans/2026-08-06-optimization-todoplan.md` | 出片 A–G · A1–A5 SHIPPED |
 | `docs/optimization-plan-2026-08-06.md` | 内容五域 P0 门 · **已落地** |
@@ -256,7 +258,9 @@
 | 11 | 内容 P1：毒化硬锁 / sung 接入（选一） | P8 | **P2** |
 | 12 | throughput-counters / provider 429 签名 | B3.4 / 延后 | **P2 deferred** |
 
-**明确 DEFERRED：** Job-graph 超 final、lipsync 复活、FRW 替换 h3_primary、全仓 except 扫荡、虚荣 LOC。
+**铁律内化子集（并入支柱 A，详表见 iron plan）：** I1 假绿（anti-hijack 全入口 · variety 像素 · plate-boring · mix）· I2 人证 harden（anatomy attestation · speaker hard · material hard）· I3 上下文。I0 账实 **2026-08-07 ship**。
+
+**明确 DEFERRED：** Job-graph 超 final、lipsync 复活、FRW 替换 h3_primary、全仓 except 扫荡、虚荣 LOC、hard-defaults 全量 markdown parser、假 CV 毒镜 Done。
 
 ---
 
@@ -280,8 +284,8 @@
 **Top-5 ROI（只能做 5 件时）：**
 
 1. **A1 闸门 fail-closed** — 正确性杠杆最大  
-2. **A1.4 / A2 final 诚实永不回退** — 防宿色类事故  
-3. **G0 单一板 + 双 checkout** — 阻止误工与改错树  
+2. **I1 假绿内化（anti-hijack / variety 像素 / plate-boring）** — 门绿≠好看止血；见 iron plan  
+3. **A1.4 / A2 final 诚实永不回退** — 防宿色类事故  
 4. **B3 真烧或诚实 OPEN_OPS** — 吞吐不能只靠代码  
 5. **C4.1 或 C4.2 在下次触达时 peel + 表征测** — 维护速度  
 

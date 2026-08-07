@@ -32,8 +32,11 @@
 | 成人 MAX / 高动 / 性爱时长底 | 07-27 · sex-hard-floors |
 | gate-auto / fill-idle / h3_primary | 08-04 · 08-05 |
 | 圣旨协议 | [user-command-is-edict](2026-08-04-user-command-is-edict.md) |
+| **H3 核心日课工作流** | [h3-core-workflow](2026-08-06-h3-core-workflow.md) |
 | **本周索引** | [session-index](2026-08-06-session-index.md) |
 | **养分对账（工程）** | [nutrient-matrix](../../../docs/plans/2026-08-06-nutrient-matrix.md) |
+| **铁律内化 Todo（I0–I5）** | [iron-internalization](../../../docs/plans/2026-08-07-iron-internalization-todoplan.md) |
+| **治理 / 五问卡** | [MEMORY_GOVERNANCE](../../../docs/MEMORY_GOVERNANCE.md) |
 
 完整文件名见目录列表；旧卡 / canary / session-wrap 在 `archive/`。
 

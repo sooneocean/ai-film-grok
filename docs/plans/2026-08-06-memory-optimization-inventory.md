@@ -9,8 +9,9 @@
 | **B 已 ship 工程** | 代码/CLI 已落地的优化 | 当基础，禁绿野重开 |
 | **C 仍 OPEN / PARTIAL** | 记忆或 canary 写明未闭合 | **真迭代队列** |
 
-**单一执行板（下一轮）：** [2026-08-06-next-optimization-todoplan.md](2026-08-06-next-optimization-todoplan.md)（含 **Wave N 养分内化**）  
-**养分对账：** [2026-08-06-nutrient-matrix.md](2026-08-06-nutrient-matrix.md)（L3/L4/L5 · 已吞吐可废文）  
+**单一执行板：** [CTO](2026-08-06-cto-optimization-todoplan.md)  
+**铁律内化子板（I0–I5）：** [2026-08-07-iron-internalization-todoplan.md](2026-08-07-iron-internalization-todoplan.md) · **I0 账实 2026-08-07**  
+**养分对账：** [2026-08-06-nutrient-matrix.md](2026-08-06-nutrient-matrix.md)（L3/L4/L5 · I0 刷新）  
 **历史出片板（A1–A5 SHIPPED）：** [2026-08-06-optimization-todoplan.md](2026-08-06-optimization-todoplan.md)  
 **结构残余：** [2026-08-05-residual-monolith-w4-todo.md](2026-08-05-residual-monolith-w4-todo.md) · [monolith-relief](2026-08-06-monolith-relief-todoplan.md)  
 **反脆弱：** [archive/2026-08-05-antifragility-todoplan.md](archive/2026-08-05-antifragility-todoplan.md)（主项多已 ship）
@@ -20,8 +21,9 @@
 ## 0. 结论（先看这）
 
 1. **记忆里 70%+ 是「产品铁律 + 已入库门禁」**（成人 MAX、毒镜、不回穿、h3_primary、字幕硬烧、gate-auto…），不是「还没写的功能」。  
-2. **真还没闭合的优化** 集中在：**运维烧满 5090**、**正牌 final 诚实语义在真片上巩固**、**巨石 orchestrator 按 bug 再 peel**、**片场 variety/L4 绿才能 drain**。  
-3. **禁止**把 A 类当「可以优化掉的限制」；优化 = 更少假绿、更少废片、更高有用 GPU%、更易维护，不是软化 IRON。
+2. **真还没闭合的优化** 集中在：**假绿路径（variety 像素 / plate-boring / anti-hijack 全入口）**、**人证 harden（毒镜 attestation / speaker hard）**、**运维 5090 诚实 OPEN_OPS**、**巨石挡路 peel**。  
+3. **禁止**把 A 类当「可以优化掉的限制」；优化 = 更少假绿、更少废片、更高有用 GPU%、更易维护，不是软化 IRON。  
+4. **出 todo 用五问卡**（A/B/C · L 阶 · 挂载层 · 证据 · 人判）→ [MEMORY_GOVERNANCE](../MEMORY_GOVERNANCE.md) · [iron plan](2026-08-07-iron-internalization-todoplan.md)。
 
 ---
 
