@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.40.89] - 2026-08-07
+
+### Changed (H3 official prompt · GUIDE optimize P2)
+- **Ref2VA multi-ref:** `_merge_official_refs` deep-merges `media_pack` / last / identity refs; duties land in `subject_definitions` / `retention_analysis` (absorbs legacy `r2v_ref_prompt_clause` dump).
+- **Dense detailed_description:** Ref2VA path densifies env/light/wardrobe/half-second motion (soft ≥80 words unit floor).
+- **Workflow:** official compile passes packed refs; legacy FLF/R2V free-text append still skipped on official prompts.
+- **Tests:** `test_ref2va_multi_ref_duties_and_density` · `test_merge_refs_from_shot_last_path`.
+- **Docs:** optimize plan P2 ✅.
+
 ## [2.40.88] - 2026-08-07
 
 ### Added / Changed (Onboarding v2 · 贴故事+图 → 出方案)

@@ -1722,7 +1722,7 @@
     },
     {
       "path": "scripts/media/h3_official_prompt.py",
-      "sha256": "e45f351a657cba5d76e1b96512a7ebf65a22f8b033f73a268f3328a0a0d5b8d7"
+      "sha256": "3096465d44cfc3161c0c0a7e6248eb4b400e7492dacd219c346232919d06956b"
     },
     {
       "path": "scripts/media/h3_ship_native.py",
@@ -1734,7 +1734,7 @@
     },
     {
       "path": "scripts/media/h3_workflow.py",
-      "sha256": "caba51ce81d2f1e5d678247c4d65a5a99356f010682e8f7fb9bc2daa289cb02f"
+      "sha256": "e201b7053df0aff07d158a7d00cce430e54020f45bd548a5ad779fd4f8a8f016"
     },
     {
       "path": "scripts/media/i2v_motion_gate.py",

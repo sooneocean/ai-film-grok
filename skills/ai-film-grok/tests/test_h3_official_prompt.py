@@ -196,3 +196,49 @@ def test_camera_vocab_push_and_static() -> None:
     }
     text2 = compile_official_h3_prompt(locked, mode="i2v")
     assert "static shot" in text2
+
+
+def test_ref2va_multi_ref_duties_and_density() -> None:
+    """P2: pose/identity refs become Picture/Subject labels; detailed densifies."""
+    shot = _hi_shot()
+    shot["media_pack"] = {
+        "first": {"path": "/tmp/first.png", "role": "first"},
+        "last": {"path": "/tmp/last.png", "role": "pose"},
+        "refs": [
+            {"path": "/tmp/face.png", "role": "identity"},
+            {"path": "/tmp/style.png", "role": "style"},
+        ],
+    }
+    text = compile_official_h3_prompt(shot, mode="r2v", duration_sec=5.0)
+    assert "subject_definitions:" in text
+    assert "<Picture 2>" in text
+    assert "end-pose" in text or "landing" in text
+    assert "<Subject 2>" in text
+    assert "identity lock" in text or "identity/style" in text
+    # densified body
+    detailed = text.split("detailed_description:", 1)[1].split("overall_soundscape:", 1)[0]
+    words = detailed.split()
+    assert len(words) >= 80, f"expected densified detailed, got {len(words)} words"
+    assert "half-second" in text or "HIGH-ENERGY" in text or "silhouette" in text
+    assert validate_official_prompt(text, mode="r2v")["ok"] is True
+    # no legacy duty dump
+    assert "Reference duties:" not in text
+    assert "=== 2V REFERENCE STAGE ===" not in text
+
+
+def test_merge_refs_from_shot_last_path() -> None:
+    from h3_official_prompt import _merge_official_refs
+
+    shot = {
+        "id": "x",
+        "last_path": "/tmp/end.png",
+        "media_pack": {"refs": [{"path": "/tmp/id.png", "role": "face"}]},
+    }
+    refs = _merge_official_refs(shot, [{"path": "/tmp/extra.png", "role": "contact"}])
+    roles = {str(r.get("role")) for r in refs}
+    paths = {str(r.get("path")) for r in refs}
+    assert "pose" in roles or "last" in roles or any("end" in str(r.get("path")) for r in refs)
+    assert "/tmp/id.png" in paths
+    assert "/tmp/extra.png" in paths
+    assert "/tmp/end.png" in paths
+

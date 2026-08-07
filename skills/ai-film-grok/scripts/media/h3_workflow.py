@@ -276,6 +276,24 @@ def _prompt_for_shot(
         duration = 8.0
     duration = max(3.0, min(8.0, duration))
 
+
+    def _official_refs_for_shot() -> list[dict[str, Any]]:
+        """P2: pack path refs for official Ref2VA compile (no legacy duty append)."""
+        out: list[dict[str, Any]] = []
+        pack = work_shot.get("media_pack") if isinstance(work_shot.get("media_pack"), dict) else {}
+        for r in pack.get("refs") or []:
+            if isinstance(r, dict):
+                out.append(r)
+        last = pack.get("last") if isinstance(pack.get("last"), dict) else None
+        if last and last.get("path"):
+            out.append({**last, "role": last.get("role") or "pose"})
+        for i, raw in enumerate(ref_image_paths or []):
+            if not raw:
+                continue
+            role = "pose" if i == 0 and str(mode).lower() in {"r2v", "flf"} else "reference"
+            out.append({"path": str(raw), "role": role, "source": f"ref_image_paths[{i}]"})
+        return out
+
     if dialect == "official" and not author:
         # Official MiniMax dialect — no Vertical 9:16 / legacy [0s-2s] / 2V stage.
         from h3_official_prompt import (
@@ -285,7 +303,8 @@ def _prompt_for_shot(
         )
 
         prompt = compile_official_h3_prompt(
-            work_shot, mode=mode, spec=film, duration_sec=duration
+            work_shot, mode=mode, spec=film, duration_sec=duration,
+            refs=_official_refs_for_shot(),
         )
         check = validate_official_prompt(prompt, mode=mode)
         if not check.get("ok") and not official_soft_validate():
@@ -309,7 +328,11 @@ def _prompt_for_shot(
             # Prefer full recompile when dialect=official (IR wins over stale author).
             if dialect == "official" and not author_is_official:
                 prompt = compile_official_h3_prompt(
-                    work_shot, mode=mode, spec=film, duration_sec=duration
+                    work_shot,
+                    mode=mode,
+                    spec=film,
+                    duration_sec=duration,
+                    refs=_official_refs_for_shot(),
                 )
                 check = validate_official_prompt(prompt, mode=mode)
                 if not check.get("ok") and not official_soft_validate():
