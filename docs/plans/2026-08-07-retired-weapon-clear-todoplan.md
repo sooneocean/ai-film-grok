@@ -268,3 +268,9 @@ rg -n 'Seedance bulk|comfy-wan22|final --lipsync auto' \
 ## Round 5 closeout (2.41.25)
 
 - M4 docs: INDEX/README/vocab/lessons archive banners
+
+## M5 closeout (2.41.25 · go next + push)
+
+- M5.1–M5.3 covered by `test_weapon_inventory` / `test_i2v_provider` / armory+router tests (already green).
+- M5.4 targeted suite green this session; full CI on push.
+- **Status: CLOSED** for retired-weapon-clear mind surface (code + CLI default + docs).
