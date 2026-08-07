@@ -108,7 +108,10 @@ API 速查：`GET /api/gates` · `GET /api/assets?kind=` · `POST /api/select`
 | `dispatch_projection` | `receipts/dispatch.json`（**不**在 GET 上重算 `build_dispatch`） | `next_cmd` / `next_why` / `stage_public` / `weapon_line` / `blocked_by` / `copy_cmd` |
 | `queue_snapshot` | `review_control.runtime_status` + `takes/` 文件数 | running/unknown/job_counts/takes_count |
 
-实现：`scripts/console_projection.py` · UI 总览「复制命令」只剪贴板，**不**从浏览器执行 H3/final。
+实现：`scripts/web/projection.py`（shim `console_projection`）· UI 总览「复制命令」只剪贴板，**不**从浏览器执行 H3/final。
+
+**Web 套件（D1）**：`scripts/web/` 为工作台包（`console.html` · `routes.py` · `projection.py`）；
+顶层 `web_routes` / `console_projection` 为 hard-compat shim。
 
 ### 完整路由表（单一真相）
 

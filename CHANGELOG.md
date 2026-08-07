@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.40.107] - 2026-08-07
+
+### Changed (WebUI/router closeout · C3/C4/D1)
+- **C3 stage single source:** `craft_spine.CRAFT_STAGES` re-exports `stage_model.CRAFT_EIGHT` (+ test).
+- **C4 dispatch hot path:** `build_dispatch` caches film-spec + manifest reads (no triple re-read).
+- **D1 web package:** `scripts/web/{routes,projection}.py` + `__init__`; top-level `web_routes` / `console_projection` shims.
+- **Docs:** web-review-console package note.
+
 ## [2.40.106] - 2026-08-07
 
 ### Changed (route-catalog C1 orphan governance)

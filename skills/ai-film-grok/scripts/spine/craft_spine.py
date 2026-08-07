@@ -9,19 +9,12 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from spine.stage_model import CRAFT_EIGHT
 from util import read_json
 from util.spine_helpers import pilot_user_ok, present
 
-CRAFT_STAGES: tuple[str, ...] = (
-    "idea",
-    "story",
-    "beats",
-    "shots",
-    "media",
-    "selects",
-    "rough",
-    "verified",
-)
+# Single source: stage_model.CRAFT_EIGHT (C3 — do not re-list rings here).
+CRAFT_STAGES: tuple[str, ...] = CRAFT_EIGHT
 
 CRAFT_LABELS_ZH: dict[str, str] = {
     "idea": "1·Idea 命题",
