@@ -351,6 +351,7 @@ from cli_misc_ops import (  # noqa: E402
     cmd_plan,
     cmd_production_report,
     cmd_quality_ledger,
+    cmd_director_center,
     cmd_review_ui,
     cmd_route,
     cmd_still_challenge,
@@ -390,6 +391,7 @@ from cli_post import (  # noqa: E402, F401
     cmd_compose_render,
     cmd_export_compose,
     cmd_export_desktop,
+    cmd_edit_director,
     cmd_final,
     cmd_final_editorial_review,
     cmd_post_plan,
@@ -795,6 +797,9 @@ def build_parser() -> argparse.ArgumentParser:
     from review_ui import add_review_ui_parsers
 
     add_review_ui_parsers(sub)
+    from web.director_center import add_director_center_parsers
+
+    add_director_center_parsers(sub)
     from cli_interactive import add_interactive_parsers
 
     add_interactive_parsers(sub)
@@ -935,6 +940,7 @@ def main(argv: list[str] | None = None) -> int:
             "export-compose": cmd_export_compose,
             "compose-render": cmd_compose_render,
             "post-plan": cmd_post_plan,
+            "edit-director": cmd_edit_director,
             "register-final": cmd_register_final,
             "export-desktop": cmd_export_desktop,
             "frw": cmd_frw,
@@ -947,6 +953,7 @@ def main(argv: list[str] | None = None) -> int:
             "assets": cmd_assets,
             "workshop": cmd_workshop,
             "review-ui": cmd_review_ui,
+            "director-center": cmd_director_center,
             "interactive": cmd_interactive,
             "usage": cmd_generation_usage,
             "metrics": cmd_metrics,

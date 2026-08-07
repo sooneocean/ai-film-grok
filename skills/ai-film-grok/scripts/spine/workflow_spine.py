@@ -604,16 +604,16 @@ def professional_stage_actions(
             "检查每个计划镜头的 take、选择与重拍分类",
         ),
         "selects_rough_cut": (
-            f'aifilm selects --root "{base}" --no-write',
-            "只读投影 canonical dailies ledger 并检查粗剪绑定",
+            f'aifilm edit-director status --root "{base}"',
+            "剪辑总监 status：cut 状态 + approved takes；缺 plan 则 draft",
         ),
         "picture_lock": (
             f'aifilm review-ui serve --root "{base}"',
             "检查 EDL、timeline 与 ordered selected take set 后等待 Picture Lock",
         ),
         "post_locks": (
-            f'aifilm post-plan --root "{base}" show',
-            "检查唯一后期 owner、声音、音乐、字幕与混音锁",
+            f'aifilm edit-director status --root "{base}"',
+            "剪辑总监 + post-plan：唯一 design owner、字幕路径与混音交接",
         ),
         "master_lock": (
             f'aifilm post-audit --root "{base}"',

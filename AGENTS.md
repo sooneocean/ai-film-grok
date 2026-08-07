@@ -103,6 +103,7 @@ JSON 约定：`util.read_json` 软（None）；`util.require_json` 硬（FilmErr
 6. **短记忆卡**：`memory/*` 仅原话+三句+清单+链 lesson；见 `memory/README.md`。
 7. **声线 / 成人 / 毒镜 / final / 构图防抢走**：见 SKILL P0 短列表 + hard-defaults；multi-seed 须 `anti-hijack`（禁只比 mean/音量）；勿在本档复写长段 IRON。  
 7e. **退役武器清心智（P0 · 2026-08-07）**：默认只记 Qwen图·H3影·Edge声·rnb；**禁**规划 Seedance bulk / Wan22 I2V / 后期 lipsync / 日文路径；`weapon inventory` 默认 primary only → [memory](skills/ai-film-grok/memory/2026-08-07-retired-weapon-clear-mind.md) · [todoplan](docs/plans/2026-08-07-retired-weapon-clear-todoplan.md) · hard-defaults。  
+7f. **剪辑总监（P0 · 2026-08-07）**：`aifilm edit-director` 统筹 cut + FFmpeg/HF/Remotion 路由；plan→apply→run；禁第二导演系统 → [memory](skills/ai-film-grok/memory/2026-08-07-edit-director-desk.md) · [todoplan](docs/plans/2026-08-07-edit-director-todoplan.md) · hard-defaults。  
 7d. **身份代际锁（P0 · 2026-08-07 · abroad 漂移）**：一代一脸一集；禁 archive/restyle 半套混 final；`face-identity.verified≠true` 禁声称角色稳定 → [memory](skills/ai-film-grok/memory/2026-08-07-identity-generation-lock-no-mix.md) · hard-defaults。  
 7c. **plate 有片仍无聊（P0 · 2026-08-06）**：有 plate≠好看；肉戏 mean≪20 禁当好看交付；variety 改 spec 须 re-I2V；mix 优先 `FORCE_BROADBAND_DUCK` 禁死等 acrossover → [memory](skills/ai-film-grok/memory/2026-08-06-plate-boring-mean-mix-iron.md) · hard-defaults。
 7b. **多 agent 5090 禁抢闲占满（P0 · 2026-08-06）**：`free-first`≠until-empty 长驻；**机读** `--until-empty --execute` 须 `--i-own-the-gpu`；默认 `run-next --max 5`；busy 零 submit → [memory](skills/ai-film-grok/memory/2026-08-06-multi-agent-gpu-no-hog.md) · hard-defaults。

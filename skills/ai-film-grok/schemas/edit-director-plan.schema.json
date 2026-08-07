@@ -1,0 +1,112 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.dex/ai-film-grok/edit-director-plan.schema.json",
+  "title": "ai-film-grok edit director plan",
+  "type": "object",
+  "required": [
+    "schema",
+    "cut_state",
+    "shot_ids",
+    "engine_route",
+    "recovery",
+    "audio_handoff"
+  ],
+  "properties": {
+    "schema": {
+      "type": "string",
+      "const": "aifilm-edit-director-plan-v1"
+    },
+    "kind": {
+      "type": "string",
+      "const": "edit-director-plan"
+    },
+    "created_at": { "type": "string" },
+    "updated_at": { "type": "string" },
+    "cut_state": {
+      "type": "string",
+      "enum": [
+        "assembly",
+        "rough",
+        "fine",
+        "director",
+        "picture_lock",
+        "master"
+      ]
+    },
+    "shot_ids": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "minItems": 0
+    },
+    "engine_route": {
+      "type": "object",
+      "required": ["plate", "design", "caption_path"],
+      "properties": {
+        "plate": { "type": "string", "const": "ffmpeg" },
+        "design": {
+          "type": "string",
+          "enum": ["hyperframes", "remotion", "none"]
+        },
+        "caption_path": {
+          "type": "string",
+          "enum": ["master_hf", "ship_hardburn"]
+        },
+        "post_engine": {
+          "type": "string",
+          "enum": ["ffmpeg", "hyperframes", "remotion"]
+        },
+        "plate_subs": { "type": "string", "enum": ["off", "burn"] },
+        "plate_cards": { "type": "string", "enum": ["blank", "text"] }
+      },
+      "additionalProperties": true
+    },
+    "join_policy": {
+      "type": "object",
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": ["off", "auto", "voice_coupled", "punchy", "silk"]
+        },
+        "continue_join": { "type": "string", "const": "hard" },
+        "soft_style_rotate": { "type": "boolean" }
+      },
+      "additionalProperties": true
+    },
+    "recovery": {
+      "type": "object",
+      "required": ["caption_fallback", "on_gate_red"],
+      "properties": {
+        "caption_fallback": {
+          "type": "string",
+          "enum": ["pil_hardburn", "none"]
+        },
+        "on_gate_red": {
+          "type": "string",
+          "enum": ["PARTIAL", "block"]
+        }
+      },
+      "additionalProperties": true
+    },
+    "audio_handoff": {
+      "type": "object",
+      "properties": {
+        "music_director_plan": { "type": ["string", "null"] },
+        "music_director_plan_sha256": { "type": ["string", "null"] },
+        "music_director_apply_present": { "type": "boolean" },
+        "prefer_native": { "type": "boolean" }
+      },
+      "additionalProperties": true
+    },
+    "errors": {
+      "type": "array",
+      "items": { "type": "object" }
+    },
+    "notes": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "source": { "type": "string" },
+    "version": { "type": "integer", "minimum": 1 }
+  },
+  "additionalProperties": true
+}

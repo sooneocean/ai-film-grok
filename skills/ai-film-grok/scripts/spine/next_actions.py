@@ -907,13 +907,19 @@ def build_next_actions(
                     "clips 齐 — gate-auto 机读过闸",
                 )
                 machine_pending = True
-        # No plate yet + machine red → only machine (+ post-plan), skip final/tts stack
+        # No plate yet + machine red → only machine (+ post-plan / edit-director), skip final/tts
         if machine_pending and not final_rec:
             if not (root / "post-plan.json").is_file():
                 add(
                     "post-plan-init",
                     f'aifilm post-plan --root "{r}" init --owner hyperframes',
                     "后期 owner 未锁 — 机读过闸后进 final 需要",
+                )
+            if not (root / "post" / "edit-director-plan.json").is_file():
+                add(
+                    "edit-director-draft",
+                    f'aifilm edit-director draft --root "{r}"',
+                    "剪辑总监 plan 未建 — 机读过闸后按 plan 路由 HF/FFmpeg",
                 )
             return actions
         # Optional formal AI upscale (default off; only when film-spec enables)
@@ -941,6 +947,49 @@ def build_next_actions(
                 f'aifilm post-plan --root "{r}" init --owner hyperframes',
                 "进入设计合成前先锁定后期与字幕 owner；若要 React 模板改为 --owner remotion",
             )
+        # Edit director desk: machine-readable cut + engine route before raw final thrash
+        ed_plan_path = root / "post" / "edit-director-plan.json"
+        if not final_rec and not ed_plan_path.is_file():
+            add(
+                "edit-director-draft",
+                f'aifilm edit-director draft --root "{r}"',
+                "剪辑总监：先写 post/edit-director-plan.json（引擎/字幕路径/cut 状态）",
+            )
+        elif not final_rec and ed_plan_path.is_file():
+            try:
+                from edit_director import status as edit_director_status
+
+                ed_st = edit_director_status(root)
+                if not ed_st.get("apply_present"):
+                    add(
+                        "edit-director-apply",
+                        f'aifilm edit-director apply --root "{r}"',
+                        "剪辑总监：apply → editor_cut + post-route 锁 caption 路径",
+                    )
+                elif ed_st.get("ok"):
+                    add(
+                        "edit-director-run",
+                        f'aifilm edit-director run --root "{r}"',
+                        "剪辑总监 dry-run stages/flags；确认后 --execute 调 aifilm final",
+                    )
+                    if ed_st.get("final_cmd"):
+                        add(
+                            "final-from-edit-director",
+                            str(ed_st["final_cmd"]),
+                            "剪辑总监 plan 导出的 final 命令（与 run --execute 同参）",
+                        )
+                else:
+                    add(
+                        "edit-director-status",
+                        f'aifilm edit-director status --root "{r}"',
+                        "剪辑总监 blocked — 先修 approved takes / cut_state",
+                    )
+            except Exception:
+                add(
+                    "edit-director-status",
+                    f'aifilm edit-director status --root "{r}"',
+                    "剪辑总监 status（desk 导入失败时仍提示）",
+                )
         if not final_rec and not rehearse_ok:
             add(
                 "tts-rehearse",

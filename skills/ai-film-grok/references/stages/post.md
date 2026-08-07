@@ -1,5 +1,13 @@
 # Post 阶段卡
 
+## 剪辑总监（edit-director · 快卡）
+
+1. **先 plan**：`aifilm edit-director draft --root …` → `post/edit-director-plan.json`  
+2. **引擎**：plate=ffmpeg 永远；design 默认 **hyperframes**；remotion 仅 explicit；`none`=ship 硬烧  
+3. **状态**：assembly→rough→…→picture_lock→master；缺 approved take 停在 assembly  
+4. **apply** 写 `editor_cut` + `post-route`（禁中途发明第二 caption 路径）  
+5. **run** 默认 dry-run 出 stages/flags；真出片仍走 `final` + gate-auto + review-final  
+6. 姊妹桌：`music-director`（mute 不剪画面）· 全文 [todoplan](../../../docs/plans/2026-08-07-edit-director-todoplan.md)
 
 ## 转场刀口（T8 快卡）
 

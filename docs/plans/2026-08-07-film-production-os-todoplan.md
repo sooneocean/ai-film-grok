@@ -201,7 +201,7 @@ Assembly → Rough → Fine → Picture Lock → Master
 
 | ID | 项 | 产物 | 挂载 | 验收 | 点 |
 |----|-----|------|------|------|----|
-| **P6.1** | 多版本 Cut 状态 | Assembly → Rough → Fine → Director → Picture Lock 投影到 post-bible | picture_lock · editor_cut | 状态可机读 | M |
+| **P6.1** | 多版本 Cut 状态 | Assembly → Rough → Fine → Director → Picture Lock 投影到 post-bible | picture_lock · editor_cut · **edit_director** desk | 状态可机读；见 [edit-director plan](2026-08-07-edit-director-todoplan.md) | M |
 | **P6.2** | 时间线装 approved takes only | 禁 draft take 进 rough 默许 | render / compose | 测 | M |
 | **P6.3** | 音画字幕 honest export | 沿用 gate-auto · 5track · hardburn；plate≠master | deliver | 已有诚实轨不回退 | S |
 | **P6.4** | Rough cut 一键 | approved shots → timeline → export | final path | §44.16–17 | M |

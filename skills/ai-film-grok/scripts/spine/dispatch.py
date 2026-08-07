@@ -560,12 +560,20 @@ def build_dispatch(
                 "visual",
             )
         elif professional_stage == "selects_rough_cut":
-            pre(
-                "rough-cut-review",
-                f'aifilm editor-cut --root "{r}"',
-                "Professional 8/11：检查 active take、时长与 Continue 接戏，形成粗剪证据",
-                "post",
-            )
+            if not (root / "post" / "edit-director-plan.json").is_file():
+                pre(
+                    "edit-director-draft",
+                    f'aifilm edit-director draft --root "{r}"',
+                    "Professional 8/11：剪辑总监 plan（cut 状态 + 引擎路由）先于裸 editor-cut thrash",
+                    "post",
+                )
+            else:
+                pre(
+                    "rough-cut-review",
+                    f'aifilm editor-cut --root "{r}"',
+                    "Professional 8/11：检查 active take、时长与 Continue 接戏，形成粗剪证据",
+                    "post",
+                )
         elif professional_stage == "picture_lock":
             pre(
                 "picture-lock-review",
@@ -574,7 +582,14 @@ def build_dispatch(
                 "post",
             )
         elif professional_stage == "post_locks":
-            if not (root / "post-plan.json").is_file():
+            if not (root / "post" / "edit-director-plan.json").is_file():
+                pre(
+                    "edit-director-draft",
+                    f'aifilm edit-director draft --root "{r}"',
+                    "Professional 10/11：剪辑总监 plan 统筹 FFmpeg/HF/Remotion 路由",
+                    "post",
+                )
+            elif not (root / "post-plan.json").is_file():
                 pre(
                     "post-plan-init",
                     f'aifilm post-plan --root "{r}" init --owner hyperframes',
@@ -590,9 +605,9 @@ def build_dispatch(
                 )
             else:
                 pre(
-                    "post-lock-review",
-                    f'aifilm review-ui serve --root "{r}"',
-                    "Professional 10/11：审核声音与后期输入 hash 后再渲染母版候选",
+                    "edit-director-status",
+                    f'aifilm edit-director status --root "{r}"',
+                    "Professional 10/11：剪辑总监 status → apply/run 后再母版",
                     "post",
                 )
     evidence = build_evidence(root)
@@ -1489,6 +1504,15 @@ def build_dispatch(
         "state_cache_hit": False,
         "capability_cache_hit": bool(capability_cache.get("hit")),
     }
+
+    # Director-center linkage: expose console_url when review-ui session is live.
+    try:
+        from console_projection import attach_console_url_to_dispatch
+
+        packet = attach_console_url_to_dispatch(root, packet)
+    except Exception:  # noqa: BLE001 — never break dispatch on console soft fields
+        packet.setdefault("console_url", None)
+        packet.setdefault("console_hint", f'aifilm director-center open --root "{root}"')
 
     if write_receipt:
         write_json(receipt_path, packet)

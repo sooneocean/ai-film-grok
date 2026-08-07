@@ -1623,6 +1623,97 @@ def cmd_post_plan(args: argparse.Namespace) -> int:
         raise FilmError(str(exc)) from exc
 
 
+def cmd_edit_director(args: argparse.Namespace) -> int:
+    """Edit Director desk: plan cut state + engine route (FFmpeg/HF/Remotion)."""
+    from edit_director import (
+        EditDirectorError,
+        activate_cut,
+        apply_plan,
+        audit_desk,
+        build_run_plan,
+        draft_and_save,
+        list_cuts,
+        load_plan,
+        normalize_plan,
+        plan_path,
+        save_plan,
+        set_plan_fields,
+        snapshot_cut,
+        status,
+    )
+
+    root = Path(args.root).expanduser().resolve()
+    action = str(getattr(args, "edit_director_action", "") or "")
+    try:
+        if action == "draft":
+            plan = draft_and_save(
+                root,
+                design=getattr(args, "design", None),
+                prefer_ship=bool(getattr(args, "prefer_ship", False)),
+                force=bool(getattr(args, "force", False)),
+            )
+            emit(
+                {
+                    "ok": not bool(plan.get("errors")),
+                    "path": str(plan_path(root)),
+                    "plan": plan,
+                }
+            )
+            return 0 if not plan.get("errors") else 2
+        if action == "normalize":
+            plan = load_plan(root, required=True)
+            assert plan is not None
+            plan = normalize_plan(plan, root=root)
+            save_plan(root, plan, force=True)
+            emit({"ok": True, "path": str(plan_path(root)), "plan": plan})
+            return 0
+        if action == "status":
+            report = status(root)
+            emit(report)
+            return 0 if report.get("ok") else 2
+        if action == "set":
+            plan = set_plan_fields(
+                root,
+                cut_state=getattr(args, "cut_state", None),
+                design=getattr(args, "design", None),
+                caption_path=getattr(args, "caption_path", None),
+                prefer_ship=getattr(args, "prefer_ship", None),
+            )
+            emit({"ok": True, "path": str(plan_path(root)), "plan": plan})
+            return 0
+        if action == "apply":
+            receipt = apply_plan(
+                root, write_route=not bool(getattr(args, "no_route", False))
+            )
+            emit(receipt)
+            return 0 if receipt.get("ok") else 2
+        if action == "run":
+            execute = bool(getattr(args, "execute", False))
+            report = build_run_plan(root, execute=execute)
+            emit(report)
+            return 0 if report.get("ok") else 2
+        if action == "audit":
+            report = audit_desk(
+                root, write=not bool(getattr(args, "no_write", False))
+            )
+            emit(report)
+            return 0 if report.get("ok") else 2
+        if action == "snapshot":
+            report = snapshot_cut(root, str(getattr(args, "name", "") or ""))
+            emit(report)
+            return 0
+        if action == "cuts":
+            emit(list_cuts(root))
+            return 0
+        if action == "activate":
+            report = activate_cut(root, str(getattr(args, "name", "") or ""))
+            emit(report)
+            return 0
+        raise FilmError(f"unknown edit-director action: {action}")
+    except EditDirectorError as exc:
+        raise FilmError(str(exc)) from exc
+
+
 def cmd_closeout(args: argparse.Namespace) -> int:
     """Wave A1: heat → review gate → post-audit → optional export next_cmd."""
     from closeout import closeout_run, closeout_status
@@ -2500,6 +2591,100 @@ def add_post_parsers(sub: argparse._SubParsersAction[argparse.ArgumentParser]) -
     pp_validate = pp_sub.add_parser("validate", help="Validate post-plan.json")
     pp_validate.add_argument("--check-artifacts", action="store_true")
     pp_sub.add_parser("show", help="Print post-plan.json and its validation result")
+
+    ed = sub.add_parser(
+        "edit-director",
+        help="Edit Director desk: cut state + FFmpeg/HF/Remotion route (plan→apply→run)",
+    )
+    ed_sub = ed.add_subparsers(dest="edit_director_action", required=True)
+    ed_draft = ed_sub.add_parser(
+        "draft", help="Draft post/edit-director-plan.json from spec + clips"
+    )
+    ed_draft.add_argument("--root", required=True)
+    ed_draft.add_argument(
+        "--design",
+        choices=["hyperframes", "remotion", "none"],
+        default=None,
+        help="Designed-post owner (default hyperframes; remotion explicit; none=ship)",
+    )
+    ed_draft.add_argument(
+        "--prefer-ship",
+        action="store_true",
+        help="Force design=none + ship_hardburn caption path",
+    )
+    ed_draft.add_argument(
+        "--force",
+        action="store_true",
+        help="Overwrite existing plan",
+    )
+    ed_norm = ed_sub.add_parser("normalize", help="Validate/normalize existing plan")
+    ed_norm.add_argument("--root", required=True)
+    ed_st = ed_sub.add_parser("status", help="Machine-readable cut/route progress")
+    ed_st.add_argument("--root", required=True)
+    ed_set = ed_sub.add_parser("set", help="Edit cut_state / design / caption_path")
+    ed_set.add_argument("--root", required=True)
+    ed_set.add_argument(
+        "--cut-state",
+        choices=["assembly", "rough", "fine", "director", "picture_lock", "master"],
+        default=None,
+    )
+    ed_set.add_argument(
+        "--design",
+        choices=["hyperframes", "remotion", "none"],
+        default=None,
+    )
+    ed_set.add_argument(
+        "--caption-path",
+        choices=["master_hf", "ship_hardburn", "hf", "ship"],
+        default=None,
+    )
+    ed_set.add_argument(
+        "--prefer-ship",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="Force ship_hardburn path",
+    )
+    ed_apply = ed_sub.add_parser(
+        "apply",
+        help="Refresh editor_cut + write post-route from plan (no media render)",
+    )
+    ed_apply.add_argument("--root", required=True)
+    ed_apply.add_argument(
+        "--no-route",
+        action="store_true",
+        help="Skip writing receipts/post-route.json",
+    )
+    ed_run = ed_sub.add_parser(
+        "run",
+        help="Compose final flags; default dry-run; --execute shells aifilm final",
+    )
+    ed_run.add_argument("--root", required=True)
+    ed_run.add_argument(
+        "--dry-run",
+        action="store_true",
+        default=True,
+        help="Write run receipt only (default)",
+    )
+    ed_run.add_argument(
+        "--execute",
+        action="store_true",
+        help="apply plan then shell existing aifilm final (stub: AIFILM_EDIT_DIRECTOR_EXECUTE_STUB=1)",
+    )
+    ed_audit = ed_sub.add_parser(
+        "audit", help="Checklist: status + final-editorial + transition soft"
+    )
+    ed_audit.add_argument("--root", required=True)
+    ed_audit.add_argument("--no-write", action="store_true")
+    ed_snap = ed_sub.add_parser("snapshot", help="Snapshot plan to post/cuts/<name>.json")
+    ed_snap.add_argument("--root", required=True)
+    ed_snap.add_argument("--name", required=True, help="cut name e.g. rough-v1")
+    ed_cuts = ed_sub.add_parser("cuts", help="List named cut snapshots")
+    ed_cuts.add_argument("--root", required=True)
+    ed_act = ed_sub.add_parser(
+        "activate", help="Restore named cut into live plan (stales picture-lock)"
+    )
+    ed_act.add_argument("--root", required=True)
+    ed_act.add_argument("--name", required=True)
 
     rf = sub.add_parser(
         "register-final",

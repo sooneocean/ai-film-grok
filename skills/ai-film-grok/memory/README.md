@@ -38,6 +38,7 @@
 | **禁半帧复合 E4** | [no-midframe-composite](2026-08-07-no-midframe-composite-flf-audio-iron.md) |
 | **I2V 首帧满幅** | [i2v-firstframe-fill](2026-08-07-i2v-firstframe-fill-no-tiny-fullbody.md) |
 | **退役武器清心智** | [retired-weapon-clear-mind](2026-08-07-retired-weapon-clear-mind.md) |
+| **剪辑总监 desk** | [edit-director-desk](2026-08-07-edit-director-desk.md) |
 | 字幕硬烧 / 对白链 | huangdao-caption · dialogue-primary · native-xor-tts |
 | 养分 / 治理 | [nutrient-matrix](../../../docs/plans/2026-08-06-nutrient-matrix.md) · [MEMORY_GOVERNANCE](../../../docs/MEMORY_GOVERNANCE.md) |
 | **错误内化板** | [error-internalization](../../../docs/plans/2026-08-07-error-internalization-todoplan.md) |

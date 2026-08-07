@@ -179,6 +179,7 @@
 | 规则 | 默认 |
 |---|---|
 | 交付 | `final --post-engine hyperframes` |
+| **剪辑总监（P0 · 2026-08-07）** | 后期统筹桌：`post/edit-director-plan.json`；`aifilm edit-director draft\|status\|apply\|run`；**只编排** FFmpeg plate + 一集一 design owner（默认 HF，Remotion 仅 explicit）；驱动 `post-route` + `editor_cut`；禁第二导演系统 / 双正式 final。机读：`post/edit_director.py` · [todoplan](../../docs/plans/2026-08-07-edit-director-todoplan.md) · stages/post |
 | 字幕唯一所有权 | `plate-cards blank` + `subs off`；最终烧字只能由 HyperFrames 完成，HF 失败即修复并重渲，禁 PIL/FFmpeg 兜底 |
 | 字幕路径（P0） | `master_hf`（plate `subs=off` + HF 烧） vs `ship_hardburn`（PIL 硬烧，可烧底）；`aifilm caption-pixel-check` 底带 ink；禁双烧 |
 | 后期单钟（P1） | 只认 `film_timeline.shot_starts`；`timeline-clock` / `post-doctor`；mix PARTIAL 写 receipt 不装五轨齐 |
