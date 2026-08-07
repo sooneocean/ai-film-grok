@@ -132,7 +132,10 @@ type:
 		scripts/util/json_io.py \
 		scripts/util/subprocess.py \
 		scripts/util/retry.py \
-		scripts/util/security_policy.py
+		scripts/util/security_policy.py \
+		scripts/util/config_loader.py \
+		scripts/util/film_spec.py \
+		scripts/util/structured_logger.py
 
 install-hooks:
 	@git -C "$(ROOT)" config core.hooksPath .githooks

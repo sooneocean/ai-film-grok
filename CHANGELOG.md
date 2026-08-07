@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.40.87] - 2026-08-07
+
+### Changed (CTO C6.5 mypy expand wave-2 + C6.3 Lane A guard)
+- **`make type`:** + `util/config_loader` · `util/film_spec` · `util/structured_logger` (12-module seed, zero errors).
+- **C6.3 guard:** `tests/test_c6_lane_a_delete_scan.py` freezes intentional zero-import residuals (examples/probes/tools); new dead whole-files fail closed.
+- CI `typecheck` continues to run `make type` (list growth is automatic).
+
 ## [2.40.86] - 2026-08-07
 
 ### Added (C6.3 Lane A machine guard)
