@@ -15,13 +15,6 @@ INTENTIONAL_RESIDUAL = frozenset(
     {
         "aifilm_grok.py",  # CLI hub
         "workflow_pack.py",  # ship-prep thrash surface
-        "smoke_console.py",  # live harness entry
-        "web_api.py",
-        "web_core.py",
-        "asset_picker.py",
-        "gate_panel.py",
-        "onboarding.py",
-        "onboarding_planner.py",  # onboarding v2 auto-decompose (console entry)
     }
 )
 

@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.41.22] - 2026-08-07
+
+### Changed (code slim round 2)
+- **`comfy_video` Wan dead path:** `select_wan22_weapon` / `resolve_wan22_profile` / `build_wan22_i2v_prompt` fail-closed; graph body removed (~260 LOC).
+- **`probe`:** connectivity-only (`schema_version` 2, `wan22_retired`); no longer gates H3 on missing Wan weights.
+- **Web console package:** `web_core`/`web_api`/`asset_picker`/`gate_panel`/`onboarding`/`onboarding_planner`/`smoke_console` → `scripts/web/` + thin top-level shims.
+- **C6 residual:** intentional top-level only hub + `workflow_pack` (matches metabolism freeze).
+- **Tests:** Wan routing/graph retired assertions; websocket unit test no longer needs real `websocket-client`.
+
 ## [2.41.21] - 2026-08-07
 
 ### Changed (code slim · dead-logic consolidation)
