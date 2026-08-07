@@ -884,6 +884,92 @@ def closeout_status(root: Path | str) -> dict[str, Any]:
         }
     )
 
+    # E1 · identity generation lock (archive mix hard; unverified → PARTIAL honesty)
+    identity_gen: dict[str, Any] = {
+        "ok": True,
+        "identity_partial": False,
+        "codes": [],
+        "classification": "SKIPPED_NO_MODULE",
+    }
+    try:
+        from gates.identity_generation_lock import audit_identity_generation
+
+        identity_gen = audit_identity_generation(base, write_receipt=True)
+    except Exception as exc:  # noqa: BLE001
+        identity_gen = {
+            "ok": False,
+            "identity_partial": True,
+            "error": str(exc)[:160],
+            "codes": ["IDENTITY_GEN_PROBE_FAILED"],
+            "classification": "PARTIAL",
+        }
+    steps.append(
+        {
+            "id": "identity_generation",
+            "ok": bool(identity_gen.get("ok")),
+            "detail": (
+                f"class={identity_gen.get('classification')} "
+                f"partial={bool(identity_gen.get('identity_partial'))} "
+                f"codes={identity_gen.get('codes') or []}"
+            ),
+            "identity_partial": bool(identity_gen.get("identity_partial")),
+            "codes": identity_gen.get("codes") or [],
+            "next_cmd": identity_gen.get("next_cmd"),
+            "advisory": bool(identity_gen.get("ok") and identity_gen.get("identity_partial")),
+            "partial": bool(identity_gen.get("identity_partial")),
+        }
+    )
+
+    # E2 · partner cast masters (hard when multi-cast incomplete / false style.locked)
+    partner_cast: dict[str, Any] = {"ok": True, "codes": [], "checked": False}
+    try:
+        from gates.partner_cast_gate import audit_partner_cast
+
+        partner_cast = audit_partner_cast(base, write_receipt=True)
+    except Exception as exc:  # noqa: BLE001
+        partner_cast = {
+            "ok": True,
+            "advisory": True,
+            "error": str(exc)[:160],
+            "codes": [],
+        }
+    steps.append(
+        {
+            "id": "partner_cast",
+            "ok": bool(partner_cast.get("ok", True)),
+            "detail": (
+                f"checked={partner_cast.get('checked')} codes={partner_cast.get('codes') or []}"
+            ),
+            "codes": partner_cast.get("codes") or [],
+            "next_cmd": partner_cast.get("next_cmd"),
+            "advisory": not partner_cast.get("checked"),
+        }
+    )
+
+    # E4 · still provenance audit (composite / poison archive)
+    still_prov: dict[str, Any] = {"ok": True, "codes": [], "checked": 0}
+    try:
+        from gates.still_provenance import audit_film_still_provenance
+
+        still_prov = audit_film_still_provenance(base)
+    except Exception as exc:  # noqa: BLE001
+        still_prov = {"ok": True, "advisory": True, "error": str(exc)[:160], "checked": 0}
+    steps.append(
+        {
+            "id": "still_provenance",
+            "ok": bool(still_prov.get("ok", True)),
+            "detail": (
+                f"checked={still_prov.get('checked', 0)} codes={still_prov.get('codes') or []}"
+            ),
+            "codes": still_prov.get("codes") or [],
+            "next_cmd": (
+                None
+                if still_prov.get("ok")
+                else "re-seed whole_frame stills; isolate _archive_poison_*"
+            ),
+        }
+    )
+
     soft_ids = {
         "desktop_exported",
         "input_fidelity",
@@ -891,6 +977,9 @@ def closeout_status(root: Path | str) -> dict[str, Any]:
         "official_final_readback",
         "attestation_audit",
     }
+    # identity partial alone is honesty, not hard block (archive mix is hard via ok=False)
+    if identity_gen.get("ok") and identity_gen.get("identity_partial"):
+        soft_ids.add("identity_generation")
     if not film_core_hard:
         soft_ids.add("film_core")
     # hard fidelity when marked hard and not ok

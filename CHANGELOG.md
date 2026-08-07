@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.40.98] - 2026-08-07
+
+### Added (error internalization · E1/E2/E4 + F4 flywheel)
+- **E1 identity generation lock:** `gates/identity_generation_lock.py` — archive-path mix hard-fail; `face-identity.verified≠true` → `IDENTITY_PARTIAL`; closeout step + `receipts/cast-generation.json`; escape `AIFILM_SKIP_IDENTITY_GEN`.
+- **E2 partner cast gate:** `gates/partner_cast_gate.py` — cast_master+face_lock paths; `style.locked` false-green when multi-cast incomplete; escape `AIFILM_SKIP_PARTNER_CAST`.
+- **E4 still provenance:** `gates/still_provenance.py` — ban `midframe_paste`/composite provenance + `_archive_poison_*` paths on H3 I2V; escape `AIFILM_SKIP_STILL_PROVENANCE`.
+- **E3 dual-truth fix:** hard-defaults native-speech row → light-process default (aligned with no-midframe card).
+- **F4 dead-link test:** hard-defaults `memory/*` links must resolve; fixed archive pointers for input-fidelity / frw-i2i.
+- **iron-status:** register composition_fill · identity_generation · partner_cast · still_provenance · skip_audit.
+- **Tests:** `tests/test_error_internalization_e1_e4.py`.
+- **Docs:** MEMORY_GOVERNANCE F0 flywheel · nutrient-matrix §2b.
+
 ## [2.40.97] - 2026-08-07
 
 ### Changed (H3 official · soft densify live canary DONE)

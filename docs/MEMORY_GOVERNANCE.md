@@ -44,6 +44,23 @@ When a rule changes:
 
 > 类比：规章上墙不够，要让走错路径的闸门自动喷水。
 
+### 事故 → 飞轮（永久 · 2026-08-07 F0）
+
+```text
+用户原话 / 掉片
+  → 五问卡（A/B/C · L阶 · 挂载层 · 证据 · 人判）
+  → 只 C 进队列（CTO OPEN 或 error-internalization plan）
+  → 代码 gate + hard-defaults 一行 + pytest
+  → iron_status 登记 + nutrient 行
+  → memory 三句指针（禁双写全表；禁缺链）
+  → stages 一行（若阶段动作变）
+  → L5：已 L4 则 archive / 瘦卡
+  → 周 reconcile：header vs plugin.json
+```
+
+**禁：** 只改 memory/AGENTS 当 Done；假 CV 当 Done；默认 `AIFILM_SKIP_*=1`。  
+**对账：** [nutrient-matrix](plans/2026-08-06-nutrient-matrix.md) §2b（E1–E4）；CTO 主执行板。
+
 ### 五问卡（出 todo 前必答；只 C 类进队列）
 
 | # | 问 | 答案形态 |

@@ -1095,6 +1095,29 @@ def run_h3_shot(
             raise H3WorkflowError(str(exc)) from exc
         except Exception:
             pass
+        # E4 · ban midframe composite / poison-archive still as I2V source
+        try:
+            from still_provenance import StillProvenanceError, assert_still_record_safe_for_i2v
+
+            still_rec: dict = {}
+            try:
+                from util import read_json
+
+                man = read_json(base / "film-manifest.json") or {}
+                st = (man.get("stills") or {}).get(str(shot_id))
+                if isinstance(st, dict):
+                    still_rec = st
+            except Exception:
+                still_rec = {}
+            assert_still_record_safe_for_i2v(
+                still_rec,
+                path=plan.get("still_path"),
+                root=base,
+            )
+        except StillProvenanceError as exc:
+            raise H3WorkflowError(str(exc)) from exc
+        except Exception:
+            pass
         # Wave 3 · composition fill before burn (EP02 postage-stamp / fullbody)
         try:
             from composition_fill_gate import assert_still_path_ready_for_i2v

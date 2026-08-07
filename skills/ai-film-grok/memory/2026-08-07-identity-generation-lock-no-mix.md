@@ -27,5 +27,7 @@
 
 ## 链
 - hard-defaults 表行「身份代际锁」  
+- **机读 E1：** `gates/identity_generation_lock.py` · closeout `identity_generation` · `receipts/cast-generation.json`  
 - face-identity CLI · cast masters · firstframe-fill memory  
+- escape：`AIFILM_SKIP_IDENTITY_GEN=1`  
 - 本片 drift：`receipts/identity-drift-ahash.json` · `takes/_archive_pre_leon_restyle/`

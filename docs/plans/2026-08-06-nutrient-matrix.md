@@ -1,9 +1,9 @@
-# 养分对账矩阵（教训 → 代码面 · 2026-08-07 I0 刷新）
+# 养分对账矩阵（教训 → 代码面 · 2026-08-07 E* 刷新）
 
 **Purpose:** 一眼看出「已吞吐可废文」vs「半吞吐补默认」vs「真 OPEN」。  
 **Authority:** hard-defaults + 代码 > memory > lesson。  
-**Probe:** plugin.json **2.40.51** · memory active **~42** · archive **~52**。  
-**执行板:** [CTO](2026-08-06-cto-optimization-todoplan.md) · **[铁律内化](2026-08-07-iron-internalization-todoplan.md)**（**I0–I4 产品链 CLOSED**）
+**Probe:** plugin.json **2.40.98** · memory active **~50** · I0–I5/R0–R5 CLOSED · **E1/E2/E4 机读 ship**。  
+**执行板:** [CTO](2026-08-06-cto-optimization-todoplan.md) · **[铁律内化](2026-08-07-iron-internalization-todoplan.md)**（I0–I5 CLOSED）· 事故内化 E*（本表 §2b）
 
 ---
 
@@ -66,6 +66,17 @@
 | H-run-next-hog | 软 hog | ops | **I5** | OPEN_OPS |
 | ~~H-context-blind~~ | dispatch 盲 | → **L3** | I3 | ✅ stages 瘦 + routing |
 
+### 2b. 2026-08-07 事故内化（E*）
+
+| ID | 主题 | L 现状 | 代码锚 | 测 |
+|----|------|--------|--------|-----|
+| **E1** | 身份代际锁 / 禁 archive 混 final | **L3–L4** | `gates/identity_generation_lock.py` · closeout step | `test_error_internalization_e1_e4` |
+| **E2** | 配角/男主 cast_master+face_lock | **L3** | `gates/partner_cast_gate.py` | 同上 |
+| **E3** | 原声轻处理默认（消双真相） | **L4 文** | hard-defaults 行改轻处理 | 契约/死链测 |
+| **E4** | 禁半帧复合 still | **L3** | `gates/still_provenance.py` · h3_workflow | 同上 |
+| E5 | H3 mode override 收据 | 半吞吐 | residual | — |
+| F4 | hard-defaults memory 死链 | **L3 测** | `test_hard_defaults_memory_links` | 同上 |
+
 ---
 
 ## 3. 真 OPEN（≤10 · 与 CTO §5 同集 · 内化子集加粗）
@@ -82,6 +93,8 @@
 | ~~I4.1~~ | hard-defaults 契约测 | **SHIPPED** |
 | CTO-12 | throughput-counters / provider 429 | deferred |
 | H-listen | aac 可懂中文 ASR | deferred |
+| E5 | H3 mode silent override 收据 | eng residual |
+| E6.3 | SKIP 全树 skip_flag 触达 | residual honesty |
 
 **明确 DEFERRED：** 真 CV 毒镜分类器、Job-graph 超 final、lipsync 复活、markdown→AST 全表 parser、虚荣 LOC。
 
