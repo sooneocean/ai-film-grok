@@ -362,7 +362,7 @@
     },
     {
       "path": "scripts/audio/music_director.py",
-      "sha256": "05fe009f9602f243d1f6cc9bd9e60ff7b238ced36f322f7304e34a6bf04af91a"
+      "sha256": "161bbea92461722772bcb5cdd1dd97d3c79e5caf1afb5b86b8d2cf9e47ede660"
     },
     {
       "path": "scripts/audio/music_editor.py",
@@ -1503,6 +1503,10 @@
     {
       "path": "scripts/gates/director_stage_gates.py",
       "sha256": "6e99de924a20c3d6e1bb659801547a0a95d50447813f6979fb111aebedca5999"
+    },
+    {
+      "path": "scripts/gates/effect_roi.py",
+      "sha256": "5e1931baaccf63ee6e351ab2e70f4d9d0c943a2d956b6d80fa3a7d62ff9e5553"
     },
     {
       "path": "scripts/gates/face_lock_triple.py",

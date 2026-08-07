@@ -22,6 +22,20 @@ from util import require_json as read_json
 from util import sha256_file, utc_now, write_json
 from util.errors import FilmError
 
+try:
+    from final.native_audio import NATIVE_LIGHT_AF_FILTER as _NATIVE_LIGHT_AF_FILTER
+except ImportError:  # pragma: no cover
+    try:
+        from native_audio import NATIVE_LIGHT_AF_FILTER as _NATIVE_LIGHT_AF_FILTER  # type: ignore
+    except ImportError:  # pragma: no cover
+        _NATIVE_LIGHT_AF_FILTER = (
+            "highpass=f=80,lowpass=f=12000,afftdn=nr=12:nf=-25,adeclick,"
+            "loudnorm=I=-16:TP=-1.5:LRA=11"
+        )
+
+# Re-export IRON ffmpeg light string (ship-native / plate re-encode)
+NATIVE_LIGHT_AF_FILTER = _NATIVE_LIGHT_AF_FILTER
+
 SCHEMA = "aifilm-music-director-plan-v1"
 PLAN_REL = Path("audio") / "music-director-plan.json"
 APPLY_RECEIPT_REL = Path("receipts") / "music-director-apply.json"
@@ -574,10 +588,10 @@ def load_audio_samples(
 def apply_light_process_samples(samples: np.ndarray, sr: int) -> np.ndarray:
     """Mild H3-native-aligned cleanup without agate / dual arnndn.
 
-    FFmpeg counterpart (re-encode / ship post-process) is
-    ``final.native_audio.NATIVE_LIGHT_AF_FILTER``
-    (hp+afftdn+adeclick+loudnorm). This numpy path is a lightweight
-    in-memory preview only — do not invent a harder gate here.
+    FFmpeg counterpart (ship / plate re-encode) is module-level
+    ``NATIVE_LIGHT_AF_FILTER`` (same string as ``final.native_audio``):
+    hp+afftdn+adeclick+loudnorm. This numpy path is in-memory preview only —
+    do not invent a harder gate here.
 
     - DC remove
     - simple 1-pole highpass ~80Hz

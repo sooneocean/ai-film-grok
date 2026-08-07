@@ -31,6 +31,14 @@ def test_h3_ship_native_receipt_carries_light_filter() -> None:
     assert ship_bn == FILM_NATIVE_STABLE_BASENAME
 
 
+def test_music_director_exports_same_light_filter() -> None:
+    """Music Director must re-export the same IRON light string as native_audio."""
+    from audio.music_director import NATIVE_LIGHT_AF_FILTER as md_f
+
+    assert md_f == NATIVE_LIGHT_AF_FILTER
+    assert "agate" not in md_f and "arnndn" not in md_f
+
+
 def test_prefer_native_lane_when_stem_present() -> None:
     shot = {"id": "s1", "audio_policy": "prefer_native"}
     lane = resolve_dialogue_audio_lane(

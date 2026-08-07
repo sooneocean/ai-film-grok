@@ -1,13 +1,40 @@
 # 巨石模组舒缓 Todo Plan（2026-08-07 · 现状诊断 + 分步队列）
 
-**Status:** ACTIVE · 结构债单一执行板（2026-08-07）  
-**Plugin:** **2.41.7** · checkout `plugins/ai-film-grok`  
+**Status:** **SHIPPED core · residual bug-driven only**（2026-08-07 close）  
+**Plugin:** **2.41.17** · checkout `plugins/ai-film-grok`  
 **历史主档（勿重开已 ship 波）：**  
 - [project-module-refactor](docs/plans/2026-08-05-project-module-refactor.md) · W0–W7 **DONE**  
 - [residual-monolith-w4](docs/plans/2026-08-05-residual-monolith-w4-todo.md) · 包边界 + pure leaf **DONE**  
 - [monolith-relief M0–M4](docs/plans/2026-08-06-monolith-relief-todoplan.md) · heat facade / film_spec 拆 / final 叶子 **SHIPPED**  
 - [metabolism inventory](docs/reports/2026-08-06-code-metabolism-inventory.md) · **SAFE MIGRATE QUEUE 已空** · 顶层只剩 hub + `workflow_pack`  
 - [monolith-closeout](docs/plans/2026-08-06-monolith-closeout.md)
+
+---
+
+## Closeout 2026-08-07（go 到最后）
+
+| 波次 | 状态 |
+|------|------|
+| W0 hygiene + mega-fn guard | **SHIPPED** |
+| W1 final stages (context/tts/music/subs/picture/dual-mix/mux/orchestrate) | **SHIPPED** · `render_final` ~456 lines |
+| W2 film_spec heat tail | **SHIPPED** |
+| W3 preflight_premium | **PARTIAL** · body residual |
+| W4 export_html | **PARTIAL** · writers residual |
+| W5 CLI thin | **DEFERRED** bug-driven |
+| W6 thrash residual | **DEFERRED** |
+| **H3 native chain** | **SHIPPED** light filter + ship-native stable + opt-in re-encode |
+
+### H3 原声链证据（真片）
+
+- film: `~/AI FILM SPACE/0805/e-virus-ch06-self-antagonism`
+- `aifilm h3 ship-native --light-process` → `out/film_native_stable.mp4` · 19 clips · ~16MB · 17s
+- light applied: `NATIVE_LIGHT_AF_FILTER` · no agate · receipt `receipts/h3-ship-native.json`
+- delivery_class: **OFFICIAL_FINAL_PLATE** (not master)
+
+### Residual mega-fn（>800 · allowlist only）
+
+- `gates/preflight.run_preflight` · `spine/dispatch.build_dispatch` · `plan/film_spec_validate.validate_film_spec` · `post/closeout.closeout_status`
+- **rule:** bug-driven peel only; no vanity sprint
 
 ---
 
