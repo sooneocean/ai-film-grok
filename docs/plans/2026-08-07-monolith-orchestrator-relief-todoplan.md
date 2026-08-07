@@ -206,8 +206,8 @@ python -m pytest tests/test_final_hotpath_contracts.py tests/test_render_core_he
 
 ### Wave 3 · `preflight` 段拆（P1 · doctor / 开工）
 
-- [ ] **W3.1** `run_preflight` 分段地图（env / tools / film root / gates / receipts…）  
-- [ ] **W3.2** 每段 pure report builder → `gates/preflight_*.py`  
+- [x] **W3.1** partial premium leaf `run_preflight` 分段地图（env / tools / film root / gates / receipts…）  
+- [x] **W3.2** preflight_premium 每段 pure report builder → `gates/preflight_*.py`  
 - [ ] **W3.3** 入口组装 status；CLI `main` 不变  
 - [ ] **W3.4** 补 2～3 条 harness：缺 ffmpeg / 坏 root / 最小绿片
 
@@ -217,9 +217,9 @@ python -m pytest tests/test_final_hotpath_contracts.py tests/test_render_core_he
 
 ### Wave 4 · export writers（P1 · harness-first 已部分存在）
 
-- [ ] **W4.1** 确认 `test_export_hotpath_contracts` / `ParseSrt` 仍绿  
+- [x] **W4.1** 确认 `test_export_hotpath_contracts` / `ParseSrt` 仍绿  
 - [ ] **W4.2** peel `build_timeline_package` 纯构建  
-- [ ] **W4.3** peel `write_hyperframes` 子构建（title/end-roll/timeline HTML）  
+- [x] **W4.3** export_html builders peel `write_hyperframes` 子构建（title/end-roll/timeline HTML）  
 - [ ] **W4.4** peel `write_remotion` 对称  
 - [ ] **W4.5** `export_composition` 入口变薄
 
@@ -229,7 +229,7 @@ python -m pytest tests/test_final_hotpath_contracts.py tests/test_render_core_he
 
 ### Wave 5 · CLI 装配层（P1 · 可选）
 
-- [ ] **W5.1** `cli_post.cmd_final`：只做 argparse → namespace → 调 `render_final` / gates；业务 if 下沉 domain  
+- [ ] **W5.1** deferred — bug-driven `cli_post.cmd_final`：只做 argparse → namespace → 调 `render_final` / gates；业务 if 下沉 domain  
 - [ ] **W5.2** `add_post_parsers` 若继续胀 → `cli/parsers_post_*.py`  
 - [ ] **W5.3** `cli_media` 仅当 register/i2v  thrash
 
@@ -257,7 +257,7 @@ python -m pytest tests/test_final_hotpath_contracts.py tests/test_render_core_he
 
 - [x] **W7.1** mega-fn 白名单测（见 W0.4 · `test_mega_fn_budget`）  
 - [ ] **W7.2** 新代码禁止在顶层加厚实现（只许 shim 或 hub 路由）  
-- [ ] **W7.3** 结构 peel 完成后：本档勾选 + metabolism inventory 一行刷新 · **禁**再开第三份 monolith plan  
+- [x] **W7.3** 结构 peel 完成后：本档勾选 + metabolism inventory 一行刷新 · **禁**再开第三份 monolith plan  
 - [ ] **W7.4** 双 checkout：改前 `git rev-parse --show-toplevel` 自检写进 PR 模板一句（可选）
 
 ---
@@ -352,3 +352,17 @@ python3 -m pytest \
 ---
 
 *Baseline probe: 2026-08-07 · plugin 2.41.4 · render_final 2525 · validate 2360 · preflight 2119 · heat facade 136.*
+
+
+## Progress 2026-08-07 session (executed)
+
+| Wave | Result |
+|------|--------|
+| W0 | SHIPPED · plan + mega-fn guard · gitea push |
+| W1 | SHIPPED · render_helpers / dual_mix / mux / official_finalize / render_context |
+| W2 | SHIPPED · film_spec_validate_heat |
+| W3 | PARTIAL · preflight_premium leaf (full preflight still thick) |
+| W4 | PARTIAL · export_html pure builders (write_hyperframes body residual) |
+| W5–W6 | DEFERRED bug-driven |
+| W7 | mega-fn guard live; this board is structure owner |
+
