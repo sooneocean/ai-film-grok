@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.40.47] - 2026-08-07
+
+### Changed (code metabolism round 6 · path-depth residual P3-1×14)
+- **Path-depth modules moved + depth fixed:** `config_loader`/`runtime_policy`/`security_policy`/`structured_logger`(import `logger`)→`util/`; `skill_registry`/`skill_runner`/`route_catalog`/`automation_verify`→`spine/`; `capability_report`/`motion_prompt_spine`/`optimization_metrics`→`plan/`; `backend_lock`/`env_plate`/`interactive_orchestration`→`media/`.
+- **Depth rules:** skill-root `parents[1]`→`parents[2]` under packages; `config.env` via `parents[3]`; script siblings via `parent.parent / name`.
+- **Inventory** refreshed (non-shim residual ~2, mainly hub + workflow_pack).
+- **Verify:** path-depth suite 105 passed / 30 subtests; shim identity 10/10.
+- Iron: public `import name` preserved; no heat/i2v/pilot retune.
+
 ## [2.40.46] - 2026-08-06
 
 ### Changed (code metabolism round 5 · P3-1×19 expanded residual)

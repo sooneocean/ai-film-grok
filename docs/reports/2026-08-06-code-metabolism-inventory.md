@@ -1,29 +1,29 @@
-# Code metabolism inventory — 2026-08-06
+# Code metabolism inventory — 2026-08-07
 
-**Generated:** 2026-08-06T14:27:41Z
-**Latest batch:** 2.40.46
+**Generated:** 2026-08-07T00:55:28Z
+**Latest batch:** 2.40.47
 
 ## Summary
 
 | Metric | Value |
 |--------|------:|
-| Top-level modules | 349 |
-| Classified shims | 332 |
-| Non-shim residual | 17 |
+| Top-level modules | 348 |
+| Classified shims | 346 |
+| Non-shim residual | 2 |
 
-## Batch 2.40.46 (round 5 · ×19)
+## Batch 2.40.47 (round 6 · path-depth residual)
 
-gates: director_stage_gates, framing_lint, quality_evidence, state_index_gate, input_fidelity  
-plan: content_channels, timeline_clock, local_llm, five_track, prompt_injector, director_cli, director_review  
-media: performance_evidence, true_video_policy, performance_candidates  
-post: review_control, dailies  
-narrative: rhythm  
-spine: pipeline_events  
+| Package | Modules | Depth fix |
+|---------|---------|-----------|
+| `spine/` | automation_verify, route_catalog, skill_registry, skill_runner | parents[2] / scripts sibling launchers |
+| `util/` | config_loader, runtime_policy, security_policy, structured_logger (shim `logger`) | config.env parents[3] |
+| `plan/` | capability_report, motion_prompt_spine, optimization_metrics | skill_root parents[2]; metrics parent-walk OK |
+| `media/` | backend_lock, env_plate, interactive_orchestration | skill root / scripts sibling paths |
 
-## Still residual (path-depth / hub / giant)
+## Still residual (intentionally)
 
-aifilm_grok, workflow_pack, backend_lock, env_plate, config_loader, skill_runner, skill_registry, capability_report, automation_verify, route_catalog, interactive_orchestration, optimization_metrics, logger, motion_prompt_spine, runtime_policy, security_policy
+`aifilm_grok` hub · `workflow_pack` giant thrash orchestrator
 
 ## Iron
 
-Public import names via shims · no heat/i2v/pilot retune.
+Public import names via shims · path depth adjusted · no heat/i2v/pilot retune.
