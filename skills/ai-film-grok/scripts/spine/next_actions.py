@@ -915,12 +915,43 @@ def build_next_actions(
                     f'aifilm post-plan --root "{r}" init --owner hyperframes',
                     "后期 owner 未锁 — 机读过闸后进 final 需要",
                 )
-            if not (root / "post" / "edit-director-plan.json").is_file():
+            ed_early = root / "post" / "edit-director-plan.json"
+            if not ed_early.is_file():
                 add(
                     "edit-director-draft",
                     f'aifilm edit-director draft --root "{r}"',
                     "剪辑总监 plan 未建 — 机读过闸后按 plan 路由 HF/FFmpeg",
                 )
+            else:
+                # R5 · desk still visible while machine lane owns primary (no final thrash)
+                try:
+                    from edit_director import status as edit_director_status
+
+                    ed_st = edit_director_status(root)
+                    if not ed_st.get("apply_present"):
+                        add(
+                            "edit-director-apply",
+                            f'aifilm edit-director apply --root "{r}"',
+                            "剪辑总监：机读过闸同时可 apply 锁 post-route",
+                        )
+                    elif not (root / "receipts" / "edit-director-verify.json").is_file():
+                        add(
+                            "edit-director-verify",
+                            f'aifilm edit-director verify --root "{r}"',
+                            "剪辑总监：verify 干跑（不烧片）再 final",
+                        )
+                    elif not ed_st.get("ok"):
+                        add(
+                            "edit-director-status",
+                            f'aifilm edit-director status --root "{r}"',
+                            "剪辑总监 blocked — 先修 cut/route",
+                        )
+                except Exception:
+                    add(
+                        "edit-director-status",
+                        f'aifilm edit-director status --root "{r}"',
+                        "剪辑总监 status（desk 导入失败时仍提示）",
+                    )
             return actions
         # Optional formal AI upscale (default off; only when film-spec enables)
         try:
@@ -967,6 +998,13 @@ def build_next_actions(
                         "剪辑总监：apply → editor_cut + post-route 锁 caption 路径",
                     )
                 elif ed_st.get("ok"):
+                    # R5 · verify before final thrash (desk dry acceptance)
+                    if not (root / "receipts" / "edit-director-verify.json").is_file():
+                        add(
+                            "edit-director-verify",
+                            f'aifilm edit-director verify --root "{r}"',
+                            "剪辑总监：verify 干跑 status+checklist+post-doctor+trims（不烧片）",
+                        )
                     add(
                         "edit-director-run",
                         f'aifilm edit-director run --root "{r}"',

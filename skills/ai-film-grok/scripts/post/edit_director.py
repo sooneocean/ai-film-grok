@@ -1569,6 +1569,84 @@ def export_checklist(
     return report
 
 
+def ensure_ready_for_final(
+    root: Path | str,
+    *,
+    auto_draft: bool = True,
+    auto_apply: bool = True,
+    strict: bool = False,
+) -> dict[str, Any]:
+    """Pre-final desk gate: draft/apply if needed; hard-fail on route mismatch.
+
+    Default (non-strict): only post_route_mismatch hard-blocks final.
+    strict=True also blocks assembly / missing clips / missing plan.
+    """
+    base = Path(root).expanduser().resolve()
+    notes: list[str] = []
+    if auto_draft and not plan_path(base).is_file():
+        try:
+            draft_and_save(base, force=False)
+            notes.append("auto-drafted edit-director plan")
+        except EditDirectorError as exc:
+            notes.append(f"draft skip: {exc}"[:120])
+        except Exception as exc:  # noqa: BLE001
+            notes.append(f"draft fail: {exc}"[:120])
+
+    plan = load_plan(base, required=False)
+    if plan is None:
+        report = {
+            "ok": not strict,
+            "hard": (["no_edit_director_plan"] if strict else []),
+            "notes": notes,
+            "next_cmd": f'aifilm edit-director draft --root "{base}"',
+        }
+        if strict:
+            raise EditDirectorError(
+                "final blocked: no edit-director plan "
+                f'(run: aifilm edit-director draft --root "{base}" '
+                "or --skip-edit-director)"
+            )
+        return report
+
+    apply_rec = read_json(apply_receipt_path(base)) or {}
+    if auto_apply and not apply_rec:
+        try:
+            apply_plan(base, write_route=True)
+            notes.append("auto-applied edit-director plan")
+            apply_rec = read_json(apply_receipt_path(base)) or {}
+        except Exception as exc:  # noqa: BLE001
+            notes.append(f"apply fail: {exc}"[:120])
+
+    st = status(base)
+    blocked = st.get("blocked_by") or []
+    if isinstance(blocked, str):
+        blocked = [blocked]
+    hard_codes = {"post_route_mismatch"}
+    if strict:
+        hard_codes |= {
+            "edit_plan_errors",
+            "cut_state_assembly",
+            "no_edit_director_plan",
+        }
+    hard = [c for c in blocked if c in hard_codes]
+    if hard:
+        raise EditDirectorError(
+            "final blocked by edit-director: "
+            + ", ".join(hard)
+            + f'. Fix: aifilm edit-director status --root "{base}" '
+            "(or --skip-edit-director / AIFILM_SKIP_EDIT_DIRECTOR=1)"
+        )
+    return {
+        "ok": True,
+        "hard": [],
+        "blocked_by": blocked or None,
+        "notes": notes,
+        "status": st,
+        "apply_present": bool(apply_rec),
+        "engine_route": st.get("engine_route"),
+    }
+
+
 def verify_desk(root: Path | str, *, write: bool = True) -> dict[str, Any]:
     """End-to-end dry-run verify: status + checklist + post-doctor + trims bind.
 

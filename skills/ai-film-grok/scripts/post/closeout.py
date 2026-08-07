@@ -477,6 +477,103 @@ def closeout_status(root: Path | str) -> dict[str, Any]:
             }
     steps.append(post_doctor_step)
 
+    # R5 · edit-director desk (prefer verify before bare final thrash)
+    ed_step: dict[str, Any] = {
+        "id": "edit_director",
+        "ok": True,
+        "detail": "skipped — no desk probe",
+        "next_cmd": None,
+        "advisory": True,
+        "skipped": True,
+    }
+    try:
+        from edit_director import plan_path as ed_plan_path
+        from edit_director import status as edit_director_status
+
+        if not ed_plan_path(base).is_file():
+            if final_rec is None:
+                ed_step = {
+                    "id": "edit_director",
+                    "ok": True,
+                    "detail": "no plan — draft before final thrash",
+                    "next_cmd": f'aifilm edit-director draft --root "{base}"',
+                    "advisory": True,
+                }
+            else:
+                ed_step = {
+                    "id": "edit_director",
+                    "ok": True,
+                    "detail": "no plan (plate already present; advisory)",
+                    "next_cmd": f'aifilm edit-director draft --root "{base}"',
+                    "advisory": True,
+                    "skipped": True,
+                }
+        else:
+            st = edit_director_status(base)
+            blocked = st.get("blocked_by") or []
+            if isinstance(blocked, str):
+                blocked = [blocked]
+            verify_rec = read_json(base / "receipts" / "edit-director-verify.json") or {}
+            hard_route = "post_route_mismatch" in blocked
+            if hard_route:
+                ed_step = {
+                    "id": "edit_director",
+                    "ok": False,
+                    "detail": "post_route_mismatch — apply or re-route before final",
+                    "next_cmd": (
+                        st.get("next_cmd")
+                        or f'aifilm edit-director apply --root "{base}"'
+                    ),
+                    "advisory": False,
+                    "blocked_by": blocked,
+                }
+            elif final_rec is None and not verify_rec:
+                ed_step = {
+                    "id": "edit_director",
+                    "ok": True,
+                    "detail": "plan present — verify desk before final",
+                    "next_cmd": f'aifilm edit-director verify --root "{base}"',
+                    "advisory": True,
+                    "apply_present": bool(st.get("apply_present")),
+                    "blocked_by": blocked or None,
+                }
+            else:
+                ed_step = {
+                    "id": "edit_director",
+                    "ok": bool(st.get("ok")) if final_rec is None else True,
+                    "detail": (
+                        "verify ok"
+                        if verify_rec.get("ok")
+                        else (
+                            "desk ok"
+                            if st.get("ok")
+                            else f"blocked: {', '.join(str(b) for b in blocked)}"
+                        )
+                    ),
+                    "next_cmd": (
+                        None
+                        if st.get("ok") or final_rec is not None
+                        else (
+                            st.get("next_cmd")
+                            or f'aifilm edit-director status --root "{base}"'
+                        )
+                    ),
+                    "advisory": not hard_route,
+                    "apply_present": bool(st.get("apply_present")),
+                    "verify_present": bool(verify_rec),
+                    "blocked_by": blocked or None,
+                }
+    except Exception as exc:  # noqa: BLE001
+        ed_step = {
+            "id": "edit_director",
+            "ok": True,
+            "detail": f"edit-director probe failed: {exc}"[:160],
+            "next_cmd": f'aifilm edit-director status --root "{base}"',
+            "advisory": True,
+            "probe_error": True,
+        }
+    steps.append(ed_step)
+
     # Delivery Truth · i2v-final-gate must be green before delivery_ready
     motion_gate_step: dict[str, Any] = {
         "id": "i2v_motion",

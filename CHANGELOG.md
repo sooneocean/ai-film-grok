@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.41.35] - 2026-08-07
+
+### Added (edit-director · Round 5 final desk gate)
+- **`ensure_ready_for_final`**: auto draft/apply before final; hard-block `post_route_mismatch` (default); `--edit-director-strict` also blocks assembly / plan errors / missing plan.
+- **final flags**: `--skip-edit-director` · `--edit-director-strict` · env `AIFILM_SKIP_EDIT_DIRECTOR=1`; gate attached on final emit/`stages`.
+- **closeout** step `edit_director` (prefer verify when plan present; hard on route mismatch).
+- **next_actions**: after apply+ok → `edit-director-verify` before run/final thrash.
+- **Tests:** ensure_ready / strict / route mismatch / closeout / next verify.
+
 ## [2.41.34] - 2026-08-07
 
 ### Added (director-center · Phase E4)

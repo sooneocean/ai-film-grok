@@ -495,6 +495,98 @@ def test_post_doctor_edit_director_section(tmp_path: Path) -> None:
     assert "EDIT_DIRECTOR_ROUTE_MISMATCH" in hard_codes
 
 
+def test_ensure_ready_for_final_auto_draft_apply(tmp_path: Path) -> None:
+    from edit_director import ensure_ready_for_final, plan_path as ed_plan
+
+    clip = tmp_path / "takes" / "sh01.mp4"
+    clip.parent.mkdir(parents=True)
+    clip.write_bytes(b"x")
+    (tmp_path / "film-spec.json").write_text(
+        json.dumps(_mini_spec("sh01")), encoding="utf-8"
+    )
+    (tmp_path / "manifest.json").write_text(
+        json.dumps(
+            {
+                "clips": {
+                    "sh01": {
+                        "path": str(clip),
+                        "status": "approved",
+                        "state": "active",
+                        "duration_sec": 4.0,
+                    }
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    assert not ed_plan(tmp_path).is_file()
+    rep = ensure_ready_for_final(tmp_path, auto_draft=True, auto_apply=True)
+    assert ed_plan(tmp_path).is_file()
+    assert rep.get("ok") is True
+    assert any("auto-draft" in str(n) for n in (rep.get("notes") or []))
+    assert rep.get("apply_present") is True
+
+
+def test_ensure_ready_strict_missing_plan_raises(tmp_path: Path) -> None:
+    from edit_director import ensure_ready_for_final
+
+    (tmp_path / "film-spec.json").write_text("{}", encoding="utf-8")
+    (tmp_path / "manifest.json").write_text("{}", encoding="utf-8")
+    with pytest.raises(EditDirectorError, match="no edit-director plan"):
+        ensure_ready_for_final(
+            tmp_path, auto_draft=False, auto_apply=False, strict=True
+        )
+    # non-strict: soft ok without plan
+    soft = ensure_ready_for_final(
+        tmp_path, auto_draft=False, auto_apply=False, strict=False
+    )
+    assert soft.get("ok") is True
+    assert soft.get("hard") == []
+
+
+def test_ensure_ready_route_mismatch_hard(tmp_path: Path) -> None:
+    from edit_director import ensure_ready_for_final
+
+    clip = tmp_path / "takes" / "sh01.mp4"
+    clip.parent.mkdir(parents=True)
+    clip.write_bytes(b"x")
+    (tmp_path / "film-spec.json").write_text(
+        json.dumps(_mini_spec("sh01")), encoding="utf-8"
+    )
+    (tmp_path / "manifest.json").write_text(
+        json.dumps(
+            {
+                "clips": {
+                    "sh01": {
+                        "path": str(clip),
+                        "status": "approved",
+                        "state": "active",
+                        "duration_sec": 4.0,
+                    }
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    draft_and_save(tmp_path, force=True)
+    apply_plan(tmp_path, write_route=True)
+    # fight plan caption_path (master_hf default)
+    (tmp_path / "receipts" / "post-route.json").write_text(
+        json.dumps(
+            {
+                "kind": "post-route",
+                "caption_path": "ship_hardburn",
+                "plate_subs": "burn",
+            }
+        ),
+        encoding="utf-8",
+    )
+    with pytest.raises(EditDirectorError, match="post_route_mismatch"):
+        ensure_ready_for_final(
+            tmp_path, auto_draft=False, auto_apply=False, strict=False
+        )
+
+
 def test_closeout_prefers_edit_director_cmd(tmp_path: Path) -> None:
     from closeout import _final_next_cmd
 
@@ -522,6 +614,28 @@ def test_closeout_prefers_edit_director_cmd(tmp_path: Path) -> None:
     draft_and_save(tmp_path, force=True, design="hyperframes")
     cmd = _final_next_cmd(tmp_path)
     assert "edit-director" in cmd or "hyperframes" in cmd
+
+
+def test_closeout_edit_director_step(tmp_path: Path) -> None:
+    from closeout import closeout_status
+
+    (tmp_path / "film-spec.json").write_text(
+        json.dumps(_mini_spec("sh01")), encoding="utf-8"
+    )
+    (tmp_path / "manifest.json").write_text(
+        json.dumps({"gates": {}, "clips": {}}), encoding="utf-8"
+    )
+    st = closeout_status(tmp_path)
+    ids = [s.get("id") for s in st.get("steps") or []]
+    assert "edit_director" in ids
+    ed = next(s for s in st["steps"] if s.get("id") == "edit_director")
+    assert ed.get("advisory") is True
+    assert "draft" in str(ed.get("next_cmd") or "")
+
+    draft_and_save(tmp_path, force=True)
+    st2 = closeout_status(tmp_path)
+    ed2 = next(s for s in st2["steps"] if s.get("id") == "edit_director")
+    assert "verify" in str(ed2.get("next_cmd") or "")
 
 
 def test_next_actions_suggests_edit_director(tmp_path: Path) -> None:
@@ -582,3 +696,69 @@ def test_next_actions_suggests_edit_director(tmp_path: Path) -> None:
     actions = build_next_actions(tmp_path, gates=gates)
     ids = [a.get("id") for a in actions]
     assert "edit-director-draft" in ids
+
+
+def test_next_actions_suggests_verify_after_apply(tmp_path: Path) -> None:
+    from next_actions import build_next_actions
+
+    clip = tmp_path / "takes" / "sh01.mp4"
+    clip.parent.mkdir(parents=True)
+    clip.write_bytes(b"x")
+    (tmp_path / "brief.json").write_text(
+        json.dumps({"title": "ed", "theme": "test"}), encoding="utf-8"
+    )
+    (tmp_path / "film-spec.json").write_text(
+        json.dumps(_mini_spec("sh01")), encoding="utf-8"
+    )
+    (tmp_path / "manifest.json").write_text(
+        json.dumps(
+            {
+                "gates": {
+                    "brief": True,
+                    "style_locked": True,
+                    "spec": True,
+                    "clips_complete": True,
+                    "final_complete": False,
+                },
+                "clips": {
+                    "sh01": {
+                        "path": str(clip),
+                        "status": "approved",
+                        "state": "active",
+                    }
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    rec = tmp_path / "receipts"
+    rec.mkdir(parents=True)
+    (rec / "pilot-approval.json").write_text(
+        json.dumps(
+            {
+                "approved": True,
+                "approved_by": "user",
+                "user_phrase": "pilot 过",
+                "shots": ["sh01"],
+            }
+        ),
+        encoding="utf-8",
+    )
+    draft_and_save(tmp_path, force=True)
+    # leave cut_state picture/locked-ish if assembly blocks ok — set + apply
+    set_plan_fields(tmp_path, cut_state="picture_lock")
+    apply_plan(tmp_path, write_route=True)
+    gates = {
+        "brief": True,
+        "style_locked": True,
+        "spec": True,
+        "clips_complete": True,
+        "final_complete": False,
+        "desktop_exported": False,
+    }
+    actions = build_next_actions(tmp_path, gates=gates)
+    ids = [a.get("id") for a in actions]
+    assert "edit-director-verify" in ids
+    # verify should appear before run when both present
+    if "edit-director-run" in ids:
+        assert ids.index("edit-director-verify") < ids.index("edit-director-run")

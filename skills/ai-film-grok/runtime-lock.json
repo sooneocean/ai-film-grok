@@ -710,7 +710,7 @@
     },
     {
       "path": "scripts/cli/cli_post.py",
-      "sha256": "9e893e01ac1ba96ff471100676cebdcd405e6754ce81007b5c001aa5127e796f"
+      "sha256": "4f7fbda388ca4a6a37df740772754fa500d10db25d2b5ef217e12a934c78bd24"
     },
     {
       "path": "scripts/cli/cli_quality.py",
@@ -2738,7 +2738,7 @@
     },
     {
       "path": "scripts/post/closeout.py",
-      "sha256": "791228e48d8e597881c025dd20e5703a8a01150c471407089a6a2bff2b4f4cf0"
+      "sha256": "699b4f43d3956908c7fd426a3ed7d9fdc581538d01d98291786a67a15b515e6b"
     },
     {
       "path": "scripts/post/color_grade.py",
@@ -2762,7 +2762,7 @@
     },
     {
       "path": "scripts/post/edit_director.py",
-      "sha256": "6de245723510b4add7ab00e12361727853dafc3c548509e7bf3e8e288452c8c5"
+      "sha256": "c4ac7169ad46ea652a5ebb4f0906fa3bc7ca736d715866fc1ae02efa5ee442a9"
     },
     {
       "path": "scripts/post/export_composition.py",
@@ -3226,7 +3226,7 @@
     },
     {
       "path": "scripts/spine/next_actions.py",
-      "sha256": "fb0bdd95e729fc6db816775461f41a1385c5f8c6a4a8c10fc15047a104e2c721"
+      "sha256": "bc712a30bda9f3dab2adb2957148bb81544e2e132cb3e3093666efa28cb0491f"
     },
     {
       "path": "scripts/spine/pipeline_events.py",
@@ -3525,6 +3525,10 @@
       "sha256": "43c0fcc3f57d300d7cf77d15fa90625cc4b8bd10ec86d8f0360a930d8adda998"
     },
     {
+      "path": "scripts/web/shot_card_api.py",
+      "sha256": "5c775a244e393fe9a257ca28f86858a5f0235e4b5d2ff8c8497b280cdd18a70b"
+    },
+    {
       "path": "scripts/web/smoke_console.py",
       "sha256": "e60030750e493b42f6ed301648fd44f45dbef5d0742b863ccf538f15118cf734"
     },
@@ -3563,10 +3567,6 @@
     {
       "path": "scripts/workflow_spine.py",
       "sha256": "f0dcbc6657e32b74c998f571b11ec29ca6b8c2d568d1b6cd589732b64a12d561"
-    },
-    {
-      "path": "scripts/web/shot_card_api.py",
-      "sha256": "5c775a244e393fe9a257ca28f86858a5f0235e4b5d2ff8c8497b280cdd18a70b"
     }
   ],
   "requirements_sha256": "f8c098495135ea53c62cfd94778efcf059f16c8e83852303f900c3eea5615001"

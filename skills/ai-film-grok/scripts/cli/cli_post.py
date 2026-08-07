@@ -219,6 +219,37 @@ def cmd_final(args: argparse.Namespace) -> int:
             pass
     post_engine = str(getattr(args, "post_engine", "hyperframes") or "hyperframes").strip().lower()
     # R2 · edit-director plan supplies defaults when CLI did not pin route
+    # R5 · desk gate: auto draft/apply; hard on post_route_mismatch (skippable)
+    edit_director_gate: dict[str, Any] | None = None
+    skip_edit_director = bool(getattr(args, "skip_edit_director", False))
+    if not skip_edit_director:
+        try:
+            import os as _os_ed
+
+            skip_edit_director = str(
+                _os_ed.environ.get("AIFILM_SKIP_EDIT_DIRECTOR") or ""
+            ).strip().lower() in {"1", "true", "yes", "on"}
+        except Exception:
+            pass
+    if not skip_edit_director:
+        try:
+            from edit_director import EditDirectorError, ensure_ready_for_final
+
+            edit_director_gate = ensure_ready_for_final(
+                root,
+                auto_draft=True,
+                auto_apply=True,
+                strict=bool(getattr(args, "edit_director_strict", False)),
+            )
+            for note in edit_director_gate.get("notes") or []:
+                log(f"edit-director: {note}")
+        except EditDirectorError as exc:
+            raise FilmError(str(exc)) from exc
+        except Exception as exc:  # noqa: BLE001
+            log(f"edit-director gate skipped: {exc}"[:160])
+    else:
+        log("edit-director gate skipped (--skip-edit-director or env)")
+
     try:
         from edit_director import resolve_final_defaults
 
@@ -434,6 +465,31 @@ def cmd_final(args: argparse.Namespace) -> int:
     # ship_hardburn→ plate burn; designed post may grade only (no second caption layer)
     # Never: hand-mux silent plate and claim "HF will have burned subs".
     stages_receipt: dict[str, Any] = {}
+    if edit_director_gate is not None:
+        stages_receipt["edit_director"] = {
+            "ok": edit_director_gate.get("ok"),
+            "notes": edit_director_gate.get("notes") or [],
+            "apply_present": edit_director_gate.get("apply_present"),
+            "blocked_by": edit_director_gate.get("blocked_by"),
+            "engine_route": edit_director_gate.get("engine_route"),
+        }
+    elif skip_edit_director:
+        stages_receipt["edit_director"] = {"skipped": True}
+
+    def _attach_edit_director_gate(obj: dict[str, Any]) -> dict[str, Any]:
+        """Surface desk gate on final emit (audit; not a second director)."""
+        if edit_director_gate is not None:
+            obj["edit_director"] = {
+                "ok": edit_director_gate.get("ok"),
+                "notes": edit_director_gate.get("notes") or [],
+                "apply_present": edit_director_gate.get("apply_present"),
+                "blocked_by": edit_director_gate.get("blocked_by"),
+                "engine_route": edit_director_gate.get("engine_route"),
+            }
+        elif skip_edit_director:
+            obj["edit_director"] = {"skipped": True}
+        return obj
+
     try:
         from post_route import (
             PostRouteError,
@@ -679,7 +735,7 @@ def cmd_final(args: argparse.Namespace) -> int:
                         if isinstance(i, dict)
                     ],
                 }
-            emit(out_obj)
+            emit(_attach_edit_director_gate(out_obj))
         elif proc.stdout:
             print(proc.stdout)
         return 0
@@ -935,7 +991,7 @@ def cmd_final(args: argparse.Namespace) -> int:
                     if isinstance(i, dict)
                 ],
             }
-        emit(out_obj)
+        emit(_attach_edit_director_gate(out_obj))
         return 0 if out_obj.get("ok") else 2
 
     if preflight_report is not None:
@@ -953,7 +1009,7 @@ def cmd_final(args: argparse.Namespace) -> int:
     )
     if bgm_usage is not None:
         out_obj["bgm_usage"] = bgm_usage
-    emit(out_obj)
+    emit(_attach_edit_director_gate(out_obj))
     return 0
 
 
@@ -2343,6 +2399,22 @@ def add_post_parsers(sub: argparse._SubParsersAction[argparse.ArgumentParser]) -
         "--skip-preflight",
         action="store_true",
         help="Skip lesson preflight hard gates before final (not recommended)",
+    )
+    fin.add_argument(
+        "--skip-edit-director",
+        action="store_true",
+        help=(
+            "Skip edit-director desk gate before final (auto draft/apply + route check). "
+            "Also AIFILM_SKIP_EDIT_DIRECTOR=1. Prefer aifilm edit-director status first."
+        ),
+    )
+    fin.add_argument(
+        "--edit-director-strict",
+        action="store_true",
+        help=(
+            "edit-director gate also blocks on assembly cut, plan errors, or missing plan "
+            "(default only hard-blocks post_route_mismatch)"
+        ),
     )
     fin.add_argument(
         "--skip-canonical-truth",
