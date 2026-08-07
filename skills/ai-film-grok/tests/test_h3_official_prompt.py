@@ -76,7 +76,7 @@ def test_force_official_and_legacy(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_auto_dialogue_official_high_legacy(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("AIFILM_H3_PROMPT_DIALECT", "auto")
     assert resolve_prompt_dialect(_dlg_shot()) == "official"
-    assert resolve_prompt_dialect(_hi_shot()) == "legacy"
+    assert resolve_prompt_dialect(_hi_shot()) == "official"
     soft = {
         "id": "s",
         "dsl": {"action": "soft blink", "prompt_tier": "soft", "style": "cel"},
@@ -268,11 +268,14 @@ def test_base_i2va_has_half_second_densify() -> None:
 
 
 def test_high_motion_official_opt_in(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Default on after live densify; escape=0 restores legacy timeline."""
     monkeypatch.setenv("AIFILM_H3_PROMPT_DIALECT", "auto")
     monkeypatch.delenv("AIFILM_H3_HIGH_MOTION_OFFICIAL", raising=False)
-    assert resolve_prompt_dialect(_hi_shot()) == "legacy"
+    assert resolve_prompt_dialect(_hi_shot()) == "official"
     monkeypatch.setenv("AIFILM_H3_HIGH_MOTION_OFFICIAL", "1")
     assert resolve_prompt_dialect(_hi_shot()) == "official"
+    monkeypatch.setenv("AIFILM_H3_HIGH_MOTION_OFFICIAL", "0")
+    assert resolve_prompt_dialect(_hi_shot()) == "legacy"
 
 
 def test_r2v_mode_hint_forces_official(monkeypatch: pytest.MonkeyPatch) -> None:

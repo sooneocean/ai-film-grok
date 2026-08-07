@@ -1,0 +1,57 @@
+{
+  "status": "DONE",
+  "ok": true,
+  "kind": "h3-official-live-canary",
+  "plugin": "2.40.94",
+  "at": "2026-08-07T05:56:15Z",
+  "seed": 202608073,
+  "shot_id": "s_high_motion_official",
+  "path": "LocalComfyH3Provider+unload_models",
+  "compile": {
+    "word_count_imd": 244,
+    "validate": {
+      "ok": true,
+      "official_mode": "I2VA",
+      "issues": [],
+      "has_dialogue_tag": false
+    }
+  },
+  "burn": {
+    "elapsed_sec": 67.6,
+    "clip": "/Users/dex/.grok/plugins/ai-film-grok/skills/ai-film-grok/artifacts/5090-evaluation/h3-official-ab-20260807/takes/s_high_motion_official/s_high_motion_official_h3_i2v_202608073.mp4",
+    "queue_end": {
+      "running": 0,
+      "pending": 0,
+      "idle": true
+    },
+    "vram_end": {
+      "free_gib": 2.56,
+      "total_gib": 31.84,
+      "free_b": 2744367616
+    }
+  },
+  "means": {
+    "legacy_o3": {
+      "path": "/Users/dex/.grok/plugins/ai-film-grok/skills/ai-film-grok/artifacts/5090-evaluation/h3-official-ab-20260807/takes/s_high_motion_legacy/s_high_motion_legacy_h3_i2v_20260807.mp4",
+      "mean": 20.6656,
+      "size": 678496
+    },
+    "official_o3": {
+      "path": "/Users/dex/.grok/plugins/ai-film-grok/skills/ai-film-grok/artifacts/5090-evaluation/h3-official-ab-20260807/takes/s_high_motion_official/s_high_motion_official_h3_i2v_20260807.mp4",
+      "mean": 18.5775,
+      "size": 647232
+    },
+    "official_live": {
+      "path": "/Users/dex/.grok/plugins/ai-film-grok/skills/ai-film-grok/artifacts/5090-evaluation/h3-official-ab-20260807/takes/s_high_motion_official/s_high_motion_official_h3_i2v_202608073.mp4",
+      "mean": 24.8562,
+      "size": 583954
+    }
+  },
+  "compare": {
+    "delta_live_minus_legacy": 4.1906,
+    "delta_live_minus_o3_official": 6.278700000000001,
+    "motion_mean_winner": "official_live",
+    "default_flip_ready": true,
+    "note": "high auto flip only if live clearly beats legacy; human lip still required"
+  }
+}

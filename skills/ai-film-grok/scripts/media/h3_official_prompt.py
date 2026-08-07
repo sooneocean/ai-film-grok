@@ -5,9 +5,10 @@ Serializes film-spec shots into the MiniMax VIDEO_PROMPT_WRITING_GUIDE formats:
 * **Base** (T2VA / I2VA / FL2VA / L2VA): alignment line + three core fields
 * **Ref2VA**: six sections (subject_definitions … non_diegetic_music)
 
-Default dialect **auto** (O3 canary 2026-08-07):
-  dialogue → official; high-motion → legacy; else official.
+Default dialect **auto** (live densify canary 2026-08-07 seed 202608073):
+  dialogue / high / else → official (high mean 24.86 > legacy 20.67).
 Force: ``AIFILM_H3_PROMPT_DIALECT=official|legacy|auto``
+  Escape high→legacy: ``AIFILM_H3_HIGH_MOTION_OFFICIAL=0``
 
 Upstream pin: ``references/vendor/minimax-h3/h3-prompt-writing/``
 """
@@ -65,13 +66,13 @@ def resolve_prompt_dialect(
 
 
 def high_motion_official_enabled() -> bool:
-    """Opt-in: high-motion auto dialect uses official densify (not legacy timeline).
+    """High-motion auto dialect uses official densify (default on after live canary).
 
-    Escape / enable: ``AIFILM_H3_HIGH_MOTION_OFFICIAL=1``.
-    Default off until P3.5 reburn proves mean+look (O3 mean favored legacy).
+    Live densify 2026-08-07 seed 202608073: official mean 24.86 > legacy 20.67.
+    Escape back to legacy timeline: ``AIFILM_H3_HIGH_MOTION_OFFICIAL=0``.
     """
-    raw = os.environ.get("AIFILM_H3_HIGH_MOTION_OFFICIAL", "0").strip().lower()
-    return raw in {"1", "true", "yes", "on"}
+    raw = os.environ.get("AIFILM_H3_HIGH_MOTION_OFFICIAL", "1").strip().lower()
+    return raw not in {"0", "false", "no", "off"}
 
 
 def _auto_dialect_for_shot(shot: dict[str, Any]) -> str:

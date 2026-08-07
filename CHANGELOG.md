@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.40.95] - 2026-08-07
+
+### Changed (H3 official · live densify canary DONE → auto high official)
+- **Live burn DONE:** `s_high_motion_official` seed `202608073` LocalComfyH3Provider after unload_models free; mean **24.86** vs legacy **20.67** (+4.19) vs O3 official **18.58** (+6.28); ~68s.
+- **Auto high:** default official densify (`AIFILM_H3_HIGH_MOTION_OFFICIAL` default **1**); escape `=0` for legacy timeline.
+- **Evidence:** `skills/ai-film-grok/artifacts/2026-08-07-h3-official-live-canary.json`.
+- **Note:** soft-portrait not reburned (O3 soft official mean still low); human look still final.
+
 ## [2.40.94] - 2026-08-07
 
 ### Changed (H3 official prompt · R5 upgrade iteration)

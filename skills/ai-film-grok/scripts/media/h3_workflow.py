@@ -167,8 +167,8 @@ def _prompt_for_shot(
 
     Dialects (``resolve_prompt_dialect``):
 
-    * **auto** (default after O3 canary 2026-08-07) — dialogue → official;
-      high-motion → legacy timeline energy; else official structure.
+    * **auto** (live densify canary 2026-08-07) — dialogue / high / else → official
+      (high escape: ``AIFILM_H3_HIGH_MOTION_OFFICIAL=0`` → legacy timeline).
     * **official** — always MiniMax three-field / Ref2VA six-section.
     * **legacy** — force temporal ``[Xs-Ys]`` (or flat when not 5090 profile).
       Env: ``AIFILM_H3_PROMPT_DIALECT=auto|official|legacy`` or ``dsl.prompt_format``.
