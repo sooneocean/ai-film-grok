@@ -127,7 +127,7 @@ S3 Stage peel → 编排函数只剩：load ctx → stage1()…stageN() → rece
 | concat + join transitions | `final/stages_picture_concat.py` |
 | Music / spotting / procedural bed | `final/stages_music_bed.py` + `render_final_music` |
 | Dual-track mix / sidechain / partial | `final/stages_dual_mix.py` |
-| Subtitle burn / SRT clock | `final/stages_subs.py` |
+| Subtitle burn / SRT clock | `final/stages_subs.py` (**SHIPPED**) |
 | Mux + manifest delivery_class | `final/stages_mux_manifest.py` |
 
 **RenderContext（已落地 `final/render_context.py`）：**  
@@ -171,7 +171,7 @@ S3 Stage peel → 编排函数只剩：load ctx → stage1()…stageN() → rece
 - [x] **W1.1** `final/render_context.py` + `load_render_context` 已挂 `render_final`；helpers→`render_helpers`；**行为零变**  
 - [x] **W1.2** peel **music/spotting 残留** → `final/stages_music_bed.py`（seed/anti-fatigue/timelines/materialize + A4 receipt）  
 - [x] **W1.3** peel **dual mix + partial receipt**（已有 `mix_partial` / sidechain 诚实语义 · 禁改 PARTIAL 语义）  
-- [ ] **W1.4** peel **subs burn / caption clock**  
+- [x] **W1.4** peel **subs burn / caption clock** → `final/stages_subs.py`  
 - [ ] **W1.5** peel **TTS stems + native XOR + 口白窗三角**（A2 IRON · 测锁死）  
 - [ ] **W1.6** peel **stretch/concat/join**  
 - [x] **W1.7** (mux leaf + official finalize leaf) peel **mux + delivery_class / master_lock 诚实字段**（A5 · plate≠master）  

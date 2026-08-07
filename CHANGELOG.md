@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.41.8] - 2026-08-07
+
+### Changed (monolith orchestrator relief · W1.4 subs)
+- **`final/stages_subs.py`:** cue clock · SRT write/mirror · PIL burn or copy (`subs=off` default).
+- **`render_final`:** stage 8 delegates to leaf (structure-only; HF caption owner / no double-burn policy unchanged).
+- **Tests:** `tests/test_stages_subs.py`.
+
 ## [2.41.7] - 2026-08-07
 
 ### Changed (monolith orchestrator relief · W2)

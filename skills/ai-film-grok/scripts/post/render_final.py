@@ -1949,109 +1949,39 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
                     json.dumps(mix_spotting, ensure_ascii=False, indent=2) + "\n",
                 )
 
-    # 8) Subtitle cues — char-weighted, early; same xfade clock as picture/VO/native
-    # P0 · 2026-07-24: default 0 — positive lead caused SRT overlap hard-fail on dense ZH units
-    sub_lead = float(getattr(args, "sub_lead", 0.0) or 0.0)
-    sub_min = float(getattr(args, "sub_min_unit", 0.48) or 0.48)
-    sub_max = float(getattr(args, "sub_max_unit", 1.75) or 1.75)
-    cues, film_tl = build_subtitle_cues_for_shots(
-        shot_audio,
-        title_duration=title_dur,
-        end_duration=end_dur,
-        transition_sec=active_transition,
-        sub_lead=sub_lead,
-        sub_min=sub_min,
-        sub_max=sub_max,
-        story_join_intents=list(story_intents) if story_intents is not None else None,
-        default_intent=default_intent if active_transition > 0 else "hard",
+    # 8) Subtitle cues + SRT + optional PIL burn (leaf: final.stages_subs)
+    from final.stages_subs import materialize_subs_stage
+
+    _subs = materialize_subs_stage(
+        args=args,
+        out_dir=out_dir,
+        audio_dir=audio_dir,
+        work=work,
+        overlays_dir=overlays_dir,
+        silent=silent,
+        shot_audio=shot_audio,
+        shot_dicts=shot_dicts,
+        title_duration=float(title_dur),
+        end_duration=float(end_dur),
+        active_transition=float(active_transition),
+        story_intents=list(story_intents) if story_intents is not None else None,
+        default_intent=default_intent,
+        use_event_tts=use_event_tts,
+        formal_timeline=formal_timeline,
+        timeline_caption_bindings=timeline_caption_bindings,
+        width=width,
+        height=height,
+        font_path=font_path,
+        run=run,
+        render_error_cls=RenderError,
     )
-    event_caption_bindings: list[dict[str, Any]] | None = None
-    if use_event_tts and formal_timeline is not None:
-        event_caption_bindings = timeline_caption_bindings(formal_timeline)
-        cues = [
-            {
-                "start": row["start_sec"],
-                "end": row["end_sec"],
-                "text": row["caption_text"],
-                "audio_event_id": row["audio_event_id"],
-            }
-            for row in event_caption_bindings
-        ]
-        write_json(audio_dir / "event-subtitle-bindings.json", event_caption_bindings)
-
-    try:
-        srt_path = safe_output_path(
-            out_dir, "final.srt", suffixes={".srt"}, field="subtitle sidecar"
-        )
-    except SecurityPolicyError as exc:
-        raise RenderError(str(exc)) from exc
-    write_srt(srt_path, cues, preserve_overlaps=use_event_tts)
-    # Wave D · if film root path has spaces, also mirror SRT to /tmp for any
-    # libass/subtitles= consumers (PIL burn already uses PNG overlays, no force_style).
-    srt_stable = stable_path_for_ffmpeg_filter(srt_path, suffix=".srt", prefix="aifilm-srt")
-    if srt_stable != srt_path:
-        log(f"SRT mirrored to space-free path for ffmpeg filters: {srt_stable}")
-
-    # Burn subs with PIL overlays (no drawtext dependency).
-    # --subs off keeps SRT only (for HyperFrames designed captions underlay path).
-    subs_mode = resolve_subtitle_mode(args)
-    video_subbed = work / "video_subbed.mp4"
-    if subs_mode == "off" or not cues:
-        shutil.copy2(silent, video_subbed)
-    else:
-        overlay_inputs: list[str] = ["-i", str(silent)]
-        filter_parts: list[str] = []
-        last = "[0:v]"
-        oidx = 1
-        for i, cue in enumerate(cues):
-            png = overlays_dir / f"sub_{i:03d}.png"
-            shot_index = cue.get("shot_index", 0)
-            shot = shot_dicts[shot_index] if shot_dicts and shot_index < len(shot_dicts) else {}
-            safe_area = (shot.get("dsl") or {}).get("safe_area") or {}
-
-            # Subtitles default to bottom, but we dodge to top if subtitle_clear is explicitly false
-            dodge = safe_area.get("subtitle_clear") is False
-            italic = cue.get("is_monologue", False)
-
-            sub_png(
-                cue["text"],
-                png,
-                width=width,
-                height=height,
-                font_path=font_path,
-                dodge=dodge,
-                italic=italic,
-            )
-            overlay_inputs += ["-i", str(png)]
-            out_label = f"[o{i}]"
-            filter_parts.append(
-                f"{last}[{oidx}:v]overlay=0:0:enable='between(t,{cue['start']:.3f},{cue['end']:.3f})'{out_label}"
-            )
-            last = out_label
-            oidx += 1
-        if filter_parts:
-            run(
-                [
-                    "ffmpeg",
-                    "-y",
-                    *overlay_inputs,
-                    "-filter_complex",
-                    ";".join(filter_parts),
-                    "-map",
-                    last,
-                    "-c:v",
-                    "libx264",
-                    "-preset",
-                    "medium",
-                    "-crf",
-                    "16",
-                    "-pix_fmt",
-                    "yuv420p",
-                    str(video_subbed),
-                ]
-            )
-        else:
-            shutil.copy2(silent, video_subbed)
+    cues = _subs["cues"]
+    film_tl = _subs["film_tl"]
+    event_caption_bindings = _subs["event_caption_bindings"]
+    srt_path = _subs["srt_path"]
+    srt_stable = _subs["srt_stable"]
+    video_subbed = _subs["video_subbed"]
+    subs_mode = _subs["subs_mode"]
 
     # 9) Mux final + verify streams (leaf: final.stages_mux_manifest)
     from final.stages_mux_manifest import mux_final_mp4, verify_final_streams
