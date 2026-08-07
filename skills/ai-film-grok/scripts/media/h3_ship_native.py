@@ -9,6 +9,7 @@ Does not replace gate-auto green master.
 
 from __future__ import annotations
 
+import contextlib
 import os
 import shutil
 import subprocess
@@ -246,10 +247,8 @@ def _hard_concat(parts: list[Path], out: Path) -> None:
     # copy may fail if codecs differ; re-encode fallback
     r = subprocess.run(cmd, capture_output=True, text=True, timeout=600, check=False)
     if r.returncode == 0 and out.is_file() and out.stat().st_size > 0:
-        try:
+        with contextlib.suppress(OSError):
             lst.unlink(missing_ok=True)
-        except OSError:
-            pass
         return
     cmd_re = [
         "ffmpeg",
@@ -275,10 +274,8 @@ def _hard_concat(parts: list[Path], out: Path) -> None:
         str(out),
     ]
     r2 = subprocess.run(cmd_re, capture_output=True, text=True, timeout=900, check=False)
-    try:
+    with contextlib.suppress(OSError):
         lst.unlink(missing_ok=True)
-    except OSError:
-        pass
     if r2.returncode != 0 or not out.is_file() or out.stat().st_size <= 0:
         err = (r2.stderr or r.stderr or "")[-800:]
         raise H3ShipNativeError(f"ffmpeg concat failed: {err}")
@@ -330,10 +327,8 @@ def apply_native_light_af_filter(
     ]
     r = subprocess.run(cmd, capture_output=True, text=True, timeout=900, check=False)
     if r.returncode != 0 or not tmp.is_file() or tmp.stat().st_size <= 0:
-        try:
+        with contextlib.suppress(OSError):
             tmp.unlink(missing_ok=True)
-        except OSError:
-            pass
         err = (r.stderr or "")[-800:]
         raise H3ShipNativeError(f"native light af filter failed: {err}")
     try:
@@ -342,10 +337,8 @@ def apply_native_light_af_filter(
         import shutil as _sh
 
         _sh.copy2(tmp, dst)
-        try:
+        with contextlib.suppress(OSError):
             tmp.unlink(missing_ok=True)
-        except OSError:
-            pass
     return {
         "ok": True,
         "filter": filt,

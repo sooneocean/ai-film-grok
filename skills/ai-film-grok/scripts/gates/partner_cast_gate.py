@@ -205,7 +205,7 @@ def audit_partner_cast(
     dual_prompt_issues: list[dict[str, Any]] = []
     spec = _load_json(base / "film-spec.json")
     shots = spec.get("shots") if isinstance(spec.get("shots"), list) else []
-    multi_ids = [str(k) for k in cast.keys() if str(k).lower() not in {"hero", "env", "bg"}]
+    multi_ids = [str(k) for k in cast if str(k).lower() not in {"hero", "env", "bg"}]
     if len(cast) >= 2:
         for sh in shots[:80]:
             if not isinstance(sh, dict):

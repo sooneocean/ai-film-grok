@@ -7,6 +7,7 @@ or pure-instrumental procedural beds. Pure analysis — does not render audio.
 
 from __future__ import annotations
 
+import contextlib
 from pathlib import Path
 from typing import Any
 
@@ -44,10 +45,8 @@ def check_bgm_anti_fatigue(
                     continue
                 for sh in sc.get("shots") or []:
                     if isinstance(sh, dict):
-                        try:
+                        with contextlib.suppress(TypeError, ValueError):
                             acc += float(sh.get("duration_sec") or 0)
-                        except (TypeError, ValueError):
-                            pass
             total_dur_sec = acc or 0.0
 
     dur = float(total_dur_sec or 0.0)

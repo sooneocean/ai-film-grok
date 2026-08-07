@@ -7,6 +7,7 @@ plan → generate on 5090 → optional silent plate → queue complete → regis
 
 from __future__ import annotations
 
+import contextlib
 import os
 import subprocess
 from pathlib import Path
@@ -1125,7 +1126,7 @@ def run_h3_shot(
                 "reason": reason or "AIFILM_ALLOW_H3_MODE_OVERRIDE",
                 "note": "CLI --mode overrode h3 list/plan resolve; prefer resolve unless energy fail",
             }
-            try:
+            with contextlib.suppress(Exception):
                 record_h3_mode_override(
                     base,
                     shot_id=str(shot_id),
@@ -1133,8 +1134,6 @@ def run_h3_shot(
                     cli=mode_norm,
                     reason=reason or "AIFILM_ALLOW_H3_MODE_OVERRIDE",
                 )
-            except Exception:
-                pass
 
     if plan["requires_still"] and not plan.get("still_path"):
         raise H3WorkflowError(

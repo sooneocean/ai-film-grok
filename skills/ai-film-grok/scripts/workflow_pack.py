@@ -7,6 +7,7 @@ Receipts land under film-root receipts/ for dispatch and humans.
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import time
@@ -394,10 +395,8 @@ def bulk_preflight(
             from util import write_json as _wj
 
             crop_rep = crop_master_still_report(man, required_shot_ids=shot_ids)
-            try:
+            with contextlib.suppress(Exception):
                 _wj(root / "receipts" / "crop-master-still.json", crop_rep)
-            except Exception:
-                pass
             # Soft: ok=True so bulk continues with visibility; hard: ok=False blocks
             add(
                 "crop_master_still",

@@ -223,7 +223,7 @@ def sync_armed_env_skips(
     """
     if root is None:
         return load_skip_usage(root)
-    ledger = load_skip_usage(root)
+    load_skip_usage(root)
     reason_eff = reason or os.environ.get("AIFILM_SKIP_REASON")
     # Prefer known IRON set + any AIFILM_SKIP_* currently in env
     candidates: set[str] = set(IRON_SKIP_FLAGS)

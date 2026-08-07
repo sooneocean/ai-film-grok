@@ -228,7 +228,7 @@ def audit_identity_generation(
         "cast_generation_id": gen_id,
         "face_identity_verified": verified,
         "enrolled_chars": sorted(enrolled.keys()) if enrolled else [],
-        "cast_master_chars": sorted(str(k) for k in cast_masters.keys()) if cast_masters else [],
+        "cast_master_chars": sorted(str(k) for k in cast_masters) if cast_masters else [],
         "escape": "AIFILM_SKIP_IDENTITY_GEN=1",
         "at": utc_now(),
         "root": str(base),

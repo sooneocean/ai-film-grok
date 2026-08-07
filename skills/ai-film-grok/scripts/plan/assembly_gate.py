@@ -29,7 +29,7 @@ def check_assembly_takes(
     strict: bool = True,
 ) -> dict[str, Any]:
     clips = manifest.get("clips") if isinstance(manifest.get("clips"), dict) else {}
-    ids = list(shot_ids) if shot_ids else sorted(str(k) for k in clips.keys())
+    ids = list(shot_ids) if shot_ids else sorted(str(k) for k in clips)
     issues: list[dict[str, Any]] = []
     allowed: list[str] = []
     blocked: list[str] = []

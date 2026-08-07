@@ -34,10 +34,7 @@ def resolve_plate_slot_sec(
     ``min_sec`` are treated as unusable.
     """
     try:
-        if isinstance(shot, dict):
-            raw = shot.get("duration_sec")
-        else:
-            raw = None
+        raw = shot.get("duration_sec") if isinstance(shot, dict) else None
         plate_slot = float(raw or 0.0)
     except (TypeError, ValueError):
         plate_slot = 0.0

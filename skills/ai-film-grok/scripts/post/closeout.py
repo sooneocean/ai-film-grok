@@ -558,7 +558,7 @@ def closeout_status(root: Path | str) -> dict[str, Any]:
                 else f"hard={len(hard_issues)} soft={rebind.get('soft_count')}"
             ),
             "next_cmd": rebind.get("next_cmd"),
-            "advisory": False if hard_issues else True,
+            "advisory": not hard_issues,
             "hard": bool(hard_issues),
             "receipt": "receipts/narrative-rebind.json",
         }

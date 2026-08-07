@@ -9,6 +9,7 @@ Never auto-downloads weights. Never auto-promotes. GPU-busy → zero submit.
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import re
@@ -175,10 +176,8 @@ def probe_media(path: Path) -> dict[str, Any]:
                     fps = float(num) / float(den) if float(den) else 0.0
                 except ValueError:
                     fps = 0.0
-            try:
+            with contextlib.suppress(TypeError, ValueError):
                 duration = float(stream.get("duration") or duration or 0)
-            except (TypeError, ValueError):
-                pass
         if stream.get("codec_type") == "audio":
             has_audio = True
     fmt = data.get("format") if isinstance(data.get("format"), Mapping) else {}

@@ -236,10 +236,6 @@ def _kill_stale_local_tunnel(local_port: int) -> list[str]:
     except (OSError, subprocess.SubprocessError):
         pids = []
     for pid in pids:
-        try:
-            cmd = Path(f"/proc/{pid}/cmdline")  # may not exist on macOS
-        except Exception:
-            cmd = None
         # macOS: ps
         try:
             ps = subprocess.run(
