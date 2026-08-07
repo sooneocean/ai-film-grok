@@ -1291,11 +1291,13 @@
       "spend_class": "local",
       "approval_class": "none",
       "advance_eligible": false,
-      "status": "orphan",
+      "status": "partial",
       "tags": [
-        "cli_surface"
+        "cli_surface",
+        "cli_only_not_spine"
       ],
-      "hub_if_ladder": false
+      "hub_if_ladder": false,
+      "note": "C1: real CLI surface; not a dispatch next_action primary"
     },
     {
       "id": "cli:advance",
@@ -1303,15 +1305,17 @@
       "cli_cmd": "advance",
       "skill_id": null,
       "craft_stage": null,
-      "pipeline_stage": null,
+      "pipeline_stage": "agent",
       "spend_class": "local",
       "approval_class": "none",
       "advance_eligible": false,
-      "status": "orphan",
+      "status": "canonical",
       "tags": [
-        "cli_surface"
+        "cli_surface",
+        "cli_hub_primary"
       ],
-      "hub_if_ladder": false
+      "hub_if_ladder": false,
+      "note": "C1: hub primary CLI promoted from orphan"
     },
     {
       "id": "cli:ambience-candidate",
@@ -1323,11 +1327,13 @@
       "spend_class": "local",
       "approval_class": "none",
       "advance_eligible": false,
-      "status": "orphan",
+      "status": "partial",
       "tags": [
-        "cli_surface"
+        "cli_surface",
+        "cli_only_not_spine"
       ],
-      "hub_if_ladder": false
+      "hub_if_ladder": false,
+      "note": "C1: real CLI surface; not a dispatch next_action primary"
     },
     {
       "id": "cli:analyze-reference",
@@ -1355,11 +1361,13 @@
       "spend_class": "local",
       "approval_class": "none",
       "advance_eligible": false,
-      "status": "orphan",
+      "status": "partial",
       "tags": [
-        "cli_surface"
+        "cli_surface",
+        "cli_only_not_spine"
       ],
-      "hub_if_ladder": false
+      "hub_if_ladder": false,
+      "note": "C1: real CLI surface; not a dispatch next_action primary"
     },
     {
       "id": "cli:assemble",
@@ -1371,11 +1379,13 @@
       "spend_class": "local",
       "approval_class": "none",
       "advance_eligible": false,
-      "status": "orphan",
+      "status": "partial",
       "tags": [
-        "cli_surface"
+        "cli_surface",
+        "cli_only_not_spine"
       ],
-      "hub_if_ladder": false
+      "hub_if_ladder": false,
+      "note": "C1: real CLI surface; not a dispatch next_action primary"
     },
     {
       "id": "cli:assets",
@@ -1383,15 +1393,17 @@
       "cli_cmd": "assets",
       "skill_id": null,
       "craft_stage": null,
-      "pipeline_stage": null,
+      "pipeline_stage": "agent",
       "spend_class": "local",
       "approval_class": "none",
       "advance_eligible": false,
-      "status": "orphan",
+      "status": "canonical",
       "tags": [
-        "cli_surface"
+        "cli_surface",
+        "cli_hub_primary"
       ],
-      "hub_if_ladder": false
+      "hub_if_ladder": false,
+      "note": "C1: hub primary CLI promoted from orphan"
     },
     {
       "id": "cli:audio-event",
@@ -1403,11 +1415,13 @@
       "spend_class": "local",
       "approval_class": "none",
       "advance_eligible": false,
-      "status": "orphan",
+      "status": "partial",
       "tags": [
-        "cli_surface"
+        "cli_surface",
+        "cli_only_not_spine"
       ],
-      "hub_if_ladder": false
+      "hub_if_ladder": false,
+      "note": "C1: real CLI surface; not a dispatch next_action primary"
     },
     {
       "id": "cli:audio-produce",
@@ -1419,11 +1433,13 @@
       "spend_class": "local",
       "approval_class": "none",
       "advance_eligible": false,
-      "status": "orphan",
+      "status": "partial",
       "tags": [
-        "cli_surface"
+        "cli_surface",
+        "cli_only_not_spine"
       ],
-      "hub_if_ladder": false
+      "hub_if_ladder": false,
+      "note": "C1: real CLI surface; not a dispatch next_action primary"
     },
     {
       "id": "cli:audio-provenance",
@@ -1451,11 +1467,13 @@
       "spend_class": "local",
       "approval_class": "none",
       "advance_eligible": false,
-      "status": "orphan",
+      "status": "partial",
       "tags": [
-        "cli_surface"
+        "cli_surface",
+        "cli_only_not_spine"
       ],
-      "hub_if_ladder": false
+      "hub_if_ladder": false,
+      "note": "C1: real CLI surface; not a dispatch next_action primary"
     },
     {
       "id": "cli:audio-verify",
@@ -1467,11 +1485,13 @@
       "spend_class": "local",
       "approval_class": "none",
       "advance_eligible": false,
-      "status": "orphan",
+      "status": "partial",
       "tags": [
-        "cli_surface"
+        "cli_surface",
+        "cli_only_not_spine"
       ],
-      "hub_if_ladder": false
+      "hub_if_ladder": false,
+      "note": "C1: real CLI surface; not a dispatch next_action primary"
     },
     {
       "id": "cli:audio-visual",
@@ -1499,11 +1519,13 @@
       "spend_class": "local",
       "approval_class": "none",
       "advance_eligible": false,
-      "status": "orphan",
+      "status": "partial",
       "tags": [
-        "cli_surface"
+        "cli_surface",
+        "cli_only_not_spine"
       ],
-      "hub_if_ladder": false
+      "hub_if_ladder": false,
+      "note": "C1: real CLI surface; not a dispatch next_action primary"
     },
     {
       "id": "cli:autopilot",
@@ -1511,15 +1533,17 @@
       "cli_cmd": "autopilot",
       "skill_id": null,
       "craft_stage": null,
-      "pipeline_stage": null,
+      "pipeline_stage": "agent",
       "spend_class": "local",
       "approval_class": "none",
       "advance_eligible": false,
-      "status": "orphan",
+      "status": "canonical",
       "tags": [
-        "cli_surface"
+        "cli_surface",
+        "cli_hub_primary"
       ],
-      "hub_if_ladder": false
+      "hub_if_ladder": false,
+      "note": "C1: hub primary CLI promoted from orphan"
     },
     {
       "id": "cli:beat-evidence",
@@ -1547,11 +1571,13 @@
       "spend_class": "local",
       "approval_class": "none",
       "advance_eligible": false,
-      "status": "orphan",
+      "status": "partial",
       "tags": [
-        "cli_surface"
+        "cli_surface",
+        "cli_only_not_spine"
       ],
-      "hub_if_ladder": false
+      "hub_if_ladder": false,
+      "note": "C1: real CLI surface; not a dispatch next_action primary"
     },
     {
       "id": "cli:bgm-candidate",
@@ -1563,11 +1589,13 @@
       "spend_class": "local",
       "approval_class": "none",
       "advance_eligible": false,
-      "status": "orphan",
+      "status": "partial",
       "tags": [
-        "cli_surface"
+        "cli_surface",
+        "cli_only_not_spine"
       ],
-      "hub_if_ladder": false
+      "hub_if_ladder": false,
+      "note": "C1: real CLI surface; not a dispatch next_action primary"
     },
     {
       "id": "cli:bgm-library",
@@ -1575,15 +1603,17 @@
       "cli_cmd": "bgm-library",
       "skill_id": null,
       "craft_stage": null,
-      "pipeline_stage": null,
+      "pipeline_stage": "agent",
       "spend_class": "local",
       "approval_class": "none",
       "advance_eligible": false,
-      "status": "orphan",
+      "status": "canonical",
       "tags": [
-        "cli_surface"
+        "cli_surface",
+        "cli_hub_primary"
       ],
-      "hub_if_ladder": false
+      "hub_if_ladder": false,
+      "note": "C1: hub primary CLI promoted from orphan"
     },
     {
       "id": "cli:bible",
@@ -1623,15 +1653,17 @@
       "cli_cmd": "capability",
       "skill_id": null,
       "craft_stage": null,
-      "pipeline_stage": null,
+      "pipeline_stage": "agent",
       "spend_class": "local",
       "approval_class": "none",
       "advance_eligible": false,
-      "status": "orphan",
+      "status": "canonical",
       "tags": [
-        "cli_surface"
+        "cli_surface",
+        "cli_hub_primary"
       ],
-      "hub_if_ladder": false
+      "hub_if_ladder": false,
+      "note": "C1: hub primary CLI promoted from orphan"
     },
     {
       "id": "cli:caption-frame-attest",
@@ -1691,11 +1723,13 @@
       "spend_class": "local",
       "approval_class": "none",
       "advance_eligible": false,
-      "status": "orphan",
+      "status": "partial",
       "tags": [
-        "cli_surface"
+        "cli_surface",
+        "cli_only_not_spine"
       ],
-      "hub_if_ladder": false
+      "hub_if_ladder": false,
+      "note": "C1: real CLI surface; not a dispatch next_action primary"
     },
     {
       "id": "cli:comfy",
@@ -1703,15 +1737,17 @@
       "cli_cmd": "comfy",
       "skill_id": null,
       "craft_stage": null,
-      "pipeline_stage": null,
+      "pipeline_stage": "agent",
       "spend_class": "local",
       "approval_class": "none",
       "advance_eligible": false,
-      "status": "orphan",
+      "status": "canonical",
       "tags": [
-        "cli_surface"
+        "cli_surface",
+        "cli_hub_primary"
       ],
-      "hub_if_ladder": false
+      "hub_if_ladder": false,
+      "note": "C1: hub primary CLI promoted from orphan"
     },
     {
       "id": "cli:continuity-chain",
@@ -1719,15 +1755,17 @@
       "cli_cmd": "continuity-chain",
       "skill_id": null,
       "craft_stage": null,
-      "pipeline_stage": null,
+      "pipeline_stage": "agent",
       "spend_class": "local",
       "approval_class": "none",
       "advance_eligible": false,
-      "status": "orphan",
+      "status": "canonical",
       "tags": [
-        "cli_surface"
+        "cli_surface",
+        "cli_hub_primary"
       ],
-      "hub_if_ladder": false
+      "hub_if_ladder": false,
+      "note": "C1: hub primary CLI promoted from orphan"
     },
     {
       "id": "cli:craft",
@@ -1735,15 +1773,17 @@
       "cli_cmd": "craft",
       "skill_id": null,
       "craft_stage": null,
-      "pipeline_stage": null,
+      "pipeline_stage": "agent",
       "spend_class": "local",
       "approval_class": "none",
       "advance_eligible": false,
-      "status": "orphan",
+      "status": "canonical",
       "tags": [
-        "cli_surface"
+        "cli_surface",
+        "cli_hub_primary"
       ],
-      "hub_if_ladder": false
+      "hub_if_ladder": false,
+      "note": "C1: hub primary CLI promoted from orphan"
     },
     {
       "id": "cli:creative-pipeline",
@@ -1755,11 +1795,13 @@
       "spend_class": "local",
       "approval_class": "none",
       "advance_eligible": false,
-      "status": "orphan",
+      "status": "partial",
       "tags": [
-        "cli_surface"
+        "cli_surface",
+        "cli_only_not_spine"
       ],
-      "hub_if_ladder": false
+      "hub_if_ladder": false,
+      "note": "C1: real CLI surface; not a dispatch next_action primary"
     },
     {
       "id": "cli:dashboard",
@@ -1767,15 +1809,17 @@
       "cli_cmd": "dashboard",
       "skill_id": null,
       "craft_stage": null,
-      "pipeline_stage": null,
+      "pipeline_stage": "agent",
       "spend_class": "local",
       "approval_class": "none",
       "advance_eligible": false,
-      "status": "orphan",
+      "status": "canonical",
       "tags": [
-        "cli_surface"
+        "cli_surface",
+        "cli_hub_primary"
       ],
-      "hub_if_ladder": false
+      "hub_if_ladder": false,
+      "note": "C1: hub primary CLI promoted from orphan"
     },
     {
       "id": "cli:delivery-package",
@@ -1787,11 +1831,13 @@
       "spend_class": "local",
       "approval_class": "none",
       "advance_eligible": false,
-      "status": "orphan",
+      "status": "partial",
       "tags": [
-        "cli_surface"
+        "cli_surface",
+        "cli_only_not_spine"
       ],
-      "hub_if_ladder": false
+      "hub_if_ladder": false,
+      "note": "C1: real CLI surface; not a dispatch next_action primary"
     },
     {
       "id": "cli:department",
@@ -1803,11 +1849,13 @@
       "spend_class": "local",
       "approval_class": "none",
       "advance_eligible": false,
-      "status": "orphan",
+      "status": "partial",
       "tags": [
-        "cli_surface"
+        "cli_surface",
+        "cli_only_not_spine"
       ],
-      "hub_if_ladder": false
+      "hub_if_ladder": false,
+      "note": "C1: real CLI surface; not a dispatch next_action primary"
     },
     {
       "id": "cli:dialogue-benchmark",
@@ -1819,11 +1867,13 @@
       "spend_class": "local",
       "approval_class": "none",
       "advance_eligible": false,
-      "status": "orphan",
+      "status": "partial",
       "tags": [
-        "cli_surface"
+        "cli_surface",
+        "cli_only_not_spine"
       ],
-      "hub_if_ladder": false
+      "hub_if_ladder": false,
+      "note": "C1: real CLI surface; not a dispatch next_action primary"
     },
     {
       "id": "cli:dialogue-benchmark-approve",
@@ -1835,11 +1885,13 @@
       "spend_class": "local",
       "approval_class": "none",
       "advance_eligible": false,
-      "status": "orphan",
+      "status": "partial",
       "tags": [
-        "cli_surface"
+        "cli_surface",
+        "cli_only_not_spine"
       ],
-      "hub_if_ladder": false
+      "hub_if_ladder": false,
+      "note": "C1: real CLI surface; not a dispatch next_action primary"
     },
     {
       "id": "cli:dialogue-benchmark-queue",
@@ -1851,11 +1903,13 @@
       "spend_class": "local",
       "approval_class": "none",
       "advance_eligible": false,
-      "status": "orphan",
+      "status": "partial",
       "tags": [
-        "cli_surface"
+        "cli_surface",
+        "cli_only_not_spine"
       ],
-      "hub_if_ladder": false
+      "hub_if_ladder": false,
+      "note": "C1: real CLI surface; not a dispatch next_action primary"
     },
     {
       "id": "cli:dialogue-benchmark-review",
@@ -1867,11 +1921,13 @@
       "spend_class": "local",
       "approval_class": "none",
       "advance_eligible": false,
-      "status": "orphan",
+      "status": "partial",
       "tags": [
-        "cli_surface"
+        "cli_surface",
+        "cli_only_not_spine"
       ],
-      "hub_if_ladder": false
+      "hub_if_ladder": false,
+      "note": "C1: real CLI surface; not a dispatch next_action primary"
     },
     {
       "id": "cli:dialogue-production-plan",
@@ -1883,11 +1939,13 @@
       "spend_class": "local",
       "approval_class": "none",
       "advance_eligible": false,
-      "status": "orphan",
+      "status": "partial",
       "tags": [
-        "cli_surface"
+        "cli_surface",
+        "cli_only_not_spine"
       ],
-      "hub_if_ladder": false
+      "hub_if_ladder": false,
+      "note": "C1: real CLI surface; not a dispatch next_action primary"
     },
     {
       "id": "cli:director",
@@ -1899,11 +1957,13 @@
       "spend_class": "local",
       "approval_class": "none",
       "advance_eligible": false,
-      "status": "orphan",
+      "status": "partial",
       "tags": [
-        "cli_surface"
+        "cli_surface",
+        "cli_only_not_spine"
       ],
-      "hub_if_ladder": false
+      "hub_if_ladder": false,
+      "note": "C1: real CLI surface; not a dispatch next_action primary"
     },
     {
       "id": "cli:director-ledger",
@@ -1927,15 +1987,17 @@
       "cli_cmd": "dispatch",
       "skill_id": null,
       "craft_stage": null,
-      "pipeline_stage": null,
+      "pipeline_stage": "agent",
       "spend_class": "local",
       "approval_class": "none",
       "advance_eligible": false,
-      "status": "orphan",
+      "status": "canonical",
       "tags": [
-        "cli_surface"
+        "cli_surface",
+        "cli_hub_primary"
       ],
-      "hub_if_ladder": false
+      "hub_if_ladder": false,
+      "note": "C1: hub primary CLI promoted from orphan"
     },
     {
       "id": "cli:doctor",
@@ -1943,15 +2005,17 @@
       "cli_cmd": "doctor",
       "skill_id": null,
       "craft_stage": null,
-      "pipeline_stage": null,
+      "pipeline_stage": "agent",
       "spend_class": "local",
       "approval_class": "none",
       "advance_eligible": false,
-      "status": "orphan",
+      "status": "canonical",
       "tags": [
-        "cli_surface"
+        "cli_surface",
+        "cli_hub_primary"
       ],
-      "hub_if_ladder": false
+      "hub_if_ladder": false,
+      "note": "C1: hub primary CLI promoted from orphan"
     },
     {
       "id": "cli:editor-cut",
@@ -1979,11 +2043,13 @@
       "spend_class": "local",
       "approval_class": "none",
       "advance_eligible": false,
-      "status": "orphan",
+      "status": "partial",
       "tags": [
-        "cli_surface"
+        "cli_surface",
+        "cli_only_not_spine"
       ],
-      "hub_if_ladder": false
+      "hub_if_ladder": false,
+      "note": "C1: real CLI surface; not a dispatch next_action primary"
     },
     {
       "id": "cli:env-plate",
@@ -1995,11 +2061,13 @@
       "spend_class": "local",
       "approval_class": "none",
       "advance_eligible": false,
-      "status": "orphan",
+      "status": "partial",
       "tags": [
-        "cli_surface"
+        "cli_surface",
+        "cli_only_not_spine"
       ],
-      "hub_if_ladder": false
+      "hub_if_ladder": false,
+      "note": "C1: real CLI surface; not a dispatch next_action primary"
     },
     {
       "id": "cli:experiment",
@@ -2011,11 +2079,13 @@
       "spend_class": "local",
       "approval_class": "none",
       "advance_eligible": false,
-      "status": "orphan",
+      "status": "partial",
       "tags": [
-        "cli_surface"
+        "cli_surface",
+        "cli_only_not_spine"
       ],
-      "hub_if_ladder": false
+      "hub_if_ladder": false,
+      "note": "C1: real CLI surface; not a dispatch next_action primary"
     },
     {
       "id": "cli:export-compose",
@@ -2027,11 +2097,13 @@
       "spend_class": "local",
       "approval_class": "none",
       "advance_eligible": false,
-      "status": "orphan",
+      "status": "partial",
       "tags": [
-        "cli_surface"
+        "cli_surface",
+        "cli_only_not_spine"
       ],
-      "hub_if_ladder": false
+      "hub_if_ladder": false,
+      "note": "C1: real CLI surface; not a dispatch next_action primary"
     },
     {
       "id": "cli:extract-frame",
@@ -2043,11 +2115,13 @@
       "spend_class": "local",
       "approval_class": "none",
       "advance_eligible": false,
-      "status": "orphan",
+      "status": "partial",
       "tags": [
-        "cli_surface"
+        "cli_surface",
+        "cli_only_not_spine"
       ],
-      "hub_if_ladder": false
+      "hub_if_ladder": false,
+      "note": "C1: real CLI surface; not a dispatch next_action primary"
     },
     {
       "id": "cli:face-identity",
@@ -2055,15 +2129,17 @@
       "cli_cmd": "face-identity",
       "skill_id": null,
       "craft_stage": null,
-      "pipeline_stage": null,
+      "pipeline_stage": "agent",
       "spend_class": "local",
       "approval_class": "none",
       "advance_eligible": false,
-      "status": "orphan",
+      "status": "canonical",
       "tags": [
-        "cli_surface"
+        "cli_surface",
+        "cli_hub_primary"
       ],
-      "hub_if_ladder": false
+      "hub_if_ladder": false,
+      "note": "C1: hub primary CLI promoted from orphan"
     },
     {
       "id": "cli:final-editorial-review",
@@ -2075,11 +2151,13 @@
       "spend_class": "local",
       "approval_class": "none",
       "advance_eligible": false,
-      "status": "orphan",
+      "status": "partial",
       "tags": [
-        "cli_surface"
+        "cli_surface",
+        "cli_only_not_spine"
       ],
-      "hub_if_ladder": false
+      "hub_if_ladder": false,
+      "note": "C1: real CLI surface; not a dispatch next_action primary"
     },
     {
       "id": "cli:five-track",
@@ -2091,11 +2169,13 @@
       "spend_class": "local",
       "approval_class": "none",
       "advance_eligible": false,
-      "status": "orphan",
+      "status": "partial",
       "tags": [
-        "cli_surface"
+        "cli_surface",
+        "cli_only_not_spine"
       ],
-      "hub_if_ladder": false
+      "hub_if_ladder": false,
+      "note": "C1: real CLI surface; not a dispatch next_action primary"
     },
     {
       "id": "cli:frw",
@@ -2103,15 +2183,17 @@
       "cli_cmd": "frw",
       "skill_id": null,
       "craft_stage": null,
-      "pipeline_stage": null,
+      "pipeline_stage": "agent",
       "spend_class": "local",
       "approval_class": "none",
       "advance_eligible": false,
-      "status": "orphan",
+      "status": "canonical",
       "tags": [
-        "cli_surface"
+        "cli_surface",
+        "cli_hub_primary"
       ],
-      "hub_if_ladder": false
+      "hub_if_ladder": false,
+      "note": "C1: hub primary CLI promoted from orphan"
     },
     {
       "id": "cli:frw-lipsync",
@@ -2123,11 +2205,13 @@
       "spend_class": "local",
       "approval_class": "none",
       "advance_eligible": false,
-      "status": "orphan",
+      "status": "partial",
       "tags": [
-        "cli_surface"
+        "cli_surface",
+        "cli_only_not_spine"
       ],
-      "hub_if_ladder": false
+      "hub_if_ladder": false,
+      "note": "C1: real CLI surface; not a dispatch next_action primary"
     },
     {
       "id": "cli:gold",
@@ -2139,11 +2223,13 @@
       "spend_class": "local",
       "approval_class": "none",
       "advance_eligible": false,
-      "status": "orphan",
+      "status": "partial",
       "tags": [
-        "cli_surface"
+        "cli_surface",
+        "cli_only_not_spine"
       ],
-      "hub_if_ladder": false
+      "hub_if_ladder": false,
+      "note": "C1: real CLI surface; not a dispatch next_action primary"
     },
     {
       "id": "cli:gpu-lease",
@@ -2203,11 +2289,13 @@
       "spend_class": "local",
       "approval_class": "none",
       "advance_eligible": false,
-      "status": "orphan",
+      "status": "partial",
       "tags": [
-        "cli_surface"
+        "cli_surface",
+        "cli_only_not_spine"
       ],
-      "hub_if_ladder": false
+      "hub_if_ladder": false,
+      "note": "C1: real CLI surface; not a dispatch next_action primary"
     },
     {
       "id": "cli:interactive",
@@ -2215,15 +2303,17 @@
       "cli_cmd": "interactive",
       "skill_id": null,
       "craft_stage": null,
-      "pipeline_stage": null,
+      "pipeline_stage": "agent",
       "spend_class": "local",
       "approval_class": "none",
       "advance_eligible": false,
-      "status": "orphan",
+      "status": "canonical",
       "tags": [
-        "cli_surface"
+        "cli_surface",
+        "cli_hub_primary"
       ],
-      "hub_if_ladder": false
+      "hub_if_ladder": false,
+      "note": "C1: hub primary CLI promoted from orphan"
     },
     {
       "id": "cli:lint-continuity",
@@ -2235,11 +2325,13 @@
       "spend_class": "local",
       "approval_class": "none",
       "advance_eligible": false,
-      "status": "orphan",
+      "status": "partial",
       "tags": [
-        "cli_surface"
+        "cli_surface",
+        "cli_only_not_spine"
       ],
-      "hub_if_ladder": false
+      "hub_if_ladder": false,
+      "note": "C1: real CLI surface; not a dispatch next_action primary"
     },
     {
       "id": "cli:lipsync-canary",
@@ -2251,11 +2343,13 @@
       "spend_class": "local",
       "approval_class": "none",
       "advance_eligible": false,
-      "status": "orphan",
+      "status": "partial",
       "tags": [
-        "cli_surface"
+        "cli_surface",
+        "cli_only_not_spine"
       ],
-      "hub_if_ladder": false
+      "hub_if_ladder": false,
+      "note": "C1: real CLI surface; not a dispatch next_action primary"
     },
     {
       "id": "cli:lipsync-challenge",
@@ -2267,11 +2361,13 @@
       "spend_class": "local",
       "approval_class": "none",
       "advance_eligible": false,
-      "status": "orphan",
+      "status": "partial",
       "tags": [
-        "cli_surface"
+        "cli_surface",
+        "cli_only_not_spine"
       ],
-      "hub_if_ladder": false
+      "hub_if_ladder": false,
+      "note": "C1: real CLI surface; not a dispatch next_action primary"
     },
     {
       "id": "cli:lipsync-node",
@@ -2283,11 +2379,13 @@
       "spend_class": "local",
       "approval_class": "none",
       "advance_eligible": false,
-      "status": "orphan",
+      "status": "partial",
       "tags": [
-        "cli_surface"
+        "cli_surface",
+        "cli_only_not_spine"
       ],
-      "hub_if_ladder": false
+      "hub_if_ladder": false,
+      "note": "C1: real CLI surface; not a dispatch next_action primary"
     },
     {
       "id": "cli:lipsync-pilot",
@@ -2299,11 +2397,13 @@
       "spend_class": "local",
       "approval_class": "none",
       "advance_eligible": false,
-      "status": "orphan",
+      "status": "partial",
       "tags": [
-        "cli_surface"
+        "cli_surface",
+        "cli_only_not_spine"
       ],
-      "hub_if_ladder": false
+      "hub_if_ladder": false,
+      "note": "C1: real CLI surface; not a dispatch next_action primary"
     },
     {
       "id": "cli:local-llm",
@@ -2343,15 +2443,17 @@
       "cli_cmd": "lock-runtime",
       "skill_id": null,
       "craft_stage": null,
-      "pipeline_stage": null,
+      "pipeline_stage": "agent",
       "spend_class": "local",
       "approval_class": "none",
       "advance_eligible": false,
-      "status": "orphan",
+      "status": "canonical",
       "tags": [
-        "cli_surface"
+        "cli_surface",
+        "cli_hub_primary"
       ],
-      "hub_if_ladder": false
+      "hub_if_ladder": false,
+      "note": "C1: hub primary CLI promoted from orphan"
     },
     {
       "id": "cli:longform",
@@ -2359,15 +2461,17 @@
       "cli_cmd": "longform",
       "skill_id": null,
       "craft_stage": null,
-      "pipeline_stage": null,
+      "pipeline_stage": "agent",
       "spend_class": "local",
       "approval_class": "none",
       "advance_eligible": false,
-      "status": "orphan",
+      "status": "canonical",
       "tags": [
-        "cli_surface"
+        "cli_surface",
+        "cli_hub_primary"
       ],
-      "hub_if_ladder": false
+      "hub_if_ladder": false,
+      "note": "C1: hub primary CLI promoted from orphan"
     },
     {
       "id": "cli:manifest",
@@ -2375,15 +2479,17 @@
       "cli_cmd": "manifest",
       "skill_id": null,
       "craft_stage": null,
-      "pipeline_stage": null,
+      "pipeline_stage": "agent",
       "spend_class": "local",
       "approval_class": "none",
       "advance_eligible": false,
-      "status": "orphan",
+      "status": "canonical",
       "tags": [
-        "cli_surface"
+        "cli_surface",
+        "cli_hub_primary"
       ],
-      "hub_if_ladder": false
+      "hub_if_ladder": false,
+      "note": "C1: hub primary CLI promoted from orphan"
     },
     {
       "id": "cli:metrics",
@@ -2391,15 +2497,17 @@
       "cli_cmd": "metrics",
       "skill_id": null,
       "craft_stage": null,
-      "pipeline_stage": null,
+      "pipeline_stage": "agent",
       "spend_class": "local",
       "approval_class": "none",
       "advance_eligible": false,
-      "status": "orphan",
+      "status": "canonical",
       "tags": [
-        "cli_surface"
+        "cli_surface",
+        "cli_hub_primary"
       ],
-      "hub_if_ladder": false
+      "hub_if_ladder": false,
+      "note": "C1: hub primary CLI promoted from orphan"
     },
     {
       "id": "cli:motion-plan",
@@ -2411,11 +2519,13 @@
       "spend_class": "local",
       "approval_class": "none",
       "advance_eligible": false,
-      "status": "orphan",
+      "status": "partial",
       "tags": [
-        "cli_surface"
+        "cli_surface",
+        "cli_only_not_spine"
       ],
-      "hub_if_ladder": false
+      "hub_if_ladder": false,
+      "note": "C1: real CLI surface; not a dispatch next_action primary"
     },
     {
       "id": "cli:narrative-evidence",
@@ -2439,15 +2549,17 @@
       "cli_cmd": "next",
       "skill_id": null,
       "craft_stage": null,
-      "pipeline_stage": null,
+      "pipeline_stage": "agent",
       "spend_class": "local",
       "approval_class": "none",
       "advance_eligible": false,
-      "status": "orphan",
+      "status": "canonical",
       "tags": [
-        "cli_surface"
+        "cli_surface",
+        "cli_hub_primary"
       ],
-      "hub_if_ladder": false
+      "hub_if_ladder": false,
+      "note": "C1: hub primary CLI promoted from orphan"
     },
     {
       "id": "cli:node",
@@ -2455,15 +2567,17 @@
       "cli_cmd": "node",
       "skill_id": null,
       "craft_stage": null,
-      "pipeline_stage": null,
+      "pipeline_stage": "agent",
       "spend_class": "local",
       "approval_class": "none",
       "advance_eligible": false,
-      "status": "orphan",
+      "status": "canonical",
       "tags": [
-        "cli_surface"
+        "cli_surface",
+        "cli_hub_primary"
       ],
-      "hub_if_ladder": false
+      "hub_if_ladder": false,
+      "note": "C1: hub primary CLI promoted from orphan"
     },
     {
       "id": "cli:optimization-program",
@@ -2475,11 +2589,13 @@
       "spend_class": "local",
       "approval_class": "none",
       "advance_eligible": false,
-      "status": "orphan",
+      "status": "partial",
       "tags": [
-        "cli_surface"
+        "cli_surface",
+        "cli_only_not_spine"
       ],
-      "hub_if_ladder": false
+      "hub_if_ladder": false,
+      "note": "C1: real CLI surface; not a dispatch next_action primary"
     },
     {
       "id": "cli:performance-candidate",
@@ -2491,11 +2607,13 @@
       "spend_class": "local",
       "approval_class": "none",
       "advance_eligible": false,
-      "status": "orphan",
+      "status": "partial",
       "tags": [
-        "cli_surface"
+        "cli_surface",
+        "cli_only_not_spine"
       ],
-      "hub_if_ladder": false
+      "hub_if_ladder": false,
+      "note": "C1: real CLI surface; not a dispatch next_action primary"
     },
     {
       "id": "cli:performance-timeline",
@@ -2587,11 +2705,13 @@
       "spend_class": "local",
       "approval_class": "none",
       "advance_eligible": false,
-      "status": "orphan",
+      "status": "partial",
       "tags": [
-        "cli_surface"
+        "cli_surface",
+        "cli_only_not_spine"
       ],
-      "hub_if_ladder": false
+      "hub_if_ladder": false,
+      "note": "C1: real CLI surface; not a dispatch next_action primary"
     },
     {
       "id": "cli:preflight",
@@ -2599,15 +2719,17 @@
       "cli_cmd": "preflight",
       "skill_id": null,
       "craft_stage": null,
-      "pipeline_stage": null,
+      "pipeline_stage": "agent",
       "spend_class": "local",
       "approval_class": "none",
       "advance_eligible": false,
-      "status": "orphan",
+      "status": "canonical",
       "tags": [
-        "cli_surface"
+        "cli_surface",
+        "cli_hub_primary"
       ],
-      "hub_if_ladder": false
+      "hub_if_ladder": false,
+      "note": "C1: hub primary CLI promoted from orphan"
     },
     {
       "id": "cli:production-report",
@@ -2619,11 +2741,13 @@
       "spend_class": "local",
       "approval_class": "none",
       "advance_eligible": false,
-      "status": "orphan",
+      "status": "partial",
       "tags": [
-        "cli_surface"
+        "cli_surface",
+        "cli_only_not_spine"
       ],
-      "hub_if_ladder": false
+      "hub_if_ladder": false,
+      "note": "C1: real CLI surface; not a dispatch next_action primary"
     },
     {
       "id": "cli:promotion-report",
@@ -2635,11 +2759,13 @@
       "spend_class": "local",
       "approval_class": "none",
       "advance_eligible": false,
-      "status": "orphan",
+      "status": "partial",
       "tags": [
-        "cli_surface"
+        "cli_surface",
+        "cli_only_not_spine"
       ],
-      "hub_if_ladder": false
+      "hub_if_ladder": false,
+      "note": "C1: real CLI surface; not a dispatch next_action primary"
     },
     {
       "id": "cli:prompt-budget",
@@ -2699,11 +2825,13 @@
       "spend_class": "local",
       "approval_class": "none",
       "advance_eligible": false,
-      "status": "orphan",
+      "status": "partial",
       "tags": [
-        "cli_surface"
+        "cli_surface",
+        "cli_only_not_spine"
       ],
-      "hub_if_ladder": false
+      "hub_if_ladder": false,
+      "note": "C1: real CLI surface; not a dispatch next_action primary"
     },
     {
       "id": "cli:quality",
@@ -2711,15 +2839,17 @@
       "cli_cmd": "quality",
       "skill_id": null,
       "craft_stage": null,
-      "pipeline_stage": null,
+      "pipeline_stage": "agent",
       "spend_class": "local",
       "approval_class": "none",
       "advance_eligible": false,
-      "status": "orphan",
+      "status": "canonical",
       "tags": [
-        "cli_surface"
+        "cli_surface",
+        "cli_hub_primary"
       ],
-      "hub_if_ladder": false
+      "hub_if_ladder": false,
+      "note": "C1: hub primary CLI promoted from orphan"
     },
     {
       "id": "cli:quality-check",
@@ -2747,11 +2877,13 @@
       "spend_class": "local",
       "approval_class": "none",
       "advance_eligible": false,
-      "status": "orphan",
+      "status": "partial",
       "tags": [
-        "cli_surface"
+        "cli_surface",
+        "cli_only_not_spine"
       ],
-      "hub_if_ladder": false
+      "hub_if_ladder": false,
+      "note": "C1: real CLI surface; not a dispatch next_action primary"
     },
     {
       "id": "cli:quality-ledger",
@@ -2763,11 +2895,13 @@
       "spend_class": "local",
       "approval_class": "none",
       "advance_eligible": false,
-      "status": "orphan",
+      "status": "partial",
       "tags": [
-        "cli_surface"
+        "cli_surface",
+        "cli_only_not_spine"
       ],
-      "hub_if_ladder": false
+      "hub_if_ladder": false,
+      "note": "C1: real CLI surface; not a dispatch next_action primary"
     },
     {
       "id": "cli:quality-status",
@@ -2779,11 +2913,13 @@
       "spend_class": "local",
       "approval_class": "none",
       "advance_eligible": false,
-      "status": "orphan",
+      "status": "partial",
       "tags": [
-        "cli_surface"
+        "cli_surface",
+        "cli_only_not_spine"
       ],
-      "hub_if_ladder": false
+      "hub_if_ladder": false,
+      "note": "C1: real CLI surface; not a dispatch next_action primary"
     },
     {
       "id": "cli:queue-progress",
@@ -2811,11 +2947,13 @@
       "spend_class": "local",
       "approval_class": "none",
       "advance_eligible": false,
-      "status": "orphan",
+      "status": "partial",
       "tags": [
-        "cli_surface"
+        "cli_surface",
+        "cli_only_not_spine"
       ],
-      "hub_if_ladder": false
+      "hub_if_ladder": false,
+      "note": "C1: real CLI surface; not a dispatch next_action primary"
     },
     {
       "id": "cli:register-clip",
@@ -2823,15 +2961,17 @@
       "cli_cmd": "register-clip",
       "skill_id": null,
       "craft_stage": null,
-      "pipeline_stage": null,
+      "pipeline_stage": "agent",
       "spend_class": "local",
       "approval_class": "none",
       "advance_eligible": false,
-      "status": "orphan",
+      "status": "canonical",
       "tags": [
-        "cli_surface"
+        "cli_surface",
+        "cli_hub_primary"
       ],
-      "hub_if_ladder": false
+      "hub_if_ladder": false,
+      "note": "C1: hub primary CLI promoted from orphan"
     },
     {
       "id": "cli:register-final",
@@ -2839,15 +2979,17 @@
       "cli_cmd": "register-final",
       "skill_id": null,
       "craft_stage": null,
-      "pipeline_stage": null,
+      "pipeline_stage": "agent",
       "spend_class": "local",
       "approval_class": "none",
       "advance_eligible": false,
-      "status": "orphan",
+      "status": "canonical",
       "tags": [
-        "cli_surface"
+        "cli_surface",
+        "cli_hub_primary"
       ],
-      "hub_if_ladder": false
+      "hub_if_ladder": false,
+      "note": "C1: hub primary CLI promoted from orphan"
     },
     {
       "id": "cli:register-still",
@@ -2855,15 +2997,17 @@
       "cli_cmd": "register-still",
       "skill_id": null,
       "craft_stage": null,
-      "pipeline_stage": null,
+      "pipeline_stage": "agent",
       "spend_class": "local",
       "approval_class": "none",
       "advance_eligible": false,
-      "status": "orphan",
+      "status": "canonical",
       "tags": [
-        "cli_surface"
+        "cli_surface",
+        "cli_hub_primary"
       ],
-      "hub_if_ladder": false
+      "hub_if_ladder": false,
+      "note": "C1: hub primary CLI promoted from orphan"
     },
     {
       "id": "cli:resume-manifest",
@@ -2875,11 +3019,13 @@
       "spend_class": "local",
       "approval_class": "none",
       "advance_eligible": false,
-      "status": "orphan",
+      "status": "partial",
       "tags": [
-        "cli_surface"
+        "cli_surface",
+        "cli_only_not_spine"
       ],
-      "hub_if_ladder": false
+      "hub_if_ladder": false,
+      "note": "C1: real CLI surface; not a dispatch next_action primary"
     },
     {
       "id": "cli:review-contract",
@@ -2891,11 +3037,13 @@
       "spend_class": "local",
       "approval_class": "none",
       "advance_eligible": false,
-      "status": "orphan",
+      "status": "partial",
       "tags": [
-        "cli_surface"
+        "cli_surface",
+        "cli_only_not_spine"
       ],
-      "hub_if_ladder": false
+      "hub_if_ladder": false,
+      "note": "C1: real CLI surface; not a dispatch next_action primary"
     },
     {
       "id": "cli:review-pack",
@@ -2923,11 +3071,13 @@
       "spend_class": "local",
       "approval_class": "none",
       "advance_eligible": false,
-      "status": "orphan",
+      "status": "partial",
       "tags": [
-        "cli_surface"
+        "cli_surface",
+        "cli_only_not_spine"
       ],
-      "hub_if_ladder": false
+      "hub_if_ladder": false,
+      "note": "C1: real CLI surface; not a dispatch next_action primary"
     },
     {
       "id": "cli:review-ui",
@@ -2951,15 +3101,17 @@
       "cli_cmd": "route",
       "skill_id": null,
       "craft_stage": null,
-      "pipeline_stage": null,
+      "pipeline_stage": "agent",
       "spend_class": "local",
       "approval_class": "none",
       "advance_eligible": false,
-      "status": "orphan",
+      "status": "canonical",
       "tags": [
-        "cli_surface"
+        "cli_surface",
+        "cli_hub_primary"
       ],
-      "hub_if_ladder": false
+      "hub_if_ladder": false,
+      "note": "C1: hub primary CLI promoted from orphan"
     },
     {
       "id": "cli:semantic-index",
@@ -2987,11 +3139,13 @@
       "spend_class": "local",
       "approval_class": "none",
       "advance_eligible": false,
-      "status": "orphan",
+      "status": "partial",
       "tags": [
-        "cli_surface"
+        "cli_surface",
+        "cli_only_not_spine"
       ],
-      "hub_if_ladder": false
+      "hub_if_ladder": false,
+      "note": "C1: real CLI surface; not a dispatch next_action primary"
     },
     {
       "id": "cli:sfx-canary",
@@ -3003,11 +3157,13 @@
       "spend_class": "local",
       "approval_class": "none",
       "advance_eligible": false,
-      "status": "orphan",
+      "status": "partial",
       "tags": [
-        "cli_surface"
+        "cli_surface",
+        "cli_only_not_spine"
       ],
-      "hub_if_ladder": false
+      "hub_if_ladder": false,
+      "note": "C1: real CLI surface; not a dispatch next_action primary"
     },
     {
       "id": "cli:sfx-candidate",
@@ -3019,11 +3175,13 @@
       "spend_class": "local",
       "approval_class": "none",
       "advance_eligible": false,
-      "status": "orphan",
+      "status": "partial",
       "tags": [
-        "cli_surface"
+        "cli_surface",
+        "cli_only_not_spine"
       ],
-      "hub_if_ladder": false
+      "hub_if_ladder": false,
+      "note": "C1: real CLI surface; not a dispatch next_action primary"
     },
     {
       "id": "cli:sfx-library",
@@ -3031,15 +3189,17 @@
       "cli_cmd": "sfx-library",
       "skill_id": null,
       "craft_stage": null,
-      "pipeline_stage": null,
+      "pipeline_stage": "agent",
       "spend_class": "local",
       "approval_class": "none",
       "advance_eligible": false,
-      "status": "orphan",
+      "status": "canonical",
       "tags": [
-        "cli_surface"
+        "cli_surface",
+        "cli_hub_primary"
       ],
-      "hub_if_ladder": false
+      "hub_if_ladder": false,
+      "note": "C1: hub primary CLI promoted from orphan"
     },
     {
       "id": "cli:shortform",
@@ -3047,15 +3207,17 @@
       "cli_cmd": "shortform",
       "skill_id": null,
       "craft_stage": null,
-      "pipeline_stage": null,
+      "pipeline_stage": "agent",
       "spend_class": "local",
       "approval_class": "none",
       "advance_eligible": false,
-      "status": "orphan",
+      "status": "canonical",
       "tags": [
-        "cli_surface"
+        "cli_surface",
+        "cli_hub_primary"
       ],
-      "hub_if_ladder": false
+      "hub_if_ladder": false,
+      "note": "C1: hub primary CLI promoted from orphan"
     },
     {
       "id": "cli:skill",
@@ -3099,11 +3261,13 @@
       "spend_class": "local",
       "approval_class": "none",
       "advance_eligible": false,
-      "status": "orphan",
+      "status": "partial",
       "tags": [
-        "cli_surface"
+        "cli_surface",
+        "cli_only_not_spine"
       ],
-      "hub_if_ladder": false
+      "hub_if_ladder": false,
+      "note": "C1: real CLI surface; not a dispatch next_action primary"
     },
     {
       "id": "cli:stage",
@@ -3111,15 +3275,17 @@
       "cli_cmd": "stage",
       "skill_id": null,
       "craft_stage": null,
-      "pipeline_stage": null,
+      "pipeline_stage": "agent",
       "spend_class": "local",
       "approval_class": "none",
       "advance_eligible": false,
-      "status": "orphan",
+      "status": "canonical",
       "tags": [
-        "cli_surface"
+        "cli_surface",
+        "cli_hub_primary"
       ],
-      "hub_if_ladder": false
+      "hub_if_ladder": false,
+      "note": "C1: hub primary CLI promoted from orphan"
     },
     {
       "id": "cli:status",
@@ -3127,15 +3293,17 @@
       "cli_cmd": "status",
       "skill_id": null,
       "craft_stage": null,
-      "pipeline_stage": null,
+      "pipeline_stage": "agent",
       "spend_class": "local",
       "approval_class": "none",
       "advance_eligible": false,
-      "status": "orphan",
+      "status": "canonical",
       "tags": [
-        "cli_surface"
+        "cli_surface",
+        "cli_hub_primary"
       ],
-      "hub_if_ladder": false
+      "hub_if_ladder": false,
+      "note": "C1: hub primary CLI promoted from orphan"
     },
     {
       "id": "cli:still-challenge",
@@ -3143,15 +3311,17 @@
       "cli_cmd": "still-challenge",
       "skill_id": null,
       "craft_stage": null,
-      "pipeline_stage": null,
+      "pipeline_stage": "agent",
       "spend_class": "local",
       "approval_class": "none",
       "advance_eligible": false,
-      "status": "orphan",
+      "status": "canonical",
       "tags": [
-        "cli_surface"
+        "cli_surface",
+        "cli_hub_primary"
       ],
-      "hub_if_ladder": false
+      "hub_if_ladder": false,
+      "note": "C1: hub primary CLI promoted from orphan"
     },
     {
       "id": "cli:style-lock",
@@ -3159,15 +3329,17 @@
       "cli_cmd": "style-lock",
       "skill_id": null,
       "craft_stage": null,
-      "pipeline_stage": null,
+      "pipeline_stage": "agent",
       "spend_class": "local",
       "approval_class": "none",
       "advance_eligible": false,
-      "status": "orphan",
+      "status": "canonical",
       "tags": [
-        "cli_surface"
+        "cli_surface",
+        "cli_hub_primary"
       ],
-      "hub_if_ladder": false
+      "hub_if_ladder": false,
+      "note": "C1: hub primary CLI promoted from orphan"
     },
     {
       "id": "cli:subtitle-cut-boundaries",
@@ -3207,15 +3379,17 @@
       "cli_cmd": "team",
       "skill_id": null,
       "craft_stage": null,
-      "pipeline_stage": null,
+      "pipeline_stage": "agent",
       "spend_class": "local",
       "approval_class": "none",
       "advance_eligible": false,
-      "status": "orphan",
+      "status": "canonical",
       "tags": [
-        "cli_surface"
+        "cli_surface",
+        "cli_hub_primary"
       ],
-      "hub_if_ladder": false
+      "hub_if_ladder": false,
+      "note": "C1: hub primary CLI promoted from orphan"
     },
     {
       "id": "cli:timeline-clock",
@@ -3287,15 +3461,17 @@
       "cli_cmd": "truth",
       "skill_id": null,
       "craft_stage": null,
-      "pipeline_stage": null,
+      "pipeline_stage": "agent",
       "spend_class": "local",
       "approval_class": "none",
       "advance_eligible": false,
-      "status": "orphan",
+      "status": "canonical",
       "tags": [
-        "cli_surface"
+        "cli_surface",
+        "cli_hub_primary"
       ],
-      "hub_if_ladder": false
+      "hub_if_ladder": false,
+      "note": "C1: hub primary CLI promoted from orphan"
     },
     {
       "id": "cli:tts-ab",
@@ -3307,11 +3483,13 @@
       "spend_class": "local",
       "approval_class": "none",
       "advance_eligible": false,
-      "status": "orphan",
+      "status": "partial",
       "tags": [
-        "cli_surface"
+        "cli_surface",
+        "cli_only_not_spine"
       ],
-      "hub_if_ladder": false
+      "hub_if_ladder": false,
+      "note": "C1: real CLI surface; not a dispatch next_action primary"
     },
     {
       "id": "cli:tunnel-probe",
@@ -3339,11 +3517,13 @@
       "spend_class": "local",
       "approval_class": "none",
       "advance_eligible": false,
-      "status": "orphan",
+      "status": "partial",
       "tags": [
-        "cli_surface"
+        "cli_surface",
+        "cli_only_not_spine"
       ],
-      "hub_if_ladder": false
+      "hub_if_ladder": false,
+      "note": "C1: real CLI surface; not a dispatch next_action primary"
     },
     {
       "id": "cli:verify",
@@ -3355,11 +3535,13 @@
       "spend_class": "local",
       "approval_class": "none",
       "advance_eligible": false,
-      "status": "orphan",
+      "status": "partial",
       "tags": [
-        "cli_surface"
+        "cli_surface",
+        "cli_only_not_spine"
       ],
-      "hub_if_ladder": false
+      "hub_if_ladder": false,
+      "note": "C1: real CLI surface; not a dispatch next_action primary"
     },
     {
       "id": "cli:vibevoice-asr",
@@ -3371,11 +3553,13 @@
       "spend_class": "local",
       "approval_class": "none",
       "advance_eligible": false,
-      "status": "orphan",
+      "status": "partial",
       "tags": [
-        "cli_surface"
+        "cli_surface",
+        "cli_only_not_spine"
       ],
-      "hub_if_ladder": false
+      "hub_if_ladder": false,
+      "note": "C1: real CLI surface; not a dispatch next_action primary"
     },
     {
       "id": "cli:visual-text-audit",
@@ -3387,11 +3571,13 @@
       "spend_class": "local",
       "approval_class": "none",
       "advance_eligible": false,
-      "status": "orphan",
+      "status": "partial",
       "tags": [
-        "cli_surface"
+        "cli_surface",
+        "cli_only_not_spine"
       ],
-      "hub_if_ladder": false
+      "hub_if_ladder": false,
+      "note": "C1: real CLI surface; not a dispatch next_action primary"
     },
     {
       "id": "cli:visual-text-repair",
@@ -3403,11 +3589,13 @@
       "spend_class": "local",
       "approval_class": "none",
       "advance_eligible": false,
-      "status": "orphan",
+      "status": "partial",
       "tags": [
-        "cli_surface"
+        "cli_surface",
+        "cli_only_not_spine"
       ],
-      "hub_if_ladder": false
+      "hub_if_ladder": false,
+      "note": "C1: real CLI surface; not a dispatch next_action primary"
     },
     {
       "id": "cli:weapon",
@@ -3415,15 +3603,17 @@
       "cli_cmd": "weapon",
       "skill_id": null,
       "craft_stage": null,
-      "pipeline_stage": null,
+      "pipeline_stage": "agent",
       "spend_class": "local",
       "approval_class": "none",
       "advance_eligible": false,
-      "status": "orphan",
+      "status": "canonical",
       "tags": [
-        "cli_surface"
+        "cli_surface",
+        "cli_hub_primary"
       ],
-      "hub_if_ladder": false
+      "hub_if_ladder": false,
+      "note": "C1: hub primary CLI promoted from orphan"
     },
     {
       "id": "cli:workshop",
@@ -3431,15 +3621,17 @@
       "cli_cmd": "workshop",
       "skill_id": null,
       "craft_stage": null,
-      "pipeline_stage": null,
+      "pipeline_stage": "agent",
       "spend_class": "local",
       "approval_class": "none",
       "advance_eligible": false,
-      "status": "orphan",
+      "status": "canonical",
       "tags": [
-        "cli_surface"
+        "cli_surface",
+        "cli_hub_primary"
       ],
-      "hub_if_ladder": false
+      "hub_if_ladder": false,
+      "note": "C1: hub primary CLI promoted from orphan"
     },
     {
       "id": "department_look_lock-evidence",
@@ -3545,6 +3737,49 @@
       "transition-frame-attest",
       "transition-frame-audit",
       "transition-frame-review-template"
-    ]
+    ],
+    "c1_orphan_governance": {
+      "at": "2026-08-07",
+      "policy": "core hub CLI → canonical; remaining former orphans → partial (cli_only_not_spine)",
+      "promoted_canonical": [
+        "advance",
+        "assets",
+        "autopilot",
+        "bgm-library",
+        "capability",
+        "comfy",
+        "continuity-chain",
+        "craft",
+        "dashboard",
+        "dispatch",
+        "doctor",
+        "face-identity",
+        "frw",
+        "interactive",
+        "lock-runtime",
+        "longform",
+        "manifest",
+        "metrics",
+        "next",
+        "node",
+        "preflight",
+        "quality",
+        "register-clip",
+        "register-final",
+        "register-still",
+        "route",
+        "sfx-library",
+        "shortform",
+        "stage",
+        "status",
+        "still-challenge",
+        "style-lock",
+        "team",
+        "truth",
+        "weapon",
+        "workshop"
+      ],
+      "reclass_partial_count": 60
+    }
   }
 }

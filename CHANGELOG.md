@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.40.106] - 2026-08-07
+
+### Changed (route-catalog C1 orphan governance)
+- **Reclass:** 36 hub-primary CLI (`dispatch`/`doctor`/`advance`/…) orphan → **canonical**; 60 other CLI-surface orphans → **partial** (`cli_only_not_spine`).
+- **Orphan soft-cap tests:** count &lt;40 and ratio &lt;20%; hub primaries must not be orphan.
+- **Docs:** CONTRIBUTING new-CLI must add catalog row; routing-map C1 note.
+- **meta.c1_orphan_governance** recorded on catalog.
+
 ## [2.40.105] - 2026-08-07
 
 ### Added (F2 face-lock triple · T3 transition-frame closeout)

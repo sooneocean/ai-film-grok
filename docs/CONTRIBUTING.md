@@ -41,6 +41,11 @@ git status -sb                  # 确认 branch / dirty 是否符合预期
 - **Primary:** `skills/ai-film-grok/scripts/aifilm` (or `aifilm` after plugin enable)
 - Helpers only: `backend-lock`, `media-queue`, `runtime-python`, `test` — not second entry points for product flow
 - Every agent turn with a film root: prefer `aifilm dispatch --root <film>` first
+- **New `aifilm` subcommand (C1 iron):** add parser+handler in `cli/*` **and** one row in
+  `skills/ai-film-grok/registry/route-catalog.json` (kind=`cli`, status=`canonical` for hub
+  primaries else `partial`, tags include `cli_surface`). Run
+  `python skills/ai-film-grok/scripts/tools/route_inventory.py` and keep
+  `pytest …/test_route_catalog.py` green (orphan ratio soft-cap).
 
 ## Config & secrets
 

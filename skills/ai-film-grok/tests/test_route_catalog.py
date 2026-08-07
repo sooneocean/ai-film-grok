@@ -43,6 +43,31 @@ def test_advance_actions_are_kind_action():
         assert route["kind"] == "action", route
 
 
+def test_orphan_ratio_under_soft_cap():
+    """C1 governance: orphan must stay rare (soft cap; tighten later if needed)."""
+    cat = load_catalog()
+    routes = [r for r in cat["routes"] if isinstance(r, dict)]
+    assert routes
+    orphan_n = sum(1 for r in routes if r.get("status") == "orphan")
+    ratio = orphan_n / len(routes)
+    assert orphan_n < 40, f"orphan count {orphan_n} >= 40 (C1 cap)"
+    assert ratio < 0.20, f"orphan ratio {ratio:.1%} >= 20% (C1 cap)"
+
+
+def test_hub_primary_cli_not_orphan():
+    """dispatch / doctor / advance must stay catalog-visible as non-orphan."""
+    cat = load_catalog()
+    by_cmd = {
+        str(r.get("cli_cmd")): r
+        for r in cat["routes"]
+        if isinstance(r, dict) and r.get("kind") == "cli" and r.get("cli_cmd")
+    }
+    for cmd in ("dispatch", "doctor", "advance", "status", "route"):
+        row = by_cmd.get(cmd)
+        assert row is not None, f"missing cli:{cmd}"
+        assert row.get("status") != "orphan", f"cli:{cmd} still orphan"
+
+
 def test_if_ladder_cmds_tagged_in_catalog():
     """Hub residual if-ladder must appear so R3 can close them out."""
     cat = load_catalog()
