@@ -2866,7 +2866,7 @@
     },
     {
       "path": "scripts/post/review_ui.py",
-      "sha256": "cbe60864361e01a67ab4b7ba848eeea0731ea188d6bbd1bf838975771aa26388"
+      "sha256": "2b38d2bdb5a8017cf49ecdce977d6d7b61be619e86b31242e8383a6e12554874"
     },
     {
       "path": "scripts/post/show_package.py",
@@ -3527,6 +3527,10 @@
     {
       "path": "scripts/web/smoke_console.py",
       "sha256": "d9c59e5b887b43548e212ea7e239c17e22488ff6ef95a687d9c79f0b52b494a6"
+    },
+    {
+      "path": "scripts/web/sse_stream.py",
+      "sha256": "71a3f39ae7838f9ff9baa746ebbb594f292936ce3bd343ea29efbf8fb3f61a46"
     },
     {
       "path": "scripts/web/takes_api.py",

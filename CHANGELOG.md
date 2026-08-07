@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.41.31] - 2026-08-07
+
+### Added (edit-director · Round 3)
+- **apply ↔ post-plan sync**: design → post_owner (hyperframes|remotion|ffmpeg); create/realign `post-plan.json`.
+- **editorial**: EDL path, source_types, optional trims from `edit/edl.json` (A-roll).
+- **`edit-director checklist`**: dry-run → `receipts/edit-director-checklist.{md,json}`.
+- **Tests:** sync · EDL/trims fail-closed · checklist (18 cases).
+
 ## [2.41.30] - 2026-08-07
 
 ### Added (Phase D · review_mode)
