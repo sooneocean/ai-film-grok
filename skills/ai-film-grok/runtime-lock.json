@@ -1494,7 +1494,11 @@
     },
     {
       "path": "scripts/gates/preflight.py",
-      "sha256": "c0c0cbb6f8e316d38b462cbec4986238a6b8abfacbd54171536c65b13c6c3e57"
+      "sha256": "bd298875307020fb972392b6d3e5b0489c9256d4406bfe708700ad74f4f15c5a"
+    },
+    {
+      "path": "scripts/gates/preflight_issues.py",
+      "sha256": "20f6273decec1f6831dde7e4ef35c7ce1f978be081c891b693399cad8723582b"
     },
     {
       "path": "scripts/gates/production_gates.py",
