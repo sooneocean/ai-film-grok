@@ -1,7 +1,7 @@
 # Code metabolism inventory — TERMINAL residual freeze
 
 **Generated:** 2026-08-07  
-**Latest batch:** 2.40.86 (Lane A allowlist guard + H3 official GUIDE align)  
+**Latest batch:** 2.40.90 (onboarding_planner residual allowlist + eng closeout green)  
 **Structure status:** **SAFE QUEUE DONE** · C6.1 migrate empty · **C6.3 Lane A empty** (no safe whole-file deletes)  
 **Guards:**  
 - `tests/test_c6_migrate_queue_empty.py` — thick top-level residual set  

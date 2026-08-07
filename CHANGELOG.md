@@ -1,5 +1,10 @@
 # Changelog
 
+## [2.40.90] - 2026-08-07
+
+### Fixed (C6.1 residual guard · eng closeout honesty)
+- **`test_c6_migrate_queue_empty`:** allowlist `onboarding_planner.py` (Onboarding v2 auto-decompose; console entry, not vanity migrate).
+
 ## [2.40.89] - 2026-08-07
 
 ### Changed (H3 official prompt · GUIDE optimize P2)
