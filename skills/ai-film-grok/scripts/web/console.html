@@ -4,32 +4,45 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>AI Film · 验片选素材控制台</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Sora:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
   :root {
-    --bg: #0b1020; --bg2: #111827; --panel: rgba(255,255,255,.06);
-    --panel-brd: rgba(255,255,255,.12); --txt: #e5e7eb; --muted: #9ca3af;
-    --accent: #a78bfa; --accent2: #34d399; --danger: #f87171; --warn: #fbbf24;
-    --ok: #34d399; --slate: #64748b; --radius: 18px;
+    --bg: #15130f; --bg2: #1e1a15; --surface: #1e1a15; --raised: #272019;
+    --panel: var(--surface); --panel-brd: rgba(255,245,230,.09);
+    --line: rgba(255,245,230,.09); --line-strong: rgba(255,245,230,.16);
+    --txt: #f3ede2; --muted: #b9b0a2; --text-lo: #7d7568;
+    --accent: #e8a463; --accent-press: #d98f47; --accent2: #b9893a;
+    --danger: #d97a5f; --warn: #e0b15f; --ok: #84b86a; --slate: #7d7568;
+    --info: #7ba6c4; --radius: 14px;
+    --font-display: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+    --font-body: "Sora", ui-sans-serif, system-ui, sans-serif;
+    --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+    --ease: cubic-bezier(.16, 1, .3, 1);
   }
   html[data-theme="light"] {
-    --bg: #f4f6fb; --bg2: #ffffff; --panel: rgba(17,24,39,.04);
-    --panel-brd: rgba(17,24,39,.10); --txt: #1f2937; --muted: #6b7280;
-    --accent: #7c3aed; --accent2: #059669;
+    --bg: #f6f3ee; --bg2: #fffdfa; --surface: #fffdfa; --raised: #fffaf3;
+    --panel: var(--surface); --panel-brd: rgba(33,29,24,.10);
+    --line: rgba(33,29,24,.10); --line-strong: rgba(33,29,24,.18);
+    --txt: #211d18; --muted: #5c544a; --text-lo: #8c8377;
+    --accent: #c8843f; --accent-press: #b3722f; --accent2: #a86f2e;
+    --danger: #c25e45; --warn: #b9893a; --ok: #5f9447; --slate: #8c8377;
+    --info: #3f7da0;
   }
   * { box-sizing: border-box; }
   body {
-    margin: 0; font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
-    background: radial-gradient(1200px 600px at 80% -10%, rgba(167,139,250,.18), transparent),
-                radial-gradient(900px 500px at -10% 110%, rgba(52,211,153,.12), transparent),
-                var(--bg);
+    margin: 0; font: 15px/1.5 var(--font-body);
+    background: var(--bg);
     color: var(--txt); min-height: 100vh;
   }
   /* WCAG: clear keyboard focus ring */
   :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 8px; }
+  .mono { font-family: var(--font-mono); font-variant-ligatures: none; font-feature-settings: "calt" 0; }
   header {
-    display: flex; align-items: center; gap: 1rem; padding: 1.1rem 1.6rem;
-    border-bottom: 1px solid var(--panel-brd); backdrop-filter: blur(12px);
-    position: sticky; top: 0; z-index: 10; background: color-mix(in srgb, var(--bg) 70%, transparent);
+    display: flex; align-items: center; gap: 1rem; padding: 1rem 1.6rem;
+    border-bottom: 1px solid var(--line);
+    position: sticky; top: 0; z-index: 10; background: color-mix(in srgb, var(--bg) 90%, transparent);
   }
   .brand { font-weight: 700; font-size: 1.05rem; letter-spacing: .3px; }
   .brand small { display:block; color: var(--muted); font-weight: 400; font-size: .72rem; }
@@ -38,10 +51,10 @@
   .tab {
     border: 1px solid var(--panel-brd); background: var(--panel); color: var(--txt);
     padding: .45rem .9rem; border-radius: 999px; cursor: pointer; font-size: .9rem;
-    transition: transform .25s cubic-bezier(.16,1,.3,1), background .2s;
+    transition: transform .25s var(--ease), background .2s;
   }
-  .tab[aria-selected="true"] { background: linear-gradient(135deg, var(--accent), var(--accent2)); color: #06121a; border-color: transparent; }
-  .magnetic { transition: transform .2s cubic-bezier(.16,1,.3,1); }
+  .tab[aria-selected="true"] { background: var(--accent); color: #06121a; border-color: transparent; }
+  .magnetic { transition: transform .2s var(--ease); }
   .ghost-btn {
     border: 1px solid var(--panel-brd); background: var(--panel); color: var(--txt);
     padding: .45rem .75rem; border-radius: 12px; cursor: pointer;
@@ -49,8 +62,7 @@
   main { padding: 1.6rem; max-width: 1180px; margin: 0 auto; }
   .panel {
     background: var(--panel); border: 1px solid var(--panel-brd); border-radius: var(--radius);
-    padding: 1.1rem 1.2rem; margin-bottom: 1.2rem; backdrop-filter: blur(14px);
-    box-shadow: 0 10px 40px -20px rgba(0,0,0,.6);
+    padding: 1.1rem 1.2rem; margin-bottom: 1.2rem;
   }
   .hidden { display: none; }
   .kindrow { display: flex; gap: .5rem; flex-wrap: wrap; margin-bottom: 1rem; }
@@ -62,7 +74,7 @@
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px,1fr)); gap: .9rem; }
   .card {
     border: 1px solid var(--panel-brd); border-radius: 14px; padding: .9rem; background: color-mix(in srgb, var(--panel) 80%, transparent);
-    transition: transform .25s cubic-bezier(.16,1,.3,1), border-color .2s;
+    transition: transform .25s var(--ease), border-color .2s;
   }
   .card:hover { transform: translateY(-3px); border-color: var(--accent); }
   .card.readonly { opacity: .96; }
@@ -70,9 +82,11 @@
   .meta { color: var(--muted); font-size: .78rem; }
   .pick {
     margin-top: .7rem; width: 100%; border: 0; border-radius: 10px; padding: .5rem;
-    background: linear-gradient(135deg, var(--accent), var(--accent2)); color: #06121a;
-    font-weight: 600; cursor: pointer;
+    background: var(--accent); color: #06121a;
+    font-weight: 600; cursor: pointer; transition: background .2s, transform .2s;
   }
+  .pick:hover:not(:disabled) { background: var(--accent-press); }
+  .pick:disabled { color: #06121a; }
   .pick:disabled { cursor: default; }
   audio { width: 100%; margin-top: .5rem; }
   .voice-select {
@@ -88,6 +102,54 @@
   .banner { padding: .7rem 1rem; border-radius: 12px; font-weight: 600; margin-bottom: 1rem; }
   .banner.block { background: color-mix(in srgb, var(--danger) 22%, transparent); border: 1px solid var(--danger); }
   .banner.clear { background: color-mix(in srgb, var(--ok) 18%, transparent); border: 1px solid var(--ok); }
+  /* ===== rich asset cards (T6) ===== */
+  .card .c-head { display: flex; align-items: flex-start; justify-content: space-between; gap: .5rem; }
+  .card .c-id { font-family: var(--font-mono); font-size: .8rem; color: var(--muted); word-break: break-all; line-height: 1.35; }
+  .card .c-title { margin: .1rem 0 .35rem; font-size: .98rem; }
+  /* decorative synthetic waveform — NOT real audio data; derived deterministically from id for visual stability */
+  .wave { display: flex; align-items: flex-end; gap: 2px; height: 36px; margin: .55rem 0 .35rem; }
+  .wave i { flex: 1 1 auto; min-width: 1px; background: var(--accent); border-radius: 2px; opacity: .5; }
+  .wave i:nth-child(3n) { opacity: .28; }
+  .wave i:nth-child(4n) { opacity: .7; }
+  .wave-cap { font-size: .66rem; color: var(--text-lo); margin: -.2rem 0 .4rem; letter-spacing: .3px; }
+  .metrics { display: flex; flex-wrap: wrap; gap: .35rem; margin: .3rem 0 .1rem; }
+  .metric { font-size: .72rem; padding: .16rem .55rem; border-radius: 999px; border: 1px solid var(--line-strong); color: var(--muted); }
+  .metric b { color: var(--txt); font-weight: 600; }
+  .metric.energy { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 40%, transparent); }
+  .card-actions { display: flex; gap: .5rem; margin-top: .7rem; align-items: stretch; }
+  .card-actions .pick { margin-top: 0; flex: 1; }
+  .btn-skip { border: 1px solid var(--panel-brd); background: transparent; color: var(--muted); border-radius: 10px; padding: .5rem .7rem; cursor: pointer; font: inherit; font-size: .82rem; transition: color .2s var(--ease), border-color .2s var(--ease), background .2s var(--ease); white-space: nowrap; }
+  .btn-skip:hover { color: var(--danger); border-color: var(--danger); }
+  .cmp-btn { align-self: flex-start; border: 1px solid var(--panel-brd); background: transparent; color: var(--muted); border-radius: 8px; padding: .2rem .55rem; cursor: pointer; font: inherit; font-size: .72rem; transition: color .2s var(--ease), border-color .2s var(--ease), background .2s var(--ease); white-space: nowrap; }
+  .cmp-btn:hover { color: var(--accent); border-color: var(--accent); }
+  .cmp-btn[aria-pressed="true"] { background: var(--accent); color: #06121a; border-color: transparent; }
+  .card.skipped { opacity: .4; }
+
+  /* skeleton loading (T9) */
+  .skeleton { background: linear-gradient(90deg, var(--panel-brd) 25%, var(--line-strong) 37%, var(--panel-brd) 63%); background-size: 400% 100%; animation: shimmer 1.4s ease infinite; border-radius: 8px; }
+  @keyframes shimmer { 0% { background-position: 100% 0; } 100% { background-position: -100% 0; } }
+  @media (prefers-reduced-motion: reduce) { .skeleton { animation: none; } }
+
+  /* compare tray + modal (T8) */
+  .cmp-tray { position: fixed; left: 50%; bottom: 1.2rem; transform: translateX(-50%) translateY(140%); transition: transform .35s var(--ease); z-index: 40; display: flex; gap: .8rem; align-items: center; background: var(--raised); border: 1px solid var(--line-strong); border-radius: 14px; padding: .6rem .8rem; box-shadow: 0 12px 30px rgb(0 0 0 / .35); }
+  .cmp-tray.show { transform: translateX(-50%) translateY(0); }
+  .cmp-tray .ct-count { font-weight: 600; }
+  .cmp-modal { position: fixed; inset: 0; z-index: 60; display: none; align-items: center; justify-content: center; background: rgb(0 0 0 / .55); padding: 1rem; }
+  .cmp-modal.show { display: flex; }
+  .cmp-box { background: var(--bg2); border: 1px solid var(--line-strong); border-radius: 16px; max-width: 920px; width: 100%; max-height: 86vh; overflow: auto; padding: 1.2rem 1.3rem; }
+  .cmp-box h3 { margin: 0 0 .2rem; }
+  .cmp-grid { display: grid; gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; margin-top: .8rem; }
+  .cmp-grid > div { background: var(--bg2); padding: .55rem .7rem; font-size: .82rem; }
+  .cmp-grid .ch { font-weight: 600; background: var(--panel); position: sticky; top: 0; }
+  .cmp-grid .rh { color: var(--muted); font-weight: 600; }
+  .cmp-close { float: right; }
+
+  /* filter bar (T7) */
+  .filterbar { display: flex; gap: .6rem; flex-wrap: wrap; align-items: center; margin-bottom: 1rem; }
+  .filterbar input[type="search"], .filterbar select { background: var(--bg2); color: var(--txt); border: 1px solid var(--panel-brd); border-radius: 10px; padding: .45rem .65rem; font: inherit; font-size: .85rem; }
+  .filterbar input[type="search"] { flex: 1; min-width: 180px; }
+  .filterbar .f-count { color: var(--muted); font-size: .8rem; margin-left: auto; }
+
   /* overview stats */
   .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px,1fr)); gap: .8rem; }
   .stat { border: 1px solid var(--panel-brd); border-radius: 14px; padding: .9rem; background: color-mix(in srgb, var(--panel) 80%, transparent); }
@@ -103,12 +165,10 @@
   }
   #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
   .muted { color: var(--muted); }
-  canvas#hero { position: fixed; inset: 0; z-index: -1; opacity: .35; pointer-events: none; }
   .more-btn { margin: 1rem auto 0; display: block; }
   /* Respect reduced-motion preference (WCAG 2.1 / accessibility) */
   @media (prefers-reduced-motion: reduce) {
     * { transition: none !important; animation: none !important; }
-    canvas#hero { display: none; }
   }
   /* onboarding v2 (brief -> thinking -> plan) */
   .dropzone { border: 1.5px dashed var(--panel-brd); border-radius: 14px; padding: 1.1rem; text-align: center; cursor: pointer;
@@ -122,11 +182,12 @@
   .ob-image .rm { position: absolute; top: -6px; right: -6px; background: var(--danger); color: #fff; border: 0;
     border-radius: 50%; width: 20px; height: 20px; cursor: pointer; line-height: 1; font-size: .7rem; }
   .hintrow { display: flex; gap: .5rem; flex-wrap: wrap; }
-  .chip.hint[aria-pressed="true"] { background: linear-gradient(135deg, var(--accent), var(--accent2)); color: #06121a; border-color: transparent; }
+  .chip.hint[aria-pressed="true"] { background: var(--accent); color: #06121a; border-color: transparent; }
   .thinking { margin: 1.1rem 0; }
   .tk-step { display: flex; align-items: center; gap: .6rem; padding: .5rem .2rem; color: var(--muted); transition: color .3s; }
   .tk-step.done { color: var(--txt); }
-  .tk-ico { width: 1.2rem; display: inline-block; text-align: center; color: var(--accent); font-weight: 700; }
+  .tk-ico { width: .85rem; height: .85rem; border-radius: 50%; border: 2px solid var(--line-strong); display: inline-block; flex: none; transition: all .3s; }
+  .tk-step.done .tk-ico { background: var(--ok); border-color: var(--ok); }
   .plan-head { display: flex; flex-direction: column; margin-bottom: .4rem; }
   .src-badge { font-size: .72rem; font-weight: 600; padding: .15rem .6rem; border-radius: 999px; vertical-align: middle; margin-left: .3rem; }
   .src-badge.llm { background: color-mix(in srgb, var(--accent) 26%, transparent); color: var(--accent); border: 1px solid var(--accent); }
@@ -148,25 +209,110 @@
   .scene-line .sm { color: var(--muted); font-size: .8rem; }
   details.legacy { border-top: 1px solid var(--panel-brd); padding-top: .9rem; margin-top: 1.4rem; }
   details.legacy summary { cursor: pointer; color: var(--muted); font-size: .88rem; padding: .3rem 0; }
+
+  /* ===== Dashboard (macro workbench) ===== */
+  .hero-strip { display: flex; align-items: flex-end; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-bottom: 1.2rem; }
+  .hero-strip h1 { margin: 0; font-family: var(--font-display); font-size: 1.6rem; letter-spacing: .2px; font-weight: 700; }
+  .hero-strip p { margin: .25rem 0 0; color: var(--muted); font-size: .9rem; }
+  .pill { display: inline-flex; align-items: center; gap: .45rem; padding: .35rem .8rem; border-radius: 999px; font-size: .82rem; font-weight: 600; border: 1px solid var(--panel-brd); white-space: nowrap; }
+  .pill .dot { width: 9px; height: 9px; }
+  .pill.ok { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 40%, transparent); background: color-mix(in srgb, var(--ok) 12%, transparent); }
+  .pill.fail { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 40%, transparent); background: color-mix(in srgb, var(--danger) 12%, transparent); }
+  .kpi-bento { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px,1fr)); gap: .9rem; margin-bottom: 1.2rem; }
+  .kpi { background: var(--panel); border: 1px solid var(--panel-brd); border-radius: var(--radius); padding: 1rem 1.1rem; position: relative; overflow: hidden; }
+  .kpi .k-num { font-family: var(--font-display); font-size: 2rem; font-weight: 700; line-height: 1.1; }
+  .kpi .k-lbl { color: var(--muted); font-size: .82rem; margin-top: .25rem; }
+  .kpi .k-sub { color: var(--text-lo); font-size: .72rem; margin-top: .3rem; }
+  .kpi.accent .k-num { color: var(--accent); }
+  .kpi.danger .k-num { color: var(--danger); }
+  .kpi.ok .k-num { color: var(--ok); }
+  .kpi.warn .k-num { color: var(--warn); }
+  .lanes { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px,1fr)); gap: .8rem; }
+  .lane { background: var(--panel); border: 1px solid var(--panel-brd); border-radius: 12px; padding: .85rem .9rem; }
+  .lane .l-top { display: flex; justify-content: space-between; align-items: baseline; }
+  .lane .l-name { font-weight: 600; font-size: .92rem; }
+  .lane .l-val { font-family: var(--font-display); font-size: .95rem; color: var(--accent); font-weight: 600; }
+  .lane .l-bar { height: 6px; border-radius: 999px; background: var(--line); margin-top: .6rem; overflow: hidden; }
+  .lane .l-fill { height: 100%; background: var(--accent); border-radius: 999px; transition: width .5s var(--ease); }
+  .section-h { display: flex; align-items: center; gap: .5rem; margin: 0 0 .8rem; font-size: 1.05rem; font-weight: 600; }
+  .section-h .ico { color: var(--accent); display: inline-flex; }
+  .two-col { display: grid; grid-template-columns: 1.4fr 1fr; gap: 1.2rem; align-items: start; }
+  @media (max-width: 880px) { .two-col { grid-template-columns: 1fr; } }
+  .recent { list-style: none; margin: 0; padding: 0; max-height: 320px; overflow: auto; }
+  .recent li { display: flex; gap: .6rem; align-items: baseline; padding: .5rem 0; border-bottom: 1px solid var(--line); font-size: .82rem; }
+  .recent li:last-child { border-bottom: 0; }
+  .recent .r-kind { color: var(--accent); font-weight: 600; flex: none; }
+  .recent .r-time { color: var(--text-lo); margin-left: auto; flex: none; font-variant-numeric: tabular-nums; }
+  .ico-btn { display: inline-flex; align-items: center; justify-content: center; }
+
+  /* ===== responsive (T10) ===== */
+  @media (max-width: 640px) {
+    header { padding: .7rem .9rem; gap: .6rem; }
+    .brand { font-size: .95rem; }
+    .brand small { display: none; }
+    main { padding: 1rem; }
+    .tabs { flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; max-width: 100%; scrollbar-width: none; }
+    .tabs::-webkit-scrollbar { display: none; }
+    .tab { white-space: nowrap; flex: none; }
+    .filterbar { flex-direction: column; align-items: stretch; }
+    .filterbar input[type="search"] { min-width: 0; }
+    .filterbar .f-count { margin-left: 0; }
+    .grid { grid-template-columns: 1fr; }
+    .kpi-bento { grid-template-columns: 1fr 1fr; }
+    .card-actions { flex-wrap: wrap; }
+  }
+  @media (max-width: 420px) {
+    .kpi-bento { grid-template-columns: 1fr; }
+  }
 </style>
 </head>
 <body>
-<canvas id="hero"></canvas>
 <header>
-  <div class="brand">AI Film 控制台<small>验片 · 选素材 · 门禁</small></div>
+  <div class="brand">AI Film 控制台<small>工作台 · 选素材 · 门禁 · 起步</small></div>
   <div class="spacer"></div>
   <nav class="tabs" role="tablist" aria-label="控制台分区">
-    <button class="tab magnetic" role="tab" data-tab="onboarding" aria-controls="onboarding" aria-selected="false">起步 Onboarding</button>
-    <button class="tab magnetic" role="tab" data-tab="assets" aria-controls="assets" aria-selected="true">选素材</button>
+    <button class="tab magnetic" role="tab" data-tab="dashboard" aria-controls="dashboard" aria-selected="true">工作台</button>
+    <button class="tab magnetic" role="tab" data-tab="assets" aria-controls="assets" aria-selected="false">选素材</button>
     <button class="tab magnetic" role="tab" data-tab="gates" aria-controls="gates" aria-selected="false">门禁</button>
-    <button class="tab magnetic" role="tab" data-tab="overview" aria-controls="overview" aria-selected="false">状态总览</button>
+    <button class="tab magnetic" role="tab" data-tab="onboarding" aria-controls="onboarding" aria-selected="false">起步</button>
     <a class="tab magnetic" href="/" style="text-decoration:none">验片 ↗</a>
   </nav>
-  <button class="ghost-btn magnetic" id="theme" title="切换主题" aria-label="切换深/浅色主题">🌓</button>
+  <button class="ghost-btn magnetic" id="theme" title="切换主题" aria-label="切换深/浅色主题">
+    <svg class="ico-btn" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+  </button>
 </header>
 
 <main>
-  <section id="assets" class="tabpane" role="tabpanel" aria-labelledby="tab-assets">
+  <section id="dashboard" class="tabpane" role="tabpanel" aria-labelledby="tab-dashboard">
+    <div class="hero-strip">
+      <div>
+        <h1>AI Film 工作台</h1>
+        <p>宏观生产状态 · 素材选择 · 门禁健康 · 起步进度，一处统览</p>
+      </div>
+      <div id="dash-gate-pill" class="pill ok"><span class="dot s-pass"></span><span>门禁检测中…</span></div>
+    </div>
+
+    <div id="dash-kpi" class="kpi-bento"></div>
+
+    <div class="two-col">
+      <div class="panel">
+        <h3 class="section-h"><span class="ico" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg></span>素材车道</h3>
+        <p class="muted" style="font-size:.82rem;margin:.2rem 0 .9rem">已选数 / 资产库总量 —— 点「选素材」进入挑选</p>
+        <div id="dash-lanes" class="lanes"></div>
+      </div>
+      <div class="panel">
+        <h3 class="section-h"><span class="ico" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/></svg></span>最近动态</h3>
+        <ul id="dash-recent" class="recent muted"></ul>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h3 class="section-h"><span class="ico" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 4 5v6c0 5 3.5 8 8 11 4.5-3 8-6 8-11V5l-8-3z"/></svg></span>门禁健康</h3>
+      <div id="dash-gates"></div>
+    </div>
+  </section>
+
+  <section id="assets" class="tabpane hidden" role="tabpanel" aria-labelledby="tab-assets">
     <div class="panel">
       <h3 style="margin-top:0">素材库</h3>
       <div class="kindrow" id="kinds" role="tablist" aria-label="素材类型">
@@ -176,6 +322,12 @@
         <button class="chip" role="tab" data-kind="shot" aria-selected="false">镜头候选</button>
         <button class="chip" role="tab" data-kind="scene" aria-selected="false">场景</button>
         <button class="chip" role="tab" data-kind="prop" aria-selected="false">道具</button>
+      </div>
+      <div class="filterbar" role="search">
+        <input type="search" id="f-search" placeholder="搜索 id / 名称 / 声线 / mood / 描述…" aria-label="搜索素材" autocomplete="off">
+        <select id="f-mood" aria-label="按 mood 过滤"><option value="">全部 mood</option></select>
+        <select id="f-energy" aria-label="按 energy 过滤"><option value="">全部 energy</option></select>
+        <span class="f-count" id="f-count"></span>
       </div>
       <div id="assets-grid" class="grid" aria-live="polite"></div>
       <button class="ghost-btn more-btn hidden" id="more">显示更多…</button>
@@ -191,17 +343,6 @@
     </div>
   </section>
 
-  <section id="overview" class="tabpane hidden" role="tabpanel" aria-labelledby="tab-overview">
-    <div class="panel">
-      <h3 style="margin-top:0">状态总览 <span class="muted" style="font-weight:400;font-size:.8rem">选择计数 · 门禁 · manifest · 起步进度 · 审计</span></h3>
-      <div id="ov-stats" class="stats"></div>
-      <div class="audit">
-        <h4 style="margin:.2rem 0">最近选择（审计）</h4>
-        <ul id="ov-recent" class="muted" style="font-size:.82rem"></ul>
-      </div>
-    </div>
-  </section>
-
   <section id="onboarding" class="tabpane hidden" role="tabpanel" aria-labelledby="tab-onboarding">
     <div class="panel">
       <h3 style="margin-top:0">起步向导 <span class="muted" style="font-weight:400;font-size:.8rem">贴故事 + 主角图 → AI 拆解出方案，确认即启动流水线</span></h3>
@@ -214,7 +355,7 @@
         <h4 style="margin-top:1rem">主角图 <span class="muted" style="font-weight:400">（可选 · 拖拽或点击上传，仅存本地，不上云）</span></h4>
         <div id="ob-drop" class="dropzone" role="button" tabindex="0" aria-label="上传主角图">
           <input id="ob-file" type="file" accept="image/png,image/jpeg,image/webp" multiple hidden />
-          <div class="dz-inner">📷 把图片拖到这里，或 <span class="dz-link">点击选择</span></div>
+          <div class="dz-inner"><svg class="ico-btn" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align:-3px;margin-right:.3rem"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>把图片拖到这里，或 <span class="dz-link">点击选择</span></div>
           <div id="ob-images" class="ob-images" aria-live="polite"></div>
         </div>
 
@@ -228,7 +369,7 @@
           <button type="button" class="chip hint" data-h="纯爱" aria-pressed="false">纯爱</button>
         </div>
 
-        <button class="pick magnetic" id="ob-decompose" style="margin-top:1.1rem">✨ 让 AI 拆解</button>
+        <button class="pick magnetic" id="ob-decompose" style="margin-top:1.1rem">拆解故事</button>
       </div>
 
       <!-- Stage 2: thinking -->
@@ -241,7 +382,7 @@
           <p class="muted" style="font-size:.8rem;margin:.2rem 0 0">这只是一个提案 —— 你可以直接编辑，确认后才会写入流水线。</p>
         </div>
         <div id="ob-plan" class="ob-plan"></div>
-        <button class="pick magnetic" id="ob-confirm">✅ 确认并启动流水线</button>
+        <button class="pick magnetic" id="ob-confirm">确认并启动流水线</button>
       </div>
 
       <div id="ob-go-banner" class="banner" style="display:none" role="status" aria-live="polite"></div>
@@ -276,10 +417,26 @@
           </div>
           <button class="pick" data-savestep="characters">保存这一步</button>
         </div>
-        <button class="pick" id="ob-go" disabled style="opacity:.5">🚀 Go · 启动流水线</button>
+        <button class="pick" id="ob-go" disabled style="opacity:.5">Go · 启动流水线</button>
       </details>
     </div>
   </section>
+
+  <!-- compare tray (T8) -->
+  <div class="cmp-tray" id="cmp-tray" role="region" aria-label="对比托盘">
+    <span class="ct-count" id="ct-count">已选 0 / 3 项对比</span>
+    <button class="ghost-btn" id="ct-view">查看对比</button>
+    <button class="ghost-btn" id="ct-clear">清空</button>
+  </div>
+  <!-- compare modal (T8) -->
+  <div class="cmp-modal" id="cmp-modal" role="dialog" aria-modal="true" aria-label="素材对比">
+    <div class="cmp-box">
+      <button class="ghost-btn cmp-close" id="cmp-close" aria-label="关闭对比">关闭 ✕</button>
+      <h3>素材对比</h3>
+      <p class="muted" style="font-size:.82rem;margin:.2rem 0 0">并排查看所选素材的字段差异</p>
+      <div id="cmp-body"></div>
+    </div>
+  </div>
 </main>
 
 <div id="toast" role="status" aria-live="polite"></div>
@@ -314,7 +471,7 @@ function activateTab(b){
   document.querySelectorAll('.tabpane').forEach(p => p.classList.add('hidden'));
   document.getElementById(b.dataset.tab).classList.remove('hidden');
   if (b.dataset.tab === 'gates') loadGates();
-  if (b.dataset.tab === 'overview') loadOverview();
+  if (b.dataset.tab === 'dashboard') loadDashboard();
 }
 tabButtons.forEach((b, i) => {
   b.onclick = () => activateTab(b);
@@ -350,37 +507,190 @@ if (!REDUCE) {
 // kind selection -> load assets (deferred / windowed rendering for large lists)
 let currentKind = 'bgm';
 const selected = { bgm: new Set(), character: new Set(), voice: new Set(), shot: new Set(), scene: new Set(), prop: new Set() };
+const skipped = { bgm: new Set(), character: new Set(), voice: new Set(), shot: new Set(), scene: new Set(), prop: new Set() };
+const compareSet = new Set();          // up to 3 ids for side-by-side compare (T8)
 let allItems = [], visible = 0;
 const PAGE = 24;
+let filterFn = null;                    // client-side filter (T7)
+
+function idOf(kind, it){ return kind === 'shot' ? it.shot_id : (it.asset_id ?? it.scene_id ?? it.prop_id); }
+// deterministic pseudo-random in [0.2,1] from a string seed — for the *decorative* waveform only
+function waveBars(seed, n = 34){
+  let h = 2166136261;
+  for (let i = 0; i < seed.length; i++){ h ^= seed.charCodeAt(i); h = Math.imul(h, 16777619); }
+  let out = '';
+  for (let i = 0; i < n; i++){
+    h ^= h << 13; h ^= h >>> 17; h ^= h << 5;
+    const v = ((h >>> 0) % 80) / 100 + 0.2;
+    out += `<i style="height:${Math.round(v*100)}%"></i>`;
+  }
+  return out;
+}
 document.querySelectorAll('#kinds .chip').forEach(c => c.onclick = () => {
   document.querySelectorAll('#kinds .chip').forEach(x => x.setAttribute('aria-selected', x===c));
   currentKind = c.dataset.kind; loadAssets(currentKind);
 });
 
 async function loadAssets(kind){
+  currentKind = kind;
+  compareSet.clear(); updateCmpTray();
   const grid = document.getElementById('assets-grid');
   const more = document.getElementById('more');
-  grid.innerHTML = '<p class="muted">载入中…</p>'; more.classList.add('hidden');
+  more.classList.add('hidden');
+  grid.innerHTML = skeletonCards(6);                 // T9: skeleton while loading
   try {
     const data = await api('/api/assets?kind=' + kind);
     allItems = data.items || [];
     visible = 0;
-    if (!allItems.length) { grid.innerHTML = '<p class="muted">暂无可选素材。先用 CLI 生成/批准资产。</p>'; return; }
-    renderChunk();
-  } catch (e) { grid.innerHTML = '<p class="muted">载入失败：' + esc(e.message) + '</p>'; }
+    buildFilterOptions();
+    applyFilter();                                    // resets visible + renders
+  } catch (e) {
+    grid.innerHTML = `<div class="banner block" role="alert" style="display:flex;align-items:center;gap:.8rem;flex-wrap:wrap">`
+      + `载入失败：${esc(e.message)}`
+      + `<button class="ghost-btn" id="retry-load">重试</button></div>`;
+    const rb = document.getElementById('retry-load');
+    if (rb) rb.onclick = () => loadAssets(kind);
+  }
+}
+function skeletonCards(n){
+  let s = '';
+  for (let i=0;i<n;i++) s += '<div class="card"><div class="skeleton" style="height:15px;width:55%"></div>'
+    + '<div class="wave" aria-hidden="true">' + '<i style="height:40%"></i>'.repeat(20) + '</div>'
+    + '<div class="skeleton" style="height:14px;width:80%;margin-top:.5rem"></div>'
+    + '<div class="skeleton" style="height:34px;width:100%;margin-top:.7rem"></div></div>';
+  return s;
+}
+function filteredItems(){
+  let list = allItems;
+  if (filterFn) list = list.filter(filterFn);
+  return list.filter(it => !skipped[currentKind].has(idOf(currentKind, it)));
 }
 function renderChunk(){
   const grid = document.getElementById('assets-grid');
   const more = document.getElementById('more');
-  const slice = allItems.slice(visible, visible + PAGE);
+  const list = filteredItems();
+  document.getElementById('f-count').textContent = list.length ? `显示 ${list.length} / ${allItems.length} 项` : '';
+  if (!list.length){
+    if (visible === 0){
+      const msg = allItems.length ? '没有符合筛选条件的素材。' : '暂无可选素材。先用 CLI 生成/批准资产。';
+      grid.innerHTML = `<div class="panel" style="text-align:center;color:var(--muted);padding:1.6rem">`
+        + `<p style="margin:.2rem 0">${msg}</p>`
+        + (allItems.length ? '<button class="ghost-btn" id="clear-f">清除筛选</button>' : '')
+        + `</div>`;
+      const cf = document.getElementById('clear-f'); if (cf) cf.onclick = clearFilter;
+    }
+    more.classList.add('hidden');
+    return;
+  }
+  const slice = list.slice(visible, visible + PAGE);
   if (visible === 0) grid.innerHTML = '';
   grid.insertAdjacentHTML('beforeend', slice.map(it => cardHtml(currentKind, it)).join(''));
   visible += slice.length;
-  grid.querySelectorAll('[data-pick]').forEach(b => b.onclick = pick);
-  if (visible < allItems.length) more.classList.remove('hidden');
+  wireCardButtons(grid);
+  if (visible < list.length) more.classList.remove('hidden');
   else more.classList.add('hidden');
 }
 document.getElementById('more').onclick = renderChunk;
+
+function buildFilterOptions(){
+  const moodSel = document.getElementById('f-mood');
+  const enSel = document.getElementById('f-energy');
+  const moods = [...new Set(allItems.map(it => it.mood).filter(Boolean))].sort();
+  const ens = [...new Set(allItems.map(it => it.energy).filter(Boolean))].sort();
+  moodSel.innerHTML = '<option value="">全部 mood</option>' + moods.map(m => `<option value="${esc(m)}">${esc(m)}</option>`).join('');
+  enSel.innerHTML = '<option value="">全部 energy</option>' + ens.map(e => `<option value="${esc(e)}">${esc(e)}</option>`).join('');
+}
+function applyFilter(){
+  const q = document.getElementById('f-search').value.trim().toLowerCase();
+  const mood = document.getElementById('f-mood').value;
+  const en = document.getElementById('f-energy').value;
+  filterFn = it => {
+    if (mood && it.mood !== mood) return false;
+    if (en && it.energy !== en) return false;
+    if (q){
+      const hay = [it.asset_id, it.shot_id, it.scene_id, it.prop_id, it.name, it.voice, it.mood, it.role, it.description, it.title]
+        .filter(Boolean).join(' ').toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  };
+  visible = 0;
+  renderChunk();
+}
+function clearFilter(){
+  document.getElementById('f-search').value = '';
+  document.getElementById('f-mood').value = '';
+  document.getElementById('f-energy').value = '';
+  applyFilter();
+}
+function wireCardButtons(root){
+  root.querySelectorAll('[data-pick]').forEach(b => b.onclick = pick);
+  root.querySelectorAll('[data-skip]').forEach(b => b.onclick = skipAsset);
+  root.querySelectorAll('[data-cmp]').forEach(b => b.onclick = toggleCompare);
+}
+function cmpBtn(kind, id){
+  const on = compareSet.has(kind + ':' + id);
+  return `<button class="cmp-btn" data-cmp data-kind="${kind}" data-id="${esc(id)}" aria-pressed="${on}" aria-label="加入对比">${on ? '已选' : '对比'}</button>`;
+}
+async function skipAsset(e){
+  const b = e.currentTarget; const kind = b.dataset.kind, id = b.dataset.id;
+  skipped[kind].add(id);
+  const card = b.closest('.card');
+  if (card){ card.style.display = 'none'; }
+  toast(`已跳过 ${KIND_LABEL[kind]}：${id}`);
+  const list = filteredItems();
+  document.getElementById('f-count').textContent = `显示 ${list.length} / ${allItems.length} 项`;
+}
+function toggleCompare(e){
+  const b = e.currentTarget; const kind = b.dataset.kind, id = b.dataset.id;
+  const key = kind + ':' + id;
+  if (compareSet.has(key)){ compareSet.delete(key); b.setAttribute('aria-pressed','false'); b.textContent = '对比'; }
+  else {
+    if (compareSet.size >= 3){ toast('最多对比 3 项', true); return; }
+    compareSet.add(key); b.setAttribute('aria-pressed','true'); b.textContent = '已选';
+  }
+  updateCmpTray();
+}
+function updateCmpTray(){
+  const tray = document.getElementById('cmp-tray');
+  document.getElementById('ct-count').textContent = `已选 ${compareSet.size} / 3 项对比`;
+  tray.classList.toggle('show', compareSet.size > 0);
+}
+function fieldRows(kind){
+  const map = {
+    bgm: [['asset_id','ID'],['mood','mood'],['energy','energy'],['bpm','BPM'],['duration','时长(s)']],
+    character: [['asset_id','ID'],['name','名称'],['role','定位']],
+    voice: [['asset_id','ID'],['voice','声线']],
+    shot: [['shot_id','镜ID'],['state','状态'],['cloud_candidates','云候选']],
+    scene: [['scene_id','场景ID'],['title','标题'],['shot_count','镜头数']],
+    prop: [['prop_id','道具ID'],['description','描述']],
+  };
+  return map[kind] || [['asset_id','ID']];
+}
+function fmtVal(kind, field, it){
+  const v = it[field];
+  if (field === 'cloud_candidates') return Array.isArray(v) ? v.map(c => `${c.provider}/${c.model}:${c.status}`).join(' · ') : '—';
+  if (v === undefined || v === null || v === '') return '—';
+  return String(v);
+}
+function openCompare(){
+  const body = document.getElementById('cmp-body');
+  const kind = currentKind;
+  const rows = fieldRows(kind);
+  const cols = [...compareSet].map(k => k.split(':')[1]);
+  let html = `<div class="cmp-grid" style="grid-template-columns: 120px repeat(${cols.length}, minmax(0,1fr))">`;
+  html += `<div class="ch">字段</div>` + cols.map(c => `<div class="ch mono">${esc(c)}</div>`).join('');
+  rows.forEach(([f, label]) => {
+    html += `<div class="rh">${esc(label)}</div>`;
+    cols.forEach(c => {
+      const it = allItems.find(x => idOf(kind, x) === c);
+      html += `<div>${esc(it ? fmtVal(kind, f, it) : '—')}</div>`;
+    });
+  });
+  html += '</div>';
+  body.innerHTML = html;
+  document.getElementById('cmp-modal').classList.add('show');
+}
 
 function selBadge(kind, id){
   return selected[kind] && selected[kind].has(id)
@@ -392,48 +702,69 @@ function cardHtml(kind, it){
     const src = it.path ? '/media-lib/' + it.path.split('/').map(encodeURIComponent).join('/') : '';
     const picked = selected.bgm.has(it.asset_id);
     return `<div class="card">
-      <h4>${esc(it.asset_id)}</h4>
-      <div class="meta">mood: ${esc(it.mood)} · energy: ${esc(it.energy)} · ${esc(it.bpm)} BPM · ${esc(it.duration)}s</div>
+      <div class="c-head"><h4 class="c-title">${esc(it.asset_id)}</h4>${cmpBtn(kind, it.asset_id)}</div>
+      <div class="wave" aria-hidden="true">${waveBars(it.asset_id)}</div>
+      <div class="wave-cap">装饰波形（非真实音频）</div>
+      <div class="metrics">
+        <span class="metric energy">energy <b>${esc(it.energy)}</b></span>
+        <span class="metric"><b>${esc(it.bpm)}</b> BPM</span>
+        <span class="metric"><b>${esc(it.duration)}</b> s</span>
+        <span class="metric">mood <b>${esc(it.mood)}</b></span>
+      </div>
       ${src ? `<audio controls preload="none" src="${src}"></audio>` : ''}
       ${selBadge('bgm', it.asset_id)}
-      <button class="pick" data-pick data-kind="bgm" data-id="${esc(it.asset_id)}" ${picked?'disabled style="opacity:.6"':''}>${picked?'✅ 已选择':'选择此 BGM'}</button>
+      <div class="card-actions">
+        <button class="pick" data-pick data-kind="bgm" data-id="${esc(it.asset_id)}" ${picked?'disabled style="opacity:.6"':''}>${picked?'已选择':'选入生产'}</button>
+        <button class="btn-skip" data-skip data-kind="bgm" data-id="${esc(it.asset_id)}" ${picked?'disabled style="opacity:.5"':''}>跳过</button>
+      </div>
     </div>`;
   }
   if (kind === 'character') {
     const picked = selected.character.has(it.asset_id);
-    return `<div class="card"><h4>${esc(it.name || it.asset_id)}</h4>
-      <div class="meta">角色定位: ${esc(it.role || '未指定')} · id: ${esc(it.asset_id)}</div>
+    return `<div class="card"><div class="c-head"><h4 class="c-title">${esc(it.name || it.asset_id)}</h4>${cmpBtn(kind, it.asset_id)}</div>
+      <div class="c-id mono">${esc(it.asset_id)}</div>
+      <div class="metrics"><span class="metric">定位 <b>${esc(it.role || '未指定')}</b></span></div>
       ${selBadge('character', it.asset_id)}
-      <button class="pick" data-pick data-kind="character" data-id="${esc(it.asset_id)}" ${picked?'disabled style="opacity:.6"':''}>${picked?'✅ 已锁定':'锁定角色'}</button></div>`;
+      <div class="card-actions">
+        <button class="pick" data-pick data-kind="character" data-id="${esc(it.asset_id)}" ${picked?'disabled style="opacity:.6"':''}>${picked?'已锁定':'锁定角色'}</button>
+        <button class="btn-skip" data-skip data-kind="character" data-id="${esc(it.asset_id)}" ${picked?'disabled style="opacity:.5"':''}>跳过</button>
+      </div></div>`;
   }
   if (kind === 'voice') {
     const picked = selected.voice.has(it.asset_id);
     const opts = [...new Set([it.voice, ...ZH_VOICES])].filter(Boolean)
       .map(v => `<option value="${esc(v)}" ${v===it.voice?'selected':''}>${esc(v)}</option>`).join('');
-    return `<div class="card"><h4>${esc(it.asset_id)}</h4>
-      <div class="meta">声线引擎: ${esc(it.voice)}</div>
+    return `<div class="card"><div class="c-head"><h4 class="c-title">${esc(it.asset_id)}</h4>${cmpBtn(kind, it.asset_id)}</div>
+      <div class="metrics"><span class="metric">引擎 <b>${esc(it.voice)}</b></span></div>
       <label class="meta" for="v-${esc(it.asset_id)}">选用声线</label>
       <select class="voice-select" id="v-${esc(it.asset_id)}" data-voice>${opts}</select>
       ${selBadge('voice', it.asset_id)}
-      <button class="pick" data-pick data-kind="voice" data-id="${esc(it.asset_id)}" ${picked?'disabled style="opacity:.6"':''}>${picked?'✅ 已选用':'选用声线'}</button></div>`;
+      <div class="card-actions">
+        <button class="pick" data-pick data-kind="voice" data-id="${esc(it.asset_id)}" ${picked?'disabled style="opacity:.6"':''}>${picked?'已选用':'选用声线'}</button>
+        <button class="btn-skip" data-skip data-kind="voice" data-id="${esc(it.asset_id)}" ${picked?'disabled style="opacity:.5"':''}>跳过</button>
+      </div></div>`;
   }
   if (kind === 'shot') {
     const picked = selected.shot.has(it.shot_id);
     const cands = (it.cloud_candidates||[]).map(c =>
-      `<div class="meta">${esc(c.provider)}/${esc(c.model)} · ${esc(c.status)}</div>`).join('');
-    return `<div class="card"><h4>镜 ${esc(it.shot_id)}</h4>
-      <div class="meta">状态: ${esc(it.state)}</div>${cands}
+      `<span class="metric">${esc(c.provider)}/${esc(c.model)} · <b>${esc(c.status)}</b></span>`).join('');
+    return `<div class="card"><div class="c-head"><h4 class="c-title">镜 ${esc(it.shot_id)}</h4>${cmpBtn(kind, it.shot_id)}</div>
+      <div class="metrics"><span class="metric">状态 <b>${esc(it.state)}</b></span>${cands}</div>
       <div class="meta" style="color:var(--muted)">批准 → 写入 manifest.json (clips)</div>
       ${selBadge('shot', it.shot_id)}
-      <button class="pick" data-pick data-kind="shot" data-id="${esc(it.shot_id)}" ${picked?'disabled style="opacity:.6"':''}>${picked?'✅ 已批准':'批准此镜'}</button></div>`;
+      <div class="card-actions">
+        <button class="pick" data-pick data-kind="shot" data-id="${esc(it.shot_id)}" ${picked?'disabled style="opacity:.6"':''}>${picked?'已批准':'批准此镜'}</button>
+        <button class="btn-skip" data-skip data-kind="shot" data-id="${esc(it.shot_id)}" ${picked?'disabled style="opacity:.5"':''}>跳过</button>
+      </div></div>`;
   }
   // scene / prop — read-only (structured pipeline data, no selection write)
   if (kind === 'scene') {
-    return `<div class="card readonly"><h4>${esc(it.title || it.scene_id)}</h4>
-      <div class="meta">场景 id: ${esc(it.scene_id)} · 镜头数: ${esc(it.shot_count)}</div>
+    return `<div class="card readonly"><div class="c-head"><h4 class="c-title">${esc(it.title || it.scene_id)}</h4>${cmpBtn(kind, it.scene_id)}</div>
+      <div class="c-id mono">${esc(it.scene_id)}</div>
+      <div class="metrics"><span class="metric">镜头数 <b>${esc(it.shot_count)}</b></span></div>
       <div class="meta" style="color:var(--accent2)">只读 · 来自 film-spec 规划</div></div>`;
   }
-  return `<div class="card readonly"><h4>${esc(it.prop_id)}</h4>
+  return `<div class="card readonly"><div class="c-head"><h4 class="c-title">${esc(it.prop_id)}</h4>${cmpBtn(kind, it.prop_id)}</div>
     <div class="meta">${esc(it.description || '（无描述）')}</div>
     <div class="meta" style="color:var(--accent2)">只读 · 来自资产库道具</div></div>`;
 }
@@ -453,9 +784,10 @@ async function pick(e){
       body: JSON.stringify(body) });
     expectedRevision = res.revision;
     selected[kind].add(id);
-    b.textContent = kind === 'shot' ? '✅ 已批准' : '✅ 已选择';
+    b.textContent = kind === 'shot' ? '已批准' : '已选择';
     b.disabled = true; b.style.opacity = '.6';
     const card = b.closest('.card');
+    const sk = card && card.querySelector('.btn-skip'); if (sk){ sk.disabled = true; sk.style.opacity = '.5'; }
     if (card && !card.querySelector('.sel-badge')) {
       const bd = document.createElement('div');
       bd.className = 'meta sel-badge'; bd.style.color = 'var(--ok)'; bd.style.fontWeight = '600';
@@ -481,7 +813,7 @@ async function loadGates(){
   try {
     const g = await api('/api/gates');
     banner.className = 'banner ' + (g.blocking ? 'block' : 'clear');
-    banner.textContent = g.blocking ? '⛔ 存在失败硬门禁，批准/选择将被服务端拒绝' : '✅ 硬门禁全部通过';
+    banner.textContent = g.blocking ? '存在失败硬门禁，批准/选择将被服务端拒绝' : '硬门禁全部通过';
     list.innerHTML = g.gates.map(x => `<div class="gate">
       <span class="dot s-${esc(x.status)}"></span>
       <div><div class="name">${esc(x.name)} ${x.required ? '· 硬' : ''}</div>
@@ -490,29 +822,72 @@ async function loadGates(){
 }
 document.getElementById('refresh-gates').onclick = loadGates;
 
-// ---- overview panel (P9) ----
-async function loadOverview(){
+// ---- dashboard (macro workbench) ----
+async function loadDashboard(){
   try {
-    const s = await api('/api/console-state');
-    renderOverview(s);
-  } catch (e) { toast('载入总览失败：' + e.message, true); }
+    const [s, g, bgm, character, voice, shot, scene, prop] = await Promise.all([
+      api('/api/console-state'),
+      api('/api/gates'),
+      api('/api/assets?kind=bgm'),
+      api('/api/assets?kind=character'),
+      api('/api/assets?kind=voice'),
+      api('/api/assets?kind=shot'),
+      api('/api/assets?kind=scene'),
+      api('/api/assets?kind=prop'),
+    ]);
+    renderDashboard(s, g, {
+      bgm: bgm.items || [], character: character.items || [], voice: voice.items || [],
+      shot: shot.items || [], scene: scene.items || [], prop: prop.items || []
+    });
+  } catch (e) { toast('载入工作台失败：' + e.message, true); }
 }
-function renderOverview(s){
+function renderDashboard(s, g, libs){
   const counts = s.selection_counts || {};
-  const countStr = Object.keys(counts).length
-    ? Object.entries(counts).map(([k,v]) => `${KIND_LABEL[k]||k}:${v}`).join(' · ')
-    : '暂无选择';
+  const total = s.selection_total || 0;
   const ob = s.onboarding || {};
-  const gateCls = s.gate_blocking ? 'stat warn' : 'stat';
-  document.getElementById('ov-stats').innerHTML = `
-    <div class="stat"><div class="num">${s.selection_total||0}</div><div class="lbl">总选择 · ${esc(countStr)}</div></div>
-    <div class="${gateCls}"><div class="num">${s.gate_blocking?'⛔':'✅'}</div><div class="lbl">硬门禁 ${s.gate_blocking?'阻断':'通过'}</div></div>
-    <div class="stat"><div class="num">${s.approved_clips||0}</div><div class="lbl">manifest 已批准 clips</div></div>
-    <div class="stat"><div class="num">${ob.done||0}/${ob.total||0}</div><div class="lbl">起步进度 ${ob.completed?'（已完成）':''}</div></div>`;
-  const recent = (s.recent_selections||[]).slice().reverse();
-  document.getElementById('ov-recent').innerHTML = recent.length
-    ? recent.map(r => `<li>${esc(r.recorded_at||'')} · ${esc(KIND_LABEL[r.kind]||r.kind)} · ${esc(r.asset_id)}</li>`).join('')
-    : '<li>暂无选择记录。</li>';
+
+  // gate health pill
+  const pill = document.getElementById('dash-gate-pill');
+  if (g.blocking){ pill.className = 'pill fail'; pill.innerHTML = '<span class="dot s-fail"></span><span>硬门禁阻断</span>'; }
+  else { pill.className = 'pill ok'; pill.innerHTML = '<span class="dot s-pass"></span><span>硬门禁通过</span>'; }
+
+  // KPI bento
+  const kpis = [
+    { cls: 'accent', num: total, lbl: '总选择数',
+      sub: Object.keys(counts).length ? Object.entries(counts).map(([k,v]) => `${KIND_LABEL[k]||k} ${v}`).join(' · ') : '暂无选择' },
+    { cls: 'ok', num: s.approved_clips || 0, lbl: '已批准 clips', sub: '已写入 manifest.json' },
+    { cls: g.blocking ? 'danger' : 'ok', num: g.blocking ? '阻断' : '通过', lbl: '硬门禁', sub: `${g.gates.length} 项检测` },
+    { cls: ob.completed ? 'ok' : '', num: `${ob.done||0}/${ob.total||0}`, lbl: '起步进度', sub: ob.completed ? '已完成' : (ob.total ? '进行中' : '未开始') },
+  ];
+  document.getElementById('dash-kpi').innerHTML = kpis.map(k =>
+    `<div class="kpi ${k.cls}"><div class="k-num">${k.num}</div><div class="k-lbl">${esc(k.lbl)}</div><div class="k-sub">${esc(k.sub)}</div></div>`
+  ).join('');
+
+  // material lanes (selected / library total)
+  const kinds = ['bgm','character','voice','shot','scene','prop'];
+  document.getElementById('dash-lanes').innerHTML = kinds.map(k => {
+    const sel = counts[k] || 0;
+    const tot = (libs[k] || []).length;
+    const pct = tot ? Math.min(100, Math.round(sel / tot * 100)) : 0;
+    return `<div class="lane"><div class="l-top"><span class="l-name">${KIND_LABEL[k]||k}</span>`
+      + `<span class="l-val">${sel} / ${tot}</span></div>`
+      + `<div class="l-bar"><div class="l-fill" style="width:${pct}%"></div></div></div>`;
+  }).join('');
+
+  // recent activity
+  const recent = (s.recent_selections || []).slice().reverse();
+  document.getElementById('dash-recent').innerHTML = recent.length
+    ? recent.map(r => `<li><span class="r-kind">${esc(KIND_LABEL[r.kind]||r.kind)}</span>`
+        + `<span>${esc(r.asset_id)}</span>`
+        + `<span class="r-time">${esc((r.recorded_at||'').slice(0,16).replace('T',' '))}</span></li>`).join('')
+    : '<li class="muted">暂无选择记录。</li>';
+
+  // gate health list
+  document.getElementById('dash-gates').innerHTML = g.gates.map(x =>
+    `<div class="gate"><span class="dot s-${esc(x.status)}"></span>`
+      + `<div><div class="name">${esc(x.name)} ${x.required ? '· 硬' : ''}</div>`
+      + `<div class="detail">${esc(x.detail)}</div></div></div>`
+  ).join('');
 }
 
 // multi-tab sync (P8): poll console-state; if another tab/external changed the
@@ -524,27 +899,12 @@ async function syncState(){
     if (s.ledger_revision > expectedRevision) {
       expectedRevision = s.ledger_revision;
       toast('选择状态已更新（来自其他标签页或外部）');
-      if (document.getElementById('overview') && !document.getElementById('overview').classList.contains('hidden'))
-        renderOverview(s);
+      const dash = document.getElementById('dashboard');
+      if (dash && !dash.classList.contains('hidden')) loadDashboard();
     }
   } catch (_) { /* silent: sync is best-effort */ }
 }
 function startSync(){ if (!syncTimer) syncTimer = setInterval(syncState, 3000); }
-
-// lightweight particle hero (no external lib); skipped under reduced-motion
-if (!REDUCE) {
-  (function(){
-    const c = document.getElementById('hero'), x = c.getContext('2d');
-    let w, h, ps;
-    function resize(){ w=c.width=innerWidth; h=c.height=innerHeight;
-      ps = Array.from({length: 60}, () => ({x:Math.random()*w, y:Math.random()*h, vx:(Math.random()-.5)*.3, vy:(Math.random()-.5)*.3, r:Math.random()*1.6+.4})); }
-    resize(); addEventListener('resize', resize);
-    (function loop(){ x.clearRect(0,0,w,h);
-      for (const p of ps){ p.x+=p.vx; p.y+=p.vy; if(p.x<0||p.x>w)p.vx*=-1; if(p.y<0||p.y>h)p.vy*=-1;
-        x.beginPath(); x.arc(p.x,p.y,p.r,0,7); x.fillStyle='rgba(167,139,250,.7)'; x.fill(); }
-      requestAnimationFrame(loop); })();
-  })();
-}
 
 // ---- onboarding wizard v2 (brief -> thinking -> plan) ----
 const STEP_LABEL = { references: '参考物', story: '故事', characters: '角色' };
@@ -572,7 +932,7 @@ function renderChars(){
 function renderStepper(state){
   document.getElementById('ob-stepper').innerHTML = ['references','story','characters'].map(s => {
     const done = state.steps[s].done;
-    return `<span class="chip" style="${done?'background:var(--ok);color:#06121a;border-color:transparent':''}">${done?'✅':'⚪'} ${STEP_LABEL[s]}</span>`;
+    return `<span class="chip" style="${done?'background:var(--ok);color:#06121a;border-color:transparent':''}"><span class="dot ${done?'s-pass':'s-unknown'}" style="display:inline-block;margin-right:.35rem;vertical-align:middle"></span>${STEP_LABEL[s]}</span>`;
   }).join('');
 }
 function updateGo(state){
@@ -580,7 +940,7 @@ function updateGo(state){
   const btn = document.getElementById('ob-go');
   btn.disabled = !allDone; btn.style.opacity = allDone ? '1' : '.5';
   const banner = document.getElementById('ob-go-banner');
-  if (allDone){ banner.style.display='block'; banner.className='banner clear'; banner.textContent='✅ 三步已完成，可以启动流水线。'; }
+  if (allDone){ banner.style.display='block'; banner.className='banner clear'; banner.textContent='三步已完成，可以启动流水线。'; }
   else { banner.style.display='none'; }
 }
 function imgSrc(im){
@@ -612,16 +972,16 @@ function toggleHint(btn){
 }
 function showThinking(){
   const box = document.getElementById('ob-thinking');
-  box.innerHTML = THINK_STEPS.map((t,i)=>`<div class="tk-step" data-i="${i}"><span class="tk-ico">⠿</span> ${esc(t)}</div>`).join('');
+  box.innerHTML = THINK_STEPS.map((t,i)=>`<div class="tk-step" data-i="${i}"><span class="tk-ico"></span> ${esc(t)}</div>`).join('');
   box.style.display='block';
   document.getElementById('ob-plan-pane').style.display='none';
   const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
   THINK_STEPS.forEach((t,i)=>{
-    setTimeout(()=>{ const el = box.querySelector(`[data-i="${i}"]`); if (el){ el.classList.add('done'); el.querySelector('.tk-ico').textContent='✓'; } }, reduce ? 0 : 350*(i+1));
+    setTimeout(()=>{ const el = box.querySelector(`[data-i="${i}"]`); if (el){ el.classList.add('done'); } }, reduce ? 0 : 350*(i+1));
   });
 }
 function markThinkingDone(){
-  document.querySelectorAll('#ob-thinking .tk-step').forEach(el=>{ el.classList.add('done'); const ic = el.querySelector('.tk-ico'); if (ic) ic.textContent='✓'; });
+  document.querySelectorAll('#ob-thinking .tk-step').forEach(el=>{ el.classList.add('done'); });
 }
 function renderPlan(plan, source){
   obPlan = plan || {};
@@ -735,7 +1095,7 @@ async function confirmPlan(){
     obRevision = res.revision;
     const banner = document.getElementById('ob-go-banner');
     banner.style.display='block'; banner.className='banner clear';
-    banner.textContent = `🚀 已启动 — 落盘：${JSON.stringify(res.persisted)} · 图表：${res.graph_written?'已生成':'跳过'} · 推进：${res.advanced ? ('是 ('+res.advanced_detail+')') : ('否 ('+res.advanced_detail+')')}`;
+    banner.textContent = `已启动 — 落盘：${JSON.stringify(res.persisted)} · 图表：${res.graph_written?'已生成':'跳过'} · 推进：${res.advanced ? ('是 ('+res.advanced_detail+')') : ('否 ('+res.advanced_detail+')')}`;
     toast('方案已确认并启动');
   } catch(err){
     btn.disabled = false;
@@ -767,7 +1127,7 @@ async function doGo(){
     obRevision = res.revision;
     const banner = document.getElementById('ob-go-banner');
     banner.style.display='block'; banner.className='banner clear';
-    banner.textContent = `🚀 已启动 — 落盘：${JSON.stringify(res.persisted)} · 流水线推进：${res.advanced ? ('是 ('+res.advanced_detail+')') : ('否 ('+res.advanced_detail+')')}`;
+    banner.textContent = `已启动 — 落盘：${JSON.stringify(res.persisted)} · 流水线推进：${res.advanced ? ('是 ('+res.advanced_detail+')') : ('否 ('+res.advanced_detail+')')}`;
     toast('Go 已执行');
   } catch(err){
     btn.disabled = false;
@@ -855,6 +1215,25 @@ document.getElementById('ob-chars').addEventListener('click', e => {
   if (e.target.dataset.rmchar !== undefined){ e.preventDefault(); obChars.splice(+e.target.dataset.rmchar, 1); renderChars(); }
 });
 
+// ---- filter bar (T7) ----
+let fTimer = null;
+document.getElementById('f-search').addEventListener('input', () => {
+  clearTimeout(fTimer); fTimer = setTimeout(applyFilter, 180);
+});
+document.getElementById('f-mood').addEventListener('change', applyFilter);
+document.getElementById('f-energy').addEventListener('change', applyFilter);
+
+// ---- compare tray + modal (T8) ----
+document.getElementById('ct-view').onclick = () => { if (compareSet.size) openCompare(); };
+document.getElementById('ct-clear').onclick = () => {
+  compareSet.clear(); updateCmpTray();
+  document.querySelectorAll('[data-cmp]').forEach(b => { b.setAttribute('aria-pressed','false'); b.textContent = '对比'; });
+};
+document.getElementById('cmp-close').onclick = () => document.getElementById('cmp-modal').classList.remove('show');
+document.getElementById('cmp-modal').addEventListener('click', e => { if (e.target.id === 'cmp-modal') e.currentTarget.classList.remove('show'); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') document.getElementById('cmp-modal').classList.remove('show'); });
+
+loadDashboard();
 loadAssets('bgm');
 startSync();
 </script>

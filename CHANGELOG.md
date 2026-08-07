@@ -1,5 +1,16 @@
 # Changelog
 
+## [2.40.97] - 2026-08-07
+
+### Changed (Web console UI · 电影工作室美学收尾 T3+T6–T12)
+- **字体：** 引入 JetBrains Mono 作 `--font-mono`，asset/引擎 id 等机器串用等宽体提升扫读性（Space Grotesk + Sora 已就位）。
+- **富化素材卡（仅真实 API 字段）：** 装饰性合成波形条（明确标注非真实音频，由 id 派生稳定高度）+ energy/duration/bpm/mood 指标 chip；主按钮「选入生产」+ 次按钮「跳过」（客户端 skipped 标记，重渲染不回弹）；API 无 peak/RMS/stem/waveform，绝不伪造音频指标。
+- **筛选栏：** 文本搜索 + bgm 的 mood/energy 下拉（列表去重），客户端 180ms 防抖过滤 + 实时计数 + 空结果引导。
+- **对比模式：** 每卡「对比」切换（上限 3），底部托盘 + 模态框按字段并排；切换 kind 清空对比集。
+- **空/加载/错误态：** 骨架屏 shimmer、API 失败「重试」、空列表引导态。
+- **响应式 + 动效：** 640px 表头横滚/网格单列/KPI 两列→单列；统一 `--ease` 缓动 token，保留 reduced-motion 降级。
+- 纯前端改动，后端契约零修改，`console` 门禁持续绿。
+
 ## [2.40.96] - 2026-08-07
 
 ### Added / Changed (Onboarding v2 · 闭环 + 启发式增强)
