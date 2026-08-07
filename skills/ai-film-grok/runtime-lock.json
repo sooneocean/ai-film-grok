@@ -1738,7 +1738,7 @@
     },
     {
       "path": "scripts/media/h3_official_prompt.py",
-      "sha256": "167198305161b9ab49c6aa479548ec0bdbda23634863b55ab4187344cc7913fb"
+      "sha256": "de00a1ae17ed72531e7a108e28e231971eb549e1c79b80b8ecd1c5e25fb4e3f5"
     },
     {
       "path": "scripts/media/h3_ship_native.py",
