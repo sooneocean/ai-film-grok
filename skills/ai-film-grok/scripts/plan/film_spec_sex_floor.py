@@ -18,9 +18,10 @@ def apply_sex_duration_floor(
     sex_floor_strict: bool,
     heat_scale: str = "max",
 ) -> None:
-    """Fail-closed on HEAT_SEX_DURATION_LOW when strict (default max).
+    """Fail-closed on HEAT_SEX_DURATION_LOW when strict (default max / explicit_max).
 
     Call after lint_heat_arc. Does **not** mutate shot durations.
+    Plot-driven hot sets sex_floor_strict=False at project time, so this no-ops.
     """
     if not sex_floor_strict:
         return
@@ -41,7 +42,7 @@ def apply_sex_duration_floor(
 
 
 def resolve_sex_floor_strict(spec: dict[str, Any], heat_scale: str) -> bool:
-    """Default sex_floor_strict=True when heat_scale is max."""
+    """Default sex_floor_strict=True when heat_scale is max (explicit max IRON)."""
     raw = spec.get("sex_floor_strict")
     if raw is None:
         return str(heat_scale or "").strip().lower() == "max"
