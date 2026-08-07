@@ -1706,7 +1706,7 @@
     },
     {
       "path": "scripts/media/h3_combo_eval.py",
-      "sha256": "8f0cfef3721f16b867056c4ae056b49058a4fd969cd8194e06131b8d22817590"
+      "sha256": "01b4816079863f6802d7ad1aea91afc212197dfa9d024ed624924db2ea8af0ad"
     },
     {
       "path": "scripts/media/h3_fill_idle.py",
@@ -1734,7 +1734,7 @@
     },
     {
       "path": "scripts/media/h3_workflow.py",
-      "sha256": "046b3567af5baae0b70d829ea982ed64b64200b322a809dd3628a2deb248fa8f"
+      "sha256": "5a261f61887342e45dd31c4ba6c3549f510a39c3e0e52cc16432174640638fb5"
     },
     {
       "path": "scripts/media/i2v_motion_gate.py",
