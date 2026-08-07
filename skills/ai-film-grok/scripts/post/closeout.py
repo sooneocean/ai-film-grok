@@ -946,6 +946,87 @@ def closeout_status(root: Path | str) -> dict[str, Any]:
         }
     )
 
+    # F2 · face-lock triple (face_identity ∧ identity_gen ∧ partner) — master claim honesty
+    face_lock_triple: dict[str, Any] = {
+        "ok": True,
+        "master_eligible": True,
+        "identity_partial": False,
+        "codes": [],
+    }
+    try:
+        from gates.face_lock_triple import (
+            annotate_official_final_for_face_lock,
+            audit_face_lock_triple,
+        )
+
+        face_lock_triple = audit_face_lock_triple(base, write_receipt=True)
+        annotate_official_final_for_face_lock(base, face_lock_triple)
+    except Exception as exc:  # noqa: BLE001
+        face_lock_triple = {
+            "ok": False,
+            "master_eligible": False,
+            "identity_partial": True,
+            "codes": ["FACE_LOCK_TRIPLE_PROBE_FAILED"],
+            "error": str(exc)[:160],
+        }
+    steps.append(
+        {
+            "id": "face_lock_triple",
+            "ok": bool(face_lock_triple.get("ok")),
+            "detail": (
+                f"master_eligible={face_lock_triple.get('master_eligible')} "
+                f"partial={face_lock_triple.get('identity_partial')} "
+                f"codes={face_lock_triple.get('codes') or []} "
+                f"hard_legs={face_lock_triple.get('hard_fail_legs') or []}"
+            )[:220],
+            "codes": face_lock_triple.get("codes") or [],
+            "master_eligible": bool(face_lock_triple.get("master_eligible")),
+            "identity_partial": bool(face_lock_triple.get("identity_partial")),
+            "next_cmd": face_lock_triple.get("next_cmd"),
+            "advisory": bool(
+                face_lock_triple.get("ok") and face_lock_triple.get("identity_partial")
+            ),
+            "partial": bool(face_lock_triple.get("identity_partial"))
+            or not bool(face_lock_triple.get("master_eligible")),
+        }
+    )
+
+    # T3 · transition frame audit when final exists
+    transition_frame: dict[str, Any] = {
+        "ok": True,
+        "checked": False,
+        "skipped": True,
+        "codes": [],
+    }
+    try:
+        from transition_frame_audit import transition_frame_audit_closeout_status
+
+        transition_frame = transition_frame_audit_closeout_status(
+            base, write_receipt=True, try_build=False
+        )
+    except Exception as exc:  # noqa: BLE001
+        transition_frame = {
+            "ok": True,
+            "advisory": True,
+            "error": str(exc)[:160],
+            "codes": [],
+        }
+    steps.append(
+        {
+            "id": "transition_frame_audit",
+            "ok": bool(transition_frame.get("ok", True)),
+            "detail": (
+                transition_frame.get("detail")
+                or f"codes={transition_frame.get('codes') or []}"
+            )[:200],
+            "codes": transition_frame.get("codes") or [],
+            "next_cmd": transition_frame.get("next_cmd"),
+            "advisory": bool(
+                transition_frame.get("skipped") or transition_frame.get("soft")
+            ),
+        }
+    )
+
     # E4 · still provenance audit (composite / poison archive)
     still_prov: dict[str, Any] = {"ok": True, "codes": [], "checked": 0}
     try:
@@ -980,6 +1061,10 @@ def closeout_status(root: Path | str) -> dict[str, Any]:
     # identity partial alone is honesty, not hard block (archive mix is hard via ok=False)
     if identity_gen.get("ok") and identity_gen.get("identity_partial"):
         soft_ids.add("identity_generation")
+    if face_lock_triple.get("ok") and face_lock_triple.get("identity_partial"):
+        soft_ids.add("face_lock_triple")
+    if transition_frame.get("skipped") or transition_frame.get("soft"):
+        soft_ids.add("transition_frame_audit")
     if not film_core_hard:
         soft_ids.add("film_core")
     # hard fidelity when marked hard and not ok
@@ -1021,6 +1106,19 @@ def closeout_status(root: Path | str) -> dict[str, Any]:
         "skip_audit": skip_audit,
         "skips_used": skip_audit.get("skips_used") or [],
         "attestation_audit": attestation_audit,
+        "face_lock_triple": {
+            "ok": face_lock_triple.get("ok"),
+            "master_eligible": face_lock_triple.get("master_eligible"),
+            "identity_partial": face_lock_triple.get("identity_partial"),
+            "codes": face_lock_triple.get("codes") or [],
+            "hard_fail_legs": face_lock_triple.get("hard_fail_legs") or [],
+        },
+        "transition_frame_audit": {
+            "ok": transition_frame.get("ok"),
+            "checked": transition_frame.get("checked"),
+            "codes": transition_frame.get("codes") or [],
+            "skipped": transition_frame.get("skipped"),
+        },
         "final": final_rec,
         "heat": {
             "active": heat.get("active"),

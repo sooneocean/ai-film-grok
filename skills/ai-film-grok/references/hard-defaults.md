@@ -12,7 +12,7 @@
 |---|---|
 | 文本入口 | Director’s Lens → 再 film-spec；禁止原文一句一图 |
 | 规划 vs 剪辑 | clips 齐后建议 Editor’s Cut；用户赶交付可缩短 |
-| **成人尺度 IRON** | 成人信号 → **自动 `heat_scale:max` + `spice_level:extreme`**；禁静默降档 |
+| **成人尺度 IRON** | 成人信号 → **剧情驱动 `heat_scale:hot`（默认）；仅显式 marker 设 `max` + `spice_level:extreme`**；禁静默降档；允许 PARTIAL 诚实降档 |
 | **亲密核** | max 硬底 **≥60%** 镜比（foreplay+act+climax）；建议 ≥70%；`heat_arc_strict` 默认 true |
 | **setup 天花板** | max 硬底 **≤20%** 镜比 |
 | **性爱片段时长** | **IRON 硬底**（2026-07-24 · **50%**）：`heat_scale=max` 时 **act+climax ≥ 总片板 50%**；write-spec 默认 `sex_floor_strict`；重口男向 ≥55%；`sex_min_duration_ratio` 可覆盖。**P0 · 2026-08-06**：`HEAT_SEX_DURATION_LOW` **fail-closed**（加镜/re-I2V/降 ratio），**禁**静默把 act/climax 空拉 `duration_sec=10`（短 H3 源 stretch 炸）。见 [suse final](lessons-2026-08-06-suse-ep01-official-final-iron.md) |
@@ -52,6 +52,8 @@
 | 女主 | **默认 single**；multi 仅证据（Prompt/多图/显式字段）；勿臆造 |
 | 定妆 | style-v1 + cast masters + lookbook → pilot 3 镜用户批准 → bulk |
 | **锁脸默认 hard（P0 · 2026-08-07 · 必要）** | 有 `cast_masters` 时：无 `face-identity` 收据 / enroll 缺口 / post_audit 漂移 → **preflight hard**（不只 soft 劝告）。漂移向来 hard。**逃生**：`face_identity_soft:true`（旧片）或 `AIFILM_SKIP_FACE_IDENTITY_GATE=1`（须 skip 记账）。register 已 enroll 角色 verify 失败默认 reject。**机读**：`assert_face_identity_passed` · `register_still`。见 [plan](../../../docs/plans/2026-08-07-codebase-opt-face-transition-todoplan.md) · [identity-gen](../memory/2026-08-07-identity-generation-lock-no-mix.md) |
+| **锁脸三联 closeout（P0 · 2026-08-07 · F2）** | closeout/ship-prep 步 **`face_lock_triple`** = face_identity ∧ identity_generation ∧ partner_cast。硬腿红或 `IDENTITY_PARTIAL` → **`master_eligible=false`**；有 official-final 则强制 **OFFICIAL_FINAL_PLATE**。回执 `receipts/face-lock-triple.json`。机读：`gates/face_lock_triple.py`。 |
+| **成片转场抽帧（P0 · 2026-08-07 · T3）** | 有 final MP4 + `final-delivery.json` 时 closeout/ship-prep 要求 `transition-frame-audit` **非 stale**；缺/旧 → hard。逃生：`transition_policy_soft:true` 或 `AIFILM_SKIP_TRANSITION_FRAME_AUDIT=1`。机读：`transition_frame_audit_closeout_status`。 |
 | **身份代际锁 · 禁混代出片（P0 · 2026-08-07 · abroad 漂移 · 不准再犯）** | **一代一脸一集**：同一 film root active timeline **只许一个 cast generation**（restyle/换男主锚/换定妆 = 新 gen）。**禁止** `_archive_*` / 旧 gen takes 与新 gen **混剪成 final**；缺镜 **重 I2V**，禁 silent restore archive 填洞。`face-identity.verified≠true` → 禁声称角色稳定；技术 plate 须 **IDENTITY_PARTIAL** 诚实。final 前 identity drift 审计；worst 先 re-I2V。有声干净 ≠ 脸对。**机读**：`gates/identity_generation_lock.py` → closeout step `identity_generation` · `receipts/cast-generation.json`；escape `AIFILM_SKIP_IDENTITY_GEN=1`。见 [memory](../memory/2026-08-07-identity-generation-lock-no-mix.md) |
 | **配角/男主定妆锁（P0 · 2026-08-07 · abroad 里昂 · 不准再犯）** | 凡上镜角色（含 partner）**立项日**须 `cast_master`+`face_lock` 图；文字 identity 不算锁。双人镜 prompt 必须有 `Character <id>:` + master 路径；禁只写 hero。`style.locked` 假绿：须全 cast 有 master，不能只认女主/style-v1。Imagine 裸双人易 moderated → **整帧** restyle（禁半帧贴脸）再 H3。**机读**：`gates/partner_cast_gate.py` · closeout `partner_cast` · escape `AIFILM_SKIP_PARTNER_CAST=1`。见 [memory](../memory/2026-08-07-partner-cast-master-iron.md) |
 | **H3 原声只留语音（P0 · 2026-08-07 · 禁错位 TTS · 轻处理默认）** | 用户要原声口型 → **禁 TTS 替换**；native XOR post_tts。**默认轻处理**：`hp+afftdn(nr≤12)+adeclick+loudnorm`；**禁默认 agate/双 arnndn**（狠 gate 仅显式 flag + 抽听 receipt，产物标 BROKEN）。交付优先 `film_native_stable`；禁 `film_watchable` 当交付。机读：`identity_generation` / closeout 不替代抽听。见 [memory](../memory/2026-08-07-h3-native-speech-isolate.md) · [no-midframe](../memory/2026-08-07-no-midframe-composite-flf-audio-iron.md) |

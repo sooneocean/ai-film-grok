@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.40.105] - 2026-08-07
+
+### Added (F2 face-lock triple · T3 transition-frame closeout)
+- **`gates/face_lock_triple.py`**: AND of face_identity · identity_generation · partner_cast; `master_eligible=false` on hard fail or IDENTITY_PARTIAL; `receipts/face-lock-triple.json`.
+- **Official-final honesty**: annotate forces `OFFICIAL_FINAL_PLATE` when triple not master-eligible.
+- **Closeout + ship-prep steps**: `face_lock_triple` · `transition_frame_audit`.
+- **T3** `transition_frame_audit_closeout_status`: final+delivery → missing/stale audit hard (`transition_policy_soft` / `AIFILM_SKIP_TRANSITION_FRAME_AUDIT` escape).
+- **Tests:** `test_face_lock_triple_f2.py` · `test_transition_frame_closeout_t3.py`.
+- **Docs:** hard-defaults F2/T3 rows · face-transition plan progress.
+
 ## [2.40.104] - 2026-08-07
 
 ### Added / Changed (WebUI workbench · Wave B1 single shell)

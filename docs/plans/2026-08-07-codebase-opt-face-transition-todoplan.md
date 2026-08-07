@@ -16,6 +16,7 @@
 | 测试 | **~483** test 文件 / 测码 ~86k LOC |
 | 主执行板（历史） | [CTO plan](docs/plans/2026-08-06-cto-optimization-todoplan.md) · 结构 [metabolism inventory](docs/reports/2026-08-06-code-metabolism-inventory.md) |
 | 本 plan 角色 | **本会话单一执行板**（挂 CTO 下，不另起第三综合板）；**新增/抬升 F 锁脸 + T 转场** |
+| **执行进度** | **F1+T1+T2 SHIPPED 2.40.101** · **F2+T3 SHIPPED 2.40.105**（closeout 三联 + 转场抽帧 status）；F3 still 绑 / T4 plate↔ops / T5 residual |
 | **执行进度** | **F1 + T1 + T2 SHIPPED 2.40.101**（默认 hard + soft-soup）；F0/T0 账实见代码注释；F2–F4 / T3–T5 residual |
 
 **仓库类比：** 分车间门牌已贴好，总控台（final/preflight/edit）仍塞满旋钮；锁脸像「每镜必须刷脸进棚」，转场像「剪辑师的刀口语法」——门绿不等于观众不跳戏。

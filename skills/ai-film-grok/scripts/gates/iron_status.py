@@ -53,6 +53,18 @@ _IRON_GATES: list[tuple[str, str, str, str]] = [
         "preflight / style lock",
     ),
     (
+        "face_lock_triple",
+        "face_identity ∧ identity_gen ∧ partner; master_eligible honesty",
+        "AIFILM_SKIP_FACE_IDENTITY_GATE",
+        "closeout / ship-prep; plate if not master_eligible",
+    ),
+    (
+        "transition_frame_audit",
+        "final+delivery requires non-stale transition-frame-audit",
+        "AIFILM_SKIP_TRANSITION_FRAME_AUDIT",
+        "closeout / ship-prep",
+    ),
+    (
         "still_provenance",
         "ban midframe composite / poison archive still as I2V source",
         "AIFILM_SKIP_STILL_PROVENANCE",
