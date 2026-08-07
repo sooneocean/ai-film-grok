@@ -1,0 +1,551 @@
+<!doctype html>
+<html lang="zh" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>AI·Film Control · 控制台原型</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Sora:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* ============ DESIGN TOKENS ============ */
+:root{
+  --font-display:"Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --font-body:"Sora", ui-sans-serif, system-ui, sans-serif;
+  --font-mono:"JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  --r-sm:8px; --r-md:12px; --r-lg:16px; --r-pill:999px;
+  --sp-1:4px; --sp-2:8px; --sp-3:12px; --sp-4:16px; --sp-6:24px; --sp-8:32px; --sp-12:48px;
+  --ease:cubic-bezier(.16,1,.3,1);
+  --sb-w:248px;
+}
+[data-theme="dark"]{
+  --bg:#15130f; --surface:#1e1a15; --raised:#272019; --line:rgba(255,245,230,.09);
+  --line-strong:rgba(255,245,230,.16);
+  --text-hi:#f3ede2; --text-mid:#b9b0a2; --text-lo:#7d7568;
+  --accent:#e8a463; --accent-press:#d98f47; --accent-soft:rgba(232,164,99,.14);
+  --ok:#84b86a; --ok-soft:rgba(132,184,106,.14);
+  --warn:#e0b15f; --bad:#d97a5f; --bad-soft:rgba(217,122,95,.14);
+  --info:#7ba6c4; --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.28);
+}
+[data-theme="light"]{
+  --bg:#f6f3ee; --surface:#fffdfa; --raised:#fffaf3; --line:rgba(33,29,24,.10);
+  --line-strong:rgba(33,29,24,.18);
+  --text-hi:#211d18; --text-mid:#5c544a; --text-lo:#8c8377;
+  --accent:#c8843f; --accent-press:#b3722f; --accent-soft:rgba(200,132,63,.14);
+  --ok:#5f9447; --ok-soft:rgba(95,148,71,.14);
+  --warn:#b9893a; --bad:#c25e45; --bad-soft:rgba(194,94,69,.14);
+  --info:#3f7da0; --shadow:0 1px 2px rgba(33,29,24,.06), 0 10px 28px rgba(33,29,24,.10);
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{
+  font-family:var(--font-body); background:var(--bg); color:var(--text-hi);
+  font-size:14px; line-height:1.5; -webkit-font-smoothing:antialiased;
+  display:grid; grid-template-columns:var(--sb-w) 1fr; min-height:100dvh;
+}
+@media (max-width:880px){ body{grid-template-columns:1fr} }
+
+/* ============ SIDEBAR ============ */
+.sidebar{
+  background:var(--surface); border-right:1px solid var(--line);
+  display:flex; flex-direction:column; padding:var(--sp-4) var(--sp-3); gap:var(--sp-2);
+  position:sticky; top:0; height:100dvh;
+}
+.brand{display:flex; align-items:center; gap:var(--sp-3); padding:var(--sp-2) var(--sp-2) var(--sp-4); }
+.brand-mark{
+  width:34px; height:34px; border-radius:10px; flex:0 0 auto;
+  background:linear-gradient(150deg,var(--accent),var(--accent-press));
+  display:grid; place-items:center; color:#1a140c; font-family:var(--font-display); font-weight:700; font-size:15px;
+}
+.brand-name{font-family:var(--font-display); font-weight:600; font-size:15px; letter-spacing:.2px}
+.brand-sub{font-size:11px; color:var(--text-lo); letter-spacing:.5px; text-transform:uppercase}
+.nav-group{font-size:11px; color:var(--text-lo); text-transform:uppercase; letter-spacing:.6px; margin:var(--sp-4) var(--sp-2) var(--sp-1)}
+.nav-item{
+  display:flex; align-items:center; gap:var(--sp-3); padding:var(--sp-2) var(--sp-3);
+  border-radius:var(--r-sm); color:var(--text-mid); text-decoration:none; cursor:pointer;
+  font-weight:500; transition:background .18s var(--ease), color .18s var(--ease); border:1px solid transparent;
+}
+.nav-item:hover{background:var(--raised); color:var(--text-hi)}
+.nav-item.active{background:var(--accent-soft); color:var(--accent); border-color:var(--line)}
+.nav-item .ico{width:18px; height:18px; flex:0 0 auto; opacity:.9}
+.nav-item .label{flex:1}
+.badge{
+  font-family:var(--font-mono); font-size:11px; padding:1px 7px; border-radius:var(--r-pill);
+  background:var(--raised); color:var(--text-mid); border:1px solid var(--line);
+}
+.nav-item.active .badge{background:var(--accent); color:#1a140c; border-color:transparent}
+.sidebar-foot{margin-top:auto; padding:var(--sp-3); border-top:1px solid var(--line); font-size:12px; color:var(--text-lo)}
+.env-dot{display:inline-block; width:7px; height:7px; border-radius:50%; background:var(--ok); margin-right:6px; vertical-align:middle}
+
+/* ============ MAIN ============ */
+.main{display:flex; flex-direction:column; min-width:0}
+.topbar{
+  display:flex; align-items:center; gap:var(--sp-4); padding:var(--sp-3) var(--sp-6);
+  border-bottom:1px solid var(--line); background:color-mix(in srgb, var(--bg) 80%, transparent);
+  position:sticky; top:0; z-index:20; backdrop-filter:blur(8px);
+}
+.search{
+  flex:1; max-width:420px; display:flex; align-items:center; gap:var(--sp-2);
+  background:var(--surface); border:1px solid var(--line); border-radius:var(--r-pill);
+  padding:var(--sp-2) var(--sp-4); color:var(--text-lo);
+}
+.search input{
+  flex:1; border:0; background:transparent; color:var(--text-hi); font-family:var(--font-body); font-size:14px; outline:none;
+}
+.search input::placeholder{color:var(--text-lo)}
+.topbar-spacer{flex:1}
+.icon-btn{
+  width:38px; height:38px; border-radius:var(--r-sm); border:1px solid var(--line); background:var(--surface);
+  color:var(--text-mid); cursor:pointer; display:grid; place-items:center; transition:.18s var(--ease);
+}
+.icon-btn:hover{color:var(--text-hi); border-color:var(--line-strong)}
+.reviewer{display:flex; align-items:center; gap:var(--sp-2); font-weight:500}
+.avatar{width:34px; height:34px; border-radius:50%; background:var(--accent-soft); color:var(--accent); display:grid; place-items:center; font-family:var(--font-display); font-weight:600}
+.menu-toggle{display:none}
+@media (max-width:880px){
+  .menu-toggle{display:grid}
+  .sidebar{position:fixed; z-index:40; left:0; top:0; transform:translateX(-100%); transition:transform .25s var(--ease); box-shadow:var(--shadow)}
+  .sidebar.open{transform:translateX(0)}
+  .scrim{display:none; position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:35}
+  .scrim.show{display:block}
+  .topbar{padding:var(--sp-3) var(--sp-4)}
+}
+.content{padding:var(--sp-6); max-width:1320px; width:100%; margin:0 auto}
+@media (max-width:880px){ .content{padding:var(--sp-4)} }
+.view{display:none; animation:fade .3s var(--ease)}
+.view.active{display:block}
+@keyframes fade{from{opacity:0; transform:translateY(6px)} to{opacity:1; transform:none}}
+
+/* ============ PAGE HEAD ============ */
+.page-head{display:flex; align-items:flex-end; justify-content:space-between; gap:var(--sp-4); margin-bottom:var(--sp-6); flex-wrap:wrap}
+.page-title{font-family:var(--font-display); font-size:28px; font-weight:700; letter-spacing:-.5px; margin:0}
+.page-desc{color:var(--text-mid); margin:var(--sp-1) 0 0; max-width:60ch}
+
+/* ============ BENTO ============ */
+.bento{display:grid; grid-template-columns:repeat(12,1fr); gap:var(--sp-4); margin-bottom:var(--sp-6)}
+.stat{grid-column:span 3; background:var(--surface); border:1px solid var(--line); border-radius:var(--r-lg); padding:var(--sp-4); position:relative; overflow:hidden}
+.stat.wide{grid-column:span 6}
+.stat.tall{grid-column:span 4; grid-row:span 2}
+@media (max-width:1024px){ .stat,.stat.wide{grid-column:span 6} .stat.tall{grid-column:span 6; grid-row:auto} }
+@media (max-width:640px){ .stat,.stat.wide,.stat.tall{grid-column:span 12} }
+.stat-label{font-size:12px; color:var(--text-lo); text-transform:uppercase; letter-spacing:.5px}
+.stat-value{font-family:var(--font-display); font-size:34px; font-weight:700; margin:var(--sp-2) 0 0; letter-spacing:-1px}
+.stat-delta{font-size:12px; font-weight:600; margin-top:2px}
+.stat-delta.up{color:var(--ok)} .stat-delta.down{color:var(--bad)}
+.stat .spark{position:absolute; right:var(--sp-4); bottom:var(--sp-4); opacity:.85}
+.lane-row{display:flex; align-items:center; gap:var(--sp-3); padding:var(--sp-3) 0; border-bottom:1px solid var(--line)}
+.lane-row:last-child{border-bottom:0}
+.lane-name{font-weight:600; width:64px}
+.pill{font-size:11px; font-weight:600; padding:3px 10px; border-radius:var(--r-pill); border:1px solid transparent}
+.pill.active{background:var(--ok-soft); color:var(--ok)} .pill.idle{background:var(--accent-soft); color:var(--accent)}
+.pill.err{background:var(--bad-soft); color:var(--bad)} .pill.off{background:var(--surface); color:var(--text-lo); border-color:var(--line)}
+.lane-meta{color:var(--text-mid); font-size:13px; margin-left:auto; font-family:var(--font-mono)}
+.section-title{font-family:var(--font-display); font-size:16px; font-weight:600; margin:0 0 var(--sp-3)}
+.feed{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:var(--sp-3)}
+.feed li{display:flex; gap:var(--sp-3); align-items:flex-start; font-size:13px}
+.feed .dot{width:8px; height:8px; border-radius:50%; margin-top:6px; flex:0 0 auto}
+.feed .t{color:var(--text-lo); font-family:var(--font-mono); font-size:11px; margin-left:auto; white-space:nowrap}
+.quick{display:flex; flex-wrap:wrap; gap:var(--sp-3)}
+
+/* ============ BUTTONS ============ */
+.btn{
+  font-family:var(--font-body); font-weight:600; font-size:14px; cursor:pointer; border:1px solid transparent;
+  border-radius:var(--r-sm); padding:var(--sp-3) var(--sp-4); display:inline-flex; align-items:center; gap:var(--sp-2);
+  transition:transform .12s var(--ease), background .18s var(--ease), border-color .18s var(--ease);
+}
+.btn:active{transform:scale(.98)}
+.btn:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+.btn-primary{background:var(--accent); color:#1a140c}
+.btn-primary:hover{background:var(--accent-press)}
+.btn-ghost{background:var(--surface); color:var(--text-hi); border-color:var(--line)}
+.btn-ghost:hover{border-color:var(--line-strong)}
+.btn-danger{background:var(--bad-soft); color:var(--bad); border-color:transparent}
+.btn-danger:hover{background:var(--bad)}
+.btn-sm{padding:var(--sp-2) var(--sp-3); font-size:13px}
+.btn[disabled]{opacity:.5; pointer-events:none}
+
+/* ============ FILTER BAR ============ */
+.filterbar{display:flex; flex-wrap:wrap; align-items:center; gap:var(--sp-3); margin-bottom:var(--sp-6); padding:var(--sp-3); background:var(--surface); border:1px solid var(--line); border-radius:var(--r-lg)}
+.chip{
+  font-size:13px; font-weight:500; padding:var(--sp-2) var(--sp-3); border-radius:var(--r-pill);
+  border:1px solid var(--line); background:var(--bg); color:var(--text-mid); cursor:pointer; transition:.16s var(--ease);
+}
+.chip:hover{border-color:var(--line-strong); color:var(--text-hi)}
+.chip.on{background:var(--accent-soft); color:var(--accent); border-color:transparent}
+.seg{display:inline-flex; background:var(--bg); border:1px solid var(--line); border-radius:var(--r-sm); overflow:hidden}
+.seg button{border:0; background:transparent; color:var(--text-mid); padding:var(--sp-2) var(--sp-3); font-family:var(--font-body); font-size:13px; cursor:pointer}
+.seg button.on{background:var(--accent); color:#1a140c; font-weight:600}
+.filterbar .count{margin-left:auto; color:var(--text-lo); font-family:var(--font-mono); font-size:13px}
+
+/* ============ ASSET CARD ============ */
+.grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(340px,1fr)); gap:var(--sp-4)}
+.card{
+  background:var(--surface); border:1px solid var(--line); border-radius:var(--r-lg); padding:var(--sp-4);
+  display:flex; flex-direction:column; gap:var(--sp-3); transition:border-color .2s var(--ease), transform .2s var(--ease);
+}
+.card:hover{border-color:var(--line-strong); transform:translateY(-2px)}
+.card-head{display:flex; align-items:center; gap:var(--sp-2)}
+.card-id{font-family:var(--font-mono); font-size:13px; font-weight:500; color:var(--text-hi); word-break:break-all}
+.card-tags{display:flex; flex-wrap:wrap; gap:6px}
+.tag{font-size:11px; padding:2px 9px; border-radius:var(--r-pill); background:var(--bg); color:var(--text-mid); border:1px solid var(--line)}
+.tag.mood{color:var(--accent); border-color:transparent; background:var(--accent-soft)}
+.wave{display:flex; align-items:center; gap:2px; height:46px; padding:var(--sp-2) 0; cursor:pointer}
+.wave .bar{flex:1; background:var(--line-strong); border-radius:2px; transition:background .2s}
+.wave.playing .bar{background:var(--accent)}
+.wave .bar.on{background:var(--accent)}
+.player-row{display:flex; align-items:center; gap:var(--sp-3)}
+.play-btn{width:40px; height:40px; border-radius:50%; background:var(--accent); color:#1a140c; border:0; cursor:pointer; display:grid; place-items:center; flex:0 0 auto; transition:transform .12s var(--ease)}
+.play-btn:active{transform:scale(.92)}
+.play-btn:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+.progress{flex:1; height:4px; background:var(--line); border-radius:var(--r-pill); overflow:hidden}
+.progress > i{display:block; height:100%; width:0; background:var(--accent); transition:width .1s linear}
+.time{font-family:var(--font-mono); font-size:12px; color:var(--text-lo); min-width:84px; text-align:right}
+.metrics{display:grid; grid-template-columns:repeat(4,1fr); gap:var(--sp-2); font-size:11px; color:var(--text-lo)}
+.metrics b{display:block; color:var(--text-hi); font-family:var(--font-mono); font-size:13px; font-weight:500}
+.recipe{font-family:var(--font-mono); font-size:11px; color:var(--text-mid); background:var(--bg); border:1px solid var(--line); border-radius:var(--r-sm); padding:var(--sp-3); max-height:0; overflow:hidden; transition:max-height .3s var(--ease); margin:0}
+.recipe.open{max-height:240px; overflow:auto}
+.card-actions{display:flex; gap:var(--sp-2); margin-top:auto}
+.card-actions .btn{flex:1; justify-content:center}
+
+/* ============ TABLE ============ */
+.table{width:100%; border-collapse:collapse; background:var(--surface); border:1px solid var(--line); border-radius:var(--r-lg); overflow:hidden}
+.table th,.table td{text-align:left; padding:var(--sp-3) var(--sp-4); border-bottom:1px solid var(--line); font-size:13px}
+.table th{color:var(--text-lo); font-weight:600; text-transform:uppercase; font-size:11px; letter-spacing:.5px}
+.table tr:last-child td{border-bottom:0}
+.table tbody tr:hover{background:var(--bg)}
+
+/* ============ MODAL / TOAST ============ */
+.modal-scrim{position:fixed; inset:0; background:rgba(0,0,0,.55); display:none; place-items:center; z-index:60; padding:var(--sp-4)}
+.modal-scrim.show{display:grid; animation:fade .2s var(--ease)}
+.modal{background:var(--surface); border:1px solid var(--line-strong); border-radius:var(--r-lg); padding:var(--sp-6); width:min(440px,100%); box-shadow:var(--shadow)}
+.modal h3{font-family:var(--font-display); margin:0 0 var(--sp-2); font-size:18px}
+.modal textarea{width:100%; min-height:88px; background:var(--bg); border:1px solid var(--line); border-radius:var(--r-sm); color:var(--text-hi); font-family:var(--font-body); padding:var(--sp-3); font-size:14px; resize:vertical}
+.modal textarea:focus{outline:none; border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-soft)}
+.modal-actions{display:flex; gap:var(--sp-2); justify-content:flex-end; margin-top:var(--sp-4)}
+.toast-wrap{position:fixed; bottom:var(--sp-6); right:var(--sp-6); display:flex; flex-direction:column; gap:var(--sp-2); z-index:70}
+.toast{background:var(--raised); border:1px solid var(--line-strong); border-left:3px solid var(--ok); border-radius:var(--r-sm); padding:var(--sp-3) var(--sp-4); box-shadow:var(--shadow); font-size:13px; animation:slidein .25s var(--ease); max-width:320px}
+.toast.bad{border-left-color:var(--bad)}
+@keyframes slidein{from{opacity:0; transform:translateX(16px)} to{opacity:1; transform:none}}
+
+/* ============ EMPTY / SKELETON ============ */
+.empty{text-align:center; padding:var(--sp-12) var(--sp-4); color:var(--text-lo); border:1px dashed var(--line); border-radius:var(--r-lg); background:var(--surface)}
+.empty .big{font-family:var(--font-display); font-size:18px; color:var(--text-mid); margin-bottom:var(--sp-2)}
+.skel{background:linear-gradient(90deg,var(--surface),var(--raised),var(--surface)); background-size:200% 100%; animation:shimmer 1.2s infinite; border-radius:var(--r-sm); height:14px}
+@keyframes shimmer{to{background-position:-200% 0}}
+@media (prefers-reduced-motion:reduce){ *{animation-duration:.001ms!important; transition-duration:.001ms!important} .wave.playing .bar{background:var(--accent)} }
+.icon{width:18px; height:18px; stroke:currentColor; fill:none; stroke-width:1.7; stroke-linecap:round; stroke-linejoin:round}
+</style>
+</head>
+<body>
+
+<!-- ============ SIDEBAR ============ -->
+<aside class="sidebar" id="sidebar">
+  <div class="brand">
+    <div class="brand-mark">AI</div>
+    <div><div class="brand-name">AI·Film</div><div class="brand-sub">Control</div></div>
+  </div>
+  <div class="nav-group">生产</div>
+  <a class="nav-item active" data-go="dashboard"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg><span class="label">仪表盘</span></a>
+  <a class="nav-item" data-go="bgm"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M9 18V5l10-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="16" cy="16" r="3"/></svg><span class="label">音乐库 BGM</span><span class="badge" id="nav-bgm">3</span></a>
+  <a class="nav-item" data-go="tts"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 3a4 4 0 0 0-4 4v5a4 4 0 0 0 8 0V7a4 4 0 0 0-4-4z"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg><span class="label">语音 TTS</span><span class="badge">0</span></a>
+  <a class="nav-item" data-go="video"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="5" width="14" height="14" rx="2"/><path d="m17 9 4-2v10l-4-2"/></svg><span class="label">镜头 Video</span><span class="badge">0</span></a>
+  <div class="nav-group">治理</div>
+  <a class="nav-item" data-go="gaps"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 7h16M4 12h16M4 17h10"/></svg><span class="label">缺口 Gaps</span><span class="badge" id="nav-gaps">100</span></a>
+  <a class="nav-item" data-go="generators"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 2v4M12 18v4M2 12h4M18 12h4M5 5l3 3M16 16l3 3M19 5l-3 3M8 16l-3 3"/></svg><span class="label">生成器</span></a>
+  <a class="nav-item" data-go="settings"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1.3l2-1.5-2-3.4-2.3 1a7 7 0 0 0-2.2-1.3L16 2H8l-.4 2.5A7 7 0 0 0 5.4 5.8l-2.3-1-2 3.4 2 1.5A7 7 0 0 0 3 12c0 .4 0 .9.1 1.3l-2 1.5 2 3.4 2.3-1a7 7 0 0 0 2.2 1.3L8 22h8l.4-2.5a7 7 0 0 0 2.2-1.3l2.3 1 2-3.4-2-1.5c.1-.4.1-.9.1-1.3Z"/></svg><span class="label">设置</span></a>
+  <div class="sidebar-foot"><span class="env-dot"></span>local:5090 · 健康<br>rev 172 · 46 资产</div>
+</aside>
+<div class="scrim" id="scrim"></div>
+
+<!-- ============ MAIN ============ -->
+<div class="main">
+  <header class="topbar">
+    <button class="icon-btn menu-toggle" id="menuToggle" aria-label="打开导航"><svg class="icon" viewBox="0 0 24 24"><path d="M3 6h18M3 12h18M3 18h18"/></svg></button>
+    <div class="search"><svg class="icon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><input placeholder="搜索资产 ID、mood、缺口…" aria-label="搜索"></div>
+    <div class="topbar-spacer"></div>
+    <button class="icon-btn" id="themeBtn" aria-label="切换主题"><svg class="icon" id="themeIco" viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8Z"/></svg></button>
+    <div class="reviewer"><div class="avatar">DX</div><span>dex</span></div>
+  </header>
+
+  <main class="content">
+    <!-- ===== DASHBOARD ===== -->
+    <section class="view active" id="view-dashboard">
+      <div class="page-head">
+        <div><h1 class="page-title">仪表盘</h1><p class="page-desc">生产进度、三条车道健康度与最近活动，一眼掌握。</p></div>
+        <button class="btn btn-ghost btn-sm" onclick="toast('健康检查已运行 · 全部绿灯')"><svg class="icon" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>运行健康检查</button>
+      </div>
+      <div class="bento">
+        <div class="stat"><div class="stat-label">待审阅</div><div class="stat-value">3</div><div class="stat-delta up">BGM 车道</div>
+          <svg class="spark" width="84" height="34" viewBox="0 0 84 34" fill="none"><polyline points="0,28 14,22 28,24 42,14 56,18 70,8 84,12" stroke="var(--accent)" stroke-width="2" fill="none"/></svg></div>
+        <div class="stat"><div class="stat-label">已批准</div><div class="stat-value">46</div><div class="stat-delta up">↑ 6 本周</div>
+          <svg class="spark" width="84" height="34" viewBox="0 0 84 34" fill="none"><polyline points="0,26 14,24 28,20 42,18 56,12 70,10 84,6" stroke="var(--ok)" stroke-width="2" fill="none"/></svg></div>
+        <div class="stat"><div class="stat-label">生成中</div><div class="stat-value">20</div><div class="stat-delta">acep-step · submitted</div>
+          <svg class="spark" width="84" height="34" viewBox="0 0 84 34" fill="none"><polyline points="0,18 14,20 28,14 42,16 56,10 70,14 84,8" stroke="var(--info)" stroke-width="2" fill="none"/></svg></div>
+        <div class="stat"><div class="stat-label">缺口覆盖</div><div class="stat-value">80%</div><div class="stat-delta down">2 STARVED</div>
+          <svg class="spark" width="84" height="34" viewBox="0 0 84 34" fill="none"><polyline points="0,22 14,18 28,20 42,12 56,14 70,9 84,11" stroke="var(--warn)" stroke-width="2" fill="none"/></svg></div>
+
+        <div class="stat tall">
+          <div class="section-title">管线概览</div>
+          <div class="lane-row"><span class="lane-name">BGM</span><span class="pill active">active</span><span class="lane-meta">3 待审</span></div>
+          <div class="lane-row"><span class="lane-name">TTS</span><span class="pill idle">idle</span><span class="lane-meta">0 缺口</span></div>
+          <div class="lane-row"><span class="lane-name">Video</span><span class="pill idle">idle</span><span class="lane-meta">0 待审</span></div>
+          <div class="lane-row"><span class="lane-name">acestep</span><span class="pill active">active</span><span class="lane-meta">10 工单</span></div>
+          <div class="lane-row"><span class="lane-name">h3</span><span class="pill err">pending</span><span class="lane-meta">未配置</span></div>
+        </div>
+
+        <div class="stat wide">
+          <div class="section-title">最近活动</div>
+          <ul class="feed">
+            <li><span class="dot" style="background:var(--ok)"></span><div><b>rnb-5900</b> 已批准并入库 · peak 0.89 通过 QA<dot></div><span class="t">2m</span></li>
+            <li><span class="dot" style="background:var(--info)"></span><div>提交 10 条 ambient 生成工单 → acep-step</div><span class="t">11m</span></li>
+            <li><span class="dot" style="background:var(--warn)"></span><div>缺口 <b>pulse</b> 曾死路，已补 stem_profiles 解锁</div><span class="t">1h</span></li>
+            <li><span class="dot" style="background:var(--accent)"></span><div>round7 覆盖分析：20 缺口复用现有资产填充</div><span class="t">3h</span></li>
+          </ul>
+        </div>
+
+        <div class="stat wide">
+          <div class="section-title">快捷操作</div>
+          <div class="quick">
+            <button class="btn btn-primary btn-sm" onclick="go('bgm')">审阅 BGM 候选</button>
+            <button class="btn btn-ghost btn-sm" onclick="toast('已重新生成审阅页')">重新生成审阅页</button>
+            <button class="btn btn-ghost btn-sm" onclick="go('gaps')">查看缺口覆盖</button>
+            <button class="btn btn-ghost btn-sm" onclick="toast('提交回路已触发')">提交生成</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== BGM ===== -->
+    <section class="view" id="view-bgm">
+      <div class="page-head">
+        <div><h1 class="page-title">音乐库 · BGM</h1><p class="page-desc">待人工审阅的候选资产。内联播放、筛选，并直接在页面完成批准 / 拒绝——无需手抄命令。</p></div>
+      </div>
+      <div class="filterbar">
+        <span style="color:var(--text-lo);font-size:12px">mood</span>
+        <button class="chip on" data-mood="all">全部</button>
+        <button class="chip" data-mood="rnb">rnb</button>
+        <button class="chip" data-mood="ambient">ambient</button>
+        <button class="chip" data-mood="dark">dark</button>
+        <button class="chip" data-mood="pulse">pulse</button>
+        <span style="color:var(--text-lo);font-size:12px;margin-left:var(--sp-2)">状态</span>
+        <div class="seg" id="segStatus">
+          <button class="on" data-st="pending">待审阅</button>
+          <button data-st="all">全部</button>
+        </div>
+        <span class="count" id="bgmCount">3 条</span>
+      </div>
+      <div class="grid" id="bgmGrid"></div>
+    </section>
+
+    <!-- ===== TTS ===== -->
+    <section class="view" id="view-tts">
+      <div class="page-head"><div><h1 class="page-title">语音 · TTS</h1><p class="page-desc">独立车道：由评估引擎样本池提供服务，不经过声音生成后端。</p></div></div>
+      <div class="empty"><div class="big">暂无待路由 tts 缺口</div><div>TTS 缺口由评估引擎样本池提供服务，不会出现在 BGM 候选列表中。</div></div>
+    </section>
+
+    <!-- ===== VIDEO ===== -->
+    <section class="view" id="view-video">
+      <div class="page-head"><div><h1 class="page-title">镜头 · Video</h1><p class="page-desc">由 Grok Video 1.5（云端）或本地 H3（5090）生成，与 BGM/TTS 互不干扰。</p></div></div>
+      <div class="empty"><div class="big">0 个待审阅镜头</div><div>视频镜头审阅页见 video-library/review。生成工单由 H3 / Grok15 后端承接。</div></div>
+    </section>
+
+    <!-- ===== GAPS ===== -->
+    <section class="view" id="view-gaps">
+      <div class="page-head">
+        <div><h1 class="page-title">缺口 · Gaps</h1><p class="page-desc">供需覆盖分析：STARVED（缺货）/ THIN（偏薄）/ OK。可一键生成优先队列。</p></div>
+        <button class="btn btn-primary btn-sm" onclick="toast('已生成优先生成队列（Top-10）')">生成优先队列</button>
+      </div>
+      <table class="table">
+        <thead><tr><th>(mood, stem, energy)</th><th>需求</th><th>供应</th><th>状态</th><th>缺口</th></tr></thead>
+        <tbody>
+          <tr><td><span class="tag mood">rnb</span> · pad · 0.2</td><td>12</td><td>14</td><td><span class="pill active">OK</span></td><td>—</td></tr>
+          <tr><td><span class="tag mood">ambient</span> · pad · 0.1</td><td>10</td><td>0</td><td><span class="pill err">STARVED</span></td><td>10</td></tr>
+          <tr><td><span class="tag mood">dark</span> · bass · 0.5</td><td>8</td><td>3</td><td><span class="pill idle">THIN</span></td><td>5</td></tr>
+          <tr><td><span class="tag mood">pulse</span> · drums · 0.7</td><td>6</td><td>6</td><td><span class="pill active">OK</span></td><td>—</td></tr>
+          <tr><td><span class="tag mood">cmin</span> · keys · 0.3</td><td>4</td><td>1</td><td><span class="pill idle">THIN</span></td><td>3</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- ===== GENERATORS ===== -->
+    <section class="view" id="view-generators">
+      <div class="page-head"><div><h1 class="page-title">生成器 · Backends</h1><p class="page-desc">声音 / 视频生成后端注册表与熔断状态。</p></div></div>
+      <div class="grid">
+        <div class="card"><div class="card-head"><b>acestep</b><span class="pill active" style="margin-left:auto">active</span></div><div class="metrics"><span>本地 5090</span><span>能力: bgm</span><span>熔断: 正常</span><span>工单: 10</span></div></div>
+        <div class="card"><div class="card-head"><b>ltx23</b><span class="pill idle" style="margin-left:auto">api</span></div><div class="metrics"><span>云端 API</span><span>能力: bgm</span><span>熔断: 正常</span><span>工单: 0</span></div></div>
+        <div class="card"><div class="card-head"><b>grok15</b><span class="pill idle" style="margin-left:auto">api</span></div><div class="metrics"><span>云端 API</span><span>能力: 待定</span><span>熔断: 正常</span><span>工单: 0</span></div></div>
+        <div class="card"><div class="card-head"><b>h3</b><span class="pill err" style="margin-left:auto">pending</span></div><div class="metrics"><span>本地 5090</span><span>能力: 未配置</span><span>熔断: —</span><span>工单: 0</span></div></div>
+      </div>
+    </section>
+
+    <!-- ===== SETTINGS ===== -->
+    <section class="view" id="view-settings">
+      <div class="page-head"><div><h1 class="page-title">设置</h1><p class="page-desc">主题、审阅人、健康门禁与快捷键。</p></div></div>
+      <div class="card" style="max-width:520px">
+        <div class="lane-row"><span>外观主题</span><div class="seg"><button id="segTheme" class="on" data-t="dark">深色</button><button data-t="light">浅色</button></div></div>
+        <div class="lane-row"><span>默认审阅人</span><span class="tag mood">dex</span></div>
+        <div class="lane-row"><span>QA 门禁（自动批准）</span><span class="pill active">开启</span></div>
+        <div class="lane-row" style="border-bottom:0"><span>减少动效</span><span class="pill idle">跟随系统</span></div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- ============ MODAL / TOAST ============ -->
+<div class="modal-scrim" id="modalScrim">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <h3 id="modalTitle">拒绝资产</h3>
+    <p style="color:var(--text-mid);margin:0 0 var(--sp-3)" id="modalDesc">填写拒绝原因，将写入 reject 记录。</p>
+    <textarea id="modalReason" placeholder="例如：峰值过低 / 与母带不连贯 / 静音段过长…"></textarea>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal()">取消</button>
+      <button class="btn btn-danger" id="modalConfirm">确认拒绝</button>
+    </div>
+  </div>
+</div>
+<div class="toast-wrap" id="toastWrap"></div>
+
+<script>
+/* ---------- data (原型内联；真实环境由 review-data.json 提供) ---------- */
+const ASSETS = [
+  {id:"rnb-21001-dedb5bddc6", mood:"rnb", energy:0.2, stem:"pad", dur:20, peak:0.89, rms:0.16, silence:0.0, loop:false, bpm:72, key:"A minor", tags:["intimacy","relationship"], qa:"PASS"},
+  {id:"rnb-21003-66462ca8cd", mood:"rnb", energy:0.2, stem:"pad", dur:20, peak:0.89, rms:0.13, silence:0.0, loop:false, bpm:72, key:"A minor", tags:["intimacy"], qa:"PASS"},
+  {id:"rnb-21004-5e683c78b7", mood:"rnb", energy:0.2, stem:"pad", dur:10, peak:0.89, rms:0.14, silence:0.0, loop:false, bpm:86, key:"E minor", tags:["relationship"], qa:"PASS"},
+  {id:"ambient-5401-a1b2c3d4", mood:"ambient", energy:0.1, stem:"pad", dur:30, peak:0.82, rms:0.10, silence:0.02, loop:true, bpm:60, key:"C major", tags:["calm"], qa:"PASS"},
+  {id:"dark-6200-9df3e64099", mood:"dark", energy:0.5, stem:"bass", dur:18, peak:0.91, rms:0.20, silence:0.0, loop:false, bpm:90, key:"D minor", tags:["tension"], qa:"HOLD"},
+  {id:"pulse-3302-7f6e5d4c", mood:"pulse", energy:0.7, stem:"drums", dur:15, peak:0.94, rms:0.22, silence:0.0, loop:true, bpm:128, key:"—", tags:["drive"], qa:"PASS"},
+];
+const state = {mood:"all", st:"pending"};
+
+/* ---------- nav ---------- */
+function go(view){
+  document.querySelectorAll(".nav-item").forEach(n=>n.classList.toggle("active", n.dataset.go===view));
+  document.querySelectorAll(".view").forEach(v=>v.classList.remove("active"));
+  document.getElementById("view-"+view).classList.add("active");
+  closeSidebar();
+  if(view==="bgm") renderBGM();
+}
+document.querySelectorAll(".nav-item").forEach(n=>n.addEventListener("click",()=>go(n.dataset.go)));
+
+/* ---------- sidebar (mobile) ---------- */
+const sb=document.getElementById("sidebar"), scrim=document.getElementById("scrim");
+function closeSidebar(){sb.classList.remove("open");scrim.classList.remove("show");}
+document.getElementById("menuToggle").addEventListener("click",()=>{sb.classList.toggle("open");scrim.classList.toggle("show");});
+scrim.addEventListener("click",closeSidebar);
+
+/* ---------- theme ---------- */
+const root=document.documentElement;
+function setTheme(t){
+  root.setAttribute("data-theme",t);
+  localStorage.setItem("aifilm-theme",t);
+  document.getElementById("segTheme").querySelectorAll("button").forEach(b=>b.classList.toggle("on",b.dataset.t===t));
+}
+document.getElementById("themeBtn").addEventListener("click",()=>setTheme(root.getAttribute("data-theme")==="dark"?"light":"dark"));
+document.getElementById("segTheme").querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>setTheme(b.dataset.t)));
+setTheme(localStorage.getItem("aifilm-theme")||"dark");
+
+/* ---------- filters ---------- */
+document.querySelectorAll("[data-mood]").forEach(c=>c.addEventListener("click",()=>{
+  document.querySelectorAll("[data-mood]").forEach(x=>x.classList.remove("on"));
+  c.classList.add("on"); state.mood=c.dataset.mood; renderBGM();
+}));
+document.querySelectorAll("#segStatus button").forEach(b=>b.addEventListener("click",()=>{
+  document.querySelectorAll("#segStatus button").forEach(x=>x.classList.remove("on"));
+  b.classList.add("on"); state.st=b.dataset.st; renderBGM();
+}));
+
+/* ---------- waveform ---------- */
+function waveBars(seed){
+  let s=seed.split("").reduce((a,c)=>a+c.charCodeAt(0),0);
+  const rnd=()=>{s=(s*9301+49297)%233280; return s/233280;};
+  let h="";
+  for(let i=0;i<48;i++){const v=8+Math.round(rnd()*34); h+=`<div class="bar" style="height:${v}px"></div>`;}
+  return h;
+}
+
+/* ---------- render BGM ---------- */
+function renderBGM(){
+  const grid=document.getElementById("bgmGrid");
+  const list=ASSETS.filter(a=>(state.mood==="all"||a.mood===state.mood)&&(state.st==="all"||true));
+  document.getElementById("bgmCount").textContent=list.length+" 条";
+  if(!list.length){grid.innerHTML=`<div class="empty" style="grid-column:1/-1"><div class="big">没有匹配的候选</div><div>调整筛选条件，或运行生成回路补充资产。</div></div>`;return;}
+  grid.innerHTML=list.map(a=>`
+    <article class="card" data-id="${a.id}">
+      <div class="card-head"><span class="card-id">${a.id}</span>
+        <span class="pill ${a.qa==="PASS"?"active":"err"}" style="margin-left:auto;font-size:10px">${a.qa}</span></div>
+      <div class="card-tags"><span class="tag mood">${a.mood}</span><span class="tag">energy ${a.energy}</span><span class="tag">${a.stem}</span>${a.loop?'<span class="tag">loop</span>':''}</div>
+      <div class="wave" data-id="${a.id}">${waveBars(a.id)}</div>
+      <div class="player-row">
+        <button class="play-btn" aria-label="播放/暂停" onclick="togglePlay('${a.id}',this)"><svg class="icon" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M8 5v14l11-7z"/></svg></button>
+        <div class="progress"><i></i></div>
+        <span class="time">0:00 / ${Math.floor(a.dur/60)}:${String(a.dur%60).padStart(2,"0")}</span>
+      </div>
+      <div class="metrics"><div>峰值<b>${a.peak.toFixed(2)}</b></div><div>RMS<b>${a.rms.toFixed(2)}</b></div><div>静音<b>${Math.round(a.silence*100)}%</b></div><div>BPM<b>${a.bpm}</b></div></div>
+      <details><summary style="cursor:pointer;color:var(--text-lo);font-size:12px">标准化配方</summary><pre class="recipe">${JSON.stringify({mood:a.mood,energy:a.energy,stem_profile:a.stem,bpm:a.bpm,keyscale:a.key,duration:a.dur,loopable:a.loop,dramatic_tags:a.tags},null,2)}</pre></details>
+      <div class="card-actions">
+        <button class="btn btn-primary btn-sm" onclick="approve('${a.id}')">批准</button>
+        <button class="btn btn-danger btn-sm" onclick="openReject('${a.id}')">拒绝</button>
+      </div>
+    </article>`).join("");
+  grid.querySelectorAll(".recipe").forEach(r=>{}); // keep collapsed
+}
+
+/* ---------- player sim ---------- */
+const players={};
+function togglePlay(id,btn){
+  const card=btn.closest(".card"); const wave=card.querySelector(".wave"); const prog=card.querySelector(".progress > i"); const time=card.querySelector(".time");
+  const a=ASSETS.find(x=>x.id===id);
+  if(players[id]&&players[id].t){clearInterval(players[id].t); delete players[id].t; btn.innerHTML='<svg class="icon" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M8 5v14l11-7z"/></svg>'; wave.classList.remove("playing"); return;}
+  let p=players[id]?players[id].p:0; wave.classList.add("playing");
+  btn.innerHTML='<svg class="icon" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg>';
+  players[id]={p};
+  players[id].t=setInterval(()=>{
+    p+=0.25; if(p>=a.dur){p=0; clearInterval(players[id].t); delete players[id].t; btn.innerHTML='<svg class="icon" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M8 5v14l11-7z"/></svg>'; wave.classList.remove("playing");}
+    prog.style.width=(p/a.dur*100)+"%";
+    time.textContent=`${Math.floor(p/60)}:${String(Math.floor(p%60)).padStart(2,"0")} / ${Math.floor(a.dur/60)}:${String(a.dur%60).padStart(2,"0")}`;
+  },250);
+}
+
+/* ---------- approve / reject ---------- */
+let pendingReject=null;
+function approve(id){
+  const i=ASSETS.findIndex(a=>a.id===id); if(i<0)return;
+  ASSETS.splice(i,1); renderBGM(); updateBadges(); toast("已批准 "+id.slice(0,12)+"… · 已调用 approve_asset.py");
+}
+function openReject(id){
+  pendingReject=id;
+  document.getElementById("modalTitle").textContent="拒绝资产";
+  document.getElementById("modalDesc").textContent="填写拒绝原因，将写入 reject 记录。";
+  document.getElementById("modalConfirm").textContent="确认拒绝";
+  document.getElementById("modalReason").value="";
+  document.getElementById("modalScrim").classList.add("show");
+  document.getElementById("modalReason").focus();
+}
+document.getElementById("modalConfirm").addEventListener("click",()=>{
+  if(!pendingReject)return;
+  const i=ASSETS.findIndex(a=>a.id===pendingReject); if(i>=0){ASSETS.splice(i,1);}
+  const id=pendingReject; pendingReject=null; closeModal(); renderBGM(); updateBadges();
+  toast("已拒绝 "+id.slice(0,12)+"… · 已调用 reject_asset.py","bad");
+});
+function closeModal(){document.getElementById("modalScrim").classList.remove("show");}
+document.getElementById("modalScrim").addEventListener("click",e=>{if(e.target.id==="modalScrim")closeModal();});
+document.addEventListener("keydown",e=>{if(e.key==="Escape")closeModal();});
+
+/* ---------- badges ---------- */
+function updateBadges(){
+  const p=ASSETS.length;
+  document.getElementById("nav-bgm").textContent=p;
+  const gc=document.getElementById("nav-gaps"); if(gc)gc.textContent=100;
+}
+
+/* ---------- toast ---------- */
+function toast(msg,bad){
+  const w=document.getElementById("toastWrap");
+  const t=document.createElement("div"); t.className="toast"+(bad?" bad":""); t.textContent=msg;
+  w.appendChild(t); setTimeout(()=>{t.style.opacity="0"; t.style.transform="translateX(16px)"; setTimeout(()=>t.remove(),250);},2600);
+}
+
+renderBGM(); updateBadges();
+</script>
+</body>
+</html>
