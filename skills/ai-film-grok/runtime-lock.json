@@ -1374,7 +1374,7 @@
     },
     {
       "path": "scripts/gates/cinematic_gate.py",
-      "sha256": "5042a80552613735ff5db18e6e22b2f617075c3235e57c7bfe8bb5580dfcd168"
+      "sha256": "a178e3233023b105c30facd850592bfe7d5de754ddbec81716d7b21d5153f80a"
     },
     {
       "path": "scripts/gates/continuity_programmatic.py",
@@ -1426,7 +1426,7 @@
     },
     {
       "path": "scripts/gates/preflight.py",
-      "sha256": "b24f21ae1c28d099cc43768a78223b949614149f572ca264f2410dad80e22e71"
+      "sha256": "efdda897503c02967800f3d73777e8a2828f6982b35417f0bbff5856236f63a9"
     },
     {
       "path": "scripts/gates/production_gates.py",
@@ -1694,7 +1694,7 @@
     },
     {
       "path": "scripts/media/h3_mode.py",
-      "sha256": "45881848d70eca603fc4b046ce41e1916e2c8b215d5b4233881aadad6e1bdc7b"
+      "sha256": "2afbe7d45e9f0a1eab5276843e1fc331f24143173a6c357892409a75a36c67e4"
     },
     {
       "path": "scripts/media/h3_ship_native.py",
@@ -1706,7 +1706,7 @@
     },
     {
       "path": "scripts/media/h3_workflow.py",
-      "sha256": "bc07ac0cce083e503b6a4de1fbd7b2b6e088df4bad069833ad46eb9a4b684d55"
+      "sha256": "7a60b8daf124fe114b35a2b91e9f8e4c30464b6094f45ab1796b3d10b0a80730"
     },
     {
       "path": "scripts/media/i2v_motion_gate.py",
@@ -1754,7 +1754,7 @@
     },
     {
       "path": "scripts/media/pilot_pack.py",
-      "sha256": "ab95c4c2517a35dbc21514b4d575575e567519775b6b245e12a7a49882cb648c"
+      "sha256": "44ffb2ef586d7a5b81a7594b6c169ebe60d30626c68b6b48b61ee742b5269cb6"
     },
     {
       "path": "scripts/media/pilot_review.py",
@@ -1790,7 +1790,7 @@
     },
     {
       "path": "scripts/media/shot_lane.py",
-      "sha256": "6dde6bb78e2e6998f7d198eb561156b2bb6037a49bf249f4847dd9f6d65bbe16"
+      "sha256": "0f969e5952b63086e76c44b66712a4cad0139d655bfcb07af51272534797c75a"
     },
     {
       "path": "scripts/media/still_challenge.py",
@@ -3158,7 +3158,7 @@
     },
     {
       "path": "scripts/workflow_pack.py",
-      "sha256": "7d4d66e31043d21164987f60ed8625ea9d283a93262ebe0e0ca1b6788e5b6ef3"
+      "sha256": "d88ee206ef091247474e53762eb11861f04fa9a34876aec5a77867cbf957ba3a"
     },
     {
       "path": "scripts/workflow_spine.py",

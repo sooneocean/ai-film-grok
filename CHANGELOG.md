@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.40.57] - 2026-08-07
+
+### Fixed (CTO A1 gates silent-green round 2)
+- **cinematic_gate:** variety probe exception → hard red (no silent ok); adds **variety_pixel** step; five_track probe fail hard on heat max/hot/extreme.
+- **preflight:** speaker_frame / dialogue_audio_lane / style_bible probe errors → **hard** when max dialogue_drama / heat max (was soft swallow).
+- **Tests:** `tests/test_opt_round_a1_gates2.py`.
+
 ## [2.40.56] - 2026-08-07
 
 ### Added (shot generation · Wave 0–4 lanes)
