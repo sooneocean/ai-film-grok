@@ -18,6 +18,7 @@
 | 旧板 / 子板 | 角色 |
 |------|------|
 | **`docs/plans/2026-08-07-iron-internalization-todoplan.md`** | **铁律→代码内化子板** · **I0–I4 产品链 CLOSED 2.40.51**；I5 ops deferred |
+| **`docs/plans/2026-08-07-delivery-honesty-rail-todoplan.md`** | **出片诚实审计轨** · Active 2.40.67 R0+R1 partial (`skip_audit`) |
 | `docs/plans/2026-08-06-nutrient-matrix.md` | L3/L4/L5 养分对账（I0 刷新） |
 | `docs/plans/2026-08-06-next-optimization-todoplan.md` | 近期 W0–N 执行板（多数 SHIPPED） |
 | `docs/plans/2026-08-06-optimization-todoplan.md` | 出片 A–G · A1–A5 SHIPPED |
@@ -245,10 +246,10 @@
 
 | ID | 主题 | 波次 | 优先级 |
 |----|------|------|--------|
-| 1 | gates 静默 except → fail-closed | A1 | **P0 · 2.40.66** state_index wardrobe_ladder ImportError；2.40.65 measured map；2.40.61–62 r4/hotpath |
+| 1 | gates 静默 except → fail-closed | A1 | **P0 · 2.40.67** heat-final 收据写盘 fail-closed + skip_audit pilot；2.40.66 state_index ladder |
 | 2 | final/hotpath + plate≠master 永不回退 | A1/A2 | **P0** |
 | 3 | 双 checkout + 单一执行板 | G0 | **P0 · G0.2 ✅** 2026-08-07 git ff 对齐（禁手拷） |
-| 4 | 真片 ship-prep 人链 / 诚实 PARTIAL | A2 | **P0** |
+| 4 | 真片 ship-prep 人链 / 诚实 PARTIAL | A2 | **P0** · honesty-rail R1 partial (`skip_audit` closeout) 2.40.67 |
 | 5 | 5090 drain 或 OPEN_OPS | B3 | **P0 ops** |
 | 6 | 触达式 peel：final / validate / preflight | C4 | **P1** |
 | 7 | logging + FilmError + JSON I/O 增量 | C5 | **P1** |

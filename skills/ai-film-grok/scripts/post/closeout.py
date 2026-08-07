@@ -503,7 +503,7 @@ def closeout_status(root: Path | str) -> dict[str, Any]:
     try:
         from cinematic_gate import assert_cinematic_gate_for_export, skip_enabled
 
-        if skip_enabled():
+        if skip_enabled(base):
             cin_step = {
                 "id": "cinematic_gate",
                 "ok": True,
@@ -813,6 +813,42 @@ def closeout_status(root: Path | str) -> dict[str, Any]:
         }
     )
 
+    # Honesty-rail R1 · IRON SKIP without reason → PARTIAL (not silent cert)
+    skip_audit: dict[str, Any] = {
+        "ok": True,
+        "skips_used": [],
+        "iron_unreasoned": [],
+        "classification": "CLEAN",
+    }
+    try:
+        from core.skip_audit import verify_skip_usage
+
+        skip_audit = verify_skip_usage(base)
+    except Exception as exc:  # noqa: BLE001
+        skip_audit = {
+            "ok": False,
+            "error": str(exc)[:160],
+            "skips_used": [],
+            "iron_unreasoned": [],
+            "classification": "PARTIAL",
+            "partial": True,
+        }
+    steps.append(
+        {
+            "id": "skip_audit",
+            "ok": bool(skip_audit.get("ok")),
+            "detail": (
+                f"skips={len(skip_audit.get('skips_used') or [])} "
+                f"class={skip_audit.get('classification')}"
+            ),
+            "next_cmd": skip_audit.get("next_cmd"),
+            "advisory": False,
+            "partial": bool(skip_audit.get("partial")),
+            "skips_used": skip_audit.get("skips_used") or [],
+            "iron_unreasoned": skip_audit.get("iron_unreasoned") or [],
+        }
+    )
+
     soft_ids = {
         "desktop_exported",
         "input_fidelity",
@@ -857,6 +893,8 @@ def closeout_status(root: Path | str) -> dict[str, Any]:
         "plate_honesty": plate,
         "duration_honesty": duration_honesty,
         "official_final_readback": official_final_readback,
+        "skip_audit": skip_audit,
+        "skips_used": skip_audit.get("skips_used") or [],
         "final": final_rec,
         "heat": {
             "active": heat.get("active"),

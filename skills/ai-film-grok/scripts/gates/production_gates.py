@@ -615,12 +615,24 @@ def assert_heat_allows_final(
     """
     if force:
         return {"skipped": True, "reason": "force"}
-    if env_skip and os.environ.get("AIFILM_SKIP_HEAT_FINAL_GATE", "").strip() in {
-        "1",
-        "true",
-        "yes",
-    }:
-        return {"skipped": True, "reason": "env"}
+    if env_skip:
+        try:
+            from core.skip_audit import skip_flag
+
+            skipped = skip_flag(
+                "AIFILM_SKIP_HEAT_FINAL_GATE",
+                origin="env",
+                film_root=root,
+                call_site="assert_heat_allows_final",
+            )
+        except Exception:
+            skipped = os.environ.get("AIFILM_SKIP_HEAT_FINAL_GATE", "").strip().lower() in {
+                "1",
+                "true",
+                "yes",
+            }
+        if skipped:
+            return {"skipped": True, "reason": "env"}
     try:
         from heat_check import heat_agent_status
     except ImportError as exc:
@@ -665,8 +677,12 @@ def assert_heat_allows_final(
                         "source": "assert_heat_allows_final",
                     },
                 )
-            except (OSError, ValueError):
-                pass
+            except (OSError, ValueError) as exc:
+                # A1 · gate pass without receipt is dishonest — fail closed
+                raise ProductionGateError(
+                    "heat final gate: final_ok but cannot write "
+                    f"receipts/heat-final-gate.json: {exc}"
+                ) from exc
         return out
     root_s = str(Path(root).expanduser().resolve())
     boost = hs.get("next_cmd") or f'aifilm heat boost --root "{root_s}" --apply'

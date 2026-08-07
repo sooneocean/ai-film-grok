@@ -1033,6 +1033,10 @@
       "sha256": "bebea624d8acff16656cb29ad98537523d6de37b03e65ce0847af124e2282c5d"
     },
     {
+      "path": "scripts/core/skip_audit.py",
+      "sha256": "25ec9775bc28d6a61d2f12c8a8cbe85bf6ef79e276267ea3d5b3751da6b1f7bd"
+    },
+    {
       "path": "scripts/craft_spine.py",
       "sha256": "0d8a7479d044fb51144f7277016ecf1e9812dc4a58c1be933dc7cd9abb74b257"
     },
@@ -1382,7 +1386,7 @@
     },
     {
       "path": "scripts/gates/cinematic_gate.py",
-      "sha256": "ce57e4e757e3319b7b7ddd23ff423608dd14f91d39a34ea77263d513c6c6d952"
+      "sha256": "8a3fda9b314dd5eb41e4d5513f66892664032a87435ec041a681cfa9e52c2f67"
     },
     {
       "path": "scripts/gates/continuity_programmatic.py",
@@ -1438,7 +1442,7 @@
     },
     {
       "path": "scripts/gates/production_gates.py",
-      "sha256": "0b5119b93465c082633096943013da81aada70c6ac99331d4953ad0437653a57"
+      "sha256": "7ab65747b6ff4464a0d31999ae1903344edd11154146eca42d38802d00097e8b"
     },
     {
       "path": "scripts/gates/quality_evidence.py",
@@ -2474,7 +2478,7 @@
     },
     {
       "path": "scripts/post/closeout.py",
-      "sha256": "af6425db34c45dff7ffdf33e0e78fa5ef99554d35cc0c6978dc2a53625674c0e"
+      "sha256": "6e5b64d963378f93ac5a05b2cf6bccbadd8e603eb77f640e3b23118595e50c42"
     },
     {
       "path": "scripts/post/color_grade.py",

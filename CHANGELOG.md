@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.40.67] - 2026-08-07
+
+### Fixed / Added (A1 heat-final receipt + honesty-rail R0/R1 partial)
+- **heat final receipt:** `assert_heat_allows_final` write failure → **ProductionGateError** (no silent `except pass` after final_ok).
+- **skip_audit (R1 pilot):** `core/skip_audit.py` — `skip_flag` / `record_skip_usage` / `verify_skip_usage`; ledger `receipts/skip-usage.json`.
+- **Wired:** heat-final env skip + cinematic `skip_enabled(root)` + closeout `skip_audit` step (IRON skip无 reason → PARTIAL).
+- **Hotpath tests:** QueueHonesty also mocks foreign GPU lease (no live `lease_held_foreign` flake).
+- **Plan:** delivery-honesty-rail Active; R0 + R1 partial ship.
+- **Tests:** `test_opt_round_a1_heat_final_receipt.py`.
+
 ## [2.40.66] - 2026-08-07
 
 ### Fixed (CTO G0.2 dual-checkout + A1 state_index)

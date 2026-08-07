@@ -24,13 +24,24 @@ class CinematicGateError(FilmError):
     """Desktop/export blocked by cinematic-gate."""
 
 
-def skip_enabled() -> bool:
-    return os.environ.get("AIFILM_SKIP_CINEMATIC_GATE", "").strip().lower() in {
-        "1",
-        "true",
-        "yes",
-        "on",
-    }
+def skip_enabled(root: Path | str | None = None) -> bool:
+    """Honesty-rail: ledger AIFILM_SKIP_CINEMATIC_GATE when film root known."""
+    try:
+        from core.skip_audit import skip_flag
+
+        return skip_flag(
+            "AIFILM_SKIP_CINEMATIC_GATE",
+            origin="env",
+            film_root=root,
+            call_site="cinematic_gate.skip_enabled",
+        )
+    except Exception:
+        return os.environ.get("AIFILM_SKIP_CINEMATIC_GATE", "").strip().lower() in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        }
 
 
 def _step(
@@ -69,7 +80,7 @@ def run_cinematic_gate(
     means and rewrite the gate receipt so agents need not hand-run the step.
     """
     base = Path(root).expanduser().resolve()
-    if skip_enabled():
+    if skip_enabled(base):
         rep = {
             "schema_version": 1,
             "kind": "cinematic-gate",
@@ -465,7 +476,7 @@ def assert_cinematic_gate_for_export(root: Path | str) -> dict[str, Any]:
     then refresh cinematic-gate — agents need not hand-click the ladder.
     """
     base = Path(root).expanduser().resolve()
-    if skip_enabled():
+    if skip_enabled(base):
         return {"ok": True, "skipped": True, "escape": "AIFILM_SKIP_CINEMATIC_GATE=1"}
     path = base / "receipts" / RECEIPT_NAME
     report = read_json(path) if path.is_file() else None

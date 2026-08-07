@@ -22,6 +22,7 @@ import os
 import sys
 import tempfile
 import unittest
+from contextlib import ExitStack
 from pathlib import Path
 from unittest import mock
 
@@ -382,7 +383,7 @@ class PlateTimeoutFloorHotpathTests(unittest.TestCase):
 
 
 class QueueHonestyHotpathTests(unittest.TestCase):
-    """Deterministic: mock Comfy probe idle so live 5090 busy cannot flaky no_hog."""
+    """Deterministic: mock Comfy idle + no foreign lease (live GPU/lease must not flaky)."""
 
     @staticmethod
     def _idle_capacity() -> dict:
@@ -395,15 +396,24 @@ class QueueHonestyHotpathTests(unittest.TestCase):
             "source": "test_idle",
         }
 
+    def _patch_stack(self, *extra) -> ExitStack:
+        stack = ExitStack()
+        stack.enter_context(
+            mock.patch(
+                "h3_fill_idle.probe_comfy_capacity_soft",
+                return_value=self._idle_capacity(),
+            )
+        )
+        stack.enter_context(mock.patch("h3_fill_idle._foreign_gpu_lease", return_value=None))
+        for p in extra:
+            stack.enter_context(p)
+        return stack
+
     def test_run_next_queue_empty_records_open_ops_and_decision_tree(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             write_json(root / "film-spec.json", {"title": "hotpath-queue-empty", "scenes": []})
-            with (
-                mock.patch(
-                    "h3_fill_idle.probe_comfy_capacity_soft",
-                    return_value=self._idle_capacity(),
-                ),
+            with self._patch_stack(
                 mock.patch(
                     "h3_fill_idle.next_fill_idle_job",
                     return_value={"ok": True, "next": None, "pending_count": 3},
@@ -449,11 +459,7 @@ class QueueHonestyHotpathTests(unittest.TestCase):
                     ],
                 },
             )
-            with (
-                mock.patch(
-                    "h3_fill_idle.probe_comfy_capacity_soft",
-                    return_value=self._idle_capacity(),
-                ),
+            with self._patch_stack(
                 mock.patch(
                     "h3_fill_idle.next_fill_idle_job",
                     return_value={
@@ -507,7 +513,10 @@ class QueueHonestyHotpathTests(unittest.TestCase):
                     ],
                 },
             )
-            rep = fill_idle_until_empty(root, execute=True, i_own_the_gpu=False, max_cycles=1)
+            with self._patch_stack():
+                rep = fill_idle_until_empty(
+                    root, execute=True, i_own_the_gpu=False, max_cycles=1
+                )
             self.assertFalse(rep.get("ok"))
             self.assertEqual(rep.get("stop_reason"), "exclusive_gpu_required")
 
