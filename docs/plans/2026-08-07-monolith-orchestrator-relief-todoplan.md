@@ -123,8 +123,8 @@ S3 Stage peel → 编排函数只剩：load ctx → stage1()…stageN() → rece
 | 注释锚点（约） | 候选 leaf / stage |
 |----------------|-------------------|
 | Per-shot **dialogue stems** (H3 native primary) | `final/stages_dialogue_stems.py` |
-| stretch / visual_fit / plate slot | `final/stages_plate_stretch.py` |
-| concat + join transitions | `final/stages_picture_concat.py` |
+| stretch / concat / join | `final/stages_picture_concat.py` (**SHIPPED**) |
+| concat + join transitions | `final/stages_picture_concat.py` (**SHIPPED**) |
 | Music / spotting / procedural bed | `final/stages_music_bed.py` + `render_final_music` |
 | Dual-track mix / sidechain / partial | `final/stages_dual_mix.py` |
 | Subtitle burn / SRT clock | `final/stages_subs.py` (**SHIPPED**) |
@@ -173,7 +173,7 @@ S3 Stage peel → 编排函数只剩：load ctx → stage1()…stageN() → rece
 - [x] **W1.3** peel **dual mix + partial receipt**（已有 `mix_partial` / sidechain 诚实语义 · 禁改 PARTIAL 语义）  
 - [x] **W1.4** peel **subs burn / caption clock** → `final/stages_subs.py`  
 - [x] **W1.5** **dialogue stems · H3 native primary** → `final/stages_dialogue_stems.py`：lane plan + silent/caption-clock；**Edge 仅 post_tts 逃生**（有 H3 原声不默认 TTS）  
-- [ ] **W1.6** peel **stretch/concat/join**  
+- [x] **W1.6** peel **stretch/concat/join** → `final/stages_picture_concat.py`（stretch + title/end + join concat）  
 - [x] **W1.7** (mux leaf + official finalize leaf) peel **mux + delivery_class / master_lock 诚实字段**（A5 · plate≠master）  
 - [ ] **W1.8** `render_final()` 只编排；`main` 不变；shim `main()` 仍进真实现
 

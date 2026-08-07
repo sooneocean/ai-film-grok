@@ -370,263 +370,48 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
         silence_wav=silence_wav,
     )
 
-    # 2) Stretch each clip to VO length (post lipsync removed — native audio only)
-    _hb("stretch", f"shots={len(shot_audio)}")
-    lipsync_report: list[dict[str, Any]] = []
-    stretched: list[Path] = []
-    shots_by_id = {shot.get("id"): shot for shot in shots}
-    for i, item in enumerate(shot_audio):
-        out = work / f"v_{i:02d}_{item['id']}.mp4"
-        shot_meta = shots_by_id.get(item["id"], {})
-        beat = shot_meta.get("dramatic_function") if isinstance(shot_meta, dict) else None
-        checkpoint_contract = {
-            "tts_backend": str(tts_backend),
-            "vo_mode": vo_mode,
-            "lipsync": "off",
-            "native_audio_volume": native_audio_volume,
-        }
-        checkpoint_signature = checkpoint.signature(
-            item["clip"],
-            target=float(item["target"]),
-            width=width,
-            height=height,
-            fps=fps,
-            lipsync="off",
-            in_point_sec=item.get("in_point_sec"),
-            out_point_sec=item.get("out_point_sec"),
-            contract=checkpoint_contract,
-        )
-        if resume:
-            cached = checkpoint.get(item["id"], checkpoint_signature)
-            if cached is not None:
-                metadata = (
-                    cached.get("metadata") if isinstance(cached.get("metadata"), dict) else {}
-                )
-                item["stretch_plan"] = metadata.get("stretch_plan")
-                if metadata.get("target") is not None:
-                    item["target"] = float(metadata["target"])
-                cached_output = Path(str(cached["output"]))
-                stretched.append(cached_output)
-                log(f"resume {item['id']} -> {cached_output.name}")
-                continue
-        log(f"stretch {item['id']} -> {item['target']:.2f}s")
-        stretch_plan = stretch_clip(
-            item["clip"],
-            out,
-            target=item["target"],
-            width=width,
-            height=height,
-            fps=fps,
-            dramatic_function=str(beat) if beat else None,
-            in_point_sec=item.get("in_point_sec"),
-            out_point_sec=item.get("out_point_sec"),
-        )
-        item["stretch_plan"] = stretch_plan
-        # Keep VO/join clock aligned when stretch clamps target (anti double-play)
-        eff = stretch_plan.get("effective_target")
-        if eff is not None:
-            try:
-                eff_f = float(eff)
-                if eff_f > 0 and abs(eff_f - float(item["target"])) > 0.04:
-                    log(
-                        f"  clamp target {item['target']:.2f}s → {eff_f:.2f}s "
-                        f"({stretch_plan.get('clamp_reason') or 'stretch'})"
-                    )
-                    item["target"] = eff_f
-                    item["vo_dur"] = min(float(item.get("vo_dur") or eff_f), eff_f)
-            except (TypeError, ValueError):
-                pass
-        log(
-            f"  stretch mode={stretch_plan.get('mode')} loops={stretch_plan.get('loops')} "
-            f"freeze={stretch_plan.get('freeze_sec')}"
-        )
+    # 2–4) Stretch + title/end + join concat (leaf: final.stages_picture_concat)
+    from final.stages_picture_concat import assemble_picture_track
 
-        stretched.append(out)
-        checkpoint.mark_done(
-            item["id"],
-            signature=checkpoint_signature,
-            output=out,
-            metadata={
-                "target": item["target"],
-                "checkpoint_contract": checkpoint_contract,
-                "stretch_plan": item.get("stretch_plan"),
-                "lipsync": None,
-            },
-        )
-
-    broll_edit_entries: list[dict[str, Any]] = []
-    for index, item in enumerate(shot_audio):
-        entries = item.get("dialogue_broll") or []
-        if not entries:
-            continue
-        composite, entries_report = apply_dialogue_broll_visual(
-            stretched[index],
-            parent_id=str(item["id"]),
-            parent_duration=float(item["target"]),
-            entries=entries,
-            work=work,
-            width=width,
-            height=height,
-            fps=fps,
-        )
-        stretched[index] = composite
-        broll_edit_entries.extend(entries_report)
-    broll_edit_report = {
-        "schema_version": 1,
-        "audio_policy": "carry_parent_dialogue",
-        "entries": [],
-    }
-    broll_edit_report_sha256: str | None = None
-    if broll_edit_entries:
-        broll_edit_report, _broll_report_path, broll_edit_report_sha256 = write_broll_edit_report(
-            root, broll_edit_entries
-        )
-
-    # 3) Title / end cards
-    # plate_cards=blank: keep pad duration for VO/SRT clock, no burned glyphs
-    # (designed-post HyperFrames/Remotion draws the readable title once).
-    plate_cards = str(getattr(args, "plate_cards", "blank") or "blank").strip().lower()
-    if plate_cards not in {"text", "blank"}:
-        raise RenderError("--plate-cards must be text|blank")
-    title_text = args.title or spec.get("title") or manifest.get("title") or "AI Film"
-    end_text = args.end_title or "— 完 —"
-    title_mp4 = work / "title.mp4"
-    end_mp4 = work / "end.mp4"
-    title_dur = float(args.title_dur)
-    end_dur = float(args.end_dur)
-    title_draw = "" if plate_cards == "blank" else str(title_text)
-    end_draw = "" if plate_cards == "blank" else str(end_text)
-    if title_dur > 0.01:
-        mkcard_video(
-            title_draw,
-            title_mp4,
-            width=width,
-            height=height,
-            duration=title_dur,
-            fps=fps,
-            font_path=font_path,
-        )
-    if end_dur > 0.01:
-        mkcard_video(
-            end_draw,
-            end_mp4,
-            width=width,
-            height=height,
-            duration=end_dur,
-            fps=fps,
-            font_path=font_path,
-        )
-
-    # 4) Concat video parts: title + shots + end (per-join hard/soft/hold)
-    try:
-        transition_sec = normalize_transition_sec(
-            getattr(args, "transition_sec", None)
-            if getattr(args, "transition_sec", None) is not None
-            else spec.get("transition_sec", DEFAULT_TRANSITION_SEC)
-        )
-    except PolicyError as exc:
-        raise RenderError(str(exc)) from exc
-    story_intents = spec.get("transition_intents")
-    if story_intents is not None and not isinstance(story_intents, list):
-        raise RenderError("film-spec transition_intents must be an array")
-    default_intent = str(spec.get("transition_default") or "soft")
-    try:
-        full_join_intents = expand_story_join_intents(
-            len(shot_audio),
-            story_intents=list(story_intents) if story_intents is not None else None,
-            default_intent=default_intent if transition_sec > 0 else "hard",
-            edge_intent=default_intent if transition_sec > 0 else "hard",
-        )
-    except PolicyError as exc:
-        raise RenderError(str(exc)) from exc
-    parts: list[Path] = []
-    if title_dur > 0.01:
-        parts.append(title_mp4)
-    parts.extend(stretched)
-    if end_dur > 0.01:
-        parts.append(end_mp4)
-    silent = work / "video_silent.mp4"
-    transition_style = str(spec.get("transition_style") or "fade").strip().lower() or "fade"
-    story_styles = spec.get("transition_styles")
-    if story_styles is not None and not isinstance(story_styles, list):
-        raise RenderError("film-spec transition_styles must be an array")
-    try:
-        full_join_styles = expand_story_join_styles(
-            len(shot_audio),
-            story_styles=[str(x) for x in story_styles] if story_styles is not None else None,
-            edge_style=transition_style,
-        )
-    except PolicyError as exc:
-        raise RenderError(str(exc)) from exc
-    # T4 · align plate between-shot styles to transition_ops.picture (no silent fade drift)
-    ops_for_align = spec.get("transition_ops")
-    if isinstance(ops_for_align, list) and ops_for_align and len(full_join_styles) >= 2:
-        try:
-            try:
-                from plan.plate_transition_align import (
-                    align_story_styles_to_transition_ops,
-                    plate_transition_ops_alignment_report,
-                )
-            except ImportError:  # pragma: no cover
-                from plate_transition_align import (  # type: ignore
-                    align_story_styles_to_transition_ops,
-                    plate_transition_ops_alignment_report,
-                )
-
-            between = list(full_join_styles[1:-1])
-            align_rep = plate_transition_ops_alignment_report(
-                transition_ops=ops_for_align,
-                story_styles=between
-                if between
-                else [str(x) for x in (story_styles or [])],
-                story_intents=(
-                    list(story_intents) if isinstance(story_intents, list) else None
-                ),
-            )
-            if not align_rep.get("ok"):
-                soft_t = bool(spec.get("transition_policy_soft") is True)
-                if not soft_t:
-                    msg = "; ".join(
-                        f"[{i.get('code')}] {i.get('message')}"
-                        for i in (align_rep.get("issues") or [])[:4]
-                        if i.get("code") in (align_rep.get("hard_codes") or [])
-                    )
-                    raise RenderError(
-                        f"plate transition_ops alignment: {msg or align_rep.get('hard_codes')}"
-                    )
-            if between:
-                aligned, _iss = align_story_styles_to_transition_ops(
-                    ops_for_align, between
-                )
-                full_join_styles = [full_join_styles[0], *aligned, full_join_styles[-1]]
-        except RenderError:
-            raise
-        except Exception as exc:
-            log(f"plate transition_ops align skipped: {exc}"[:160])
-    # Per-join transition duration from edit_strategy (voice-coupled rhythm)
-    full_join_use_ts = resolve_join_transition_secs(
-        spec.get("join_transition_secs"),
-        n_parts=len(parts),
-        n_shots=len(shot_audio),
-        transition_sec=transition_sec,
-    )
-    _hb("video_concat", f"parts={len(parts)}")
-    xfade_plan = concat_videos(
-        parts,
-        silent,
-        transition_sec=transition_sec,
+    _pic = assemble_picture_track(
+        shot_audio=shot_audio,
+        shots=shots,
+        work=work,
+        width=width,
+        height=height,
         fps=fps,
-        join_intents=full_join_intents,
-        transition_style=transition_style,
-        join_styles=full_join_styles,
-        join_use_ts=full_join_use_ts,
+        tts_backend=str(tts_backend),
+        vo_mode=vo_mode,
+        native_audio_volume=float(native_audio_volume),
+        resume=resume,
+        checkpoint=checkpoint,
+        root=root,
+        args=args,
+        spec=spec if isinstance(spec, dict) else {},
+        manifest=manifest if isinstance(manifest, dict) else {},
+        font_path=font_path,
+        write_broll_edit_report=write_broll_edit_report,
+        heartbeat=_hb,
     )
-    log(
-        f"video concat method={xfade_plan.get('method')} transition_sec={transition_sec} "
-        f"style={transition_style} styles={xfade_plan.get('join_styles')} "
-        f"join_use_ts={full_join_use_ts} "
-        f"enabled={xfade_plan.get('enabled')} joins={full_join_intents}"
-    )
+    stretched = _pic["stretched"]
+    lipsync_report = _pic["lipsync_report"]
+    broll_edit_report = _pic["broll_edit_report"]
+    broll_edit_report_sha256 = _pic["broll_edit_report_sha256"]
+    title_text = _pic["title_text"]
+    end_text = _pic["end_text"]
+    title_mp4 = _pic["title_mp4"]
+    end_mp4 = _pic["end_mp4"]
+    title_dur = _pic["title_dur"]
+    end_dur = _pic["end_dur"]
+    silent = _pic["silent"]
+    transition_sec = _pic["transition_sec"]
+    story_intents = _pic["story_intents"]
+    default_intent = _pic["default_intent"]
+    full_join_intents = _pic["full_join_intents"]
+    full_join_styles = _pic["full_join_styles"]
+    full_join_use_ts = _pic["full_join_use_ts"]
+    transition_style = _pic["transition_style"]
+    xfade_plan = _pic["xfade_plan"]
 
     # 5) Build narration track with title/end silence + acrossfade matching video
     sil_t = work / "sil_t.wav"

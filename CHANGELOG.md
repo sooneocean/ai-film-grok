@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.41.12] - 2026-08-07
+
+### Changed (monolith orchestrator relief · W1.6 picture)
+- **`final/stages_picture_concat.py`:** stretch plates · title/end cards · join intents/styles concat.
+- **`render_final`:** stages 2–4 delegate to leaf (structure-only; lipsync stays off).
+- **Tests:** `tests/test_stages_picture_concat.py`.
+
 ## [2.41.11] - 2026-08-07
 
 ### Added (Music Director R3 · batch + checklist)
