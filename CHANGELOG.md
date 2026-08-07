@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.40.78] - 2026-08-07
+
+### Added / Fixed (CTO C6.1 empty verify + C6.4 base contracts)
+- **C6.1 honesty:** re-scan confirms safe migrate queue empty; IRON residuals only. Guard test `test_c6_migrate_queue_empty` fails on new thick top-level outside residual set.
+- **C6.4 `core.media_ops`:** contract tests for volumedetect parsers + `run_fn`-injected probe path.
+- **C6.4 `util.film_spec`:** strict/soft/shot-iter contracts; **fix** `soft_load_spec` used strict `util.json_io.read_json` → now `util.soft_json` (missing/invalid → `{}`).
+- Inventory pointer + CTO C6.1/C6.4 marks.
+
 ## [2.40.77] - 2026-08-07
 
 ### Added / Changed (CTO C5.3 JSON I/O single entry)

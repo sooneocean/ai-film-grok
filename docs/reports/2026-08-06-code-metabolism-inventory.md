@@ -1,8 +1,9 @@
 # Code metabolism inventory — TERMINAL residual freeze
 
 **Generated:** 2026-08-07  
-**Latest batch:** 2.40.48 (residual freeze documentation)  
-**Structure status:** **SAFE QUEUE DONE** · only hub + thrash orchestrator left on purpose
+**Latest batch:** 2.40.78 (C6.1 empty re-verify + C6.4 base contracts)  
+**Structure status:** **SAFE QUEUE DONE** · only hub + thrash orchestrator left on purpose  
+**Guard:** `tests/test_c6_migrate_queue_empty.py` fails if a new thick top-level appears outside IRON residual set.
 
 ## Summary (post 2.40.47)
 
