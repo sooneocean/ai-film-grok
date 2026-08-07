@@ -122,7 +122,7 @@ S3 Stage peel → 编排函数只剩：load ctx → stage1()…stageN() → rece
 
 | 注释锚点（约） | 候选 leaf / stage |
 |----------------|-------------------|
-| Per-shot TTS / native XOR | `final/stages_tts_stems.py` |
+| Per-shot **dialogue stems** (H3 native primary) | `final/stages_dialogue_stems.py` |
 | stretch / visual_fit / plate slot | `final/stages_plate_stretch.py` |
 | concat + join transitions | `final/stages_picture_concat.py` |
 | Music / spotting / procedural bed | `final/stages_music_bed.py` + `render_final_music` |
@@ -157,7 +157,7 @@ S3 Stage peel → 编排函数只剩：load ctx → stage1()…stageN() → rece
 | # | 约行 | 阶段 | 候选模块 | 铁律/备注 |
 |---|------|------|----------|-----------|
 | 0 | 328–460 | load ctx / paths / vo_cfg / lipsync gate | `final/render_context.py` | 入口装载 |
-| 1 | 461–1027 | Per-shot TTS · native XOR · 口白窗三角 · visual_fit | `final/stages_tts_stems.py` | A2 · Chinese-only |
+| 1 | … | Per-shot **native-primary** dialogue · XOR · caption clock | `final/stages_dialogue_stems.py` | A2 · H3 first |
 | 2 | 1028–1139 | Stretch clips to plate/VO | `final/stages_plate_stretch.py` | post lipsync removed |
 | 3 | 1140–1174 | Title / end cards | 既有 `final/cards.py` | |
 | 4 | 1175–1285 | Concat + join transitions | `final/stages_picture_concat.py` | T4 transition_ops |
@@ -172,7 +172,7 @@ S3 Stage peel → 编排函数只剩：load ctx → stage1()…stageN() → rece
 - [x] **W1.2** peel **music/spotting 残留** → `final/stages_music_bed.py`（seed/anti-fatigue/timelines/materialize + A4 receipt）  
 - [x] **W1.3** peel **dual mix + partial receipt**（已有 `mix_partial` / sidechain 诚实语义 · 禁改 PARTIAL 语义）  
 - [x] **W1.4** peel **subs burn / caption clock** → `final/stages_subs.py`  
-- [ ] **W1.5** peel **TTS stems + native XOR + 口白窗三角**（A2 IRON · 测锁死）  
+- [x] **W1.5** **dialogue stems · H3 native primary** → `final/stages_dialogue_stems.py`：lane plan + silent/caption-clock；**Edge 仅 post_tts 逃生**（有 H3 原声不默认 TTS）  
 - [ ] **W1.6** peel **stretch/concat/join**  
 - [x] **W1.7** (mux leaf + official finalize leaf) peel **mux + delivery_class / master_lock 诚实字段**（A5 · plate≠master）  
 - [ ] **W1.8** `render_final()` 只编排；`main` 不变；shim `main()` 仍进真实现

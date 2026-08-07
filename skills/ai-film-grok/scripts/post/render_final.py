@@ -462,121 +462,60 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
                 vo_mode=vo_mode,
             )
         caption_text = caption_text_for_shot(shot, caption_lang=caption_lang) or text
-        # dialogue_drama coverage (reaction / action_cover / silence without voice cue)
-        # may legitimately carry no TTS line — plate is ambience/foley only.
+        # dialogue_drama coverage may carry no spoken line — plate ambience only.
         non_vo_coverage = _is_non_vo_coverage_shot(shot) and not text
-        # Film / H3 audio_policy string (prefer_native default; strip forces post_tts).
-        _ap = spec.get("audio_policy")
-        _h3 = spec.get("h3") if isinstance(spec.get("h3"), dict) else {}
-        if isinstance(_ap, dict):
-            film_audio_policy = str(
-                _ap.get("mode") or _ap.get("audio_policy") or _h3.get("audio_policy") or ""
-            )
-        else:
-            film_audio_policy = str(_ap or _h3.get("audio_policy") or "")
-        dialogue_audio_lane = resolve_dialogue_audio_lane(
+        # W1.5 · H3/native primary (leaf: final.stages_dialogue_stems)
+        # Edge TTS is post_tts escape only — never double-speak over H3 native.
+        from final.stages_dialogue_stems import (
+            materialize_silent_vo_clock,
+            plan_dialogue_stem,
+            resolve_film_audio_policy,
+        )
+
+        film_audio_policy = resolve_film_audio_policy(spec if isinstance(spec, dict) else {})
+        _stem = plan_dialogue_stem(
             shot,
             has_native_stem=native_audio is not None,
             native_audible=native_audio_audible,
-            has_spoken_text=bool(text and str(text).strip()),
+            spoken_text=str(text or ""),
             non_vo_coverage=non_vo_coverage,
-            audio_policy=film_audio_policy or None,
+            film_audio_policy=film_audio_policy or None,
         )
-        # XOR: post_tts suppresses native; native lane never mixes Edge dialogue.
-        native_dialogue_replaced = native_audio is not None and dialogue_lane_suppresses_native(
-            dialogue_audio_lane
-        )
-        # Legacy contract helper still true for post_vo; lane is the single mix owner.
-        if native_dialogue_replaced_by_post_tts(shot) and dialogue_audio_lane != "post_tts":
-            dialogue_audio_lane = "post_tts"
-            native_dialogue_replaced = native_audio is not None
-        tts_mix_gain = dialogue_lane_tts_mix_gain(dialogue_audio_lane)
-        caption_clock_only = dialogue_audio_lane == "native"
+        dialogue_audio_lane = _stem.lane
+        native_dialogue_replaced = _stem.native_suppressed
+        tts_mix_gain = _stem.tts_mix_gain
+        caption_clock_only = _stem.caption_clock_only
         max_chars = int(
             getattr(args, "sub_max_chars", DEFAULT_SUB_MAX_CHARS) or DEFAULT_SUB_MAX_CHARS
         )
-        # Subtitles + TTS: Chinese-only product path
         units = split_units(caption_text, max_len=max_chars) if caption_text else []
-        try:
-            mp3 = safe_output_path(
-                audio_dir, f"{sid}_vo.mp3", suffixes={".mp3"}, field=f"VO output for {sid}"
+        if not _stem.needs_edge_tts:
+            clock = materialize_silent_vo_clock(
+                sid=sid,
+                index=i,
+                shot=shot,
+                work=work,
+                audio_dir=audio_dir,
+                lane=(
+                    dialogue_audio_lane
+                    if dialogue_audio_lane in {"native", "silence"}
+                    else "silence"
+                ),
+                note=_stem.note,
+                silence_wav=silence_wav,
+                run=run,
+                render_error_cls=RenderError,
             )
-            safe_output_path(
-                audio_dir, f"{sid}_vo.wav", suffixes={".wav"}, field=f"VO WAV output for {sid}"
-            )
-        except SecurityPolicyError as exc:
-            raise RenderError(str(exc)) from exc
-        if non_vo_coverage or dialogue_audio_lane == "silence":
-            plate_slot = resolve_plate_slot_sec(shot)
-            silent_wav = work / f"vo_silent_{i:02d}_{sid}.wav"
-            silence_wav(silent_wav, plate_slot)
-            # keep mp3 companion for downstream path expectations (empty AAC ok via ffmpeg)
-            run(
-                [
-                    "ffmpeg",
-                    "-y",
-                    "-i",
-                    str(silent_wav),
-                    "-c:a",
-                    "libmp3lame",
-                    "-q:a",
-                    "4",
-                    str(mp3),
-                ]
-            )
-            wav = silent_wav
-            dur = plate_slot
-            tts_meta = {
-                "backend": "silence",
-                "voice": "none",
-                "note": "non_vo_coverage" if non_vo_coverage else "silence_lane",
-                "duration_sec": plate_slot,
-            }
-            text = ""
-            caption_text = ""
-            units = []
-            shot_voice = "none"
-            shot_tts_backend = "silence"
-            log(f"silence VO {sid}: coverage plate {plate_slot:.2f}s (no TTS)")
-            color_wav = None
-            color_dur = 0.0
-            color_meta = None
-            color_payload = {}
-            color_text = ""
-            color_gain = 0.0
-        elif dialogue_audio_lane == "native":
-            # Caption clock only: keep subtitle text, never synthesize Edge for mix.
-            plate_slot = resolve_plate_slot_sec(shot)
-            silent_wav = work / f"vo_native_clock_{i:02d}_{sid}.wav"
-            silence_wav(silent_wav, plate_slot)
-            run(
-                [
-                    "ffmpeg",
-                    "-y",
-                    "-i",
-                    str(silent_wav),
-                    "-c:a",
-                    "libmp3lame",
-                    "-q:a",
-                    "4",
-                    str(mp3),
-                ]
-            )
-            wav = silent_wav
-            dur = plate_slot
-            tts_meta = {
-                "backend": "silence",
-                "voice": "none",
-                "note": "native_xor_caption_clock",
-                "duration_sec": plate_slot,
-                "dialogue_audio_lane": "native",
-            }
-            shot_voice = "none"
-            shot_tts_backend = "silence"
-            log(
-                f"native dialogue {sid}: keep clip audio, silent VO clock "
-                f"{plate_slot:.2f}s (caption only; no Edge double-speak)"
-            )
+            wav = clock["wav"]
+            mp3 = clock["mp3"]
+            dur = clock["dur"]
+            tts_meta = clock["tts_meta"]
+            shot_voice = clock["shot_voice"]
+            shot_tts_backend = clock["shot_tts_backend"]
+            if clock["clear_spoken"]:
+                text = ""
+                caption_text = ""
+                units = []
             color_wav = None
             color_dur = 0.0
             color_meta = None
@@ -584,12 +523,22 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
             color_text = ""
             color_gain = 0.0
         else:
+            # post_tts escape only (not H3 native default)
+            try:
+                mp3 = safe_output_path(
+                    audio_dir, f"{sid}_vo.mp3", suffixes={".mp3"}, field=f"VO output for {sid}"
+                )
+                safe_output_path(
+                    audio_dir, f"{sid}_vo.wav", suffixes={".wav"}, field=f"VO WAV output for {sid}"
+                )
+            except SecurityPolicyError as exc:
+                raise RenderError(str(exc)) from exc
             if not text:
                 raise RenderError(
-                    f"Shot {sid} has no spoken text for VO "
+                    f"Shot {sid} has no spoken text for post_tts escape "
                     f"(need Chinese nar/dialogue/caption_text or voice.spoken_text)"
                 )
-            log(f"TTS {sid}: {text[:40]}...")
+            log(f"post_tts escape {sid}: {text[:40]}...")
             voice_source = {**shot, "speaker": voice_cue.get("speaker")} if voice_cue else shot
             shot_voice = voice_for_shot(
                 voice_source,
