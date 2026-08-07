@@ -1,4 +1,10 @@
-"""Loopback-only WebUI for review_control; uses no third-party web framework."""
+"""Loopback-only WebUI for review_control; uses no third-party web framework.
+
+Security invariant (S8 · console quality review):
+  This server is **loopback-only** by design (bind 127.0.0.1 + token + Origin
+  check on mutating POSTs).  If it is ever exposed beyond localhost, add CSRF,
+  SameSite cookies, and rate limiting before opening the bind address.
+"""
 
 from __future__ import annotations
 

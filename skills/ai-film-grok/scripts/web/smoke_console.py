@@ -501,10 +501,23 @@ def main() -> int:
             body={"kind": "voice", "asset_id": "male_lead", "expected_revision": r0},
         )
         sel = json.loads(body) if st == 200 else {}
+        # S2: permanent POST /api/select response shape (console.html reads these)
+        select_shape_ok = (
+            isinstance(sel.get("revision"), int)
+            and "canonical_binding" in sel
+            and isinstance(sel.get("canonical_binding"), dict)
+            and "bound" in sel["canonical_binding"]
+            and "manifest_binding" in sel
+        )
         check(
             "UI-flow: voice select 200 + revision bump",
             st == 200 and sel.get("revision") == r0 + 1,
             f"status={st} rev={sel.get('revision')}",
+        )
+        check(
+            "POST /api/select response shape (revision+bindings)",
+            st == 200 and select_shape_ok,
+            f"keys={sorted(sel.keys()) if isinstance(sel, dict) else type(sel)}",
         )
         st1, r1, state1 = get_state()
         recent_voice = [

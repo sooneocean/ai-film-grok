@@ -18,6 +18,7 @@ Selections are hash-bound to the upstream workspace files
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from typing import Any
 
@@ -30,6 +31,9 @@ from web_core import (
     workspace_binding_sha256,
     write_json_locked,
 )
+
+# Soft-degrade paths (S4): empty library is silent; unexpected errors log.
+_log = logging.getLogger("aifilm.web.asset_picker")
 
 SELECTION_NAME = "selection-ledger.json"
 VALID_KINDS = ("bgm", "character", "voice", "shot", "scene", "prop")
@@ -75,28 +79,33 @@ def list_assets(root: Path | str, kind: str) -> dict[str, Any]:
 def _list_bgm(base: Path) -> list[dict[str, Any]]:
     try:
         library = _bgm_library_root()
-    except Exception:  # noqa: BLE001
+    except Exception as exc:  # noqa: BLE001
+        _log.warning("bgm library root unavailable: %s", exc)
         return []
-    catalog = read_json(library / "catalog.json")
-    if not isinstance(catalog, dict):
+    try:
+        catalog = read_json(library / "catalog.json")
+        if not isinstance(catalog, dict):
+            return []
+        assets = catalog.get("assets") if isinstance(catalog.get("assets"), dict) else {}
+        items: list[dict[str, Any]] = []
+        for asset_id, asset in assets.items():
+            if not isinstance(asset, dict) or asset.get("status") != "approved":
+                continue
+            recipe = asset.get("recipe") if isinstance(asset.get("recipe"), dict) else {}
+            items.append(
+                {
+                    "asset_id": asset_id,
+                    "mood": asset.get("mood") or recipe.get("mood"),
+                    "energy": asset.get("energy", recipe.get("energy")),
+                    "duration": (asset.get("technical") or {}).get("duration_sec"),
+                    "bpm": asset.get("bpm", recipe.get("bpm")),
+                    "path": asset.get("path"),
+                }
+            )
+        return items
+    except Exception as exc:  # noqa: BLE001
+        _log.warning("bgm catalog list failed: %s", exc)
         return []
-    assets = catalog.get("assets") if isinstance(catalog.get("assets"), dict) else {}
-    items: list[dict[str, Any]] = []
-    for asset_id, asset in assets.items():
-        if not isinstance(asset, dict) or asset.get("status") != "approved":
-            continue
-        recipe = asset.get("recipe") if isinstance(asset.get("recipe"), dict) else {}
-        items.append(
-            {
-                "asset_id": asset_id,
-                "mood": asset.get("mood") or recipe.get("mood"),
-                "energy": asset.get("energy", recipe.get("energy")),
-                "duration": (asset.get("technical") or {}).get("duration_sec"),
-                "bpm": asset.get("bpm", recipe.get("bpm")),
-                "path": asset.get("path"),
-            }
-        )
-    return items
 
 
 def _list_characters(base: Path) -> list[dict[str, Any]]:
@@ -140,7 +149,8 @@ def _list_shots(base: Path) -> list[dict[str, Any]]:
         from review_control import review_queue
 
         queue = review_queue(base)
-    except Exception:  # noqa: BLE001
+    except Exception as exc:  # noqa: BLE001
+        _log.warning("review_queue unavailable for shot assets: %s", exc)
         return []
     return [
         {
@@ -468,14 +478,16 @@ def console_state(root: Path | str) -> dict[str, Any]:
 
     gates_blocking = False
     hard_fail: list[str] = []
+    degrade: list[str] = []
     try:
         from gate_panel import collect_gates
 
         g = collect_gates(base)
         gates_blocking = bool(g.get("blocking"))
         hard_fail = list(g.get("hard_fail") or [])
-    except Exception:  # noqa: BLE001
-        pass
+    except Exception as exc:  # noqa: BLE001
+        degrade.append("gates")
+        _log.warning("console_state gates soft-fail: %s", exc)
 
     approved_clips = 0
     try:
@@ -487,8 +499,9 @@ def console_state(root: Path | str) -> dict[str, Any]:
             approved_clips = sum(
                 1 for c in clips.values() if isinstance(c, dict) and c.get("status") == "approved"
             )
-    except Exception:  # noqa: BLE001
-        pass
+    except Exception as exc:  # noqa: BLE001
+        degrade.append("manifest")
+        _log.warning("console_state manifest soft-fail: %s", exc)
 
     onboarding_progress: dict[str, Any] = {"done": 0, "total": 0, "completed": False}
     try:
@@ -503,8 +516,9 @@ def console_state(root: Path | str) -> dict[str, Any]:
                 "total": len(STEPS),
                 "completed": bool(st.get("completed_at")),
             }
-    except Exception:  # noqa: BLE001
-        pass
+    except Exception as exc:  # noqa: BLE001
+        degrade.append("onboarding")
+        _log.warning("console_state onboarding soft-fail: %s", exc)
 
     recent = [
         {"kind": s.get("kind"), "asset_id": s.get("asset_id"), "recorded_at": s.get("recorded_at")}
@@ -523,11 +537,15 @@ def console_state(root: Path | str) -> dict[str, Any]:
         "onboarding": onboarding_progress,
         "recent_selections": recent,
     }
+    if degrade:
+        state["degraded"] = degrade
     try:
         from console_projection import enrich_console_state
 
         return enrich_console_state(base, state)
-    except Exception:  # noqa: BLE001 — overview must never 500 on projection soft-fail
+    except Exception as exc:  # noqa: BLE001 — overview must never 500 on projection soft-fail
+        _log.warning("console_state projection soft-fail: %s", exc)
         state["dispatch_projection"] = {"available": False, "hint": "dispatch 投影不可用"}
         state["queue_snapshot"] = {"available": False}
+        state.setdefault("degraded", []).append("projection")
         return state
