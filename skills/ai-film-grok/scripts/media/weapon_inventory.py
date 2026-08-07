@@ -256,10 +256,6 @@ def inventory_report(
     # Explicit all / * shows every inventory tier (not comfy research unless flag).
     want_all = raw_tier in {"all", "*", "any"}
     want_tier = None if want_all else raw_tier
-    if want_tier and want_tier not in _VALID_TIERS and want_tier != "primary":
-        # Unknown tier filter → empty list rather than silent full dump
-        if want_tier not in _VALID_TIERS:
-            want_tier = raw_tier  # still filter; may yield zero rows
     want_mod = str(modality or "").strip().lower() or None
     for entry in iter_entries(data):
         entry_tier = str(entry.get("tier") or "").lower()

@@ -9,6 +9,7 @@
 - **seedance_bridge:** docstring rebrand as Chinese motion prompt pack (not live Seedance spine).
 - **wan_*_probe:** first-line 非生产 research-only.
 - **Tests:** primary-only listing · retired not in demand_primary_index · seedance not registered · closed_loop expects comfy-h3/frw-api-i2v.
+- **Web path fix / hard-compat:** `web_api` sibling console.html; dual_mix `primary_native_shot_ids` import; `extract_native_audio` stub; input_fidelity list cues speaker.
 
 ## [2.41.22] - 2026-08-07
 

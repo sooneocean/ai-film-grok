@@ -53,10 +53,12 @@ StillSource → GenerationRequest (text_sha + image_refs.sha) → H3 / media-que
 ## 校验 / CLI
 
 ```bash
-aifilm weapon inventory                 # 全表 + line
-aifilm weapon inventory --tier primary  # 仅 primary
+aifilm weapon inventory                 # 默认 primary only + line
+aifilm weapon inventory --tier all      # primary+secondary+experimental+retired
+aifilm weapon inventory --tier retired  # 仅退役墓碑
+aifilm weapon inventory --research      # 附带 comfy research_weapons 柜
 aifilm weapon inventory --primary-for image-to-video --validate
-aifilm doctor                           # soft 字段 weapon_inventory.line
+aifilm doctor                           # soft 字段 weapon_inventory.line（仍 primary line）
 pytest skills/ai-film-grok/tests/test_weapon_inventory.py skills/ai-film-grok/tests/test_cli_weapon.py -q
 ```
 
