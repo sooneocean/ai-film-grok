@@ -1562,7 +1562,7 @@
     },
     {
       "path": "scripts/gates/preflight.py",
-      "sha256": "32a3b25e237b1dd06e98fc9101820eeebf8b818584e20342cd5142899f2bf610"
+      "sha256": "b41aeb780d0b8ea2552654b49915baee88d824223c95cd81ede91dc873b17957"
     },
     {
       "path": "scripts/gates/preflight_issues.py",
