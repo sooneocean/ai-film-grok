@@ -253,7 +253,7 @@
 | 5 | 5090 drain 或 OPEN_OPS | B3 | **P0 ops** · eng closeout OPEN_OPS ✅ 2.40.85 · 真 drain 仍需独占 GPU |
 | 6 | 触达式 peel：final / validate / preflight | C4 | **P1** · bug-driven only（eng 日不虚荣 peel） |
 | 7 | logging + FilmError + JSON I/O 增量 | C5 | **P1** · C5.1–C5.6 ✅ 2.40.81 |
-| 8 | legacy 迁 5–10/周 + 基座测 | C6 | **P1** · C6.1/3/4/5 ✅ 2.40.87 · C6.2 bug-driven |
+| 8 | legacy 迁 5–10/周 + 基座测 | C6 | **P1** · C6.1/3/4/5 ✅ 2.40.90 · C6.2 bug-driven only |
 | 9 | CI 版本指针 + mypy 扩 | D7 | **P1** · G0.4 ✅ · D7.2 typecheck ✅ 2.40.85 |
 | 10 | subprocess timeout 触达补 | C5.5 | **P1** · ✅ 2.40.79 util/compose default |
 | 11 | 内容 P1：毒化硬锁 / sung 接入（选一） | P8 | **P2 deferred** · 产品日另开 |
