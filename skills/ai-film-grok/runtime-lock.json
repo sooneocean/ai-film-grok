@@ -137,6 +137,10 @@
       "sha256": "49ee09ff7a6d5d698b81e29d69be2b5016c927f934f7a49d0c5adda80b23afe0"
     },
     {
+      "path": "scripts/asset_picker.py",
+      "sha256": "68d006872005669d611f272e473a5d8cd37e41ee156c977f921e2c9d5f4c0b15"
+    },
+    {
       "path": "scripts/asset_registry.py",
       "sha256": "8c63c8373ea32c3cb93ea06c025fa1fe041c714db803fef9e2d1602a42f105bc"
     },
@@ -1361,6 +1365,10 @@
       "sha256": "91d972762452f8f1d14dc284a15a70da0f7110ce9fc8cc2d79815a525d1984d9"
     },
     {
+      "path": "scripts/gate_panel.py",
+      "sha256": "db8fa0ce4c8ca975a48b15791b40f5ba7d8e814116c0d0decf3942720198f477"
+    },
+    {
       "path": "scripts/gates/__init__.py",
       "sha256": "4719e62db0e4f9221a5a23664cd1603cabb350d6e5bb4a006ba9e7bc0bec3293"
     },
@@ -2065,6 +2073,10 @@
       "sha256": "89ed20725df97c21bae8b824c0d7646c5274e251a12475de36863413f77d9152"
     },
     {
+      "path": "scripts/onboarding.py",
+      "sha256": "723df19ef88e4f5dad6d81af24a5638ceec6507278a87c1ef9a9bbe9b6113175"
+    },
+    {
       "path": "scripts/optimization_dashboard.py",
       "sha256": "2b7e1da8c5d2b8a25cea2dee376c68f678b819d2678b2be41b44227c81af684a"
     },
@@ -2578,7 +2590,7 @@
     },
     {
       "path": "scripts/post/review_ui.py",
-      "sha256": "c53d012353a6e748146476a884eec0200920d5242ae4ed14b53bcf4e9c4edd95"
+      "sha256": "1264ea66c4ec2635571e9f163fe2aa442a5183877da21d95dcadc33cfd3182a4"
     },
     {
       "path": "scripts/post/show_package.py",
@@ -3155,6 +3167,14 @@
     {
       "path": "scripts/weapon_router.py",
       "sha256": "bb1f306227f0276ffffa36c424b94f6f65d4472df9be1b3eef2396152faa9028"
+    },
+    {
+      "path": "scripts/web_api.py",
+      "sha256": "fdba95755cbd87c7bfd8d74645ee03d3992508a170ca21b2dcd75befa94026ba"
+    },
+    {
+      "path": "scripts/web_core.py",
+      "sha256": "5588510470b1df68b594918d0457113b6b788b2f13d07ab0669155dedb94d43e"
     },
     {
       "path": "scripts/workflow_pack.py",

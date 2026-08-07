@@ -28,6 +28,7 @@ from review_control import (
     update_settings,
 )
 from util import exclusive_file_lock, write_json
+from web_core import WebConsoleConflict, WebConsoleError, WebConsoleForbidden
 
 MAX_BODY = 128 * 1024
 MEDIA_SUFFIXES = frozenset(
@@ -176,6 +177,24 @@ def make_handler(root: Path, token: str):
 
         def do_GET(self) -> None:
             parsed = urlparse(self.path)
+            if parsed.path in ("/console", "/studio"):
+                console = Path(__file__).resolve().parent.parent / "web" / "console.html"
+                if console.is_file():
+                    try:
+                        data = console.read_bytes()
+                    except OSError:
+                        self._json(HTTPStatus.NOT_FOUND, {"error": "console unreadable"})
+                        return
+                    self.send_response(200)
+                    self.send_header("Content-Type", "text/html; charset=utf-8")
+                    self.send_header("Content-Length", str(len(data)))
+                    self.send_header("Cache-Control", "no-store")
+                    self.send_header("X-Content-Type-Options", "nosniff")
+                    self.end_headers()
+                    self.wfile.write(data)
+                    return
+                self._json(HTTPStatus.NOT_FOUND, {"error": "console not found"})
+                return
             if parsed.path == "/":
                 invite = (parse_qs(parsed.query).get("invite") or [""])[0]
                 if invite:
@@ -220,9 +239,53 @@ def make_handler(root: Path, token: str):
                 except ValueError as exc:
                     self._json(HTTPStatus.NOT_FOUND, {"error": str(exc)})
                 return
+            if parsed.path == "/api/gates":
+                try:
+                    import gate_panel
+
+                    self._json(200, gate_panel.collect_gates(root))
+                except Exception as exc:  # noqa: BLE001
+                    self._json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
+                return
+            if parsed.path == "/api/assets":
+                kind = (parse_qs(parsed.query).get("kind") or ["bgm"])[0]
+                try:
+                    import asset_picker
+
+                    self._json(200, asset_picker.list_assets(root, kind))
+                except WebConsoleError as exc:
+                    self._json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+                return
+            if parsed.path == "/api/console-state":
+                try:
+                    import asset_picker
+
+                    self._json(200, asset_picker.console_state(root))
+                except Exception as exc:  # noqa: BLE001
+                    self._json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
+                return
+            if parsed.path == "/api/onboarding":
+                try:
+                    import onboarding
+
+                    self._json(200, onboarding.get_state(root))
+                except Exception as exc:  # noqa: BLE001
+                    self._json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
+                return
             if parsed.path.startswith("/media/"):
                 try:
                     self._media(_safe_media(root, unquote(parsed.path.removeprefix("/media/"))))
+                except ReviewUIError as exc:
+                    self._json(HTTPStatus.NOT_FOUND, {"error": str(exc)})
+                return
+            if parsed.path.startswith("/media-lib/"):
+                try:
+                    from bgm_library import default_library_root
+
+                    lib_root = default_library_root()
+                    self._media(
+                        _safe_media(lib_root, unquote(parsed.path.removeprefix("/media-lib/")))
+                    )
                 except ReviewUIError as exc:
                     self._json(HTTPStatus.NOT_FOUND, {"error": str(exc)})
                 return
@@ -281,6 +344,23 @@ def make_handler(root: Path, token: str):
                     report = advance_to_next_review(root, **body)
                 elif self.path == "/api/final-review-input":
                     report = write_review_input(root, body)
+                elif self.path == "/api/select":
+                    import asset_picker
+
+                    report = asset_picker.select_asset(root, **body)
+                elif self.path == "/api/onboarding/step":
+                    import onboarding
+
+                    report = onboarding.submit_step(
+                        root,
+                        body.get("step"),
+                        body.get("payload", {}),
+                        expected_revision=body.get("expected_revision"),
+                    )
+                elif self.path == "/api/onboarding/go":
+                    import onboarding
+
+                    report = onboarding.go(root, expected_revision=body.get("expected_revision"))
                 elif self.path == "/api/stop":
                     report = {"ok": True, "stopping": True}
                     threading.Thread(target=self.server.shutdown, daemon=True).start()
@@ -288,11 +368,14 @@ def make_handler(root: Path, token: str):
                     self._json(HTTPStatus.NOT_FOUND, {"error": "not found"})
                     return
                 self._json(200, report)
-            except ReviewControlConflict as exc:
+            except WebConsoleForbidden as exc:
+                self._json(HTTPStatus.FORBIDDEN, {"error": str(exc)})
+            except (ReviewControlConflict, WebConsoleConflict) as exc:
                 self._json(HTTPStatus.CONFLICT, {"error": str(exc)})
             except (
                 ReviewControlError,
                 ReviewUIError,
+                WebConsoleError,
                 json.JSONDecodeError,
                 TypeError,
                 ValueError,

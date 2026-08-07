@@ -23,6 +23,14 @@ for import_root in (SKILL_ROOT, SCRIPTS):
         sys.path.insert(0, str(import_root))
 
 
+def pytest_configure(config):
+    # Register the web review-console marker so `pytest -m console` works
+    # regardless of the invocation directory (CI runs from the skill subdir).
+    config.addinivalue_line(
+        "markers", "console: web review console (web_core / asset_picker / gateways / onboarding)"
+    )
+
+
 @pytest.fixture()
 def film_root(tmp_path: Path) -> Path:
     """A temporary film root directory with an ``out/`` subdir.

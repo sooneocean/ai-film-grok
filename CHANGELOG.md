@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.40.64] - 2026-08-07
+
+### Added (localhost review console · P6–P11)
+- **Fail-closed gate gate (P6):** `WebConsoleForbidden` (→403) distinct from `WebConsoleError`; `asset_picker.select_asset` refuses any selection/approval while a required gate `status=="fail"` (`blocking`). Wired into both the stdlib gateway (`post/review_ui.py`) and the FastAPI gateway (`web_api.py`).
+- **Canonical asset bindings (P7):** `voice` selections pin `cast_voices` in `film-spec.json`; `character` selections set `characters[].selected` in `assets.json`; `shot` selections bind the precise candidate (`path`/`sha256`/`provider`) into `manifest.json` instead of a console placeholder. `scene`/`prop` are read-only. `_list_voices` always merges the fallback pool so pinning one never hides the other.
+- **UX hardening (P8):** multi-tab `console-state` sync polling, ARIA tablist + arrow-key nav, `:focus-visible` ring, `aria-live` status, `prefers-reduced-motion` degrade (no magnetic/hero canvas/transitions), `preload="none"` lazy audio, windowed rendering (`PAGE=24` + "显示更多").
+- **Console-state aggregator (P9):** `GET /api/console-state` returns ledger revision/counts, gate blocking + hard_fail, approved manifest clips, onboarding progress, and recent selections; powers the overview tab.
+- **Docs & CI (P10):** `references/web-review-console.md` (architecture/security/data-contract/gate-semantics), `.github/PULL_REQUEST_TEMPLATE.md` with console self-check, and a `console` pytest marker registered in `pytest.ini` + `tests/conftest.py`.
+- **Security core (`web_core.py`):** framework-agnostic shared by both gateways — token auth (URL param + `X-Review-Token` + HttpOnly/SameSite=Strict cookie), one-time invite, cross-origin rejection, path-escape protection, Range/Content-Range media streaming.
+
 ## [2.40.63] - 2026-08-07
 
 ### Added (iron I5 GPU/ops · multi-agent + dual-film)

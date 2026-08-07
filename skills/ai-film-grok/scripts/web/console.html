@@ -1,0 +1,582 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>AI Film · 验片选素材控制台</title>
+<style>
+  :root {
+    --bg: #0b1020; --bg2: #111827; --panel: rgba(255,255,255,.06);
+    --panel-brd: rgba(255,255,255,.12); --txt: #e5e7eb; --muted: #9ca3af;
+    --accent: #a78bfa; --accent2: #34d399; --danger: #f87171; --warn: #fbbf24;
+    --ok: #34d399; --slate: #64748b; --radius: 18px;
+  }
+  html[data-theme="light"] {
+    --bg: #f4f6fb; --bg2: #ffffff; --panel: rgba(17,24,39,.04);
+    --panel-brd: rgba(17,24,39,.10); --txt: #1f2937; --muted: #6b7280;
+    --accent: #7c3aed; --accent2: #059669;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+    background: radial-gradient(1200px 600px at 80% -10%, rgba(167,139,250,.18), transparent),
+                radial-gradient(900px 500px at -10% 110%, rgba(52,211,153,.12), transparent),
+                var(--bg);
+    color: var(--txt); min-height: 100vh;
+  }
+  /* WCAG: clear keyboard focus ring */
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 8px; }
+  header {
+    display: flex; align-items: center; gap: 1rem; padding: 1.1rem 1.6rem;
+    border-bottom: 1px solid var(--panel-brd); backdrop-filter: blur(12px);
+    position: sticky; top: 0; z-index: 10; background: color-mix(in srgb, var(--bg) 70%, transparent);
+  }
+  .brand { font-weight: 700; font-size: 1.05rem; letter-spacing: .3px; }
+  .brand small { display:block; color: var(--muted); font-weight: 400; font-size: .72rem; }
+  .spacer { flex: 1; }
+  .tabs { display: flex; gap: .4rem; flex-wrap: wrap; }
+  .tab {
+    border: 1px solid var(--panel-brd); background: var(--panel); color: var(--txt);
+    padding: .45rem .9rem; border-radius: 999px; cursor: pointer; font-size: .9rem;
+    transition: transform .25s cubic-bezier(.16,1,.3,1), background .2s;
+  }
+  .tab[aria-selected="true"] { background: linear-gradient(135deg, var(--accent), var(--accent2)); color: #06121a; border-color: transparent; }
+  .magnetic { transition: transform .2s cubic-bezier(.16,1,.3,1); }
+  .ghost-btn {
+    border: 1px solid var(--panel-brd); background: var(--panel); color: var(--txt);
+    padding: .45rem .75rem; border-radius: 12px; cursor: pointer;
+  }
+  main { padding: 1.6rem; max-width: 1180px; margin: 0 auto; }
+  .panel {
+    background: var(--panel); border: 1px solid var(--panel-brd); border-radius: var(--radius);
+    padding: 1.1rem 1.2rem; margin-bottom: 1.2rem; backdrop-filter: blur(14px);
+    box-shadow: 0 10px 40px -20px rgba(0,0,0,.6);
+  }
+  .hidden { display: none; }
+  .kindrow { display: flex; gap: .5rem; flex-wrap: wrap; margin-bottom: 1rem; }
+  .chip {
+    border: 1px solid var(--panel-brd); background: var(--panel); color: var(--txt);
+    padding: .4rem .85rem; border-radius: 999px; cursor: pointer; font-size: .85rem;
+  }
+  .chip[aria-selected="true"] { background: var(--accent); color: #06121a; border-color: transparent; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px,1fr)); gap: .9rem; }
+  .card {
+    border: 1px solid var(--panel-brd); border-radius: 14px; padding: .9rem; background: color-mix(in srgb, var(--panel) 80%, transparent);
+    transition: transform .25s cubic-bezier(.16,1,.3,1), border-color .2s;
+  }
+  .card:hover { transform: translateY(-3px); border-color: var(--accent); }
+  .card.readonly { opacity: .96; }
+  .card h4 { margin: .1rem 0 .4rem; font-size: .98rem; }
+  .meta { color: var(--muted); font-size: .78rem; }
+  .pick {
+    margin-top: .7rem; width: 100%; border: 0; border-radius: 10px; padding: .5rem;
+    background: linear-gradient(135deg, var(--accent), var(--accent2)); color: #06121a;
+    font-weight: 600; cursor: pointer;
+  }
+  .pick:disabled { cursor: default; }
+  audio { width: 100%; margin-top: .5rem; }
+  .voice-select {
+    width: 100%; margin-top: .5rem; padding: .4rem; border-radius: 10px;
+    background: var(--bg2); color: var(--txt); border: 1px solid var(--panel-brd);
+  }
+  .gate { display: flex; align-items: center; gap: .7rem; padding: .6rem .8rem; border-radius: 12px;
+    border: 1px solid var(--panel-brd); margin-bottom: .5rem; background: var(--panel); }
+  .dot { width: 11px; height: 11px; border-radius: 50%; flex: none; }
+  .s-pass { background: var(--ok); } .s-warn { background: var(--warn); }
+  .s-fail { background: var(--danger); } .s-unknown, .s-skipped { background: var(--slate); }
+  .gate .name { font-weight: 600; } .gate .detail { color: var(--muted); font-size: .78rem; }
+  .banner { padding: .7rem 1rem; border-radius: 12px; font-weight: 600; margin-bottom: 1rem; }
+  .banner.block { background: color-mix(in srgb, var(--danger) 22%, transparent); border: 1px solid var(--danger); }
+  .banner.clear { background: color-mix(in srgb, var(--ok) 18%, transparent); border: 1px solid var(--ok); }
+  /* overview stats */
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px,1fr)); gap: .8rem; }
+  .stat { border: 1px solid var(--panel-brd); border-radius: 14px; padding: .9rem; background: color-mix(in srgb, var(--panel) 80%, transparent); }
+  .stat .num { font-size: 1.6rem; font-weight: 700; }
+  .stat .lbl { color: var(--muted); font-size: .78rem; }
+  .stat.warn .num { color: var(--danger); }
+  .audit { margin-top: .8rem; border-top: 1px solid var(--panel-brd); padding-top: .6rem; }
+  .audit li { margin: .25rem 0; }
+  #toast {
+    position: fixed; bottom: 1.2rem; left: 50%; transform: translateX(-50%) translateY(20px);
+    background: var(--panel); border: 1px solid var(--panel-brd); color: var(--txt);
+    padding: .7rem 1.1rem; border-radius: 12px; opacity: 0; transition: all .3s; z-index: 50;
+  }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  .muted { color: var(--muted); }
+  canvas#hero { position: fixed; inset: 0; z-index: -1; opacity: .35; pointer-events: none; }
+  .more-btn { margin: 1rem auto 0; display: block; }
+  /* Respect reduced-motion preference (WCAG 2.1 / accessibility) */
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; animation: none !important; }
+    canvas#hero { display: none; }
+  }
+</style>
+</head>
+<body>
+<canvas id="hero"></canvas>
+<header>
+  <div class="brand">AI Film 控制台<small>验片 · 选素材 · 门禁</small></div>
+  <div class="spacer"></div>
+  <nav class="tabs" role="tablist" aria-label="控制台分区">
+    <button class="tab magnetic" role="tab" data-tab="onboarding" aria-controls="onboarding" aria-selected="false">起步 Onboarding</button>
+    <button class="tab magnetic" role="tab" data-tab="assets" aria-controls="assets" aria-selected="true">选素材</button>
+    <button class="tab magnetic" role="tab" data-tab="gates" aria-controls="gates" aria-selected="false">门禁</button>
+    <button class="tab magnetic" role="tab" data-tab="overview" aria-controls="overview" aria-selected="false">状态总览</button>
+    <a class="tab magnetic" href="/" style="text-decoration:none">验片 ↗</a>
+  </nav>
+  <button class="ghost-btn magnetic" id="theme" title="切换主题" aria-label="切换深/浅色主题">🌓</button>
+</header>
+
+<main>
+  <section id="assets" class="tabpane" role="tabpanel" aria-labelledby="tab-assets">
+    <div class="panel">
+      <h3 style="margin-top:0">素材库</h3>
+      <div class="kindrow" id="kinds" role="tablist" aria-label="素材类型">
+        <button class="chip" role="tab" data-kind="bgm" aria-selected="true">BGM 音乐</button>
+        <button class="chip" role="tab" data-kind="character" aria-selected="false">角色</button>
+        <button class="chip" role="tab" data-kind="voice" aria-selected="false">声线</button>
+        <button class="chip" role="tab" data-kind="shot" aria-selected="false">镜头候选</button>
+        <button class="chip" role="tab" data-kind="scene" aria-selected="false">场景</button>
+        <button class="chip" role="tab" data-kind="prop" aria-selected="false">道具</button>
+      </div>
+      <div id="assets-grid" class="grid" aria-live="polite"></div>
+      <button class="ghost-btn more-btn hidden" id="more">显示更多…</button>
+    </div>
+  </section>
+
+  <section id="gates" class="tabpane hidden" role="tabpanel" aria-labelledby="tab-gates">
+    <div class="panel">
+      <h3 style="margin-top:0">门禁面板 <span class="muted" style="font-weight:400;font-size:.8rem">（硬门禁失败即拒绝批准/选择）</span></h3>
+      <div id="gate-banner" role="status" aria-live="polite"></div>
+      <div id="gates-list"></div>
+      <button class="ghost-btn" id="refresh-gates">刷新门禁</button>
+    </div>
+  </section>
+
+  <section id="overview" class="tabpane hidden" role="tabpanel" aria-labelledby="tab-overview">
+    <div class="panel">
+      <h3 style="margin-top:0">状态总览 <span class="muted" style="font-weight:400;font-size:.8rem">选择计数 · 门禁 · manifest · 起步进度 · 审计</span></h3>
+      <div id="ov-stats" class="stats"></div>
+      <div class="audit">
+        <h4 style="margin:.2rem 0">最近选择（审计）</h4>
+        <ul id="ov-recent" class="muted" style="font-size:.82rem"></ul>
+      </div>
+    </div>
+  </section>
+
+  <section id="onboarding" class="tabpane hidden" role="tabpanel" aria-labelledby="tab-onboarding">
+    <div class="panel">
+      <h3 style="margin-top:0">起步向导 <span class="muted" style="font-weight:400;font-size:.8rem">逐步录入 参考物 → 故事 → 角色，最后推动 Go 启动流水线</span></h3>
+      <div id="ob-stepper" class="kindrow"></div>
+
+      <div class="ob-step">
+        <h4>① 参考物（视觉 / 风格参考）</h4>
+        <div id="ob-refs"></div>
+        <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+          <input id="ob-ref-url" class="ghost-btn" style="flex:1;min-width:200px" placeholder="参考图 / 视频 URL 或本地路径" aria-label="参考物 URL 或路径">
+          <input id="ob-ref-note" class="ghost-btn" style="flex:1;min-width:160px" placeholder="备注（可选）" aria-label="参考物备注">
+          <button class="ghost-btn" id="ob-ref-add">+ 添加</button>
+        </div>
+        <button class="pick" data-savestep="references">保存这一步</button>
+      </div>
+
+      <div class="ob-step">
+        <h4>② 故事（剧情 / 脚本）</h4>
+        <textarea id="ob-story" rows="8" style="width:100%;background:var(--bg2);color:var(--txt);border:1px solid var(--panel-brd);border-radius:10px;padding:.6rem" placeholder="粘贴故事 / 脚本文本…" aria-label="故事文本"></textarea>
+        <button class="pick" data-savestep="story">保存这一步</button>
+      </div>
+
+      <div class="ob-step">
+        <h4>③ 角色（演员 / 人物）</h4>
+        <div id="ob-chars"></div>
+        <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+          <input id="ob-char-id" class="ghost-btn" style="width:120px" placeholder="id（英文）" aria-label="角色 id">
+          <input id="ob-char-name" class="ghost-btn" style="flex:1;min-width:140px" placeholder="名称" aria-label="角色名称">
+          <input id="ob-char-desc" class="ghost-btn" style="flex:1;min-width:180px" placeholder="外貌 / 身份描述" aria-label="角色描述">
+          <input id="ob-char-img" class="ghost-btn" style="flex:1;min-width:180px" placeholder="参考图 URL / 路径" aria-label="角色参考图">
+          <button class="ghost-btn" id="ob-char-add">+ 添加</button>
+        </div>
+        <button class="pick" data-savestep="characters">保存这一步</button>
+      </div>
+
+      <div id="ob-go-banner" class="banner" style="display:none" role="status" aria-live="polite"></div>
+      <button class="pick" id="ob-go" disabled style="opacity:.5">🚀 Go · 启动流水线</button>
+    </div>
+  </section>
+</main>
+
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script>
+const token = new URLSearchParams(location.search).get('token');
+if (token) history.replaceState(null, '', location.pathname);
+const h = token ? { 'X-Review-Token': token } : {};
+const KIND_LABEL = { bgm: 'BGM', character: '角色', voice: '声线', shot: '镜头', scene: '场景', prop: '道具' };
+const READONLY_KINDS = new Set(['scene', 'prop']);
+const ZH_VOICES = ['zh-CN-XiaoyiNeural','zh-CN-YunxiNeural','zh-CN-YunyangNeural','zh-CN-XiaoxiaoNeural','zh-CN-liaoning-XiaobeiNeural'];
+let expectedRevision = 0;
+
+function esc(s){ return String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+async function api(p, o={}) {
+  o.headers = { ...h, ...(o.headers||{}) };
+  const r = await fetch(p, o); const j = await r.json().catch(()=>({}));
+  if (!r.ok) throw new Error(j.error || j.detail || r.status);
+  return j;
+}
+function toast(msg, isErr=false){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.className = 'show' + (isErr ? ' err' : '');
+  t.style.borderColor = isErr ? 'var(--danger)' : 'var(--panel-brd)';
+  setTimeout(()=> t.className='', 2200);
+}
+
+// tabs (keyboard: arrow left/right moves between tabs — WCAG)
+const tabButtons = [...document.querySelectorAll('.tab[data-tab]')];
+function activateTab(b){
+  tabButtons.forEach(x => x.setAttribute('aria-selected', x===b));
+  document.querySelectorAll('.tabpane').forEach(p => p.classList.add('hidden'));
+  document.getElementById(b.dataset.tab).classList.remove('hidden');
+  if (b.dataset.tab === 'gates') loadGates();
+  if (b.dataset.tab === 'overview') loadOverview();
+}
+tabButtons.forEach((b, i) => {
+  b.onclick = () => activateTab(b);
+  b.addEventListener('keydown', e => {
+    if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+      e.preventDefault();
+      const dir = e.key === 'ArrowRight' ? 1 : -1;
+      const next = tabButtons[(i + dir + tabButtons.length) % tabButtons.length];
+      next.focus(); activateTab(next);
+    }
+  });
+});
+// theme
+const saved = localStorage.getItem('theme') || 'dark';
+document.documentElement.setAttribute('data-theme', saved);
+document.getElementById('theme').onclick = () => {
+  const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', next);
+  localStorage.setItem('theme', next);
+};
+// magnetic + particle hero — disabled when user prefers reduced motion
+const REDUCE = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+if (!REDUCE) {
+  document.querySelectorAll('.magnetic').forEach(el => {
+    el.addEventListener('mousemove', e => {
+      const r = el.getBoundingClientRect();
+      el.style.transform = `translate(${(e.clientX-r.left-r.width/2)*0.12}px, ${(e.clientY-r.top-r.height/2)*0.12}px)`;
+    });
+    el.addEventListener('mouseleave', () => el.style.transform = '');
+  });
+}
+
+// kind selection -> load assets (deferred / windowed rendering for large lists)
+let currentKind = 'bgm';
+const selected = { bgm: new Set(), character: new Set(), voice: new Set(), shot: new Set(), scene: new Set(), prop: new Set() };
+let allItems = [], visible = 0;
+const PAGE = 24;
+document.querySelectorAll('#kinds .chip').forEach(c => c.onclick = () => {
+  document.querySelectorAll('#kinds .chip').forEach(x => x.setAttribute('aria-selected', x===c));
+  currentKind = c.dataset.kind; loadAssets(currentKind);
+});
+
+async function loadAssets(kind){
+  const grid = document.getElementById('assets-grid');
+  const more = document.getElementById('more');
+  grid.innerHTML = '<p class="muted">载入中…</p>'; more.classList.add('hidden');
+  try {
+    const data = await api('/api/assets?kind=' + kind);
+    allItems = data.items || [];
+    visible = 0;
+    if (!allItems.length) { grid.innerHTML = '<p class="muted">暂无可选素材。先用 CLI 生成/批准资产。</p>'; return; }
+    renderChunk();
+  } catch (e) { grid.innerHTML = '<p class="muted">载入失败：' + esc(e.message) + '</p>'; }
+}
+function renderChunk(){
+  const grid = document.getElementById('assets-grid');
+  const more = document.getElementById('more');
+  const slice = allItems.slice(visible, visible + PAGE);
+  if (visible === 0) grid.innerHTML = '';
+  grid.insertAdjacentHTML('beforeend', slice.map(it => cardHtml(currentKind, it)).join(''));
+  visible += slice.length;
+  grid.querySelectorAll('[data-pick]').forEach(b => b.onclick = pick);
+  if (visible < allItems.length) more.classList.remove('hidden');
+  else more.classList.add('hidden');
+}
+document.getElementById('more').onclick = renderChunk;
+
+function selBadge(kind, id){
+  return selected[kind] && selected[kind].has(id)
+    ? '<div class="meta" style="color:var(--ok);font-weight:600">● 已选入生产状态</div>'
+    : '';
+}
+function cardHtml(kind, it){
+  if (kind === 'bgm') {
+    const src = it.path ? '/media-lib/' + it.path.split('/').map(encodeURIComponent).join('/') : '';
+    const picked = selected.bgm.has(it.asset_id);
+    return `<div class="card">
+      <h4>${esc(it.asset_id)}</h4>
+      <div class="meta">mood: ${esc(it.mood)} · energy: ${esc(it.energy)} · ${esc(it.bpm)} BPM · ${esc(it.duration)}s</div>
+      ${src ? `<audio controls preload="none" src="${src}"></audio>` : ''}
+      ${selBadge('bgm', it.asset_id)}
+      <button class="pick" data-pick data-kind="bgm" data-id="${esc(it.asset_id)}" ${picked?'disabled style="opacity:.6"':''}>${picked?'✅ 已选择':'选择此 BGM'}</button>
+    </div>`;
+  }
+  if (kind === 'character') {
+    const picked = selected.character.has(it.asset_id);
+    return `<div class="card"><h4>${esc(it.name || it.asset_id)}</h4>
+      <div class="meta">角色定位: ${esc(it.role || '未指定')} · id: ${esc(it.asset_id)}</div>
+      ${selBadge('character', it.asset_id)}
+      <button class="pick" data-pick data-kind="character" data-id="${esc(it.asset_id)}" ${picked?'disabled style="opacity:.6"':''}>${picked?'✅ 已锁定':'锁定角色'}</button></div>`;
+  }
+  if (kind === 'voice') {
+    const picked = selected.voice.has(it.asset_id);
+    const opts = [...new Set([it.voice, ...ZH_VOICES])].filter(Boolean)
+      .map(v => `<option value="${esc(v)}" ${v===it.voice?'selected':''}>${esc(v)}</option>`).join('');
+    return `<div class="card"><h4>${esc(it.asset_id)}</h4>
+      <div class="meta">声线引擎: ${esc(it.voice)}</div>
+      <label class="meta" for="v-${esc(it.asset_id)}">选用声线</label>
+      <select class="voice-select" id="v-${esc(it.asset_id)}" data-voice>${opts}</select>
+      ${selBadge('voice', it.asset_id)}
+      <button class="pick" data-pick data-kind="voice" data-id="${esc(it.asset_id)}" ${picked?'disabled style="opacity:.6"':''}>${picked?'✅ 已选用':'选用声线'}</button></div>`;
+  }
+  if (kind === 'shot') {
+    const picked = selected.shot.has(it.shot_id);
+    const cands = (it.cloud_candidates||[]).map(c =>
+      `<div class="meta">${esc(c.provider)}/${esc(c.model)} · ${esc(c.status)}</div>`).join('');
+    return `<div class="card"><h4>镜 ${esc(it.shot_id)}</h4>
+      <div class="meta">状态: ${esc(it.state)}</div>${cands}
+      <div class="meta" style="color:var(--muted)">批准 → 写入 manifest.json (clips)</div>
+      ${selBadge('shot', it.shot_id)}
+      <button class="pick" data-pick data-kind="shot" data-id="${esc(it.shot_id)}" ${picked?'disabled style="opacity:.6"':''}>${picked?'✅ 已批准':'批准此镜'}</button></div>`;
+  }
+  // scene / prop — read-only (structured pipeline data, no selection write)
+  if (kind === 'scene') {
+    return `<div class="card readonly"><h4>${esc(it.title || it.scene_id)}</h4>
+      <div class="meta">场景 id: ${esc(it.scene_id)} · 镜头数: ${esc(it.shot_count)}</div>
+      <div class="meta" style="color:var(--accent2)">只读 · 来自 film-spec 规划</div></div>`;
+  }
+  return `<div class="card readonly"><h4>${esc(it.prop_id)}</h4>
+    <div class="meta">${esc(it.description || '（无描述）')}</div>
+    <div class="meta" style="color:var(--accent2)">只读 · 来自资产库道具</div></div>`;
+}
+
+async function pick(e){
+  const b = e.currentTarget; const kind = b.dataset.kind, id = b.dataset.id;
+  let value = null;
+  if (kind === 'voice') {
+    const sel = b.closest('.card').querySelector('.voice-select');
+    if (sel) value = sel.value;
+  }
+  b.disabled = true;
+  try {
+    const body = { kind, asset_id: id, expected_revision: expectedRevision };
+    if (value) body.value = value;
+    const res = await api('/api/select', { method:'POST', headers:{'Content-Type':'application/json', Origin:location.origin},
+      body: JSON.stringify(body) });
+    expectedRevision = res.revision;
+    selected[kind].add(id);
+    b.textContent = kind === 'shot' ? '✅ 已批准' : '✅ 已选择';
+    b.disabled = true; b.style.opacity = '.6';
+    const card = b.closest('.card');
+    if (card && !card.querySelector('.sel-badge')) {
+      const bd = document.createElement('div');
+      bd.className = 'meta sel-badge'; bd.style.color = 'var(--ok)'; bd.style.fontWeight = '600';
+      bd.textContent = '● 已选入生产状态';
+      card.insertBefore(bd, b);
+    }
+    let msg = `已选择 ${KIND_LABEL[kind]}：${id}`;
+    if (kind === 'voice' && value) msg += ` · 声线=${value}`;
+    if (res.manifest_binding && res.manifest_binding.bound) msg += ' · 已写入 manifest.json';
+    if (res.canonical_binding && res.canonical_binding.bound) msg += ' · 已落盘规范文件';
+    toast(msg);
+  } catch (err) {
+    if (/stale/i.test(err.message)) { toast('版本冲突，请刷新后重试', true); }
+    else if (/硬门禁/.test(err.message)) { toast('硬门禁未通过，选择被拒绝', true); }
+    else toast('选择失败：' + err.message, true);
+    b.disabled = false;
+  }
+}
+
+async function loadGates(){
+  const list = document.getElementById('gates-list'), banner = document.getElementById('gate-banner');
+  list.innerHTML = '<p class="muted">评估中…</p>';
+  try {
+    const g = await api('/api/gates');
+    banner.className = 'banner ' + (g.blocking ? 'block' : 'clear');
+    banner.textContent = g.blocking ? '⛔ 存在失败硬门禁，批准/选择将被服务端拒绝' : '✅ 硬门禁全部通过';
+    list.innerHTML = g.gates.map(x => `<div class="gate">
+      <span class="dot s-${esc(x.status)}"></span>
+      <div><div class="name">${esc(x.name)} ${x.required ? '· 硬' : ''}</div>
+      <div class="detail">${esc(x.detail)}</div></div></div>`).join('');
+  } catch (e) { list.innerHTML = '<p class="muted">门禁评估失败：' + esc(e.message) + '</p>'; }
+}
+document.getElementById('refresh-gates').onclick = loadGates;
+
+// ---- overview panel (P9) ----
+async function loadOverview(){
+  try {
+    const s = await api('/api/console-state');
+    renderOverview(s);
+  } catch (e) { toast('载入总览失败：' + e.message, true); }
+}
+function renderOverview(s){
+  const counts = s.selection_counts || {};
+  const countStr = Object.keys(counts).length
+    ? Object.entries(counts).map(([k,v]) => `${KIND_LABEL[k]||k}:${v}`).join(' · ')
+    : '暂无选择';
+  const ob = s.onboarding || {};
+  const gateCls = s.gate_blocking ? 'stat warn' : 'stat';
+  document.getElementById('ov-stats').innerHTML = `
+    <div class="stat"><div class="num">${s.selection_total||0}</div><div class="lbl">总选择 · ${esc(countStr)}</div></div>
+    <div class="${gateCls}"><div class="num">${s.gate_blocking?'⛔':'✅'}</div><div class="lbl">硬门禁 ${s.gate_blocking?'阻断':'通过'}</div></div>
+    <div class="stat"><div class="num">${s.approved_clips||0}</div><div class="lbl">manifest 已批准 clips</div></div>
+    <div class="stat"><div class="num">${ob.done||0}/${ob.total||0}</div><div class="lbl">起步进度 ${ob.completed?'（已完成）':''}</div></div>`;
+  const recent = (s.recent_selections||[]).slice().reverse();
+  document.getElementById('ov-recent').innerHTML = recent.length
+    ? recent.map(r => `<li>${esc(r.recorded_at||'')} · ${esc(KIND_LABEL[r.kind]||r.kind)} · ${esc(r.asset_id)}</li>`).join('')
+    : '<li>暂无选择记录。</li>';
+}
+
+// multi-tab sync (P8): poll console-state; if another tab/external changed the
+// ledger revision, refresh our base + surface a toast so two reviewers don't clash.
+let syncTimer = null;
+async function syncState(){
+  try {
+    const s = await api('/api/console-state');
+    if (s.ledger_revision > expectedRevision) {
+      expectedRevision = s.ledger_revision;
+      toast('选择状态已更新（来自其他标签页或外部）');
+      if (document.getElementById('overview') && !document.getElementById('overview').classList.contains('hidden'))
+        renderOverview(s);
+    }
+  } catch (_) { /* silent: sync is best-effort */ }
+}
+function startSync(){ if (!syncTimer) syncTimer = setInterval(syncState, 3000); }
+
+// lightweight particle hero (no external lib); skipped under reduced-motion
+if (!REDUCE) {
+  (function(){
+    const c = document.getElementById('hero'), x = c.getContext('2d');
+    let w, h, ps;
+    function resize(){ w=c.width=innerWidth; h=c.height=innerHeight;
+      ps = Array.from({length: 60}, () => ({x:Math.random()*w, y:Math.random()*h, vx:(Math.random()-.5)*.3, vy:(Math.random()-.5)*.3, r:Math.random()*1.6+.4})); }
+    resize(); addEventListener('resize', resize);
+    (function loop(){ x.clearRect(0,0,w,h);
+      for (const p of ps){ p.x+=p.vx; p.y+=p.vy; if(p.x<0||p.x>w)p.vx*=-1; if(p.y<0||p.y>h)p.vy*=-1;
+        x.beginPath(); x.arc(p.x,p.y,p.r,0,7); x.fillStyle='rgba(167,139,250,.7)'; x.fill(); }
+      requestAnimationFrame(loop); })();
+  })();
+}
+
+// ---- onboarding wizard (references -> story -> characters -> go) ----
+const STEP_LABEL = { references: '参考物', story: '故事', characters: '角色' };
+let obRevision = 0;
+let obRefs = [];
+let obChars = [];
+
+function renderRefs(){
+  document.getElementById('ob-refs').innerHTML = obRefs.length
+    ? obRefs.map((r,i) => `<div class="meta">• ${esc(r.url)} ${r.note?('· '+esc(r.note)):''} <a href="#" data-rmref="${i}" style="color:var(--danger)">✕</a></div>`).join('')
+    : '<p class="muted">尚未添加参考物。</p>';
+}
+function renderChars(){
+  document.getElementById('ob-chars').innerHTML = obChars.length
+    ? obChars.map((c,i) => `<div class="meta">• ${esc(c.id)} / ${esc(c.name)} ${c.reference_image?('· '+esc(c.reference_image)):''} <a href="#" data-rmchar="${i}" style="color:var(--danger)">✕</a></div>`).join('')
+    : '<p class="muted">尚未添加角色。</p>';
+}
+function renderStepper(state){
+  document.getElementById('ob-stepper').innerHTML = ['references','story','characters'].map(s => {
+    const done = state.steps[s].done;
+    return `<span class="chip" style="${done?'background:var(--ok);color:#06121a;border-color:transparent':''}">${done?'✅':'⚪'} ${STEP_LABEL[s]}</span>`;
+  }).join('');
+}
+function updateGo(state){
+  const allDone = ['references','story','characters'].every(s => state.steps[s].done);
+  const btn = document.getElementById('ob-go');
+  btn.disabled = !allDone; btn.style.opacity = allDone ? '1' : '.5';
+  const banner = document.getElementById('ob-go-banner');
+  if (allDone){ banner.style.display='block'; banner.className='banner clear'; banner.textContent='✅ 三步已完成，可以启动流水线。'; }
+  else { banner.style.display='none'; }
+}
+async function loadOnboarding(){
+  try {
+    const s = await api('/api/onboarding');
+    obRevision = s.revision || 0;
+    const refs = (s.steps.references.data||{}).items || [];
+    const story = (s.steps.story.data||{}).text || '';
+    const chars = (s.steps.characters.data||{}).items || [];
+    if (refs.length) obRefs = refs.map(r => ({url: r.url||r.path||'', note: r.note||''}));
+    if (story) document.getElementById('ob-story').value = story;
+    if (chars.length) obChars = chars.map(c => ({
+      id: c.id, name: c.name,
+      description: c.description || ((c.visual_features && (c.visual_features.identity||[]))||[]).join(' '),
+      reference_image: (c.reference_image && c.reference_image.path) || '',
+    }));
+    renderRefs(); renderChars(); renderStepper(s); updateGo(s);
+  } catch(e){ toast('载入起步状态失败：'+e.message, true); }
+}
+async function saveStep(step){
+  let payload = {};
+  if (step === 'references') payload = { items: obRefs };
+  else if (step === 'story') payload = { text: document.getElementById('ob-story').value };
+  else if (step === 'characters') payload = { items: obChars };
+  try {
+    const res = await api('/api/onboarding/step', { method:'POST', headers:{'Content-Type':'application/json', Origin:location.origin},
+      body: JSON.stringify({ step, payload, expected_revision: obRevision }) });
+    obRevision = res.revision;
+    toast(`已保存：${STEP_LABEL[step]}`);
+    renderStepper(res); updateGo(res);
+  } catch(err){
+    if (/stale/i.test(err.message)) toast('版本冲突，请刷新后重试', true);
+    else toast('保存失败：'+err.message, true);
+  }
+}
+async function doGo(){
+  const btn = document.getElementById('ob-go'); btn.disabled = true;
+  try {
+    const res = await api('/api/onboarding/go', { method:'POST', headers:{'Content-Type':'application/json', Origin:location.origin},
+      body: JSON.stringify({ expected_revision: obRevision }) });
+    obRevision = res.revision;
+    const banner = document.getElementById('ob-go-banner');
+    banner.style.display='block'; banner.className='banner clear';
+    banner.textContent = `🚀 已启动 — 落盘：${JSON.stringify(res.persisted)} · 流水线推进：${res.advanced ? ('是 ('+res.advanced_detail+')') : ('否 ('+res.advanced_detail+')')}`;
+    toast('Go 已执行');
+  } catch(err){
+    btn.disabled = false;
+    if (/incomplete/i.test(err.message)) toast('还有步骤未完成', true);
+    else if (/stale/i.test(err.message)) toast('版本冲突，请刷新后重试', true);
+    else toast('Go 失败：'+err.message, true);
+  }
+}
+document.getElementById('ob-ref-add').onclick = () => {
+  const url = document.getElementById('ob-ref-url').value.trim();
+  const note = document.getElementById('ob-ref-note').value.trim();
+  if (!url){ toast('请填写参考物 URL/路径', true); return; }
+  obRefs.push({url, note}); renderRefs();
+  document.getElementById('ob-ref-url').value=''; document.getElementById('ob-ref-note').value='';
+};
+document.getElementById('ob-char-add').onclick = () => {
+  const id = document.getElementById('ob-char-id').value.trim();
+  const name = document.getElementById('ob-char-name').value.trim();
+  const description = document.getElementById('ob-char-desc').value.trim();
+  const reference_image = document.getElementById('ob-char-img').value.trim();
+  if (!id){ toast('请填写角色 id', true); return; }
+  obChars.push({id, name: name||id, description, reference_image}); renderChars();
+  document.getElementById('ob-char-id').value=''; document.getElementById('ob-char-name').value='';
+  document.getElementById('ob-char-desc').value=''; document.getElementById('ob-char-img').value='';
+};
+document.querySelectorAll('[data-savestep]').forEach(b => b.onclick = () => saveStep(b.dataset.savestep));
+document.getElementById('ob-go').onclick = doGo;
+document.getElementById('ob-refs').addEventListener('click', e => {
+  if (e.target.dataset.rmref !== undefined){ e.preventDefault(); obRefs.splice(+e.target.dataset.rmref, 1); renderRefs(); }
+});
+document.getElementById('ob-chars').addEventListener('click', e => {
+  if (e.target.dataset.rmchar !== undefined){ e.preventDefault(); obChars.splice(+e.target.dataset.rmchar, 1); renderChars(); }
+});
+
+loadAssets('bgm');
+startSync();
+</script>
+</body>
+</html>
