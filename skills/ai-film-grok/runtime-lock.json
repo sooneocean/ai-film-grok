@@ -122,7 +122,7 @@
     },
     {
       "path": "scripts/aifilm_grok.py",
-      "sha256": "f2cc4950a1ac518fd4734dea6ac3fa20e39295e274321a040727665ce1646bc9"
+      "sha256": "4de507d43224c5ae3e944464e8749ffaa152f77f5ca586a885fddfb0a51253d9"
     },
     {
       "path": "scripts/ambience_candidates.py",
@@ -710,7 +710,7 @@
     },
     {
       "path": "scripts/cli/cli_post.py",
-      "sha256": "a9ccddc1af2fe6bf92a613332591b9ef2103b5ea0739d1f9aee24b2f0fe3c3cc"
+      "sha256": "6e6696c2f23315ced4a0bb8332e783a969f21cf2f786873fbb40a2914d871940"
     },
     {
       "path": "scripts/cli/cli_quality.py",
@@ -1203,6 +1203,10 @@
     {
       "path": "scripts/duration_target.py",
       "sha256": "fdc8be27f32828fd1fa7bc5e238304b5c162fce8d132df21361eaf0d15cf8576"
+    },
+    {
+      "path": "scripts/edit_director.py",
+      "sha256": "2285984342f41e37eb8712999186943830ac46e579a97a33ac539ee28bc4b1e3"
     },
     {
       "path": "scripts/edit_edl_merge.py",
@@ -2757,6 +2761,10 @@
       "sha256": "abb2644d738593b5194fd59c8ca4aed97078a71c936b400216b9a8aa0e3eb383"
     },
     {
+      "path": "scripts/post/edit_director.py",
+      "sha256": "c7e628d05d0857662bd8f6aa34352c0a03db601a7e702c2f7c68dfbc3ca0c15a"
+    },
+    {
       "path": "scripts/post/export_composition.py",
       "sha256": "2b8d744f06da1ab5bdbeefc6e4b857941683420268c00d3cdfac054e6e1e30e5"
     },
@@ -3202,7 +3210,7 @@
     },
     {
       "path": "scripts/spine/dispatch.py",
-      "sha256": "455a4fd52fecf1604f3ea25bcf2fb009d38464fed9e3f1215cee02b7d95454c8"
+      "sha256": "a3f5c551078cc0cd0e93af774e276c48089956dc35b017ac5c6ed06b21540a72"
     },
     {
       "path": "scripts/spine/dispatch_compact.py",
@@ -3210,7 +3218,7 @@
     },
     {
       "path": "scripts/spine/next_actions.py",
-      "sha256": "0228dc87bfa3bad33b8bd50c1da28d41d3773450598ee89f170eb1a72fee9683"
+      "sha256": "fb0bdd95e729fc6db816775461f41a1385c5f8c6a4a8c10fc15047a104e2c721"
     },
     {
       "path": "scripts/spine/pipeline_events.py",
@@ -3246,7 +3254,7 @@
     },
     {
       "path": "scripts/spine/workflow_spine.py",
-      "sha256": "dde54aab27d2d7f6c71ce47bb022468f58f65d80ac2f8e8060720db1a394adc2"
+      "sha256": "aee5d808eed2564c9023d880064c69e4f7d1ecd404d84f47b55326d3c0e721de"
     },
     {
       "path": "scripts/state_index_gate.py",
