@@ -299,6 +299,7 @@
   <div class="spacer"></div>
   <nav class="tabs" role="tablist" aria-label="控制台分区">
     <button class="tab magnetic" role="tab" data-tab="overview" aria-controls="dashboard" aria-selected="true">工作台</button>
+    <button class="tab magnetic" role="tab" data-tab="studio" aria-controls="studio" aria-selected="false" id="tab-studio" style="display:none">总控台</button>
     <button class="tab magnetic" role="tab" data-tab="assets" aria-controls="assets" aria-selected="false">选素材</button>
     <button class="tab magnetic" role="tab" data-tab="review" aria-controls="review" aria-selected="false">验片</button>
     <button class="tab magnetic" role="tab" data-tab="gates" aria-controls="gates" aria-selected="false">门禁</button>
@@ -350,6 +351,39 @@
       </div>
       <div id="cmd-log" class="cmd-log" role="status" aria-live="polite"></div>
       <div id="dash-next" class="cmd-next"></div>
+    </div>
+  </section>
+
+  <section id="studio" class="tabpane hidden" role="tabpanel" aria-labelledby="tab-studio">
+    <div class="hero-strip">
+      <div>
+        <h1>导演总控台</h1>
+        <p id="studio-sub">所有已制作 / 制作中的 AI FILM · 一处统览与管理监控</p>
+      </div>
+      <span id="studio-mode-pill" class="pill"><span class="dot s-unknown"></span><span>检查中…</span></span>
+    </div>
+
+    <div id="studio-stats" class="stats"></div>
+
+    <div class="panel">
+      <div class="filterbar" role="search">
+        <input type="search" id="st-search" placeholder="搜索片名 / 类型 / id…" aria-label="搜索影片" autocomplete="off">
+        <select id="st-cat" aria-label="按分类过滤"><option value="">全部分类</option></select>
+        <select id="st-status" aria-label="按状态过滤">
+          <option value="">全部状态</option>
+          <option value="draft">草稿</option>
+          <option value="producing">制作中</option>
+          <option value="released">已发布</option>
+        </select>
+        <span class="f-count" id="st-count"></span>
+      </div>
+      <h3 class="section-h"><span class="ico" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M2 7h20M8 21h8M12 17v4"/></svg></span>影片库 <span class="muted" style="font-weight:400;font-size:.8rem">点「打开此片」即切换为当前工作台影片</span></h3>
+      <div id="studio-grid" class="grid" aria-live="polite"></div>
+    </div>
+
+    <div class="panel" id="studio-released-panel">
+      <h3 class="section-h"><span class="ico" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></span>已发布作品 <span class="muted" style="font-weight:400;font-size:.8rem">来自发布目录 catalog</span></h3>
+      <div id="studio-released" class="grid"></div>
     </div>
   </section>
 
@@ -522,6 +556,7 @@ function activateTab(b){
   if (b.dataset.tab === 'overview') loadDashboard();
   if (b.dataset.tab === 'review') ensureReviewFrame();
   if (b.dataset.tab === 'onboarding') loadOnboarding();   // T1: 起步 tab 必须加载状态，否则"点画面不会动"
+  if (b.dataset.tab === 'studio') loadStudio();           // 导演总控台：多片统览 + 切换
 }
 tabButtons.forEach((b, i) => {
   b.onclick = () => activateTab(b);
@@ -1292,6 +1327,12 @@ document.getElementById('f-search').addEventListener('input', () => {
 document.getElementById('f-mood').addEventListener('change', applyFilter);
 document.getElementById('f-energy').addEventListener('change', applyFilter);
 
+// ---- 总控台 filters (director studio) ----
+let stTimer = null;
+document.getElementById('st-search').addEventListener('input', () => { clearTimeout(stTimer); stTimer = setTimeout(applyStudioFilter, 180); });
+document.getElementById('st-cat').addEventListener('change', applyStudioFilter);
+document.getElementById('st-status').addEventListener('change', applyStudioFilter);
+
 // ---- compare tray + modal (T8) ----
 document.getElementById('ct-view').onclick = () => { if (compareSet.size) openCompare(); };
 document.getElementById('ct-clear').onclick = () => {
@@ -1301,6 +1342,119 @@ document.getElementById('ct-clear').onclick = () => {
 document.getElementById('cmp-close').onclick = () => document.getElementById('cmp-modal').classList.remove('show');
 document.getElementById('cmp-modal').addEventListener('click', e => { if (e.target.id === 'cmp-modal') e.currentTarget.classList.remove('show'); });
 document.addEventListener('keydown', e => { if (e.key === 'Escape') document.getElementById('cmp-modal').classList.remove('show'); });
+
+// ===== director 总控台 (studio command center) =====
+// Shows ALL films in a studio (produced + in-progress) and lets the director
+// switch the active workbench film. Hidden unless the server runs in studio mode.
+let studioMode = false;
+let studioData = null;
+function studioStatusLabel(s){ return s === 'released' ? '已发布' : s === 'producing' ? '制作中' : '草稿'; }
+function studioCardHtml(f, isReleased){
+  const active = (!isReleased && studioData && studioData.active_film_id === f.id);
+  const pillCls = f.status === 'released' ? 'ok' : f.status === 'producing' ? 'warn' : '';
+  const dotCls = f.status === 'released' ? 's-pass' : f.status === 'producing' ? 's-warn' : 's-unknown';
+  const meta = [
+    `<span class="metric">类型 <b>${esc(f.genre || f.theme || '未分类')}</b></span>`,
+    f.aspect_ratio ? `<span class="metric">${esc(f.aspect_ratio)}</span>` : '',
+  ];
+  if (!isReleased) meta.push(`<span class="metric">${f.clips_approved}/${f.clips_total} 镜</span>`);
+  const when = isReleased && f.released_at
+    ? ('发布 ' + esc(String(f.released_at).slice(0, 10)))
+    : (f.last_updated ? ('更新 ' + esc(String(f.last_updated).slice(0, 16).replace('T', ' '))) : '');
+  return `<div class="card">
+    <div class="c-head"><h4 class="c-title">${esc(f.title || f.id)}</h4>
+      <span class="pill ${pillCls}" style="padding:.2rem .6rem"><span class="dot ${dotCls}"></span><span>${studioStatusLabel(f.status)}</span></span></div>
+    <div class="c-id mono">${esc(f.id)}</div>
+    <div class="metrics">${meta.join('')}</div>
+    <div class="lane" style="margin-top:.5rem"><div class="l-top"><span class="l-name">进度</span><span class="l-val">${f.progress}%</span></div><div class="l-bar"><div class="l-fill" style="width:${f.progress}%"></div></div></div>
+    <div class="meta" style="margin-top:.4rem">${when}</div>
+    ${isReleased ? '' : `<div class="card-actions"><button class="pick" data-studio-open data-id="${esc(f.id)}">${active ? '当前影片 ✓' : '打开此片'}</button></div>`}
+  </div>`;
+}
+function studioFiltered(){
+  if (!studioData) return [];
+  const q = (document.getElementById('st-search').value || '').trim().toLowerCase();
+  const cat = document.getElementById('st-cat').value;
+  const st = document.getElementById('st-status').value;
+  return (studioData.films || []).filter(f => {
+    if (cat && (f.genre || f.theme || '') !== cat) return false;
+    if (st && f.status !== st) return false;
+    if (q){ const hay = [f.id, f.title, f.theme, f.genre].filter(Boolean).join(' ').toLowerCase(); if (!hay.includes(q)) return false; }
+    return true;
+  });
+}
+function renderStudio(d){
+  studioData = d; studioMode = !!d.studio_mode;
+  const mp = document.getElementById('studio-mode-pill');
+  if (d.studio_mode){
+    mp.className = 'pill ok';
+    mp.innerHTML = '<span class="dot s-pass"></span><span>工作室模式 · ' + (d.film_count || 0) + ' 部</span>';
+  } else {
+    mp.className = 'pill';
+    mp.innerHTML = '<span class="dot s-unknown"></span><span>单片模式</span>';
+  }
+  document.getElementById('studio-sub').textContent = d.studio_mode
+    ? ('工作室：' + (d.studio_dir || '') + ' · 已制作 / 制作中的 AI FILM 统览')
+    : '当前为单片模式 —— 用 `aifilm review-ui serve --studio <目录>` 启动多片总控台';
+  const sc = d.status_counts || {};
+  const stats = [
+    { num: d.film_count || (d.films ? d.films.length : 0), lbl: '影片总数' },
+    { num: sc.producing || 0, lbl: '制作中' },
+    { num: sc.draft || 0, lbl: '草稿' },
+    { num: (d.released_count != null ? d.released_count : (d.released ? d.released.length : 0)), lbl: '已发布', cls: 'ok' },
+  ];
+  document.getElementById('studio-stats').innerHTML = stats.map(s => `<div class="stat"><div class="num ${s.cls || ''}">${s.num}</div><div class="lbl">${esc(s.lbl)}</div></div>`).join('');
+  const cats = d.categories || {};
+  document.getElementById('st-cat').innerHTML = '<option value="">全部分类</option>' + Object.keys(cats).sort().map(c => `<option value="${esc(c)}">${esc(c)} (${cats[c]})</option>`).join('');
+  applyStudioFilter();
+}
+function applyStudioFilter(){
+  if (!studioData) return;
+  const list = studioFiltered();
+  document.getElementById('st-count').textContent = list.length ? ('显示 ' + list.length + ' / ' + (studioData.films || []).length + ' 部') : '';
+  const grid = document.getElementById('studio-grid');
+  if (!list.length){ grid.innerHTML = '<div class="panel" style="text-align:center;color:var(--muted);padding:1.6rem">没有符合条件的影片。</div>'; }
+  else { grid.innerHTML = list.map(f => studioCardHtml(f, false)).join(''); }
+  grid.querySelectorAll('[data-studio-open]').forEach(b => b.onclick = () => selectFilm(b.dataset.id));
+  const rel = studioData.released || [];
+  const rpanel = document.getElementById('studio-released-panel');
+  const rgrid = document.getElementById('studio-released');
+  rpanel.style.display = rel.length ? '' : 'none';
+  rgrid.innerHTML = rel.length ? rel.map(f => studioCardHtml(f, true)).join('') : '';
+}
+async function loadStudio(){
+  try {
+    const d = await api('/api/studio');
+    renderStudio(d);
+  } catch(e){ toast('载入总控台失败：' + e.message, true); }
+}
+async function selectFilm(id){
+  try {
+    const res = await api('/api/studio/select', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Origin: location.origin },
+      body: JSON.stringify({ id })
+    });
+    toast('已切换到影片：' + (res.summary ? res.summary.title : id));
+    if (studioData) studioData.active_film_id = res.active_film_id;
+    applyStudioFilter();
+    // refresh the single-film workbench underneath to the now-active film
+    loadDashboard(); loadOnboarding(); loadGates(); loadAssets(currentKind);
+    const ob = tabButtons.find(x => x.dataset.tab === 'overview'); if (ob) activateTab(ob);
+  } catch(e){ toast('切换失败：' + e.message, true); }
+}
+// boot: reveal the 总控台 tab only in studio mode, and make it the director's
+// default landing view (multi-film oversight), else stay on the single-film 工作台.
+async function bootStudio(){
+  try {
+    const s = await api('/api/console-state');
+    if (s.studio_mode){
+      const tab = document.getElementById('tab-studio');
+      if (tab) tab.style.display = '';
+      studioMode = true;
+      activateTab(tab);
+    }
+  } catch(_){ /* single-root mode: tab stays hidden */ }
+}
 
 // === command center (CTO plan T2): turn the dashboard into a real monitor + direct surface ===
 function cmdLog(msg, isErr=false){
@@ -1364,6 +1518,7 @@ document.getElementById('cmd-advance').onclick = cmdAdvance;
 loadDashboard();
 loadAssets('bgm');
 startSync();
+bootStudio();   // reveal 总控台 tab in studio mode; default landing there
 </script>
 </body>
 </html>

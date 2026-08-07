@@ -205,11 +205,16 @@ def make_handler(root: Path, token: str):
 
         def do_GET(self) -> None:
             parsed = urlparse(self.path)
+            # Studio mode: the "active film" is the per-request root. When not in
+            # studio mode, self.server.active_film is unset and we fall back to the
+            # serve-time root (keeps single-root tests / CLI working unchanged).
+            base_root = root
+            film_root = getattr(self.server, "active_film", None) or root
             # B1 single shell: / and /console serve workbench; /review is验片专页.
             if parsed.path in ("/", "/console", "/studio"):
                 invite = (parse_qs(parsed.query).get("invite") or [""])[0]
                 if invite and parsed.path == "/":
-                    if not _consume_invite(root, invite):
+                    if not _consume_invite(base_root, invite):
                         self._json(
                             HTTPStatus.UNAUTHORIZED, {"error": "invalid or expired review invite"}
                         )
@@ -234,15 +239,15 @@ def make_handler(root: Path, token: str):
                 self._json(
                     200,
                     {
-                        "queue": review_queue(root),
-                        "settings": load_settings(root),
-                        "autopilot": autopilot_status(root),
+                        "queue": review_queue(film_root),
+                        "settings": load_settings(film_root),
+                        "autopilot": autopilot_status(film_root),
                     },
                 )
                 return
             if parsed.path == "/api/final-review-template":
                 try:
-                    self._json(200, review_input_template(root))
+                    self._json(200, review_input_template(film_root))
                 except ValueError as exc:
                     self._json(HTTPStatus.NOT_FOUND, {"error": str(exc)})
                 return
@@ -250,7 +255,7 @@ def make_handler(root: Path, token: str):
                 try:
                     import gate_panel
 
-                    self._json(200, gate_panel.collect_gates(root))
+                    self._json(200, gate_panel.collect_gates(film_root))
                 except Exception as exc:  # noqa: BLE001
                     self._json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
                 return
@@ -259,7 +264,7 @@ def make_handler(root: Path, token: str):
                 try:
                     import asset_picker
 
-                    self._json(200, asset_picker.list_assets(root, kind))
+                    self._json(200, asset_picker.list_assets(film_root, kind))
                 except WebConsoleError as exc:
                     self._json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
                 return
@@ -267,7 +272,15 @@ def make_handler(root: Path, token: str):
                 try:
                     import asset_picker
 
-                    self._json(200, asset_picker.console_state(root))
+                    state = asset_picker.console_state(film_root)
+                    # Studio mode: tell the console whether it may show the
+                    # 总控台 (director command center) tab and which film is active.
+                    sd = getattr(self.server, "studio_dir", None)
+                    state["studio_mode"] = sd is not None
+                    state["studio_dir"] = str(sd) if sd else None
+                    active = getattr(self.server, "active_film", None)
+                    state["active_film_id"] = active.name if active else None
+                    self._json(200, state)
                 except Exception as exc:  # noqa: BLE001
                     self._json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
                 return
@@ -275,13 +288,13 @@ def make_handler(root: Path, token: str):
                 try:
                     import onboarding
 
-                    self._json(200, onboarding.get_state(root))
+                    self._json(200, onboarding.get_state(film_root))
                 except Exception as exc:  # noqa: BLE001
                     self._json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
                 return
             if parsed.path.startswith("/media/"):
                 try:
-                    self._media(_safe_media(root, unquote(parsed.path.removeprefix("/media/"))))
+                    self._media(_safe_media(film_root, unquote(parsed.path.removeprefix("/media/"))))
                 except ReviewUIError as exc:
                     self._json(HTTPStatus.NOT_FOUND, {"error": str(exc)})
                 return
@@ -302,9 +315,27 @@ def make_handler(root: Path, token: str):
                     self._json(HTTPStatus.BAD_REQUEST, {"error": "invalid file path"})
                     return
                 try:
-                    self._media(_safe_media(root, unquote(rel)))
+                    self._media(_safe_media(film_root, unquote(rel)))
                 except ReviewUIError as exc:
                     self._json(HTTPStatus.NOT_FOUND, {"error": str(exc)})
+                    return
+            # ---- director 总控台 (studio registry) ----
+            if parsed.path == "/api/studio":
+                try:
+                    import studio as studio_mod
+
+                    sd = self.server.studio_dir
+                    if sd is None:
+                        self._json(200, studio_mod.single_film_view(self.server.active_film))
+                    else:
+                        payload = studio_mod.build_studio(sd, active_id=self.server.active_film.name)
+                        payload["studio_mode"] = True
+                        self._json(200, payload)
+                except Exception as exc:  # noqa: BLE001
+                    self._json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
+                return
+            if parsed.path.startswith("/api/studio/"):
+                self._studio_detail(parsed.path.removeprefix("/api/studio/").strip("/"))
                 return
             self._json(HTTPStatus.NOT_FOUND, {"error": "not found"})
 
@@ -343,7 +374,44 @@ def make_handler(root: Path, token: str):
                 handle.seek(start)
                 self.wfile.write(handle.read(end - start + 1))
 
+        # ---- director 总控台 helpers (studio registry) ----
+
+        def _validate_film_id(self, fid: str):
+            """Return the resolved film-root Path, or (status, error) tuple.
+
+            Guards against path traversal: the id must be a bare directory name
+            inside the studio dir that actually contains a manifest.json.
+            """
+            from core.constants import MANIFEST_NAME
+
+            sd = self.server.studio_dir
+            if sd is None:
+                return (HTTPStatus.BAD_REQUEST, "not in studio mode")
+            if not fid or "/" in fid or "\\" in fid or fid in (".", ".."):
+                return (HTTPStatus.BAD_REQUEST, "invalid film id")
+            cand = (Path(sd) / fid).resolve()
+            base = Path(sd).resolve()
+            if cand != base and base not in cand.parents:
+                return (HTTPStatus.BAD_REQUEST, "film id out of studio dir")
+            if not (cand / MANIFEST_NAME).is_file():
+                return (HTTPStatus.NOT_FOUND, "film not found in studio")
+            return cand
+
+        def _studio_detail(self, fid: str) -> None:
+            import studio as studio_mod
+
+            result = self._validate_film_id(fid)
+            if isinstance(result, tuple):
+                self._json(result[0], {"error": result[1]})
+                return
+            try:
+                self._json(200, studio_mod.summarize_film(result))
+            except Exception as exc:  # noqa: BLE001
+                self._json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
+
         def do_POST(self) -> None:
+            # Studio mode: route write ops to the active film (see do_GET).
+            film_root = getattr(self.server, "active_film", None) or root
             if not self._authorized():
                 self._json(HTTPStatus.UNAUTHORIZED, {"error": "invalid session token"})
                 return
@@ -354,22 +422,22 @@ def make_handler(root: Path, token: str):
             try:
                 body = self._payload(max_size=MAX_UPLOAD if self.path == "/api/upload" else MAX_BODY)
                 if self.path == "/api/action":
-                    report = record_action(root, **body)
+                    report = record_action(film_root, **body)
                 elif self.path == "/api/settings":
-                    report = update_settings(root, **body)
+                    report = update_settings(film_root, **body)
                 elif self.path == "/api/advance":
-                    report = advance_to_next_review(root, **body)
+                    report = advance_to_next_review(film_root, **body)
                 elif self.path == "/api/final-review-input":
-                    report = write_review_input(root, body)
+                    report = write_review_input(film_root, body)
                 elif self.path == "/api/select":
                     import asset_picker
 
-                    report = asset_picker.select_asset(root, **body)
+                    report = asset_picker.select_asset(film_root, **body)
                 elif self.path == "/api/onboarding/step":
                     import onboarding
 
                     report = onboarding.submit_step(
-                        root,
+                        film_root,
                         body.get("step"),
                         body.get("payload", {}),
                         expected_revision=body.get("expected_revision"),
@@ -377,18 +445,18 @@ def make_handler(root: Path, token: str):
                 elif self.path == "/api/onboarding/go":
                     import onboarding
 
-                    report = onboarding.go(root, expected_revision=body.get("expected_revision"))
+                    report = onboarding.go(film_root, expected_revision=body.get("expected_revision"))
                 elif self.path == "/api/upload":
                     import onboarding
 
                     report = onboarding.handle_upload(
-                        root, filename=body.get("filename", ""), data_url=body.get("data_url", "")
+                        film_root, filename=body.get("filename", ""), data_url=body.get("data_url", "")
                     )
                 elif self.path == "/api/onboarding/brief":
                     import onboarding
 
                     report = onboarding.submit_brief(
-                        root,
+                        film_root,
                         story_text=body.get("story_text", ""),
                         image_paths=body.get("image_paths"),
                         hints=body.get("hints"),
@@ -398,7 +466,7 @@ def make_handler(root: Path, token: str):
                     import onboarding
 
                     report = onboarding.decompose(
-                        root,
+                        film_root,
                         expected_revision=body.get("expected_revision"),
                         brief=body.get("brief"),
                     )
@@ -406,10 +474,28 @@ def make_handler(root: Path, token: str):
                     import onboarding
 
                     report = onboarding.save_plan(
-                        root,
+                        film_root,
                         body.get("plan", {}),
                         expected_revision=body.get("expected_revision"),
                     )
+                elif self.path == "/api/studio/select":
+                    import studio as studio_mod
+
+                    result = self._validate_film_id((body.get("id") or "").strip())
+                    if isinstance(result, tuple):
+                        self._json(result[0], {"error": result[1]})
+                        return
+                    self.server.active_film = result
+                    try:
+                        summary = studio_mod.summarize_film(result)
+                    except Exception as exc:  # noqa: BLE001
+                        self._json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
+                        return
+                    self._json(
+                        200,
+                        {"ok": True, "active_film_id": summary["id"], "summary": summary},
+                    )
+                    return
                 elif self.path == "/api/stop":
                     report = {"ok": True, "stopping": True}
                     threading.Thread(target=self.server.shutdown, daemon=True).start()
@@ -434,18 +520,41 @@ def make_handler(root: Path, token: str):
     return Handler
 
 
-def serve(root: Path | str, *, port: int = 0) -> dict[str, Any]:
-    base = Path(root).expanduser().resolve()
-    if not base.is_dir():
-        raise ReviewUIError("film root must be an existing directory")
+def serve(
+    root: Path | str | None = None,
+    *,
+    studio: Path | str | None = None,
+    port: int = 0,
+) -> dict[str, Any]:
+    if studio is not None:
+        base = Path(studio).expanduser().resolve()
+        if not base.is_dir():
+            raise ReviewUIError("studio dir must be an existing directory")
+        import studio as studio_mod
+
+        films = studio_mod.discover_films(base)
+        if not films:
+            raise ReviewUIError("studio dir contains no film roots (subdirs with manifest.json)")
+    else:
+        if not root:
+            raise ReviewUIError("either --root or --studio is required")
+        base = Path(root).expanduser().resolve()
+        if not base.is_dir():
+            raise ReviewUIError("film root must be an existing directory")
+        films = None
     token = secrets.token_urlsafe(32)
     server = ThreadingHTTPServer(("127.0.0.1", port), make_handler(base, token))
+    # Studio mode lives on the server instance: which film is "active" for all
+    # per-film endpoints, and whether we are in multi-film director mode.
+    server.studio_dir = Path(studio).expanduser().resolve() if studio is not None else None
+    server.active_film = films[0] if films else base
     session = {
         "kind": "review-ui-session",
         "pid": os.getpid(),
         "port": server.server_port,
         "token": token,
         "root": str(base),
+        "studio_mode": studio is not None,
     }
     write_json(_session_path(base), session)
     os.chmod(_session_path(base), 0o600)
@@ -455,6 +564,7 @@ def serve(root: Path | str, *, port: int = 0) -> dict[str, Any]:
                 "ok": True,
                 "url": f"http://127.0.0.1:{server.server_port}/console?token={token}",
                 "root": str(base),
+                "studio_mode": studio is not None,
                 "token": token,
             },
             ensure_ascii=False,
@@ -505,21 +615,40 @@ def add_review_ui_parsers(subparsers: Any) -> None:
     parser = subparsers.add_parser("review-ui", help="Loopback review WebUI: serve|status|stop")
     sub = parser.add_subparsers(dest="review_ui_action", required=True)
     serve_p = sub.add_parser("serve")
-    serve_p.add_argument("--root", required=True)
+    serve_p.add_argument("--root", required=False, default=None)
+    serve_p.add_argument(
+        "--studio",
+        required=False,
+        default=None,
+        help="Studio directory: serve ALL film roots in director 总控台 (multi-film) mode",
+    )
     serve_p.add_argument("--port", type=int, default=0)
     status_p = sub.add_parser("status")
-    status_p.add_argument("--root", required=True)
+    status_p.add_argument("--root", required=False, default=None)
+    status_p.add_argument("--studio", required=False, default=None)
     invite_p = sub.add_parser("invite", help="Create a one-time Telegram-safe review link")
     invite_p.add_argument("--root", required=True)
     invite_p.add_argument("--ttl-seconds", type=int, default=600)
     stop_p = sub.add_parser("stop")
-    stop_p.add_argument("--root", required=True)
+    stop_p.add_argument("--root", required=False, default=None)
+    stop_p.add_argument("--studio", required=False, default=None)
 
 
 def run_review_ui(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
     if args.review_ui_action == "serve":
-        return serve(args.root, port=args.port), 0
+        if args.studio:
+            return serve(studio=args.studio, port=args.port), 0
+        if args.root:
+            return serve(args.root, port=args.port), 0
+        raise ReviewUIError("--root or --studio is required")
     if args.review_ui_action == "status":
+        if args.studio:
+            import studio as studio_mod
+
+            return {
+                "ok": True,
+                "studio": studio_mod.build_studio(Path(args.studio).expanduser().resolve()),
+            }, 0
         return {
             "ok": True,
             "queue": review_queue(args.root),
@@ -528,5 +657,5 @@ def run_review_ui(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
     if args.review_ui_action == "invite":
         return {"ok": True, **create_invite(args.root, ttl_seconds=args.ttl_seconds)}, 0
     if args.review_ui_action == "stop":
-        return stop(args.root), 0
+        return stop(args.studio or args.root), 0
     raise ReviewUIError("unknown review-ui action")

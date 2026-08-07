@@ -39,9 +39,9 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 # Repo-relative resolution: this file lives at
-#   <root>/skills/ai-film-grok/scripts/smoke_console.py
-# so three parents up is the git root.
-ROOT = Path(__file__).resolve().parents[3]
+#   <root>/skills/ai-film-grok/scripts/web/smoke_console.py
+# so FOUR parents up is the git root.
+ROOT = Path(__file__).resolve().parents[4]
 LAUNCHER = ROOT / "skills" / "ai-film-grok" / "scripts" / "aifilm"
 
 
@@ -118,6 +118,142 @@ def req(conn, method, path, *, token=None, body=None, origin=None):
     if resp.status >= 400:
         print(f"    >> {method} {path} -> {resp.status}: {payload.decode('utf-8', 'ignore')[:200]}")
     return resp.status, payload
+
+
+def start_studio_server(studio_dir: Path):
+    """Boot a studio-mode (导演总控台) review server for the studio smoke phase."""
+    proc = subprocess.Popen(
+        [str(LAUNCHER), "review-ui", "serve", "--studio", str(studio_dir), "--port", "0"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    for _ in range(100):
+        line = proc.stdout.readline()
+        if not line:
+            if proc.poll() is not None:
+                raise RuntimeError(
+                    f"studio server exited early: {proc.stderr.read()[-2000:]}"
+                )
+            continue
+        line = line.strip()
+        if line.startswith("{"):
+            info = json.loads(line)
+            if info.get("ok"):
+                return proc, info
+    raise RuntimeError("never received studio server URL JSON")
+
+
+def setup_studio_dir() -> Path:
+    """Create a temp studio dir with two film roots for the studio-mode e2e."""
+    studio = Path(tempfile.mkdtemp(prefix="aifilm-studio-smoke-"))
+    # film-a: 甜宠, producing (has approved clips)
+    fa = studio / "film-a"
+    fa.mkdir()
+    (fa / "manifest.json").write_text(
+        json.dumps(
+            {
+                "title": "雨夜书店",
+                "theme": "甜宠",
+                "aspect_ratio": "16:9",
+                "style_locked": True,
+                "clips": {f"shot_{i:03d}": {"status": "approved"} for i in range(8)},
+                "gates": {f"gate_{i}": True for i in range(5)},
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    # film-b: 悬疑, draft (no approved clips)
+    fb = studio / "film-b"
+    fb.mkdir()
+    (fb / "manifest.json").write_text(
+        json.dumps(
+            {
+                "title": "雾港谜案",
+                "theme": "悬疑",
+                "aspect_ratio": "9:16",
+                "style_locked": False,
+                "clips": {f"shot_{i:03d}": {"status": "draft"} for i in range(4)},
+                "gates": {f"gate_{i}": False for i in range(3)},
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    return studio
+
+
+def run_studio_phase(failures):
+    """Studio-mode (导演总控台) live e2e: lists films, switches active film,
+    rejects path traversal. Drives a real --studio server on loopback."""
+    studio_dir = setup_studio_dir()
+    proc = None
+    port = None
+    token = None
+    try:
+        proc, info = start_studio_server(studio_dir)
+        parsed = urlparse(info["url"])
+        port = parsed.port
+        token = info["token"]
+        print(f"[smoke] studio server up: {info['url']}")
+
+        def check(name, cond, extra=""):
+            status = "PASS" if cond else "FAIL"
+            print(f"[{status}] {name} {extra}")
+            if not cond:
+                failures.append(name)
+
+        def sreq(method, path, *, body=None):
+            return req(HTTPConnection("127.0.0.1", port), method, path, token=token, body=body)
+
+        # studio console HTML must ship the 总控台 tab + studio JS
+        st, body = sreq("GET", "/console")
+        text = body.decode("utf-8", "ignore") if body else ""
+        check("studio console: 总控台 tab present", st == 200 and 'id="tab-studio"' in text, f"status={st}")
+        check("studio console: studio JS wired", st == 200 and "function loadStudio" in text, f"status={st}")
+
+        # /api/studio lists films
+        st, body = sreq("GET", "/api/studio")
+        d = json.loads(body) if st == 200 else {}
+        check(
+            "GET /api/studio",
+            st == 200 and d.get("film_count", 0) >= 1,
+            f"status={st} count={d.get('film_count')}",
+        )
+
+        # console-state carries studio_mode
+        st, body = sreq("GET", "/api/console-state")
+        ds = json.loads(body) if st == 200 else {}
+        check("GET /api/console-state studio_mode", st == 200 and ds.get("studio_mode") is True, f"status={st}")
+
+        # select switches active film (200) and persists
+        st, _ = sreq("POST", "/api/studio/select", body={"id": "film-b"})
+        check("POST /api/studio/select switches active film", st == 200, f"status={st}")
+        st, body = sreq("GET", "/api/studio")
+        da = json.loads(body) if st == 200 else {}
+        check(
+            "after select: active_film_id persisted",
+            st == 200 and da.get("active_film_id") == "film-b",
+            f"status={st} active={da.get('active_film_id')}",
+        )
+
+        # traversal guard -> 400
+        st, _ = sreq("POST", "/api/studio/select", body={"id": "../escape"})
+        check("POST /api/studio/select traversal -> 400", st == 400, f"status={st}")
+    finally:
+        if proc is not None and port is not None:
+            try:
+                stop = HTTPConnection("127.0.0.1", port)
+                req(stop, "POST", "/api/stop", token=token, body={})
+                stop.close()
+            except Exception:
+                pass
+            try:
+                proc.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+    shutil.rmtree(studio_dir, ignore_errors=True)
 
 
 def main() -> int:
@@ -477,6 +613,7 @@ def main() -> int:
             proc.kill()
 
     shutil.rmtree(film_root, ignore_errors=True)
+    run_studio_phase(failures)
     if failures:
         print(f"\n[smoke] FAILED checks: {failures}")
         return 1

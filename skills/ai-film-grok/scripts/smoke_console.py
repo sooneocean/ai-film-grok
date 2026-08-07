@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """Shim — implementation in web.smoke_console."""
 from __future__ import annotations
 

@@ -2854,7 +2854,7 @@
     },
     {
       "path": "scripts/post/review_ui.py",
-      "sha256": "8f8e821b6d6b2156ef1b2d44740a196747d8c364701e8552772574479a09b2ba"
+      "sha256": "1105deb342f81f8c76429f93aa34bfbc1dccb01da60917a8cdc57fec26c2024e"
     },
     {
       "path": "scripts/post/show_package.py",
@@ -3142,7 +3142,7 @@
     },
     {
       "path": "scripts/smoke_console.py",
-      "sha256": "7c0e6b781607a4f3e81ad83d7b328270da6590075ee5ce25548ba0982dbb4112"
+      "sha256": "1a40b84e6f401086572c670b4adc0f632b6b824af6675c35e54be07f58046d48"
     },
     {
       "path": "scripts/sound_cue_model.py",
@@ -3295,6 +3295,10 @@
     {
       "path": "scripts/storyboard_status.py",
       "sha256": "11de79d3c1ebc074744647b9fe298122d438535eefc1b92ff8e11375b4f09893"
+    },
+    {
+      "path": "scripts/studio.py",
+      "sha256": "64ee9ac1ef7c270e5ce099cd23cd1216d0888be4aeb73ec5b34f985664d64cc7"
     },
     {
       "path": "scripts/style_lock.py",
@@ -3498,7 +3502,7 @@
     },
     {
       "path": "scripts/web/smoke_console.py",
-      "sha256": "833735e1a60ab94088d700a378029dace5ff162c9415e4c075bf358fecaeb967"
+      "sha256": "20f78a47e0115c3b9c3c1681e8f3f01ac867d58be6ba5e81db90c3318b2e6f95"
     },
     {
       "path": "scripts/web/web_api.py",

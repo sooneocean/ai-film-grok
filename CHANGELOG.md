@@ -1,5 +1,19 @@
 # Changelog
 
+## [2.41.26] - 2026-08-07
+
+### Added (Web 控制台 · 导演总控台 / 多片工作室视图)
+- **导演总控台（studio mode）：** `aifilm review-ui serve --studio <dir>` 启动工作室模式，扫描目录下所有影片根目录并构建跨片注册表；`/studio` 页面别名保持不变（API 命名空间为 `/api/studio*` 无冲突）。
+- **总控台 tab：** 控制台新增「总控台」页（仅 studio 模式可见，启动即默认进入）——展示全部已制作 / 制作中的 AI Film 卡片，支持按分类（题材）与状态筛选、关键词搜索；每张卡含进度条、状态 pill 与「打开此片」。
+- **多片监控：** `GET /api/studio` 列出工作室全部影片（分类、状态计数、进度），`GET /api/studio/<id>` 取单片详情，`POST /api/studio/select` 切换当前活跃影片（服务端 `active_film` 持久化、跨接口生效），含路径穿越防护（非法 id → 400、缺失 → 404）。
+- **已发布作品：** 总控台合并 `video-library/catalog.json`（`aifilm-video-library-v1`，`assets` 键）中已发布的影片元数据，与本地在制影片同屏管理监控。
+- **注册表模块：** 新增纯函数、可测的 `scripts/studio.py`——`discover_films` / `summarize_film`（标题 / 题材 / 状态 / 进度 = 0.6·镜头 + 0.4·门数 / 镜头与门数统计 / 风格锁定 / 更新时间）/ `build_studio` / `load_released`。
+- **测试 & e2e：** 新增 `tests/test_web_studio.py`（9 测试全过）；`web/smoke_console.py` 扩展 studio 阶段（总控台 tab、studio JS 接线、select 切换活跃片并持久化、穿越防护 → 400）全部通过。
+
+### Changed
+- `review_ui.py` 服务端支持 studio 模式：`film_root` 经 `self.server.active_film` 动态绑定（修复闭包遮蔽 `root` 的 bug），`/api/console-state` 注入 `studio_mode` / `studio_dir` / `active_film_id`；写操作（record_action / advance / select_asset / onboarding.* 等）全部走 `film_root`。
+- `runtime-lock.json`：刷新 `review_ui.py` / `web/smoke_console.py` 指纹，doctor 恢复 `runtime_lock=true`。
+
 ## [2.41.25] - 2026-08-07
 
 ### Fixed
