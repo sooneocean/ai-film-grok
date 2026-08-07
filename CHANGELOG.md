@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.40.61] - 2026-08-07
+
+### Fixed (CTO A1 silent-green · round 4)
+- **cinematic_gate edit_rhythm:** probe exception was `ok=True skipped` → now **ok=False** (hard on heat max/hot/extreme).
+- **iron_status:** plate_boring floor import fail → `plate_boring_meat_floor_error` (no silent omit).
+- **post_audit premium:** audio/post bible probe exceptions → hard `*_BIBLE_PROBE_ERROR`.
+- **final_stages caption:** SRT cue probe fail marks pixel_probe ok=false + `cue_probe_error`.
+- **Tests:** `tests/test_opt_round_a1_cinematic_post.py`.
+
 ## [2.40.60] - 2026-08-07
 
 ### Added (shot generation · Wave 6 canary closeout)

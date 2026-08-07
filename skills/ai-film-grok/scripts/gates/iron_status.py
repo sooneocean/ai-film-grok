@@ -54,8 +54,9 @@ def iron_floors() -> dict[str, Any]:
         from final.delivery_class import PLATE_BORING_MEAT_FLOOR
 
         out["plate_boring_meat_floor"] = PLATE_BORING_MEAT_FLOOR
-    except Exception:
-        pass
+    except Exception as exc:
+        # A1 · surface import/probe fail (never leave floor missing silently)
+        out["plate_boring_meat_floor_error"] = str(exc)[:80]
     return out
 
 

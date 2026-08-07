@@ -176,6 +176,7 @@ def ensure_captions_after_hf(root: Path, *, final_mp4: Path) -> dict[str, Any]:
 
     # Probe mid-cue timestamps from SRT if present
     timestamps = [5.0, 20.0, 50.0]
+    cue_probe_error: str | None = None
     if srt.is_file():
         try:
             from subtitle_dialogue_alignment import _cues
@@ -187,14 +188,17 @@ def ensure_captions_after_hf(root: Path, *, final_mp4: Path) -> dict[str, Any]:
                 for i in idxs:
                     start, end = cues[i]
                     timestamps.append(round(start + max(0.05, (end - start) / 2), 3))
-        except Exception:
-            pass
+        except Exception as exc:
+            # A1 · keep fallback stamps but surface probe fail (no silent skip)
+            cue_probe_error = f"srt cue probe failed: {exc}"[:200]
 
     pixel = (
         sample_bottom_band_activity(final_mp4, timestamps=timestamps)
         if final_mp4.is_file()
         else {"ok": False, "error": "final missing"}
     )
+    if cue_probe_error and isinstance(pixel, dict):
+        pixel = {**pixel, "cue_probe_error": cue_probe_error, "ok": False}
 
     report: dict[str, Any] = {
         "stage": "caption",

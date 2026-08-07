@@ -836,8 +836,14 @@ def audit(root: Path, *, write: bool = True) -> dict[str, Any]:
                             "message": f"audio-bible: {err.get('message', '')}",
                         }
                     )
-            except Exception:
-                pass
+            except Exception as exc:
+                # A1 · premium: bible probe fail is hard (no silent skip)
+                hard.append(
+                    {
+                        "code": "AUDIO_BIBLE_PROBE_ERROR",
+                        "message": f"audio-bible probe failed: {exc}"[:200],
+                    }
+                )
 
         post_bible_path = _first_file(root, "post-bible.json")
         if post_bible_path:
@@ -853,8 +859,13 @@ def audit(root: Path, *, write: bool = True) -> dict[str, Any]:
                             "message": f"post-bible: {err.get('message', '')}",
                         }
                     )
-            except Exception:
-                pass
+            except Exception as exc:
+                hard.append(
+                    {
+                        "code": "POST_BIBLE_PROBE_ERROR",
+                        "message": f"post-bible probe failed: {exc}"[:200],
+                    }
+                )
 
     report = {
         "ok": True,

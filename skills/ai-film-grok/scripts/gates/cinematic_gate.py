@@ -387,8 +387,24 @@ def run_cinematic_gate(
                 codes=list(ppt.get("codes") or []),
             )
         )
-    except Exception as exc:  # noqa: BLE001
-        steps.append(_step("edit_rhythm", ok=True, hard=False, detail=str(exc)[:120], skipped=True))
+    except Exception as exc:  # noqa: BLE001 — A1: never silent-green edit_rhythm
+        heat = ""
+        try:
+            sp = read_json(base / "film-spec.json") or {}
+            heat = str((sp or {}).get("heat_scale") or "").lower()
+        except Exception:
+            heat = ""
+        hard_er = heat in {"max", "hot", "extreme"}
+        steps.append(
+            _step(
+                "edit_rhythm",
+                ok=False,
+                hard=hard_er,
+                detail=f"edit_rhythm probe failed: {exc}"[:200],
+                next_cmd="check edit_policy.lint_equal_duration_ppt / visual_fit",
+                skipped=False,
+            )
+        )
 
     # 7) film_core advisory receipt if present
     fc = read_json(base / "receipts" / "film-core-closeout.json") or {}
