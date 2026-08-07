@@ -14,8 +14,11 @@ def run(
     check: bool = True,
     timeout: int | float | None = 60,
 ) -> subprocess.CompletedProcess[str]:
+    """Canonical subprocess runner. ``timeout=None`` → 60s (C5.5 hang protection)."""
     from security_policy import minimal_subprocess_env
 
+    if timeout is None:
+        timeout = 60
     return subprocess.run(
         cmd,
         timeout=timeout,
@@ -61,8 +64,14 @@ def run_compose_env(
     timeout: int | float | None = 60,
     stdin: Any | None = None,
 ) -> subprocess.CompletedProcess[str]:
+    """Compose/post subprocess with minimal env.
+
+    ``timeout=None`` → 60s so thin facades cannot disable hang protection (C5.5).
+    """
     from security_policy import minimal_subprocess_env
 
+    if timeout is None:
+        timeout = 60
     env = minimal_subprocess_env()
     for key in ("PATH", "HOME", "TMPDIR", "LANG", "LC_ALL", "NODE_PATH", "npm_config_cache"):
         if key in os.environ:

@@ -55,8 +55,13 @@ def run(
     *,
     cwd: Path | None = None,
     check: bool = True,
-    timeout: int | None = None,
+    timeout: int | float | None = 60,
 ) -> subprocess.CompletedProcess[str]:
+    """Subprocess runner for compose/post. Default timeout 60s (C5.5).
+
+    Long renders pass an explicit timeout (e.g. hyperframes 3600).
+    ``timeout=None`` is normalized to 60 by ``run_compose_env``.
+    """
     argv = list(cmd)
     if argv and Path(argv[0]).name == "ffmpeg" and "-nostdin" not in argv:
         argv.insert(1, "-nostdin")

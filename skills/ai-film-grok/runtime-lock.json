@@ -2498,7 +2498,7 @@
     },
     {
       "path": "scripts/post/compose_render.py",
-      "sha256": "d53922fabd9890e6ec816ea303cc16cc4d0ca410a60f2b25e18cbc1bd43e386d"
+      "sha256": "32731d43db7c29d5bc397c056b43878b11b7f1d3adb69ae00ff8b3f70c34b872"
     },
     {
       "path": "scripts/post/dailies.py",
@@ -3126,7 +3126,7 @@
     },
     {
       "path": "scripts/util/subprocess.py",
-      "sha256": "5e500a19c46592ad2e00e44fcdb1066c0089440c492bbf58d9835efcf6d2da4a"
+      "sha256": "18fd3aabaf4c7ab8e292f213bd9d6e9c805ec3af36d901f4a1c973dfe270b180"
     },
     {
       "path": "scripts/util/time.py",

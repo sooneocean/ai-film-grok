@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.40.79] - 2026-08-07
+
+### Fixed (CTO C5.5 subprocess timeout)
+- **Hang protection:** `util.subprocess.run` / `run_compose_env` treat `timeout=None` as **60s** (thin facades can no longer disable timeouts by forwarding unset kwargs).
+- **compose_render.run** default timeout **60s** (long renders still pass explicit 600/3600).
+- **Contract tests:** `tests/test_c5_subprocess_timeout.py`.
+
 ## [2.40.78] - 2026-08-07
 
 ### Added / Fixed (CTO C6.1 empty verify + C6.4 base contracts)
