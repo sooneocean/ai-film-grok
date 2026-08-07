@@ -259,6 +259,22 @@ def main() -> int:
             "served console: dashboard + picker functions present",
             "function loadDashboard" in text and "function cardHtml" in text and "function pick" in text,
         )
+        # 11b) Command center shipped with the page (CTO plan T2): the dashboard
+        #      must be a real monitor+direct surface, not a read-only overview.
+        check(
+            "served console: command center present",
+            'id="dash-command"' in text
+            and 'id="cmd-go"' in text
+            and 'id="cmd-advance"' in text
+            and "function cmdGo" in text
+            and "function cmdAdvance" in text,
+        )
+        # 11c) Onboarding tab actually wires its loader (CTO plan T1): the tab
+        #      switch must invoke loadOnboarding() so the "起步" screen is alive.
+        check(
+            "served console: onboarding tab lazy-loads",
+            "if (b.dataset.tab === 'onboarding') loadOnboarding()" in text,
+        )
 
         # 12) Dashboard parallel-load shape parity (loadDashboard contract).
         #     console.html's cardHtml() reads specific fields per kind; assert the
@@ -414,6 +430,38 @@ def main() -> int:
             body={"kind": "character", "asset_id": "ghost", "expected_revision": rn},
         )
         check("POST /api/select unknown asset -> 400", st == 400, f"status={st}")
+
+        # 18) Command-center drive endpoints reachable (CTO plan T2): the
+        #     "启动流水线" / "推进审核队列" buttons POST here. A fresh film root
+        #     has no completed onboarding / no pending review, so the handlers
+        #     return structured 400/403/409 — the assertion is that the wire is
+        #     live (NOT 404/405/500), proving the buttons are wired end-to-end.
+        st, body = req(conn, "GET", "/api/onboarding", token=token)
+        ob_rev = (json.loads(body).get("revision", 0) if st == 200 else 0)
+        st, _ = req(
+            conn,
+            "POST",
+            "/api/onboarding/go",
+            token=token,
+            body={"expected_revision": ob_rev},
+        )
+        check(
+            "POST /api/onboarding/go reachable (cmd-go wire)",
+            st in (200, 400, 403, 409),
+            f"status={st}",
+        )
+        st, _ = req(
+            conn,
+            "POST",
+            "/api/advance",
+            token=token,
+            body={"expected_ledger_revision": r3},
+        )
+        check(
+            "POST /api/advance reachable (cmd-advance wire)",
+            st in (200, 409),
+            f"status={st}",
+        )
         conn.close()
     finally:
         # stop the server via its own stop endpoint

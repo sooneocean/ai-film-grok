@@ -1,5 +1,10 @@
 # Changelog
 
+## [2.41.15] - 2026-08-07
+
+### Merged
+- Merge gitea/main (console command-center) with H3-native + final stage peels.
+
 ## [2.41.14] - 2026-08-07
 
 ### Changed (monolith orchestrator relief · W1.8 orchestration)
@@ -31,7 +36,6 @@
 - **`audit --apply-peak-auto`**: stamp `peak_fix=auto` on hot stems.
 - Tests for batch/checklist/peak suggestions.
 
-
 ## [2.41.10] - 2026-08-07
 
 ### Added (Music Director R2 · production harden)
@@ -41,6 +45,11 @@
 - **CLI** `music-director set` (mute window/entire, duck, peak) · `audit` (hot peak probe).
 - Tests extended in `test_music_director_plan.py`.
 
+### Fixed (Web 控制台 · 指挥台 · gitea/main)
+- **起步 tab 复活：** `activateTab` 对 `onboarding` 调用 `loadOnboarding()`.
+- **工作台指挥台：** 仪表盘指挥面板 + `/api/onboarding/go` · `/api/advance`.
+- **致命错误浮条：** 全局 error/unhandledrejection.
+- **e2e：** `smoke_console.py` 指挥台 DOM 断言.
 
 ## [2.41.9] - 2026-08-07
 
