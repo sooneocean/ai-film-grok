@@ -47,3 +47,9 @@
 - motion_prompt_zh_pack alias
 - comfy_video Wan name stubs only
 - retired-weapon-clear M0/M1/M2 core SHIPPED
+
+## Round 4 closeout (2.41.24)
+
+- lipsync routes tombstone + list hide
+- doctor weapon_inventory counts-only retired
+- research_weapons not select_weapon

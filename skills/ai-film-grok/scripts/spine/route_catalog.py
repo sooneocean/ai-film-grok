@@ -9,9 +9,14 @@ from typing import Any
 from util import read_json
 
 VALID_KINDS = frozenset({"action", "skill", "cli"})
-VALID_STATUS = frozenset({"canonical", "legacy", "partial", "orphan", "deprecated"})
+# tombstone = production-removed surface (e.g. post lipsync CLI) — keep for lookup, hide by default.
+VALID_STATUS = frozenset(
+    {"canonical", "legacy", "partial", "orphan", "deprecated", "tombstone"}
+)
 VALID_SPEND = frozenset({"local", "external", "paid", "none"})
 VALID_APPROVAL = frozenset({"none", "human_required"})
+# Hidden from default list_routes (clear mind); still loadable via include_* or status=.
+_DEFAULT_HIDDEN_STATUS = frozenset({"tombstone", "deprecated"})
 
 
 def skill_dir() -> Path:
@@ -133,9 +138,22 @@ def list_routes(
     kind: str | None = None,
     advance_only: bool = False,
     status: str | None = None,
+    include_tombstones: bool = False,
+    include_deprecated: bool = False,
+    include_hidden: bool = False,
 ) -> list[dict[str, Any]]:
+    """List routes for agents/CLI.
+
+    Default **hides** ``tombstone`` and ``deprecated`` so retired surfaces
+    (post lipsync, etc.) do not pollute default menus. Pass
+    ``include_tombstones=True`` / ``include_hidden=True`` or filter
+    ``status="tombstone"`` to inspect them.
+    """
     cat = load_catalog()
     out: list[dict[str, Any]] = []
+    want_status = str(status or "").strip() or None
+    show_tomb = include_tombstones or include_hidden or want_status == "tombstone"
+    show_dep = include_deprecated or include_hidden or want_status == "deprecated"
     for route in cat.get("routes") or []:
         if not isinstance(route, dict):
             continue
@@ -143,15 +161,23 @@ def list_routes(
             continue
         if advance_only and not route.get("advance_eligible"):
             continue
-        if status and route.get("status") != status:
-            continue
+        st = str(route.get("status") or "")
+        if want_status:
+            if st != want_status:
+                continue
+        else:
+            if st == "tombstone" and not show_tomb:
+                continue
+            if st == "deprecated" and not show_dep:
+                continue
         out.append(route)
     return out
 
 
 def get_route(route_id: str) -> dict[str, Any] | None:
     rid = str(route_id or "").strip()
-    for route in list_routes():
+    # Include hidden statuses so dispatch/CLI identity lookups still resolve tombstones.
+    for route in list_routes(include_hidden=True):
         if route.get("id") == rid:
             return route
     return None

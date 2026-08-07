@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.41.24] - 2026-08-07
+
+### Changed (retired-weapon clear · mind surface round 4)
+- **route-catalog:** `status=tombstone` valid; post-lipsync CLIs (`frw-lipsync`, `lipsync-*`) marked tombstone; `list_routes()` hides tombstone/deprecated by default; `get_route` still resolves hidden ids.
+- **doctor:** `weapon_inventory` slim payload = primary `line` + `retired_count`/`experimental_count` + `mind.retired_do_not_plan` (no retired name thrash).
+- **comfy_armory:** `select_weapon` never picks `research_weapons` (hard error on research id).
+- **Tests:** route tombstone hide/lookup; research weapon not selectable.
+
 ## [2.41.23] - 2026-08-07
 
 ### Changed (retired weapon clear mind)

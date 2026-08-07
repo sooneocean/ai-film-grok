@@ -317,3 +317,20 @@ def test_next_actions_h3_why_tags_motion_primary(tmp_path: Path) -> None:
     h3 = [a for a in actions if str(a.get("id") or "").startswith("h3-")]
     assert h3, actions
     assert any("wp=minimax-h3-i2v-pilot" in str(a.get("why") or "") for a in h3)
+
+
+def test_research_weapon_ids_not_selectable_via_armory() -> None:
+    import json
+    from pathlib import Path
+
+    from comfy_armory import ComfyArmoryError, load_armory, select_weapon
+
+    armory = load_armory()
+    research = [
+        str(x.get("id"))
+        for x in (armory.get("research_weapons") or [])
+        if isinstance(x, dict) and x.get("id")
+    ]
+    assert research, "expected research_weapons in armory"
+    with pytest.raises(ComfyArmoryError, match="research weapon"):
+        select_weapon(research[0], stage="production")

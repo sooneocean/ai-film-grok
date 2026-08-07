@@ -66,8 +66,21 @@ def _select_candidates(
     stage: str,
     allow_experimental: bool,
 ) -> list[dict[str, Any]]:
+    """Pick from production ``weapons`` only — never from ``research_weapons``."""
+    armory = load_armory()
+    # Research cabinet is not a production selector surface (clear mind 2026-08-07).
+    research_ids = {
+        str(item.get("id") or "")
+        for item in (armory.get("research_weapons") or [])
+        if isinstance(item, dict) and item.get("id")
+    }
+    if operation in research_ids:
+        raise ComfyArmoryError(
+            f"research weapon {operation!r} is not on the production spine; "
+            "use research probes / AIFILM research flags — not select_weapon"
+        )
     candidates = []
-    for weapon in load_armory()["weapons"]:
+    for weapon in armory["weapons"]:
         status = str(weapon.get("status") or "")
         is_experimental = status == "experimental"
         if status not in _VERIFIED_STATUSES and not (is_experimental and allow_experimental):

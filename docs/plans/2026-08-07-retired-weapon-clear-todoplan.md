@@ -258,3 +258,9 @@ rg -n 'Seedance bulk|comfy-wan22|final --lipsync auto' \
 ## 10. 一句话给自己
 
 > **在役四件套记牢；退役只留墓碑一行；研究柜上锁；别再让 Seedance/Wan/lipsync 出现在「下一步可选武器」里。**
+
+## Round 4 closeout (2.41.24)
+
+- lipsync routes tombstone + list hide
+- doctor weapon_inventory counts-only retired
+- research_weapons not select_weapon

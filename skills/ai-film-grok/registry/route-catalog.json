@@ -2205,13 +2205,15 @@
       "spend_class": "local",
       "approval_class": "none",
       "advance_eligible": false,
-      "status": "partial",
+      "status": "tombstone",
       "tags": [
         "cli_surface",
-        "cli_only_not_spine"
+        "cli_only_not_spine",
+        "tombstone",
+        "post_lipsync_removed"
       ],
       "hub_if_ladder": false,
-      "note": "C1: real CLI surface; not a dispatch next_action primary"
+      "note": "v2.40+ post lipsync removed — tombstone only; use prefer_native Grok/H3 audio. Not a production next_action."
     },
     {
       "id": "cli:gold",
@@ -2343,13 +2345,15 @@
       "spend_class": "local",
       "approval_class": "none",
       "advance_eligible": false,
-      "status": "partial",
+      "status": "tombstone",
       "tags": [
         "cli_surface",
-        "cli_only_not_spine"
+        "cli_only_not_spine",
+        "tombstone",
+        "post_lipsync_removed"
       ],
       "hub_if_ladder": false,
-      "note": "C1: real CLI surface; not a dispatch next_action primary"
+      "note": "v2.40+ post lipsync removed — tombstone only; use prefer_native Grok/H3 audio. Not a production next_action."
     },
     {
       "id": "cli:lipsync-challenge",
@@ -2361,13 +2365,15 @@
       "spend_class": "local",
       "approval_class": "none",
       "advance_eligible": false,
-      "status": "partial",
+      "status": "tombstone",
       "tags": [
         "cli_surface",
-        "cli_only_not_spine"
+        "cli_only_not_spine",
+        "tombstone",
+        "post_lipsync_removed"
       ],
       "hub_if_ladder": false,
-      "note": "C1: real CLI surface; not a dispatch next_action primary"
+      "note": "v2.40+ post lipsync removed — tombstone only; use prefer_native Grok/H3 audio. Not a production next_action."
     },
     {
       "id": "cli:lipsync-node",
@@ -2379,13 +2385,15 @@
       "spend_class": "local",
       "approval_class": "none",
       "advance_eligible": false,
-      "status": "partial",
+      "status": "tombstone",
       "tags": [
         "cli_surface",
-        "cli_only_not_spine"
+        "cli_only_not_spine",
+        "tombstone",
+        "post_lipsync_removed"
       ],
       "hub_if_ladder": false,
-      "note": "C1: real CLI surface; not a dispatch next_action primary"
+      "note": "v2.40+ post lipsync removed — tombstone only; use prefer_native Grok/H3 audio. Not a production next_action."
     },
     {
       "id": "cli:lipsync-pilot",
@@ -2397,13 +2405,15 @@
       "spend_class": "local",
       "approval_class": "none",
       "advance_eligible": false,
-      "status": "partial",
+      "status": "tombstone",
       "tags": [
         "cli_surface",
-        "cli_only_not_spine"
+        "cli_only_not_spine",
+        "tombstone",
+        "post_lipsync_removed"
       ],
       "hub_if_ladder": false,
-      "note": "C1: real CLI surface; not a dispatch next_action primary"
+      "note": "v2.40+ post lipsync removed — tombstone only; use prefer_native Grok/H3 audio. Not a production next_action."
     },
     {
       "id": "cli:local-llm",

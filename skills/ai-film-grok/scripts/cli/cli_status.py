@@ -574,13 +574,21 @@ def cmd_doctor(args: argparse.Namespace) -> int:
         from weapon_inventory import inventory_report
 
         weapon_inventory = inventory_report(validate=True)
-        # slim for doctor payload
+        # slim for doctor payload — primary line only; retired as counts (no name thrash)
+        mind = weapon_inventory.get("mind") if isinstance(weapon_inventory.get("mind"), dict) else {}
         weapon_inventory = {
             "ok": bool(weapon_inventory.get("ok")),
             "line": weapon_inventory.get("line"),
+            "list_tier": weapon_inventory.get("list_tier") or "primary",
             "primaries": weapon_inventory.get("primaries"),
             "profile_default": weapon_inventory.get("profile_default"),
             "updated_at": weapon_inventory.get("updated_at"),
+            "retired_count": int(weapon_inventory.get("retired_count") or 0),
+            "experimental_count": int(weapon_inventory.get("experimental_count") or 0),
+            "mind": {
+                "default": mind.get("default") or "primary_only",
+                "retired_do_not_plan": list(mind.get("retired_do_not_plan") or [])[:8],
+            },
             "validation": {
                 "ok": (weapon_inventory.get("validation") or {}).get("ok"),
                 "errors": list((weapon_inventory.get("validation") or {}).get("errors") or [])[:6],

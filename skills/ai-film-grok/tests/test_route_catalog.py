@@ -96,3 +96,28 @@ def test_if_ladder_cmds_tagged_in_catalog():
     }
     missing = if_ladder - tagged_cmds
     assert not missing, f"if_ladder not tagged in catalog: {sorted(missing)[:10]}"
+
+
+def test_lipsync_routes_are_tombstones_hidden_by_default():
+    cat = load_catalog()
+    lips = [
+        r
+        for r in cat["routes"]
+        if isinstance(r, dict)
+        and (
+            "lipsync" in str(r.get("id") or "").lower()
+            or "lipsync" in str(r.get("cli_cmd") or "").lower()
+        )
+    ]
+    assert lips, "expected lipsync CLI rows in catalog"
+    assert all(r.get("status") == "tombstone" for r in lips)
+    default_ids = {r["id"] for r in route_catalog.list_routes()}
+    for r in lips:
+        assert r["id"] not in default_ids
+    # Explicit status / include still resolves
+    tomb_ids = {r["id"] for r in route_catalog.list_routes(status="tombstone")}
+    assert {r["id"] for r in lips} <= tomb_ids
+    for r in lips:
+        got = route_catalog.get_route(r["id"])
+        assert got is not None
+        assert got.get("status") == "tombstone"
