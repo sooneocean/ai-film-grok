@@ -209,3 +209,65 @@ def test_api_live_and_takes(tmp_path):
     )
     assert r.status_code == 200
     assert r.json()["ok"] is True
+
+
+def test_review_mode_default_async(tmp_path):
+    from review_mode_policy import get_review_mode
+
+    (tmp_path / "receipts").mkdir()
+    assert get_review_mode(tmp_path) == "async_dailies"
+
+
+def test_review_mode_gate_each_blocks_take_pick(tmp_path):
+    from review_mode_policy import (
+        ReviewModeError,
+        assert_review_advance_allowed,
+        collect_pending_review_blockers,
+        set_review_mode,
+    )
+
+    (tmp_path / "receipts").mkdir()
+    _write_manifest_two_takes(tmp_path)
+    set_review_mode(tmp_path, "gate_each")
+    blockers = collect_pending_review_blockers(
+        tmp_path, include_take_picks=True, include_stages=True, include_shot_stages=True
+    )
+    assert any(b.get("kind") == "take_pick" for b in blockers)
+    with pytest.raises(ReviewModeError, match="pending human review"):
+        assert_review_advance_allowed(tmp_path)
+    set_review_mode(tmp_path, "async_dailies")
+    # async bulk: take_pick alone does not appear when stages-only collection
+    async_picks = collect_pending_review_blockers(
+        tmp_path, include_take_picks=True, include_stages=False
+    )
+    assert any(b.get("kind") == "take_pick" for b in async_picks)
+    # hard boundary still blocked by take_pick
+    with pytest.raises(ReviewModeError, match="pending human review"):
+        assert_review_advance_allowed(tmp_path, boundary="picture_lock")
+    with pytest.raises(ReviewModeError, match="pending human review"):
+        assert_review_advance_allowed(tmp_path, next_id="final")
+
+
+def test_hard_boundary_clear_after_select(tmp_path):
+    from review_mode_policy import (
+        assert_review_advance_allowed,
+        collect_pending_review_blockers,
+        set_review_mode,
+    )
+    from web.takes_api import review_take
+
+    (tmp_path / "receipts").mkdir()
+    _write_manifest_two_takes(tmp_path)
+    set_review_mode(tmp_path, "async_dailies")
+    review_take(
+        tmp_path,
+        shot_id="s01",
+        take_id="s01--bbbbbbbbbbbb",
+        director_status="selected",
+    )
+    picks = collect_pending_review_blockers(
+        tmp_path, include_take_picks=True, include_stages=False
+    )
+    assert not any(b.get("kind") == "take_pick" for b in picks)
+    report = assert_review_advance_allowed(tmp_path, boundary="final")
+    assert report["ok"] is True

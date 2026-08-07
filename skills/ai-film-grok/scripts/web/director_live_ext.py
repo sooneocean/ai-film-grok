@@ -221,10 +221,18 @@ def project_director_live(root: Path | str, *, include_token: bool = False) -> d
         multi_take = int(list_take_shots(base).get("multi_take_count") or 0)
     except Exception:
         pass
+    review_mode = "async_dailies"
+    try:
+        from review_mode_policy import get_review_mode
+
+        review_mode = get_review_mode(base)
+    except Exception:
+        pass
     return {
         "kind": "director-center-live",
         "available": True,
         "revision": ledger_revision,
+        "review_mode": review_mode,
         "dispatch": {
             "available": dispatch.get("available"),
             "stage_public": dispatch.get("stage_public"),

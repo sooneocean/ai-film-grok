@@ -424,6 +424,14 @@ def advance_local(
 
             next_id = str(full_packet.get("next_id") or "")
             try:
+                from review_mode_policy import ReviewModeError, assert_review_advance_allowed
+
+                assert_review_advance_allowed(root, next_id=next_id)
+            except ReviewModeError as exc:
+                stop_reason = "pending_human_review"
+                stop_detail = str(exc)
+                break
+            try:
                 policy, argv = _validate_argv(
                     root=root,
                     action_id=next_id,

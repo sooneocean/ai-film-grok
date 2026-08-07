@@ -281,6 +281,13 @@ def lock_native_stage(
     from director_stage_gates import hash_input_refs, lock_stage, stage_status
 
     base = Path(root).expanduser().resolve()
+    if str(stage) in {"picture_lock", "master_lock", "selects_rough_cut", "post_locks"}:
+        try:
+            from review_mode_policy import ReviewModeError, assert_review_advance_allowed
+
+            assert_review_advance_allowed(base, boundary=str(stage))
+        except ReviewModeError as exc:
+            raise ValueError(str(exc)) from exc
     native_refs = validate_native_stage_evidence(base, stage)
     team_gate: dict[str, Any] | None = None
     team_plan = base / "production-team.json"

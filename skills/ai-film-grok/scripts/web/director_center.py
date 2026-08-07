@@ -214,6 +214,13 @@ def add_director_center_parsers(subparsers):
     w.add_argument("--timeout", type=float, default=3600.0)
     w.add_argument("--poll", type=float, default=1.0)
 
+    mode_p = sub.add_parser("set-mode", help="Set review_mode async_dailies|gate_each")
+    mode_p.add_argument("--root", required=True)
+    mode_p.add_argument("--mode", required=True, choices=("async_dailies", "gate_each"))
+    mode_p.add_argument("--expected-revision", type=int, default=None)
+    blk = sub.add_parser("blockers", help="List pending human review blockers")
+    blk.add_argument("--root", required=True)
+
 
 def run_director_center(args):
     action = str(args.director_center_action)
@@ -239,4 +246,31 @@ def run_director_center(args):
             poll_sec=float(args.poll),
         )
         return r, 0 if r.get("ok") else 2
+    if action == "set-mode":
+        from review_mode_policy import set_review_mode
+        base = _root(args.root)
+        updated = set_review_mode(
+            base, str(args.mode), expected_revision=args.expected_revision
+        )
+        return {
+            "ok": True,
+            "kind": "director-center-set-mode",
+            "review_mode": updated.get("review_mode"),
+            "revision": updated.get("revision"),
+            "root": str(base),
+            "at": utc_now(),
+        }, 0
+    if action == "blockers":
+        from review_mode_policy import collect_pending_review_blockers, get_review_mode
+        base = _root(args.root)
+        blockers = collect_pending_review_blockers(base)
+        return {
+            "ok": True,
+            "kind": "director-center-blockers",
+            "review_mode": get_review_mode(base),
+            "blockers": blockers,
+            "blocker_count": len(blockers),
+            "root": str(base),
+            "at": utc_now(),
+        }, 0
     raise DirectorCenterError(action)

@@ -576,9 +576,13 @@ def advance_to_next_review(root: Path | str, *, expected_ledger_revision: int) -
     base = _root(root)
     if int(read_approval_ledger(base)["revision"]) != expected_ledger_revision:
         raise ReviewControlConflict("approval ledger revision is stale")
+    try:
+        from review_mode_policy import ReviewModeError, assert_review_advance_allowed
+
+        assert_review_advance_allowed(base)
+    except ReviewModeError as exc:
+        raise ReviewControlError(str(exc)) from exc
     queue = review_queue(base)
-    if any(item["state"] in {"pending_review", "stale"} for item in queue["items"]):
-        raise ReviewControlError("pending or stale review evidence blocks automatic advance")
     runtime = queue["runtime"]
     if runtime["running"] or runtime["unknown"]:
         raise ReviewControlError("running or unknown provider work blocks automatic advance")
