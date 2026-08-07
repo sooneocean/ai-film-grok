@@ -39,10 +39,12 @@
 | 方言 | 何时 | 形态 |
 |------|------|------|
 | **auto**（默认） | 未强制 env | 对白→official · high→legacy · 其他 official |
-| **official** | `AIFILM_H3_PROMPT_DIALECT=official` | 三字段 / Ref2VA + `<d>[Mandarin]` |
+| **official** | `AIFILM_H3_PROMPT_DIALECT=official` | 三字段 / Ref2VA + `<d>[Mandarin]`；禁 2V stage |
 | **legacy** | `…=legacy` 或 `prompt_format=timeline` | `[0s-2s] Primary action…` |
 
-O3 canary：`skills/ai-film-grok/artifacts/2026-08-07-h3-official-ab-canary.json`（6/6 seed 20260807）。
+- T2VA：**无** `<Picture 1>`；I2VA/FL2VA/L2VA 用官方对齐首行  
+- 优化板：[h3-official-prompt-optimize](../../../../docs/plans/2026-08-07-h3-official-prompt-optimize-todoplan.md)  
+- O3 canary：`artifacts/2026-08-07-h3-official-ab-canary.json`
 
 ## Fill-Idle（h3_primary 语义）
 

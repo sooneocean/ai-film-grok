@@ -102,6 +102,7 @@ JSON 约定：`util.read_json` 软（None）；`util.require_json` 硬（FilmErr
 5. **阶段卡**：`references/stages/*`（dispatch 默认 context）；长课 `lessons-*` 按需，**不**默认整页进 context。
 6. **短记忆卡**：`memory/*` 仅原话+三句+清单+链 lesson；见 `memory/README.md`。
 7. **声线 / 成人 / 毒镜 / final / 构图防抢走**：见 SKILL P0 短列表 + hard-defaults；multi-seed 须 `anti-hijack`（禁只比 mean/音量）；勿在本档复写长段 IRON。  
+7d. **身份代际锁（P0 · 2026-08-07 · abroad 漂移）**：一代一脸一集；禁 archive/restyle 半套混 final；`face-identity.verified≠true` 禁声称角色稳定 → [memory](skills/ai-film-grok/memory/2026-08-07-identity-generation-lock-no-mix.md) · hard-defaults。  
 7c. **plate 有片仍无聊（P0 · 2026-08-06）**：有 plate≠好看；肉戏 mean≪20 禁当好看交付；variety 改 spec 须 re-I2V；mix 优先 `FORCE_BROADBAND_DUCK` 禁死等 acrossover → [memory](skills/ai-film-grok/memory/2026-08-06-plate-boring-mean-mix-iron.md) · hard-defaults。
 7b. **多 agent 5090 禁抢闲占满（P0 · 2026-08-06）**：`free-first`≠until-empty 长驻；**机读** `--until-empty --execute` 须 `--i-own-the-gpu`；默认 `run-next --max 5`；busy 零 submit → [memory](skills/ai-film-grok/memory/2026-08-06-multi-agent-gpu-no-hog.md) · hard-defaults。
 8. **字幕 ship 硬烧 + 肉戏 speaker/体位（2026-08-03 荒岛 v3）**：用户可见=像素有中文；`on_camera` speaker=画面主体；肉戏邻镜差异 + afterglow 禁单人站桩 → [huangdao lesson](skills/ai-film-grok/references/lessons-2026-08-03-huangdao-rhythm-still-voice-silk.md) · [memory](skills/ai-film-grok/memory/2026-08-03-huangdao-caption-hardburn-meat-variety.md)。

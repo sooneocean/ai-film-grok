@@ -37,6 +37,7 @@
 | **养分对账（工程）** | [nutrient-matrix](../../../docs/plans/2026-08-06-nutrient-matrix.md) |
 | **铁律内化 Todo（I0–I5）** | [iron-internalization](../../../docs/plans/2026-08-07-iron-internalization-todoplan.md) |
 | **出片诚实审计轨（SKIP/人证/双 checkout）** | [delivery-honesty-rail](2026-08-07-delivery-honesty-rail.md) |
+| **身份代际锁 · 禁混代出片（P0）** | [identity-generation-lock](2026-08-07-identity-generation-lock-no-mix.md) |
 | **治理 / 五问卡** | [MEMORY_GOVERNANCE](../../../docs/MEMORY_GOVERNANCE.md)
 
 完整文件名见目录列表；旧卡 / canary / session-wrap 在 `archive/`。

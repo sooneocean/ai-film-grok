@@ -4,7 +4,7 @@
 
 | 项 | 本机探针（2026-08-06 · plugins checkout） |
 |----|------------------------------------------|
-| 版本 | `plugin.json` **2.40.85**（CTO eng closeout · D7.2/C6.3/B3 · 本轮） |
+| 版本 | `plugin.json` **2.40.87**（C6.5 mypy wave-2 · 本轮） |
 | 源码 | scripts **~688** `.py` / **~170k** LOC |
 | 巨石函数 ≥200 行 | **74**；最大 `render_final` **2456** / `validate_film_spec` **2322** / `run_preflight` **1937** / `build_dispatch` **1249** |
 | 顶层模块 | ~349（约 **256** 薄 shim + ~**93** 仍厚） |
@@ -195,9 +195,9 @@
 |----|------|------|------|
 | **C6.1** | **低 importer 优先迁** | 每周 **5–10** 模块 → package + 薄 shim | metabolism inventory 更新 | ✅ safe queue empty · guard 2.40.78 |
 | **C6.2** | **优先厚顶层** | `workflow_pack` / `input_fidelity` / `state_index_gate` / `prompt_injector` / `shortform_director`… | 归属 spine/gates/plan | IRON 禁 vanity；bug-driven peel only |
-| **C6.3** | **Lane A 删除** | 0 import ∧ 0 CLI ∧ 0 test → 删 | 每 batch 报告 | ✅ 2.40.85 re-scan empty (shims retained) |
+| **C6.3** | **Lane A 删除** | 0 import ∧ 0 CLI ∧ 0 test → 删 | 每 batch 报告 | ✅ 2.40.85 empty · 4 intentional residuals allowlisted + guard test |
 | **C6.4** | **基座测试补漏** | `core/*` `util/*` 公共 API | P4 延续；每模块 ≥ 契约测 | ✅ 2.40.78 media_ops/film_spec · 2.40.80 config_loader/gates |
-| **C6.5** | **mypy 增量扩名单** | `make type` 每清一文件加名单；禁一次开全树 | 零新增错误 | ✅ 2.40.83 util×9 + fix shim import |
+| **C6.5** | **mypy 增量扩名单** | `make type` 每清一文件加名单；禁一次开全树 | 零新增错误 | ✅ 2.40.83×9 · **2.40.87×12** |
 
 **当前厚顶层观察（启发式）：** `workflow_pack` ~2.2k · `input_fidelity` ~1.1k · `aifilm_grok` ~1k · 若干 prompt/director ~700–850。
 
@@ -253,7 +253,7 @@
 | 5 | 5090 drain 或 OPEN_OPS | B3 | **P0 ops** · eng closeout OPEN_OPS ✅ 2.40.85 · 真 drain 仍需独占 GPU |
 | 6 | 触达式 peel：final / validate / preflight | C4 | **P1** · bug-driven only（eng 日不虚荣 peel） |
 | 7 | logging + FilmError + JSON I/O 增量 | C5 | **P1** · C5.1–C5.6 ✅ 2.40.81 |
-| 8 | legacy 迁 5–10/周 + 基座测 | C6 | **P1** · C6.1/3/4/5 ✅ 2.40.85 · C6.2 bug-driven only |
+| 8 | legacy 迁 5–10/周 + 基座测 | C6 | **P1** · C6.1/3/4/5 ✅ 2.40.87 · C6.2 bug-driven |
 | 9 | CI 版本指针 + mypy 扩 | D7 | **P1** · G0.4 ✅ · D7.2 typecheck ✅ 2.40.85 |
 | 10 | subprocess timeout 触达补 | C5.5 | **P1** · ✅ 2.40.79 util/compose default |
 | 11 | 内容 P1：毒化硬锁 / sung 接入（选一） | P8 | **P2 deferred** · 产品日另开 |
@@ -362,4 +362,6 @@
 | C4 peel | 非目标本轮 · 触达才拆 |
 | 内容 P8 / B3.4 | DEFERRED |
 
-> 下一会话：产品日走 A2/I*；运维日有 GPU 再 B3 drain；工程日扩 mypy 名单或 bug 驱动 peel。
+> 下一会话：产品日走 A2/I*；运维日有 GPU 再 B3 drain；工程日继续 mypy 扩（core 需解 dual-module）或 bug 驱动 peel。
+>
+> **2.40.87：** mypy seed 9→12；Lane A delete scan 守卫测落地。

@@ -124,3 +124,75 @@ def test_motion_core_dialogue_survives() -> None:
     shot = _dlg_shot()
     text = compile_official_h3_prompt(shot, mode="i2v")
     assert_motion_prompt_core(text, shot, mode="i2v", role="hero")
+
+
+def test_t2va_has_no_picture_anchor() -> None:
+    shot = {
+        "id": "s_env",
+        "shot_size": "ws",
+        "duration_sec": 5.0,
+        "dsl": {
+            "action": "rain sweeps across empty night street",
+            "subject": "an empty alley",
+            "style": "cinematic",
+            "prompt_tier": "medium",
+        },
+    }
+    text = compile_official_h3_prompt(shot, mode="t2v", duration_sec=5.0)
+    assert "integrated_multimodal_description:" in text
+    assert "For the target video, at 0.00 seconds" not in text
+    assert "<Picture 1>" not in text
+    assert "shown in <Picture 1>" not in text
+    assert "[0s-" not in text
+    v = validate_official_prompt(text, mode="t2v")
+    assert v["ok"] is True, v["issues"]
+
+
+def test_fl2va_align_and_picture2() -> None:
+    text = compile_official_h3_prompt(_hi_shot(), mode="flf", duration_sec=5.0)
+    assert "How the reference pictures align" in text
+    assert "Picture 2" in text
+    assert "8.00" not in text  # duration must match clip
+    assert "5.00" in text
+    assert validate_official_prompt(text, mode="flf")["ok"] is True
+
+
+def test_l2va_align_line() -> None:
+    text = compile_official_h3_prompt(_hi_shot(), mode="l2v", duration_sec=6.0)
+    assert "How the reference pictures align" in text
+    assert "6.00-second mark" in text
+    assert validate_official_prompt(text, mode="l2v")["ok"] is True
+
+
+def test_validate_rejects_legacy_timecode() -> None:
+    bad = (
+        "integrated_multimodal_description: [0s-2s] walk\n\n"
+        "overall_soundscape: room\n\n"
+        "non_diegetic_music: N/A\n"
+    )
+    v = validate_official_prompt(bad, mode="i2v")
+    assert v["ok"] is False
+    assert any("LEGACY_TIMECODE" in x for x in v["issues"])
+
+
+def test_camera_vocab_push_and_static() -> None:
+    push = {
+        "id": "p",
+        "dsl": {"camera_prompt": "slow push in", "action": "walk", "subject": "woman"},
+        "duration_sec": 5,
+    }
+    text = compile_official_h3_prompt(push, mode="i2v")
+    assert "pushes in" in text
+    locked = {
+        "id": "l",
+        "dsl": {
+            "camera_prompt": "locked static ECU",
+            "action": "blink",
+            "subject": "woman",
+            "prompt_tier": "soft",
+        },
+        "prompt_tier": "soft",
+        "duration_sec": 5,
+    }
+    text2 = compile_official_h3_prompt(locked, mode="i2v")
+    assert "static shot" in text2

@@ -277,12 +277,21 @@ def _prompt_for_shot(
     duration = max(3.0, min(8.0, duration))
 
     if dialect == "official" and not author:
-        # Official MiniMax dialect — no Vertical 9:16 / legacy [0s-2s] wrapper.
-        from h3_official_prompt import compile_official_h3_prompt
+        # Official MiniMax dialect — no Vertical 9:16 / legacy [0s-2s] / 2V stage.
+        from h3_official_prompt import (
+            compile_official_h3_prompt,
+            official_soft_validate,
+            validate_official_prompt,
+        )
 
         prompt = compile_official_h3_prompt(
             work_shot, mode=mode, spec=film, duration_sec=duration
         )
+        check = validate_official_prompt(prompt, mode=mode)
+        if not check.get("ok") and not official_soft_validate():
+            raise H3WorkflowError(
+                f"H3 official prompt validate failed for {sid}: {check.get('issues')}"
+            )
     elif author:
         # Keep author geometry/style; merge DF/want/dialogue; timeline when enabled.
         # Family-filled work_shot still supplies missing motion core clauses.
@@ -291,13 +300,23 @@ def _prompt_for_shot(
             "subject_definitions:" in author and "detailed_description:" in author
         )
         if dialect == "official" or author_is_official:
-            from h3_official_prompt import compile_official_h3_prompt
+            from h3_official_prompt import (
+                compile_official_h3_prompt,
+                official_soft_validate,
+                validate_official_prompt,
+            )
 
             # Prefer full recompile when dialect=official (IR wins over stale author).
             if dialect == "official" and not author_is_official:
                 prompt = compile_official_h3_prompt(
                     work_shot, mode=mode, spec=film, duration_sec=duration
                 )
+                check = validate_official_prompt(prompt, mode=mode)
+                if not check.get("ok") and not official_soft_validate():
+                    raise H3WorkflowError(
+                        f"H3 official prompt validate failed for {sid}: "
+                        f"{check.get('issues')}"
+                    )
             else:
                 prompt = author
         else:
@@ -319,6 +338,7 @@ def _prompt_for_shot(
                 prompt = body
     elif use_timeline:
         # Layer-4 timed action script ([0s-2s] …) for 5090 H3 (or explicit timeline).
+        # Legacy path only — may inject 2V reference stage when refs present.
         prompt = build_h3_temporal_prompt(
             film, work_shot, mode=mode, duration_sec=duration,
             ref_image_paths=ref_image_paths,
@@ -1057,11 +1077,20 @@ def run_h3_shot(
         base, shot, mode=str(plan["mode"]), spec=spec,
         ref_image_paths=ref_image_paths,
     )
-    if plan["mode"] == "flf":
+    # Official MiniMax dialect already encodes FL2VA / Ref2VA structure — do not
+    # append legacy free-text clauses or duty lines that break field grammar.
+    _is_official_prompt = (
+        "integrated_multimodal_description:" in prompt
+        or (
+            "subject_definitions:" in prompt
+            and "detailed_description:" in prompt
+        )
+    )
+    if plan["mode"] == "flf" and not _is_official_prompt:
         clause = flf_prompt_clause()
         if "first-last-frame" not in prompt.lower() and "last keyframe" not in prompt.lower():
             prompt = f"{prompt.rstrip()} {clause}"
-    if plan["mode"] == "r2v":
+    if plan["mode"] == "r2v" and not _is_official_prompt:
         pack_refs: list[dict[str, Any]] = []
         # First-last R2V: last pose land ref first, then identity/style refs.
         if plan.get("last_path"):

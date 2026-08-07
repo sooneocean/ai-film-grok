@@ -11,6 +11,24 @@
 - **测试：** 新增 `test_onboarding_planner.py`（启发式分解单测）；`test_web_api` / `test_review_ui` 扩 onboarding 上传/拆解/plan/go、409 冲突、跨域 403、坏 token 401、file path-escape 404。
 - **修复：** `review_ui.do_POST` 缩进错位（try 块越级）；`onboarding.handle_upload` 缺 `import os`；`onboarding` 多余 `import re`；`onboarding_planner` 未用 `LocalLLMError` 导入。刷新 `runtime-lock.json`。
 
+## [2.40.87] - 2026-08-07
+
+### Changed (CTO C6.5 mypy expand wave-2 + C6.3 Lane A guard)
+- **`make type`:** + `util/config_loader` · `util/film_spec` · `util/structured_logger` (12-module seed, zero errors).
+- **C6.3 guard:** `tests/test_c6_lane_a_delete_scan.py` freezes intentional zero-import residuals (examples/probes/tools); new dead whole-files fail closed.
+- CI `typecheck` continues to run `make type` (list growth is automatic).
+
+## [2.40.86] - 2026-08-07
+
+### Added (C6.3 Lane A machine guard)
+- **`tests/test_c6_lane_a_delete_scan.py`:** freezes 4 intentional 0-import residuals (examples / backend_probe / route_inventory); new dead modules fail closed.
+
+### Changed (H3 official prompt · GUIDE optimize P0+P1)
+- **`h3_official_prompt`:** align T2VA/I2VA/FL2VA/L2VA/Ref2VA with MiniMax HF guides — T2VA no Picture1; camera type+amplitude+speed; multi-speaker `(Sx)` + `<d>[Mandarin|English]`; FL/L duration align; optional music from bgm intent; stronger `validate_official_prompt`.
+- **`h3_workflow`:** official path fail-closed validate; skip legacy FLF/R2V free-text append on official prompts; 2V stage remains legacy-only.
+- **Docs:** `docs/plans/2026-08-07-h3-official-prompt-optimize-todoplan.md` · memory/hard-defaults/h3-core-day pointers.
+- **Tests:** `test_h3_official_prompt` golden modes (12).
+
 ## [2.40.85] - 2026-08-07
 
 ### Added (CTO eng closeout · D7.2 + C6.3 empty + B3 OPEN_OPS)
