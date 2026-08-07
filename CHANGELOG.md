@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.40.71] - 2026-08-07
+
+### Added (delivery honesty-rail R4 I5 ops · named contracts)
+- **R4.1:** `test_run_next_soft_hog` — unowned `run-next` soft-cap max_jobs=5; until-empty requires ownership; OPEN_OPS receipt when refused.
+- **R4.2:** `test_pgrep_no_source_match` — forbid `pgrep -f` invocations in scripts; `local_comfy_client_status` remains `ps` token method.
+- **R4.3:** `test_openops_receipt` — drain end `open_ops_status=queue_empty|OPEN_OPS` (+ reason); isolates live GPU lease via mock.
+- Board honesty-rail **R0–R4 CLOSED**; evidence report updated.
+
 ## [2.40.70] - 2026-08-07
 
 ### Fixed (honesty-rail R1 expand · more skip_flag wires)

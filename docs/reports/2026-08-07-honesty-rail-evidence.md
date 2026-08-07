@@ -1,7 +1,7 @@
 # Honesty-rail evidence · 2026-08-07
 
-**Version:** 2.40.68  
-**Plan:** [delivery-honesty-rail](../plans/2026-08-07-delivery-honesty-rail-todoplan.md)
+**Version:** 2.40.71  
+**Plan:** [delivery-honesty-rail](../plans/2026-08-07-delivery-honesty-rail-todoplan.md) · **R0–R4 CLOSED**
 
 ## Units
 
@@ -16,17 +16,21 @@
 | R3 | `core/checkout_drift.py` | HEAD mismatch warn |
 | R3 | doctor | `checkout_drift` field always |
 | R3 | tests | `pytest tests/test_checkout_drift.py` |
+| R4.1 | soft-hog | `test_run_next_soft_hog` + `test_gpu_no_hog` |
+| R4.2 | no pgrep -f invoke | `local_comfy_client_status` → ps; `test_pgrep_no_source_match` |
+| R4.3 | OPEN_OPS | `attach_open_ops_status` · `test_openops_receipt` |
 
 ## SURFACE (local)
 
 ```bash
 export AIFILM_SKIP_CINEMATIC_GATE=1
 # no reason → closeout skip_audit classification=PARTIAL
-# with AIFILM_SKIP_REASON='demo' → SKIP_DOCUMENTED
 aifilm doctor   # report.checkout_drift
+
+# drain end: receipts/fill-idle-until-empty.json → open_ops_status
 ```
 
-## Residual
+## Residual (non-blocking)
 
-- R4 I5 ops canary / pgrep audit (OPEN_OPS without GPU)
-- Touch-migrate remaining ~100 direct `os.environ AIFILM_SKIP_*` readers to `skip_flag` opportunistically
+- Opportunistic migrate remaining direct `os.environ AIFILM_SKIP_*` readers
+- True overnight GPU drain canary when user owns 5090 (OPEN_OPS without GPU is OK)

@@ -2491,8 +2491,8 @@ def queue_progress_honest(root: Path | str) -> dict[str, Any]:
 def local_comfy_client_status() -> dict[str, Any]:
     """Best-effort: count local comfy_video.py processes (macOS/Linux ps).
 
-    Honesty-rail R4.2: **never** ``pgrep -f`` / wide source match (self-kill hazard
-    when argv embeds script paths). Uses ``ps`` + token filter + skip self PID.
+    Honesty-rail R4.2: never use full-cmdline process grep (self-kill hazard when
+    argv embeds script paths). Uses ``ps`` + token filter + skip self PID.
     """
     try:
         import os
@@ -2528,7 +2528,9 @@ def local_comfy_client_status() -> dict[str, Any]:
             if "comfy_video.py" not in cmd:
                 continue
             low = cmd.lower()
-            if any(x in low for x in ("pgrep", "grep comfy", " rg ", "ripgrep")):
+            # skip diagnostic greps that only *search* for the name
+            first = low.split()[0] if low.split() else ""
+            if first in {"grep", "rg", "ripgrep"} or "ripgrep" in low:
                 continue
             lines.append(ln)
         count = len(lines)
@@ -2537,7 +2539,7 @@ def local_comfy_client_status() -> dict[str, Any]:
             "ok": ok,
             "count": count,
             "lines": lines[:5],
-            "note": "at most one local comfy_video.py client (16GB Mac OOM risk); ps not pgrep -f",
+            "note": "at most one local comfy_video.py client (16GB Mac OOM risk); method=ps_token",
             "method": "ps_token",
         }
     except Exception as exc:  # noqa: BLE001

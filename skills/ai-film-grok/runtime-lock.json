@@ -3190,7 +3190,7 @@
     },
     {
       "path": "scripts/workflow_pack.py",
-      "sha256": "513295f25b309881026c18d303811653240032a3f46d893b0dba00683c094b00"
+      "sha256": "308af153828ac722f644c3ff91792229b42bc63451e3abfa818926367192f081"
     },
     {
       "path": "scripts/workflow_spine.py",
