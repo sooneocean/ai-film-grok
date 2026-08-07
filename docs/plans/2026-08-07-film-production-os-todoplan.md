@@ -6,8 +6,8 @@
 
 | 项 | 值 |
 |----|-----|
-| Status | **ACTIVE · W0–W4 slice SHIPPED**（W3 coverage/storyboard · W4 scene-drama/continuity；P2.7 animatic harden 待加深） |
-| 基线版本 | `plugin.json` **2.41.1**（W3–W4 slice；2.41.0 heat plot-driven） |
+| Status | **ACTIVE · W0–W6 SHIPPED**（W7 横切按 ROI；P2.7 animatic 已并入 production-ready） |
+| 基线版本 | `plugin.json` **2.41.2**（W5–W6 closeout；2.41.1 W3–W4；2.41.0 heat plot-driven） |
 | 工作树 | `/Users/dex/.grok/plugins/ai-film-grok`（本会话真相） |
 | 战略约束 | CTO 板：禁止第二套导演系统 · 巨石挡路才拆 · 机读门禁 > 散文 IRON |
 | 北极星 | **剧本 → 可剪、可审、可接戏的 Shot Card**（用户 MVP §44）；生成质量是第二位 |
@@ -223,18 +223,18 @@ Assembly → Rough → Fine → Picture Lock → Master
 
 ## 4. 推荐执行波次（90 天内可落地）
 
-| Wave | 内容 | 用户价值 | 依赖 |
-|------|------|----------|------|
-| **W0** | P0.1–P0.3 落档 | 防误工 | — |
-| **W1** | P1.1 + P1.2 + P1.4 | 弱故事不烧 GPU | W0 |
-| **W2** | P2.1 + P2.2 + P2.3 + P2.4 | **Shot Card 里程碑** | W1 |
-| **W3** | P2.5 + P2.6 + P2.7 | 剪辑前 Coverage + Animatic | W2 |
-| **W4** | P1.3 + P5.1 + P3.1–3.2 | 接戏与资产 ID | W2 |
-| **W5** | P4.1–P4.5 | 编译器 + Take 审片 | W2 |
-| **W6** | P5.3–P5.4 + P6.* | 最小重生 + 粗剪导出 | W5 |
-| **W7** | P7.* 按 ROI | 表演/声音/摄影表 | 非阻断 |
+| Wave | 内容 | 用户价值 | 依赖 | 状态 |
+|------|------|----------|------|------|
+| **W0** | P0.1–P0.3 落档 | 防误工 | — | ✅ |
+| **W1** | P1.1 + P1.2 + P1.4 | 弱故事不烧 GPU | W0 | ✅ |
+| **W2** | P2.1 + P2.2 + P2.3 + P2.4 | **Shot Card 里程碑** | W1 | ✅ |
+| **W3** | P2.5 + P2.6 + P2.7 | 剪辑前 Coverage + Animatic | W2 | ✅ 2.41.1 + production-ready |
+| **W4** | P1.3 + P5.1 + P3.1–3.2 | 接戏与资产 ID | W2 | ✅ 2.41.1（asset_refs 仍可加深） |
+| **W5** | P4.1–P4.5 | 编译器 + Take 审片 | W2 | ✅ **2.41.2** |
+| **W6** | P5.3–P5.4 + P6.* | 最小重生 + 粗剪导出 | W5 | ✅ **2.41.2** |
+| **W7** | P7.* 按 ROI | 表演/声音/摄影表 | 非阻断 | OPEN |
 
-**默认下一刀（确认后立刻做）：W0 → W1 → W2**，直到「剧本 → Shot Card」可演示。
+**默认下一刀：** W7 横切（Performance 丰富度 / SoundCue / 摄影规则表）按 ROI；主产线可用 W0–W6 命令。
 
 ---
 

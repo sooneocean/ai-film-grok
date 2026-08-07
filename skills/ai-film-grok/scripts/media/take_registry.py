@@ -109,6 +109,8 @@ def compare_takes(manifest: dict[str, Any], shot_id: str) -> dict[str, Any]:
         quality = item.get("quality_gate") if isinstance(item.get("quality_gate"), dict) else {}
         review = quality.get("review") if isinstance(quality.get("review"), dict) else {}
         dimensions = (review.get("scorecard") or {}).get("dimensions") or {}
+        # Film Production OS W5: director review dimensions on the take itself
+        drev = item.get("director_review") if isinstance(item.get("director_review"), dict) else {}
         rows.append(
             {
                 "take_id": item.get("take_id"),
@@ -116,9 +118,104 @@ def compare_takes(manifest: dict[str, Any], shot_id: str) -> dict[str, Any]:
                 "state": item.get("state"),
                 "active": item.get("active") is True,
                 "quality_ok": quality.get("ok") is True,
-                "review_approved": review.get("approved") is True,
-                "score_total": sum(int(value or 0) for value in dimensions.values()),
+                "review_approved": review.get("approved") is True
+                or str(item.get("director_status") or "").lower() in {"selected", "approved"},
+                "score_total": sum(int(value or 0) for value in dimensions.values())
+                or sum(
+                    int(drev.get(k) or 0)
+                    for k in ("performance", "continuity", "camera", "artifacts")
+                ),
+                "director_review": {
+                    "performance": drev.get("performance"),
+                    "continuity": drev.get("continuity"),
+                    "camera": drev.get("camera"),
+                    "artifacts": drev.get("artifacts"),
+                }
+                if drev
+                else None,
+                "director_status": item.get("director_status"),
             }
         )
     rows.sort(key=lambda item: (not item["active"], -item["score_total"], str(item["take_id"])))
     return {"shot_id": shot_id, "candidate_count": len(rows), "candidates": rows}
+
+
+def set_take_review(
+    manifest: dict[str, Any],
+    shot_id: str,
+    *,
+    take_id: str | None = None,
+    performance: int | None = None,
+    continuity: int | None = None,
+    camera: int | None = None,
+    artifacts: int | None = None,
+    director_status: str | None = None,
+) -> dict[str, Any]:
+    """Attach director review scores to a take (never deletes media bytes)."""
+    clips = manifest.setdefault("clips", {})
+    if not isinstance(clips, dict):
+        raise ValueError("manifest.clips must be a dict")
+    current = clips.get(shot_id)
+    history = (manifest.get("take_history") or {}).get(shot_id) or []
+    if not isinstance(history, list):
+        history = []
+    pool: list[dict[str, Any]] = []
+    if isinstance(current, dict):
+        pool.append(current)
+    for item in history:
+        if isinstance(item, dict):
+            pool.append(item)
+    if take_id:
+        pool = [t for t in pool if str(t.get("take_id")) == str(take_id)]
+    if not pool:
+        raise ValueError(f"no take found for shot_id={shot_id!r} take_id={take_id!r}")
+    rec = pool[0]
+    rev = dict(rec.get("director_review") or {})
+    for key, val in (
+        ("performance", performance),
+        ("continuity", continuity),
+        ("camera", camera),
+        ("artifacts", artifacts),
+    ):
+        if val is not None:
+            rev[key] = int(val)
+    rec["director_review"] = rev
+    if director_status:
+        status = str(director_status).strip().lower()
+        allowed = {
+            "generated",
+            "candidate",
+            "selected",
+            "approved",
+            "rejected",
+            "archived",
+            "active",
+        }
+        if status not in allowed:
+            raise ValueError(f"director_status must be one of {sorted(allowed)}")
+        rec["director_status"] = status
+        if status in {"selected", "approved", "active"}:
+            rec["active"] = True
+            rec["state"] = "active" if status == "active" else status
+            # Promote reviewed take into clips slot without deleting prior history
+            if current is not rec and isinstance(current, dict):
+                prev = dict(current)
+                prev["active"] = False
+                if str(prev.get("state")) in {"active", "selected", "approved"}:
+                    prev["state"] = "superseded"
+                hist_list = manifest.setdefault("take_history", {}).setdefault(shot_id, [])
+                if isinstance(hist_list, list):
+                    hist_list.append(prev)
+            clips[shot_id] = rec
+            manifest.setdefault("active_takes", {})[shot_id] = rec.get("take_id")
+        elif status in {"rejected", "archived"}:
+            rec["active"] = False
+            rec["state"] = status
+    return {
+        "ok": True,
+        "shot_id": shot_id,
+        "take_id": rec.get("take_id"),
+        "director_review": rec.get("director_review"),
+        "director_status": rec.get("director_status"),
+        "state": rec.get("state"),
+    }

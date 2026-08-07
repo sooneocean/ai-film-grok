@@ -727,6 +727,130 @@ def cmd_plan(args: argparse.Namespace) -> int:
         )
         emit(report)
         return 0 if report.get("ok") else 1
+    if action == "compile-prompt":
+        from prompt_compiler import compile_for_shot
+        from util import read_json
+
+        root_s = getattr(args, "root", None)
+        if not root_s:
+            raise FilmError("plan compile-prompt requires --root")
+        root = Path(root_s).expanduser().resolve()
+        spec = read_json(root / "film-spec.json") or {}
+        if not isinstance(spec, dict):
+            raise FilmError("film-spec.json missing")
+        shot_id = str(getattr(args, "shot_id", "") or "")
+        found = None
+        for sc in spec.get("scenes") or []:
+            if not isinstance(sc, dict):
+                continue
+            for sh in sc.get("shots") or []:
+                if isinstance(sh, dict) and str(sh.get("id")) == shot_id:
+                    found = sh
+                    break
+            if found is not None:
+                break
+            for beat in sc.get("beats") or []:
+                if not isinstance(beat, dict):
+                    continue
+                for sh in beat.get("shots") or []:
+                    if isinstance(sh, dict) and str(sh.get("id")) == shot_id:
+                        found = sh
+                        break
+                if found is not None:
+                    break
+            if found is not None:
+                break
+        if found is None:
+            raise FilmError(f"shot_id={shot_id!r} not found in film-spec")
+        di = spec.get("director_intent") if isinstance(spec.get("director_intent"), dict) else {}
+        report = compile_for_shot(
+            found,
+            adapter=str(getattr(args, "adapter", "h3") or "h3"),
+            director_intent=di,
+        )
+        report["ok"] = True
+        emit(report)
+        return 0
+    if action == "revise":
+        from revise_plan import revise_plan_at_root
+
+        root_s = getattr(args, "root", None)
+        if not root_s:
+            raise FilmError("plan revise requires --root")
+        report = revise_plan_at_root(
+            Path(root_s).expanduser().resolve(),
+            defect=str(getattr(args, "defect", "") or ""),
+            shot_id=str(getattr(args, "shot_id", "") or ""),
+            scene_id=str(getattr(args, "scene_id", "") or ""),
+            notes=str(getattr(args, "notes", "") or ""),
+        )
+        emit(report)
+        return 0 if report.get("ok") else 1
+    if action == "assembly-gate":
+        from assembly_gate import assembly_gate_at_root
+
+        root_s = getattr(args, "root", None)
+        if not root_s:
+            raise FilmError("plan assembly-gate requires --root")
+        soft = bool(getattr(args, "soft", False))
+        report = assembly_gate_at_root(
+            Path(root_s).expanduser().resolve(),
+            strict=not soft,
+        )
+        emit(report)
+        return 0 if report.get("ok") else 1
+    if action == "production-ready":
+        from coverage_check import coverage_check_at_root
+        from creative_pipeline import build_animatic_gate
+        from storyboard_status import check_storyboard_gate
+        from util import write_json
+
+        root_s = getattr(args, "root", None)
+        if not root_s:
+            raise FilmError("plan production-ready requires --root")
+        root = Path(root_s).expanduser().resolve()
+        strict = bool(getattr(args, "strict", False))
+        cov = coverage_check_at_root(root, strict=strict)
+        sb = check_storyboard_gate(root, strict=strict, require_approved=True)
+        anim = build_animatic_gate(root)
+        anim_ok = bool(anim.get("ok")) if isinstance(anim, dict) else False
+        parts_ok = {
+            "coverage": bool(cov.get("ok")),
+            "storyboard": bool(sb.get("ok")),
+            "animatic": anim_ok,
+        }
+        if strict:
+            ok = all(parts_ok.values())
+        else:
+            # Soft: coverage must not hard-error; storyboard/animatic warn only
+            ok = bool(cov.get("ok"))
+        report = {
+            "ok": ok,
+            "kind": "production-ready",
+            "strict": strict,
+            "parts": parts_ok,
+            "coverage": {
+                "ok": cov.get("ok"),
+                "codes": cov.get("codes"),
+                "production_allowed": cov.get("production_allowed"),
+            },
+            "storyboard": {
+                "ok": sb.get("ok"),
+                "codes": sb.get("codes"),
+                "status": sb.get("status"),
+            },
+            "animatic": {
+                "ok": anim_ok,
+                "blockers": (anim or {}).get("blockers") if isinstance(anim, dict) else [],
+            },
+            "bulk_allowed": ok if strict else bool(cov.get("production_allowed", cov.get("ok"))),
+            "root": str(root),
+        }
+        rec = root / "receipts" / "production-ready.json"
+        write_json(rec, report)
+        report["receipt"] = str(rec)
+        emit(report)
+        return 0 if report.get("ok") else 1
     if action == "debrief":
         from cli_plan import run_debrief
 

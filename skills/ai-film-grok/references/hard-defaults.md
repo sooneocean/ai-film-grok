@@ -10,7 +10,7 @@
 
 | 规则 | 弹性默认 |
 |---|---|
-| **Film Production OS（P0 · 2026-08-07）** | **禁**剧本直灌模型；须 Scene→Beat→Shot→Take。CreativeIntent 挂 `director_intent`（`creative_intent_strict`）。`aifilm plan validate-structure` · `plan shot-cards` · `director interpret-scene`。Shot purpose 禁「好看/cinematic」sole。状态投影 [production-state-map](production-state-map.md) · 执行板 [film-production-os-todoplan](../../../docs/plans/2026-08-07-film-production-os-todoplan.md)。**禁**第二套 DirectorAgent 绿地。 |
+| **Film Production OS（P0 · 2026-08-07 · W0–W6）** | **禁**剧本直灌模型；须 Scene→Beat→Shot→Take。CreativeIntent · `validate-structure` · `shot-cards` · `interpret-scene` · **`coverage-check`** · **`storyboard`** · **`production-ready`** · **`scene-drama`** · **`continuity-audit`** · **`compile-prompt`** · **`revise`** · **`assembly-gate`**。Shot purpose 禁好看 sole；缺陷重生最小单位；粗剪仅 approved takes。状态投影 [production-state-map](production-state-map.md) · 板 [film-production-os-todoplan](../../../docs/plans/2026-08-07-film-production-os-todoplan.md)。**禁**第二套 DirectorAgent 绿地。 |
 | 文本入口 | Director’s Lens → 再 film-spec；禁止原文一句一图 |
 | 规划 vs 剪辑 | clips 齐后建议 Editor’s Cut；用户赶交付可缩短 |
 | **剧情驱动自然叙事（P0）** | 默认 **`heat_scale: natural` / `plot_driven`**；**不强塞**色气/肉戏/脱衣/荤梗；亲密与情感随剧情自然发生；解除 50% 肉戏时长 Fail-Closed 拦截 |

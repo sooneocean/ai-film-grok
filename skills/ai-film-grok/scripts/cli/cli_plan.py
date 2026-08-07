@@ -179,6 +179,54 @@ def add_plan_parsers(subparsers: Any) -> None:
         action="store_true",
         help="Do not write receipts/scene-drama.json",
     )
+    compile_p = plan_sub.add_parser(
+        "compile-prompt",
+        help="Prompt compiler: pure ShotSpec → adapter artifact (Film Production OS W5)",
+    )
+    compile_p.add_argument("--root", required=True)
+    compile_p.add_argument("--shot-id", required=True)
+    compile_p.add_argument(
+        "--adapter", choices=("h3", "grok", "generic"), default="h3"
+    )
+    revise = plan_sub.add_parser(
+        "revise",
+        help="Defect → minimal regeneration unit (Film Production OS W6)",
+    )
+    revise.add_argument("--root", required=True)
+    revise.add_argument(
+        "--defect",
+        required=True,
+        help="face|hand|performance|camera|continuity|dialogue|background|timing|wardrobe|motion",
+    )
+    revise.add_argument("--shot-id", default="")
+    revise.add_argument("--scene-id", default="")
+    revise.add_argument("--notes", default="")
+    assembly = plan_sub.add_parser(
+        "assembly-gate",
+        help="Rough cut: only approved/selected/active takes (Film Production OS W6)",
+    )
+    assembly.add_argument("--root", required=True)
+    assembly.add_argument(
+        "--strict",
+        action="store_true",
+        default=True,
+        help="Fail closed on draft/rejected takes (default true)",
+    )
+    assembly.add_argument(
+        "--soft",
+        action="store_true",
+        help="Warnings only (overrides --strict)",
+    )
+    production_ready = plan_sub.add_parser(
+        "production-ready",
+        help="Pre-bulk: coverage + storyboard + animatic composite (Film Production OS W3)",
+    )
+    production_ready.add_argument("--root", required=True)
+    production_ready.add_argument(
+        "--strict",
+        action="store_true",
+        help="All sub-gates hard (coverage + storyboard approved + animatic)",
+    )
     edit = plan_sub.add_parser("edit", help="Edit one unlocked narrative node")
     edit.add_argument("--root", required=True)
     edit.add_argument("--node", required=True, help="Node id/ref, e.g. story or ep01_sc01_bt03")

@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.41.2] - 2026-08-07
+
+### Added (Film Production OS · W5–W6 closeout)
+- **W5 Prompt Compiler:** `plan/prompt_compiler.py` · `aifilm plan compile-prompt --shot-id --adapter h3|grok|generic` — execution artifact only; no project mutation; provider-leak lint.
+- **W5 Take review:** `take_registry.set_take_review` + compare rows expose performance/continuity/camera/artifacts + director_status.
+- **W6 Revise plan:** `plan/revise_plan.py` · `aifilm plan revise --defect face|…` — minimal unit; never default whole-scene regen.
+- **W6 Assembly gate:** `plan/assembly_gate.py` · `aifilm plan assembly-gate` — draft/rejected takes blocked from rough cut.
+- **W3 composite:** `aifilm plan production-ready` (coverage + storyboard + animatic).
+- **Tests:** `test_film_production_os_w5_w6.py`.
+
 ## [2.41.1] - 2026-08-07
 
 ### Added (Film Production OS · W3–W4 slice)
