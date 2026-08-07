@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.40.73] - 2026-08-07
+
+### Fixed / Added (go-all · A1 residual + G0.4/D7.4 + A2.1 + B3 canary)
+- **production_gates:** remaining env SKIP (anti-boring / headroom / transition×2 / style-bible / face / continuity) → `_env_skip_armed` + IRON ledger.
+- **G0.4 / D7.4:** CI `validate-core` asserts `plugin.json` version in `docs/GRAPH.md` + README project-status.
+- **A2.1:** `stages/deliver.md` ship-prep rows 15–17 (skip_usage / attestation / plate≠master).
+- **B3 OPEN_OPS canary:** `artifacts/2026-08-07-b3-ops-canary.json` — Comfy 18188 up; eng-day no film drain → OPEN_OPS.
+- **C6 scan:** low-importer thick top-level queue empty (terminal residual freeze).
+- **Tests:** skip_audit anti-boring ledger + IRON secondary flags.
+
 ## [2.40.72] - 2026-08-07
 
 ### Added (web review console · local live smoke + PR gate)

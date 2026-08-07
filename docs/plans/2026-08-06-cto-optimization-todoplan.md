@@ -111,7 +111,7 @@
 | **G0.1** | **钉死本 CTO plan 为单一执行板** | 本 session plan 落档后，把 `docs/plans/2026-08-06-next-optimization-todoplan.md` header 改为 `SUPERSEDED → CTO plan`（或互指）；禁止第三块「综合板」 | 新会话只认一处 OPEN 表 | ✅ 2.40.42 |
 | **G0.2** | **双 checkout 收敛** | plugins 为主可写；禁手拷 | 两树用 git 同步 | ✅ 2026-08-07 ff `~/.grok/ai-film-grok` → `c10cf4e`/`2.40.66` 链 |
 | **G0.3** | **OPEN 冻结集 ≤12** | 从 memory inventory + 本 plan §4 抽出；其余 DEFERRED | 表在本档 §5 | ✅ 见下 |
-| **G0.4** | **版本指针账实** | README/GRAPH 非 marker 硬编码 vs `plugin.json`；CI 可选 assert | `make sync-docs` + 抽检 | pending |
+| **G0.4** | **版本指针账实** | README/GRAPH 非 marker 硬编码 vs `plugin.json`；CI 可选 assert | `make sync-docs` + 抽检 | ✅ 2.40.73 CI assert |
 
 ---
 

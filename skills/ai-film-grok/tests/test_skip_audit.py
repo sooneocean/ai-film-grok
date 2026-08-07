@@ -136,5 +136,28 @@ class TestSkipAudit(unittest.TestCase):
             self.assertIn("AIFILM_SKIP_HEAT_QUEUE_GATE", names)
 
 
+    def test_anti_boring_skip_ledger(self) -> None:
+        from production_gates import assert_anti_boring_variety
+        from core.skip_audit import load_skip_usage
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            os.environ["AIFILM_SKIP_ANTI_BORING_GATE"] = "1"
+            rep = assert_anti_boring_variety(root, env_skip=True)
+            self.assertTrue(rep.get("skipped"))
+            names = {e.get("name") for e in (load_skip_usage(root).get("entries") or [])}
+            self.assertIn("AIFILM_SKIP_ANTI_BORING_GATE", names)
+
+    def test_iron_flags_include_production_secondaries(self) -> None:
+        from core.skip_audit import IRON_SKIP_FLAGS
+
+        for name in (
+            "AIFILM_SKIP_ANTI_BORING_GATE",
+            "AIFILM_SKIP_FACE_IDENTITY_GATE",
+            "AIFILM_SKIP_CONTINUITY_GATE",
+        ):
+            self.assertIn(name, IRON_SKIP_FLAGS)
+
+
 if __name__ == "__main__":
     unittest.main()

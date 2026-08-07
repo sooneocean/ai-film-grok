@@ -34,12 +34,16 @@
 | 12 | 抽听中文 | 每场 ≥1 句人耳可懂 | aac 存在 ≠ 可懂；升 hard 仅用户要 `AIFILM_NATIVE_AUDIO_MANDARIN_HARD` |
 | 13 | 门红话术 | gate-auto 红 → **PARTIAL plate ship** | 禁称 master-lock / final_complete |
 | 14 | 改 final 清缓存 | 删陈旧 `quality-report.json` + 叙事重绑 | 见 closeout / post 纪律 |
+| 15 | SKIP 逃生记账 | `receipts/skip-usage.json` · closeout `skip_audit` / `skips_used` | IRON SKIP **无** `AIFILM_SKIP_REASON` → **PARTIAL** 禁 cert master |
+| 16 | 人证溯源 | `receipts/attestation-ledger.json` | anatomy/speaker 人证缺 provenance → `pending_human_review` 不假绿 |
+| 17 | plate≠master | official-final-report + plate_honesty | plate ship 须文案 **PARTIAL**；禁 `final_complete` 假 master |
 
 ### Agent 回报用户前（B1 肌肉 · 禁口头「final 好了」）
 
-1. 读 `receipts/official-final-report.json` → `status` / `master_lock` / path  
-2. 读 closeout `plate_honesty` + `duration_honesty`  
+1. 读 `receipts/official-final-report.json` → `status` / `master_lock` / `skips_used` / path  
+2. 读 closeout `plate_honesty` + `duration_honesty` + `skip_audit`  
 3. 有 `final-timeout.json` → 按 `next_cmd`，勿当成功  
-4. 三字段写进对话再给用户看片路径  
+4. 有 IRON SKIP → 确认 `AIFILM_SKIP_REASON` 已记账，否则 PARTIAL  
+5. 三字段写进对话再给用户看片路径  
 
-链：`stages/post.md` · memory `suse-ep01-official-final-iron` · plan `2026-08-06-ad-process-optimization-todoplan` · next-optimization W1。
+链：`stages/post.md` · memory `suse-ep01-official-final-iron` · honesty-rail · plan CTO A2。

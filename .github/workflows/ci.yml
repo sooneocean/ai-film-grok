@@ -60,6 +60,17 @@ jobs:
           assert cmds, "commands/*.md is empty"
           for c in cmds:
               assert "aifilm" in c.read_text(encoding="utf-8").lower(), f"{c.name} missing aifilm dispatch"
+          # G0.4 / D7.4 · version pointer must match plugin.json
+          ver = str(data["version"]).strip()
+          graph = Path("docs/GRAPH.md").read_text(encoding="utf-8")
+          assert ver in graph, f"docs/GRAPH.md missing plugin version {ver}; run make sync-docs"
+          readme = Path("README.md").read_text(encoding="utf-8")
+          assert ver in readme, f"README.md missing version {ver}; run make sync-docs"
+          if "BEGIN GENERATED: project-status" in readme:
+              block = readme.split("BEGIN GENERATED: project-status", 1)[1].split(
+                  "END GENERATED: project-status", 1
+              )[0]
+              assert ver in block, f"generated project-status missing {ver}"
           print("OK", data["name"], data["version"], "cmds:", [c.name for c in cmds])
           PY
 

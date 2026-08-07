@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "kind": "b3-ops-canary",
+  "at": "2026-08-07T03:45:55+00:00",
+  "comfy_url": "http://127.0.0.1:18188/system_stats",
+  "comfy_status": "http_200",
+  "ram_free": 53328367616,
+  "ram_total": 68498669568,
+  "open_ops_status": "OPEN_OPS",
+  "open_ops_reason": "no_film_root_drain_this_session",
+  "note": "Comfy 18188 reachable; no exclusive until-empty run this go-all (eng day)",
+  "next": "with film root + --i-own-the-gpu: aifilm h3 run-next / until-empty"
+}

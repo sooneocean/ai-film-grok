@@ -163,16 +163,18 @@ def _prompt_for_shot(
 ) -> str:
     """Build H3 motion prompt with shared film-core spine (DF/want/camera/dialogue).
 
-    When the film spec uses the 5090 H3 primary profile (``h3_primary`` or
-    ``hybrid_h3``), the prompt is built with MiniMax H3 temporal-segment
-    format (``[Xs-Ys]``) so the DiT decoder receives per-segment visual
-    decomposition instead of a single monolithic paragraph.
+    Dialects (``resolve_prompt_dialect``):
 
-    When 2V + reference images are available, the prompt includes a
-    Grok reference-composition stage before the timeline segments.
+    * **official** — MiniMax ``h3-prompt-writing`` structure
+      (``integrated_multimodal_description`` / soundscape / music, or Ref2VA six-section).
+      Env: ``AIFILM_H3_PROMPT_DIALECT=official`` or ``dsl.prompt_format=official``.
+    * **legacy** (default until O3 canary) — temporal ``[Xs-Ys]`` segments for
+      ``h3_primary`` / ``hybrid_h3``, or flat spine otherwise.
 
-    Combo-eval ``prompt_family`` (from registry winners) is hole-filled onto
-    the shot before compile so production matches canary recipes
+    When 2V + reference images are available on the *legacy* path, the prompt
+    may include a Grok reference-composition stage before timeline segments.
+
+    Combo-eval ``prompt_family`` hole-fills IR fields before compile
     (escape: ``AIFILM_H3_FAMILY_APPLY=0``).
     """
     from motion_prompt_spine import (
@@ -220,17 +222,31 @@ def _prompt_for_shot(
                     work_shot = apply_combo_family_to_shot(work_shot, fam_id)
         except Exception:
             work_shot = shot if isinstance(shot, dict) else {}
-    # Per-shot override for A/B: dsl.prompt_format = flat | timeline
+    # Per-shot override for A/B: dsl.prompt_format = flat | timeline | official
     dsl0 = work_shot.get("dsl") if isinstance(work_shot.get("dsl"), dict) else {}
     fmt = str(
         dsl0.get("prompt_format") or work_shot.get("prompt_format") or ""
     ).strip().lower()
+
+    dialect = "legacy"
+    try:
+        from h3_official_prompt import resolve_prompt_dialect
+
+        dialect = resolve_prompt_dialect(work_shot)
+    except Exception:
+        dialect = "legacy"
+
     if fmt in {"flat", "spine", "paragraph"}:
         use_timeline = False
+        dialect = "legacy"
     elif fmt in {"timeline", "temporal", "h3_timeline"}:
         use_timeline = True
+        dialect = "legacy"
+    elif fmt in {"official", "h3_official", "minimax", "native"}:
+        use_timeline = False
+        dialect = "official"
     else:
-        use_timeline = is_5090_h3
+        use_timeline = is_5090_h3 and dialect != "official"
 
     sid = str(work_shot.get("id") or "shot")
     prompt_paths = [
@@ -258,25 +274,47 @@ def _prompt_for_shot(
         duration = 8.0
     duration = max(3.0, min(8.0, duration))
 
-    if author:
+    if dialect == "official" and not author:
+        # Official MiniMax dialect — no Vertical 9:16 / legacy [0s-2s] wrapper.
+        from h3_official_prompt import compile_official_h3_prompt
+
+        prompt = compile_official_h3_prompt(
+            work_shot, mode=mode, spec=film, duration_sec=duration
+        )
+    elif author:
         # Keep author geometry/style; merge DF/want/dialogue; timeline when enabled.
         # Family-filled work_shot still supplies missing motion core clauses.
-        body = ensure_motion_core_in_prompt(
-            author,
-            film,
-            work_shot,
-            timeline=bool(use_timeline),
-            duration_sec=duration,
+        # If author already wrote official fields, pass through with core merge only.
+        author_is_official = "integrated_multimodal_description:" in author or (
+            "subject_definitions:" in author and "detailed_description:" in author
         )
-        if use_timeline:
-            prompt = body
-        elif not any(
-            k in body.lower()
-            for k in ("vertical 9:16", "picture 1", "text-to-video", "animate the start")
-        ):
-            prompt = f"{provider_prefix(mode)} {body}".strip()
+        if dialect == "official" or author_is_official:
+            from h3_official_prompt import compile_official_h3_prompt
+
+            # Prefer full recompile when dialect=official (IR wins over stale author).
+            if dialect == "official" and not author_is_official:
+                prompt = compile_official_h3_prompt(
+                    work_shot, mode=mode, spec=film, duration_sec=duration
+                )
+            else:
+                prompt = author
         else:
-            prompt = body
+            body = ensure_motion_core_in_prompt(
+                author,
+                film,
+                work_shot,
+                timeline=bool(use_timeline),
+                duration_sec=duration,
+            )
+            if use_timeline:
+                prompt = body
+            elif not any(
+                k in body.lower()
+                for k in ("vertical 9:16", "picture 1", "text-to-video", "animate the start")
+            ):
+                prompt = f"{provider_prefix(mode)} {body}".strip()
+            else:
+                prompt = body
     elif use_timeline:
         # Layer-4 timed action script ([0s-2s] …) for 5090 H3 (or explicit timeline).
         prompt = build_h3_temporal_prompt(

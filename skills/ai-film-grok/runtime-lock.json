@@ -1042,7 +1042,7 @@
     },
     {
       "path": "scripts/core/skip_audit.py",
-      "sha256": "7edcc7a66efa2a6fe8f8e604e31cf0f16213a4131fa5dd34b10a952281fb7095"
+      "sha256": "b9bc024d7a8982d77466c07bf6feb56e956ff6144ffa268578c5c0eb9ab380e6"
     },
     {
       "path": "scripts/craft_spine.py",
@@ -1450,7 +1450,7 @@
     },
     {
       "path": "scripts/gates/production_gates.py",
-      "sha256": "1179201a9cd93d685b74b7de9ac35873ae514366fd0a130d2ce6791a65321002"
+      "sha256": "ac23424a84ffced4c55841e5143105edd6c85d215b54d73a2e1b9fc1a70ad0ad"
     },
     {
       "path": "scripts/gates/quality_evidence.py",
@@ -1503,6 +1503,10 @@
     {
       "path": "scripts/h3_mode.py",
       "sha256": "101124905b67810f03f09c9b19b59398c25da62d24910144c5df2fa1e8aa915b"
+    },
+    {
+      "path": "scripts/h3_official_prompt.py",
+      "sha256": "c045985b60e6f47003f0d7fb62b61efc9220c2cc6bab508bc89c2e2a7398e00c"
     },
     {
       "path": "scripts/h3_ship_native.py",
@@ -1717,6 +1721,10 @@
       "sha256": "f39c960dd4180ec85c042fceb04944dec5e2de2cb6aa8e116401dba0d4530794"
     },
     {
+      "path": "scripts/media/h3_official_prompt.py",
+      "sha256": "3691d12467a0f09abe46e5f502b3fb5769c2785653e0bfeaa659afaa999341d0"
+    },
+    {
       "path": "scripts/media/h3_ship_native.py",
       "sha256": "3d7e91d9b99c19dc483ca939136249b876c579496bcdd5e49ee3b1db6d088826"
     },
@@ -1726,7 +1734,7 @@
     },
     {
       "path": "scripts/media/h3_workflow.py",
-      "sha256": "c8b78df14a4c108f5c209afd6a171e83669aa3e1c0467e9f0e9f39040deb7203"
+      "sha256": "351b0b2e320f396bce8b7f8498919c05d6355787bdbeeed166f1b31422ce3d25"
     },
     {
       "path": "scripts/media/i2v_motion_gate.py",
@@ -2871,6 +2879,10 @@
     {
       "path": "scripts/skill_runner.py",
       "sha256": "6541d162e61ec4ca8f9bde72668386e3d3751ca2a36be2ca8359cc2eb72e5b67"
+    },
+    {
+      "path": "scripts/smoke_console.py",
+      "sha256": "e9a35f5963494f924e5b5f188520c41e370857287f789910510e9cf2ae74bef8"
     },
     {
       "path": "scripts/sound_plan.py",
