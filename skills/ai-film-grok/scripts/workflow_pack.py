@@ -1744,67 +1744,7 @@ def ship_prep(
     root = _root(root)
     steps: list[dict[str, Any]] = []
 
-    if measure:
-        try:
-            from i2v_motion_gate import ensure_take_means
-
-            mm = ensure_take_means(root, recompute=False, write_sidecars=True)
-            steps.append(
-                {
-                    "id": "measure_means",
-                    "ok": True,
-                    "detail": (
-                        f"measured={mm.get('measured_count', 0)} "
-                        f"skipped={mm.get('skipped_count', 0)} "
-                        f"errors={mm.get('error_count', 0)}"
-                    ),
-                    "next_cmd": None,
-                }
-            )
-        except Exception as exc:  # noqa: BLE001
-            steps.append(
-                {
-                    "id": "measure_means",
-                    "ok": False,
-                    "detail": str(exc)[:200],
-                    "next_cmd": f'aifilm i2v-motion-gate --root "{root}" --write',
-                }
-            )
-
-    # True-video-only (hard): ban Ken Burns / panel still-motion approved clips
-    try:
-        from true_video_policy import scan_manifest_true_video
-
-        tv = scan_manifest_true_video(root)
-        steps.append(
-            {
-                "id": "true_video",
-                "ok": bool(tv.get("ok") or tv.get("skipped")),
-                "detail": (
-                    "skipped"
-                    if tv.get("skipped")
-                    else (
-                        f"checked={tv.get('checked', 0)} violations={len(tv.get('violations') or [])}"
-                    )
-                ),
-                "hard": True,
-                "next_cmd": (
-                    None
-                    if tv.get("ok") or tv.get("skipped")
-                    else "re-I2V Grok/H3; remove still-motion approved clips"
-                ),
-            }
-        )
-    except Exception as exc:  # noqa: BLE001
-        steps.append(
-            {
-                "id": "true_video",
-                "ok": False,
-                "detail": str(exc)[:200],
-                "hard": True,
-                "next_cmd": "check true_video_policy / re-register generative clips",
-            }
-        )
+    _ship_prep_means_truevideo(root, steps, measure)
 
     variety_env_skip = bool(skip_variety)
     if not variety_env_skip:
@@ -1959,233 +1899,9 @@ def ship_prep(
             }
         )
 
-    # E4.2 · music-director draft for prefer_native (advisory; draft when missing)
-    try:
-        from music_director import draft_and_save, plan_path
+    _ship_prep_draft_plans(root, steps, write)
 
-        _spec_md = read_json(root / "film-spec.json") or {}
-        ap = _spec_md.get("audio_policy") if isinstance(_spec_md, dict) else None
-        h3b = _spec_md.get("h3") if isinstance(_spec_md, dict) else None
-        policy = ""
-        if isinstance(ap, dict):
-            policy = str(ap.get("mode") or ap.get("audio_policy") or "")
-        elif isinstance(ap, str):
-            policy = ap
-        if not policy and isinstance(h3b, dict):
-            policy = str(h3b.get("audio_policy") or "")
-        policy = policy.strip().lower() or "prefer_native"
-        prefer_native = "native" in policy or policy in {"prefer_native", "film_native"}
-        md_path = plan_path(root)
-        has_plan = md_path.is_file()
-        detail = f"policy={policy}"
-        if prefer_native and not has_plan and write:
-            try:
-                draft_and_save(root)
-                has_plan = md_path.is_file()
-                detail = "drafted music-director plan (prefer_native)"
-            except Exception as exc:
-                detail = f"draft fail:{str(exc)[:100]}"
-        elif prefer_native and has_plan:
-            detail = "music-director plan present"
-        steps.append(
-            {
-                "id": "music_director",
-                "ok": True,
-                "advisory": True,
-                "detail": detail[:200],
-                "next_cmd": (
-                    None
-                    if has_plan or not prefer_native
-                    else f'aifilm music-director draft --root "{root}"'
-                ),
-            }
-        )
-    except Exception as exc:  # noqa: BLE001
-        steps.append(
-            {
-                "id": "music_director",
-                "ok": True,
-                "advisory": True,
-                "detail": f"skip:{str(exc)[:120]}",
-                "next_cmd": None,
-            }
-        )
-
-    # R2 · edit-director draft before final thrash (advisory; always when missing)
-    try:
-        from edit_director import draft_and_save, plan_path as ed_plan_path
-
-        ed_path = ed_plan_path(root)
-        has_ed = ed_path.is_file()
-        ed_detail = "edit-director plan present"
-        if not has_ed and write:
-            try:
-                draft_and_save(root, force=False)
-                has_ed = ed_path.is_file()
-                ed_detail = "drafted edit-director plan"
-            except Exception as exc:
-                ed_detail = f"draft fail:{str(exc)[:100]}"
-        elif not has_ed:
-            ed_detail = "missing edit-director plan"
-        steps.append(
-            {
-                "id": "edit_director",
-                "ok": True,
-                "advisory": True,
-                "detail": ed_detail[:200],
-                "next_cmd": (
-                    None
-                    if has_ed
-                    else f'aifilm edit-director draft --root "{root}"'
-                ),
-            }
-        )
-    except Exception as exc:  # noqa: BLE001
-        steps.append(
-            {
-                "id": "edit_director",
-                "ok": True,
-                "advisory": True,
-                "detail": f"skip:{str(exc)[:120]}",
-                "next_cmd": None,
-            }
-        )
-
-    # Fill-Idle / multi-take PK advisory (never hard-fail; never auto-promote)
-    pk_env_skip = bool(skip_pk)
-    if not pk_env_skip:
-        try:
-            from core.skip_audit import skip_flag
-
-            pk_env_skip = skip_flag(
-                "AIFILM_SKIP_SHIP_PK",
-                origin="env",
-                film_root=root,
-                call_site="ship_prep.pk_compare",
-            )
-        except Exception:
-            pk_env_skip = os.environ.get("AIFILM_SKIP_SHIP_PK", "").strip().lower() in {
-                "1",
-                "true",
-                "yes",
-                "on",
-            }
-    if pk_env_skip:
-        steps.append(
-            {
-                "id": "pk_compare",
-                "ok": True,
-                "skipped": True,
-                "advisory": True,
-                "detail": "AIFILM_SKIP_SHIP_PK or --skip-pk",
-                "next_cmd": None,
-            }
-        )
-    else:
-        try:
-            from h3_fill_idle import next_fill_idle_job, pk_compare
-
-            pk = pk_compare(root, measure_missing=False, write_dailies=write)
-            multi = [
-                s
-                for s in (pk.get("shots") or [])
-                if isinstance(s, dict) and int(s.get("take_count") or 0) >= 2
-            ]
-            human_rows: list[dict[str, Any]] = []
-            for s in multi[:40]:
-                rec = s.get("recommended") if isinstance(s.get("recommended"), dict) else {}
-                human_rows.append(
-                    {
-                        "shot_id": s.get("shot_id"),
-                        "take_count": s.get("take_count"),
-                        "recommended_lane": rec.get("lane"),
-                        "recommended_mean": rec.get("mean"),
-                        "recommended_path": rec.get("path"),
-                        "pk_score": rec.get("pk_score"),
-                        "caution": list(s.get("caution") or []),
-                    }
-                )
-            if write and multi:
-                write_json(
-                    root / "receipts" / "pk-compare-ship-prep.json",
-                    {
-                        "schema_version": 1,
-                        "kind": "ai-film-pk-compare-ship-prep",
-                        "ok": True,
-                        "human_required": True,
-                        "multi_take_count": len(multi),
-                        "shots": human_rows,
-                        "dailies_path": str(root / "receipts" / "pk-dailies.md"),
-                        "note": "advisory only — human select-shortlist --promote / pk-ledger",
-                    },
-                )
-            steps.append(
-                {
-                    "id": "pk_compare",
-                    "ok": True,
-                    "advisory": True,
-                    "human_required": bool(multi),
-                    "detail": (
-                        f"multi_take={len(multi)} (human review recommended)"
-                        if multi
-                        else "no multi-take shots"
-                    ),
-                    "next_cmd": (
-                        f'aifilm h3 pk-compare --root "{root}"; '
-                        f'aifilm select-shortlist --root "{root}" --promote  # human OK only'
-                        if multi
-                        else None
-                    ),
-                    "multi_take_count": len(multi),
-                    "shots": human_rows,
-                    "dailies_path": (
-                        str(root / "receipts" / "pk-dailies.md") if multi and write else None
-                    ),
-                }
-            )
-            # Pending Fill-Idle work (P0 meat still not burned) — advisory only
-            try:
-                nxt = next_fill_idle_job(root, include_challenge=True, check_capacity=False)
-                pending = int(nxt.get("pending_count") or 0)
-                n = nxt.get("next") if isinstance(nxt.get("next"), dict) else None
-                steps.append(
-                    {
-                        "id": "fill_idle_pending",
-                        "ok": True,
-                        "advisory": True,
-                        "detail": (
-                            f"pending={pending}"
-                            + (f" next={n.get('shot_id')}/{n.get('priority')}" if n else "")
-                        ),
-                        "next_cmd": (
-                            f'aifilm h3 run-next --root "{root}" --execute'
-                            if pending and n
-                            else None
-                        ),
-                        "pending_count": pending,
-                        "next_shot": n,
-                    }
-                )
-            except Exception as exc:  # noqa: BLE001
-                steps.append(
-                    {
-                        "id": "fill_idle_pending",
-                        "ok": True,
-                        "advisory": True,
-                        "detail": f"skip:{str(exc)[:120]}",
-                        "next_cmd": None,
-                    }
-                )
-        except Exception as exc:  # noqa: BLE001
-            steps.append(
-                {
-                    "id": "pk_compare",
-                    "ok": True,
-                    "advisory": True,
-                    "detail": f"skip:{str(exc)[:160]}",
-                    "next_cmd": f'aifilm h3 pk-compare --root "{root}"',
-                }
-            )
+    _ship_prep_pk_block(root, steps, write, skip_pk)
 
     # i2v: reuse receipt when green — full rewrite deferred to ensure_machine_lane
     gate_rep: dict[str, Any] = {}
@@ -2555,6 +2271,301 @@ def ship_prep(
     if write:
         write_json(root / "receipts" / "ship-prep.json", out)
     return out
+
+
+def _ship_prep_means_truevideo(root: Path, steps: list[dict[str, Any]], measure: bool) -> None:
+    """Measure take means + true-video (Ken Burns ban) preamble steps."""
+    if measure:
+        try:
+            from i2v_motion_gate import ensure_take_means
+
+            mm = ensure_take_means(root, recompute=False, write_sidecars=True)
+            steps.append(
+                {
+                    "id": "measure_means",
+                    "ok": True,
+                    "detail": (
+                        f"measured={mm.get('measured_count', 0)} "
+                        f"skipped={mm.get('skipped_count', 0)} "
+                        f"errors={mm.get('error_count', 0)}"
+                    ),
+                    "next_cmd": None,
+                }
+            )
+        except Exception as exc:  # noqa: BLE001
+            steps.append(
+                {
+                    "id": "measure_means",
+                    "ok": False,
+                    "detail": str(exc)[:200],
+                    "next_cmd": f'aifilm i2v-motion-gate --root "{root}" --write',
+                }
+            )
+
+    try:
+        from true_video_policy import scan_manifest_true_video
+
+        tv = scan_manifest_true_video(root)
+        steps.append(
+            {
+                "id": "true_video",
+                "ok": bool(tv.get("ok") or tv.get("skipped")),
+                "detail": (
+                    "skipped"
+                    if tv.get("skipped")
+                    else (
+                        f"checked={tv.get('checked', 0)} violations={len(tv.get('violations') or [])}"
+                    )
+                ),
+                "hard": True,
+                "next_cmd": (
+                    None
+                    if tv.get("ok") or tv.get("skipped")
+                    else "re-I2V Grok/H3; remove still-motion approved clips"
+                ),
+            }
+        )
+    except Exception as exc:  # noqa: BLE001
+        steps.append(
+            {
+                "id": "true_video",
+                "ok": False,
+                "detail": str(exc)[:200],
+                "hard": True,
+                "next_cmd": "check true_video_policy / re-register generative clips",
+            }
+        )
+
+
+def _ship_prep_draft_plans(root: Path, steps: list[dict[str, Any]], write: bool) -> None:
+    """Advisory draft steps: music-director (prefer_native) + edit-director plan."""
+    try:
+        from music_director import draft_and_save, plan_path
+
+        _spec_md = read_json(root / "film-spec.json") or {}
+        ap = _spec_md.get("audio_policy") if isinstance(_spec_md, dict) else None
+        h3b = _spec_md.get("h3") if isinstance(_spec_md, dict) else None
+        policy = ""
+        if isinstance(ap, dict):
+            policy = str(ap.get("mode") or ap.get("audio_policy") or "")
+        elif isinstance(ap, str):
+            policy = ap
+        if not policy and isinstance(h3b, dict):
+            policy = str(h3b.get("audio_policy") or "")
+        policy = policy.strip().lower() or "prefer_native"
+        prefer_native = "native" in policy or policy in {"prefer_native", "film_native"}
+        md_path = plan_path(root)
+        has_plan = md_path.is_file()
+        detail = f"policy={policy}"
+        if prefer_native and not has_plan and write:
+            try:
+                draft_and_save(root)
+                has_plan = md_path.is_file()
+                detail = "drafted music-director plan (prefer_native)"
+            except Exception as exc:
+                detail = f"draft fail:{str(exc)[:100]}"
+        elif prefer_native and has_plan:
+            detail = "music-director plan present"
+        steps.append(
+            {
+                "id": "music_director",
+                "ok": True,
+                "advisory": True,
+                "detail": detail[:200],
+                "next_cmd": (
+                    None
+                    if has_plan or not prefer_native
+                    else f'aifilm music-director draft --root "{root}"'
+                ),
+            }
+        )
+    except Exception as exc:  # noqa: BLE001
+        steps.append(
+            {
+                "id": "music_director",
+                "ok": True,
+                "advisory": True,
+                "detail": f"skip:{str(exc)[:120]}",
+                "next_cmd": None,
+            }
+        )
+
+    try:
+        from edit_director import draft_and_save, plan_path as ed_plan_path
+
+        ed_path = ed_plan_path(root)
+        has_ed = ed_path.is_file()
+        ed_detail = "edit-director plan present"
+        if not has_ed and write:
+            try:
+                draft_and_save(root, force=False)
+                has_ed = ed_path.is_file()
+                ed_detail = "drafted edit-director plan"
+            except Exception as exc:
+                ed_detail = f"draft fail:{str(exc)[:100]}"
+        elif not has_ed:
+            ed_detail = "missing edit-director plan"
+        steps.append(
+            {
+                "id": "edit_director",
+                "ok": True,
+                "advisory": True,
+                "detail": ed_detail[:200],
+                "next_cmd": (
+                    None
+                    if has_ed
+                    else f'aifilm edit-director draft --root "{root}"'
+                ),
+            }
+        )
+    except Exception as exc:  # noqa: BLE001
+        steps.append(
+            {
+                "id": "edit_director",
+                "ok": True,
+                "advisory": True,
+                "detail": f"skip:{str(exc)[:120]}",
+                "next_cmd": None,
+            }
+        )
+
+
+def _ship_prep_pk_block(root: Path, steps: list[dict[str, Any]], write: bool, skip_pk: bool) -> None:
+    """Fill-Idle / multi-take PK advisory (never hard-fail; never auto-promote)."""
+    pk_env_skip = bool(skip_pk)
+    if not pk_env_skip:
+        try:
+            from core.skip_audit import skip_flag
+
+            pk_env_skip = skip_flag(
+                "AIFILM_SKIP_SHIP_PK",
+                origin="env",
+                film_root=root,
+                call_site="ship_prep.pk_compare",
+            )
+        except Exception:
+            pk_env_skip = os.environ.get("AIFILM_SKIP_SHIP_PK", "").strip().lower() in {
+                "1",
+                "true",
+                "yes",
+                "on",
+            }
+    if pk_env_skip:
+        steps.append(
+            {
+                "id": "pk_compare",
+                "ok": True,
+                "skipped": True,
+                "advisory": True,
+                "detail": "AIFILM_SKIP_SHIP_PK or --skip-pk",
+                "next_cmd": None,
+            }
+        )
+    else:
+        try:
+            from h3_fill_idle import next_fill_idle_job, pk_compare
+
+            pk = pk_compare(root, measure_missing=False, write_dailies=write)
+            multi = [
+                s
+                for s in (pk.get("shots") or [])
+                if isinstance(s, dict) and int(s.get("take_count") or 0) >= 2
+            ]
+            human_rows: list[dict[str, Any]] = []
+            for s in multi[:40]:
+                rec = s.get("recommended") if isinstance(s.get("recommended"), dict) else {}
+                human_rows.append(
+                    {
+                        "shot_id": s.get("shot_id"),
+                        "take_count": s.get("take_count"),
+                        "recommended_lane": rec.get("lane"),
+                        "recommended_mean": rec.get("mean"),
+                        "recommended_path": rec.get("path"),
+                        "pk_score": rec.get("pk_score"),
+                        "caution": list(s.get("caution") or []),
+                    }
+                )
+            if write and multi:
+                write_json(
+                    root / "receipts" / "pk-compare-ship-prep.json",
+                    {
+                        "schema_version": 1,
+                        "kind": "ai-film-pk-compare-ship-prep",
+                        "ok": True,
+                        "human_required": True,
+                        "multi_take_count": len(multi),
+                        "shots": human_rows,
+                        "dailies_path": str(root / "receipts" / "pk-dailies.md"),
+                        "note": "advisory only — human select-shortlist --promote / pk-ledger",
+                    },
+                )
+            steps.append(
+                {
+                    "id": "pk_compare",
+                    "ok": True,
+                    "advisory": True,
+                    "human_required": bool(multi),
+                    "detail": (
+                        f"multi_take={len(multi)} (human review recommended)"
+                        if multi
+                        else "no multi-take shots"
+                    ),
+                    "next_cmd": (
+                        f'aifilm h3 pk-compare --root "{root}"; '
+                        f'aifilm select-shortlist --root "{root}" --promote  # human OK only'
+                        if multi
+                        else None
+                    ),
+                    "multi_take_count": len(multi),
+                    "shots": human_rows,
+                    "dailies_path": (
+                        str(root / "receipts" / "pk-dailies.md") if multi and write else None
+                    ),
+                }
+            )
+            # Pending Fill-Idle work (P0 meat still not burned) — advisory only
+            try:
+                nxt = next_fill_idle_job(root, include_challenge=True, check_capacity=False)
+                pending = int(nxt.get("pending_count") or 0)
+                n = nxt.get("next") if isinstance(nxt.get("next"), dict) else None
+                steps.append(
+                    {
+                        "id": "fill_idle_pending",
+                        "ok": True,
+                        "advisory": True,
+                        "detail": (
+                            f"pending={pending}"
+                            + (f" next={n.get('shot_id')}/{n.get('priority')}" if n else "")
+                        ),
+                        "next_cmd": (
+                            f'aifilm h3 run-next --root "{root}" --execute'
+                            if pending and n
+                            else None
+                        ),
+                        "pending_count": pending,
+                        "next_shot": n,
+                    }
+                )
+            except Exception as exc:  # noqa: BLE001
+                steps.append(
+                    {
+                        "id": "fill_idle_pending",
+                        "ok": True,
+                        "advisory": True,
+                        "detail": f"skip:{str(exc)[:120]}",
+                        "next_cmd": None,
+                    }
+                )
+        except Exception as exc:  # noqa: BLE001
+            steps.append(
+                {
+                    "id": "pk_compare",
+                    "ok": True,
+                    "advisory": True,
+                    "detail": f"skip:{str(exc)[:160]}",
+                    "next_cmd": f'aifilm h3 pk-compare --root "{root}"',
+                }
+            )
 
 
 def _read_motion_mean(root: Path, shot_id: str, take: Path) -> float | None:

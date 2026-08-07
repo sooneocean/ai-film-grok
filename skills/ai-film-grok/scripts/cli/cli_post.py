@@ -538,164 +538,18 @@ def cmd_final(args: argparse.Namespace) -> int:
     except ImportError as exc:
         raise FilmError(f"Cannot import post_route: {exc}") from exc
 
-    cmd = [sys.executable, str(script), "--root", str(root)]
-    if args.out_name:
-        cmd += ["--out-name", args.out_name]
-    if args.voice:
-        cmd += ["--voice", args.voice]
-    if getattr(args, "tts_backend", None):
-        cmd += ["--tts-backend", args.tts_backend]
-    # Use --flag=value so values starting with '-' (e.g. -5%) are not eaten as flags
-    if getattr(args, "vo_rate", None):
-        cmd += [f"--vo-rate={args.vo_rate}"]
-    if getattr(args, "vo_pitch", None):
-        cmd += [f"--vo-pitch={args.vo_pitch}"]
-    if getattr(args, "vo_gain", None) is not None:
-        cmd += [f"--vo-gain={args.vo_gain}"]
-    if getattr(args, "vocal_color_gain", None) is not None:
-        cmd += ["--vocal-color-gain", str(args.vocal_color_gain)]
-    if args.title:
-        cmd += ["--title", args.title]
-    if args.end_title:
-        cmd += ["--end-title", args.end_title]
-    if args.music:
-        cmd += ["--music", args.music]
-    if args.music_license:
-        cmd += ["--music-license", args.music_license]
-    if getattr(args, "music_template", None):
-        cmd += ["--music-template", str(args.music_template)]
-    if args.music_volume is not None:
-        cmd += ["--music-volume", str(args.music_volume)]
-    if getattr(args, "transition_sec", None) is not None:
-        cmd += ["--transition-sec", str(args.transition_sec)]
-    if getattr(args, "native_audio_volume", None) is not None:
-        cmd += ["--native-audio-volume", str(args.native_audio_volume)]
-    if args.music_mood:
-        cmd += ["--music-mood", args.music_mood]
-    if getattr(args, "music_seed", None) is not None:
-        cmd += ["--music-seed", str(int(args.music_seed))]
-    if getattr(args, "sidechain_threshold", None) is not None:
-        cmd += ["--sidechain-threshold", str(args.sidechain_threshold)]
-    if getattr(args, "sidechain_ratio", None) is not None:
-        cmd += ["--sidechain-ratio", str(args.sidechain_ratio)]
-    if getattr(args, "sidechain_attack", None) is not None:
-        cmd += ["--sidechain-attack", str(args.sidechain_attack)]
-    if getattr(args, "sidechain_release", None) is not None:
-        cmd += ["--sidechain-release", str(args.sidechain_release)]
-    if getattr(args, "loudnorm", None):
-        cmd += ["--loudnorm", str(args.loudnorm)]
-    if getattr(args, "target_lufs", None) is not None:
-        cmd += ["--target-lufs", str(args.target_lufs)]
-    if getattr(args, "lipsync", None):
-        cmd += ["--lipsync", args.lipsync]
-    if getattr(args, "sub_lead", None) is not None:
-        cmd += ["--sub-lead", str(args.sub_lead)]
-    if getattr(args, "sub_max_unit", None) is not None:
-        cmd += ["--sub-max-unit", str(args.sub_max_unit)]
-    if getattr(args, "sub_max_chars", None) is not None:
-        cmd += ["--sub-max-chars", str(args.sub_max_chars)]
-    if getattr(args, "title_dur", None) is not None:
-        cmd += ["--title-dur", str(args.title_dur)]
-    if getattr(args, "end_dur", None) is not None:
-        cmd += ["--end-dur", str(args.end_dur)]
-    if getattr(args, "allow_loop_risk", False):
-        cmd += ["--allow-loop-risk"]
-    if bool(getattr(args, "skip_preflight", False)):
-        cmd += ["--skip-preflight"]
-    if bool(getattr(args, "skip_heat_gate", False)):
-        cmd += ["--skip-heat-gate"]
-    if getattr(args, "vo_fit", None):
-        cmd += ["--vo-fit", str(args.vo_fit)]
-    if bool(getattr(args, "resume", False)):
-        cmd += ["--resume"]
-    if bool(getattr(args, "force", False)):
-        cmd += ["--force"]
-    cmd += ["--subs", subs_mode]
-    cmd += ["--plate-cards", plate_cards]
-    log(
-        f"stage_plate: render_final.py (post_engine={post_engine}, "
-        f"subs={subs_mode}, plate_cards={plate_cards}) — captions NOT assumed here"
-    )
-    # Short films retain the 1200s floor; longform scales by picture clock,
-    # shot count and lipsync work instead of being killed by a fixed timeout.
-    requested_timeout = int(getattr(args, "plate_timeout", 0) or 0)
-    if requested_timeout > 0:
-        plate_timeout = requested_timeout
-    else:
-        from longform import estimate_plate_timeout
-
-        plate_timeout = estimate_plate_timeout(
-            root,
-            lipsync=str(getattr(args, "lipsync", "off") or "off"),
-        )
-    from pipeline_events import append_event
-
-    append_event(
+    cmd = _build_render_cmd(root, args, script, post_engine, subs_mode, plate_cards)
+    ffmpeg_result, plate_exit = _run_plate(
         root,
-        stage="final-plate",
-        phase="started",
-        note=f"timeout_sec={plate_timeout}",
+        cmd,
+        args,
+        post_engine,
+        subs_mode,
+        plate_cards,
+        stages_receipt,
     )
-    try:
-        proc = run(cmd, check=False, timeout=plate_timeout)
-    except subprocess.TimeoutExpired as exc:
-        append_event(
-            root,
-            stage="final-plate",
-            phase="failed",
-            note=f"timeout_sec={plate_timeout}",
-        )
-        # Wave D: do not leave agents guessing — point at direct render_final + floor
-        skill_scripts = Path(__file__).resolve().parents[2]  # scripts/
-        raise FilmError(
-            f"final plate timed out after {plate_timeout}s. "
-            f"Retry with --plate-timeout {max(plate_timeout * 2, 1800)} "
-            f"or direct: {skill_scripts / 'runtime-python'} "
-            f"{skill_scripts / 'render_final.py'} --root {root} "
-            f"(set AIFILM_FFMPEG_TIMEOUT≥1800 for long mixes)"
-        ) from exc
-    append_event(
-        root,
-        stage="final-plate",
-        phase="completed" if proc.returncode == 0 else "failed",
-        note=f"returncode={proc.returncode}; timeout_sec={plate_timeout}",
-    )
-    sys.stderr.write(proc.stderr or "")
-    ffmpeg_result: dict[str, Any] | None = None
-    if proc.stdout:
-        try:
-            ffmpeg_result = json.loads(proc.stdout)
-        except json.JSONDecodeError:
-            # keep raw for ffmpeg-only path
-            if post_engine == "ffmpeg":
-                print(proc.stdout)
-    stages_receipt["plate"] = {
-        "ok": proc.returncode == 0,
-        "returncode": proc.returncode,
-        "subs": subs_mode,
-        "plate_cards": plate_cards,
-        "timeout_sec": plate_timeout,
-        "ffmpeg": {
-            "output": (ffmpeg_result or {}).get("output"),
-            "srt": (ffmpeg_result or {}).get("srt") or str(root / "out" / "final.srt"),
-            "subtitles": (ffmpeg_result or {}).get("subtitles"),
-        },
-    }
-    if proc.returncode != 0:
-        if post_engine == "ffmpeg" and not proc.stdout:
-            pass
-        elif post_engine != "ffmpeg":
-            emit(
-                {
-                    "ok": False,
-                    "post_engine": post_engine,
-                    "stage": "plate",
-                    "stages": stages_receipt,
-                    "error": (proc.stderr or proc.stdout or "render_final failed")[:2000],
-                    "ffmpeg": ffmpeg_result,
-                }
-            )
-        return proc.returncode
+    if plate_exit is not None:
+        return plate_exit
 
     if post_engine == "ffmpeg":
         if ffmpeg_result is not None:
@@ -740,7 +594,39 @@ def cmd_final(args: argparse.Namespace) -> int:
             print(proc.stdout)
         return 0
 
-    # stage_hf / stage_remotion: designed-post AFTER plate (subs off)
+    if post_engine in {"hyperframes", "remotion"}:
+        # stage_hf / stage_remotion: designed-post AFTER plate
+        return _dispatch_designed_post(
+            root,
+            args,
+            skill_dir,
+            post_engine,
+            post_plan,
+            preflight_report,
+            ffmpeg_result,
+            stages_receipt,
+            _attach_edit_director_gate,
+            allow_burned_underlay_route,
+            designed_caption_owner,
+        )
+
+    raise FilmError(f"unreachable post_engine={post_engine}")
+
+
+def _dispatch_designed_post(
+    root: Path,
+    args: argparse.Namespace,
+    skill_dir: Path,
+    post_engine: str,
+    post_plan: dict[str, Any] | None,
+    preflight_report: dict[str, Any] | None,
+    ffmpeg_result: dict[str, Any] | None,
+    stages_receipt: dict[str, Any],
+    attach_gate: callable,
+    allow_burned_underlay_route: bool,
+    designed_caption_owner: bool,
+) -> int:
+    """stage_hf / stage_remotion: designed-post AFTER plate (subs off)."""
     sys.path.insert(0, str(skill_dir / "scripts"))
     try:
         from compose_render import (
@@ -822,13 +708,9 @@ def cmd_final(args: argparse.Namespace) -> int:
         }
 
         final_path = Path(str(result.get("output") or root / "out" / "film_final.mp4"))
-        # stage_caption: master_hf → HF ownership gate; ship_hardburn → pixel ink only
         if designed_caption_owner:
             log("stage_caption: verify HF caption ownership (no assume) ...")
-            caption_gate = ensure_captions_after_hf(
-                root,
-                final_mp4=final_path,
-            )
+            caption_gate = ensure_captions_after_hf(root, final_mp4=final_path)
             stages_receipt["caption"] = caption_gate
             if not caption_gate.get("ok"):
                 stages_path = write_stages_receipt(root, stages_receipt)
@@ -885,7 +767,6 @@ def cmd_final(args: argparse.Namespace) -> int:
                 return 2
             owner = "ffmpeg_plate"
             burned = True
-        # Always refresh durable pixel receipt when delivery succeeds
         try:
             from caption_pixel_check import run_caption_pixel_check
 
@@ -912,7 +793,6 @@ def cmd_final(args: argparse.Namespace) -> int:
             "next": result.get("next"),
         }
     else:
-        # remotion
         if not which_npx_safe():
             raise FilmError(
                 "post-engine=remotion 需要 Node/npx。"
@@ -959,7 +839,6 @@ def cmd_final(args: argparse.Namespace) -> int:
                 )
             except PostPlanError as exc:
                 raise FilmError(str(exc)) from exc
-        # compose_render may return ok=False when not ready (no raise)
         out_obj = {
             "ok": bool(result.get("ok")),
             "post_engine": "remotion" if result.get("rendered") else None,
@@ -991,7 +870,7 @@ def cmd_final(args: argparse.Namespace) -> int:
                     if isinstance(i, dict)
                 ],
             }
-        emit(_attach_edit_director_gate(out_obj))
+        emit(attach_gate(out_obj))
         return 0 if out_obj.get("ok") else 2
 
     if preflight_report is not None:
@@ -1009,8 +888,191 @@ def cmd_final(args: argparse.Namespace) -> int:
     )
     if bgm_usage is not None:
         out_obj["bgm_usage"] = bgm_usage
-    emit(_attach_edit_director_gate(out_obj))
+    emit(attach_gate(out_obj))
     return 0
+
+
+def _build_render_cmd(
+    root: Path,
+    args: argparse.Namespace,
+    script: Path,
+    post_engine: str,
+    subs_mode: str,
+    plate_cards: str,
+) -> list[str]:
+    """Assemble the render_final.py argv (byte-identical to the inline build it replaced)."""
+    cmd = [sys.executable, str(script), "--root", str(root)]
+    if args.out_name:
+        cmd += ["--out-name", args.out_name]
+    if args.voice:
+        cmd += ["--voice", args.voice]
+    if getattr(args, "tts_backend", None):
+        cmd += ["--tts-backend", args.tts_backend]
+    # Use --flag=value so values starting with '-' (e.g. -5%) are not eaten as flags
+    if getattr(args, "vo_rate", None):
+        cmd += [f"--vo-rate={args.vo_rate}"]
+    if getattr(args, "vo_pitch", None):
+        cmd += [f"--vo-pitch={args.vo_pitch}"]
+    if getattr(args, "vo_gain", None) is not None:
+        cmd += [f"--vo-gain={args.vo_gain}"]
+    if getattr(args, "vocal_color_gain", None) is not None:
+        cmd += ["--vocal-color-gain", str(args.vocal_color_gain)]
+    if args.title:
+        cmd += ["--title", args.title]
+    if args.end_title:
+        cmd += ["--end-title", args.end_title]
+    if args.music:
+        cmd += ["--music", args.music]
+    if args.music_license:
+        cmd += ["--music-license", args.music_license]
+    if getattr(args, "music_template", None):
+        cmd += ["--music-template", str(args.music_template)]
+    if args.music_volume is not None:
+        cmd += ["--music-volume", str(args.music_volume)]
+    if getattr(args, "transition_sec", None) is not None:
+        cmd += ["--transition-sec", str(args.transition_sec)]
+    if getattr(args, "native_audio_volume", None) is not None:
+        cmd += ["--native-audio-volume", str(args.native_audio_volume)]
+    if args.music_mood:
+        cmd += ["--music-mood", args.music_mood]
+    if getattr(args, "music_seed", None) is not None:
+        cmd += ["--music-seed", str(int(args.music_seed))]
+    if getattr(args, "sidechain_threshold", None) is not None:
+        cmd += ["--sidechain-threshold", str(args.sidechain_threshold)]
+    if getattr(args, "sidechain_ratio", None) is not None:
+        cmd += ["--sidechain-ratio", str(args.sidechain_ratio)]
+    if getattr(args, "sidechain_attack", None) is not None:
+        cmd += ["--sidechain-attack", str(args.sidechain_attack)]
+    if getattr(args, "sidechain_release", None) is not None:
+        cmd += ["--sidechain-release", str(args.sidechain_release)]
+    if getattr(args, "loudnorm", None):
+        cmd += ["--loudnorm", str(args.loudnorm)]
+    if getattr(args, "target_lufs", None) is not None:
+        cmd += ["--target-lufs", str(args.target_lufs)]
+    if getattr(args, "lipsync", None):
+        cmd += ["--lipsync", args.lipsync]
+    if getattr(args, "sub_lead", None) is not None:
+        cmd += ["--sub-lead", str(args.sub_lead)]
+    if getattr(args, "sub_max_unit", None) is not None:
+        cmd += ["--sub-max-unit", str(args.sub_max_unit)]
+    if getattr(args, "sub_max_chars", None) is not None:
+        cmd += ["--sub-max-chars", str(args.sub_max_chars)]
+    if getattr(args, "title_dur", None) is not None:
+        cmd += ["--title-dur", str(args.title_dur)]
+    if getattr(args, "end_dur", None) is not None:
+        cmd += ["--end-dur", str(args.end_dur)]
+    if getattr(args, "allow_loop_risk", False):
+        cmd += ["--allow-loop-risk"]
+    if bool(getattr(args, "skip_preflight", False)):
+        cmd += ["--skip-preflight"]
+    if bool(getattr(args, "skip_heat_gate", False)):
+        cmd += ["--skip-heat-gate"]
+    if getattr(args, "vo_fit", None):
+        cmd += ["--vo-fit", str(args.vo_fit)]
+    if bool(getattr(args, "resume", False)):
+        cmd += ["--resume"]
+    if bool(getattr(args, "force", False)):
+        cmd += ["--force"]
+    cmd += ["--subs", subs_mode]
+    cmd += ["--plate-cards", plate_cards]
+    log(
+        f"stage_plate: render_final.py (post_engine={post_engine}, "
+        f"subs={subs_mode}, plate_cards={plate_cards}) — captions NOT assumed here"
+    )
+    return cmd
+
+
+def _run_plate(
+    root: Path,
+    cmd: list[str],
+    args: argparse.Namespace,
+    post_engine: str,
+    subs_mode: str,
+    plate_cards: str,
+    stages_receipt: dict[str, Any],
+) -> tuple[dict[str, Any] | None, int | None]:
+    """Run the final FFmpeg plate; returns (ffmpeg_result, exit_code_or_None)."""
+    # Short films retain the 1200s floor; longform scales by picture clock,
+    # shot count and lipsync work instead of being killed by a fixed timeout.
+    requested_timeout = int(getattr(args, "plate_timeout", 0) or 0)
+    if requested_timeout > 0:
+        plate_timeout = requested_timeout
+    else:
+        from longform import estimate_plate_timeout
+
+        plate_timeout = estimate_plate_timeout(
+            root,
+            lipsync=str(getattr(args, "lipsync", "off") or "off"),
+        )
+    from pipeline_events import append_event
+
+    append_event(
+        root,
+        stage="final-plate",
+        phase="started",
+        note=f"timeout_sec={plate_timeout}",
+    )
+    try:
+        proc = run(cmd, check=False, timeout=plate_timeout)
+    except subprocess.TimeoutExpired as exc:
+        append_event(
+            root,
+            stage="final-plate",
+            phase="failed",
+            note=f"timeout_sec={plate_timeout}",
+        )
+        # Wave D: do not leave agents guessing — point at direct render_final + floor
+        skill_scripts = Path(__file__).resolve().parents[2]  # scripts/
+        raise FilmError(
+            f"final plate timed out after {plate_timeout}s. "
+            f"Retry with --plate-timeout {max(plate_timeout * 2, 1800)} "
+            f"or direct: {skill_scripts / 'runtime-python'} "
+            f"{skill_scripts / 'render_final.py'} --root {root} "
+            f"(set AIFILM_FFMPEG_TIMEOUT≥1800 for long mixes)"
+        ) from exc
+    append_event(
+        root,
+        stage="final-plate",
+        phase="completed" if proc.returncode == 0 else "failed",
+        note=f"returncode={proc.returncode}; timeout_sec={plate_timeout}",
+    )
+    sys.stderr.write(proc.stderr or "")
+    ffmpeg_result: dict[str, Any] | None = None
+    if proc.stdout:
+        try:
+            ffmpeg_result = json.loads(proc.stdout)
+        except json.JSONDecodeError:
+            # keep raw for ffmpeg-only path
+            if post_engine == "ffmpeg":
+                print(proc.stdout)
+    stages_receipt["plate"] = {
+        "ok": proc.returncode == 0,
+        "returncode": proc.returncode,
+        "subs": subs_mode,
+        "plate_cards": plate_cards,
+        "timeout_sec": plate_timeout,
+        "ffmpeg": {
+            "output": (ffmpeg_result or {}).get("output"),
+            "srt": (ffmpeg_result or {}).get("srt") or str(root / "out" / "final.srt"),
+            "subtitles": (ffmpeg_result or {}).get("subtitles"),
+        },
+    }
+    if proc.returncode != 0:
+        if post_engine == "ffmpeg" and not proc.stdout:
+            pass
+        elif post_engine != "ffmpeg":
+            emit(
+                {
+                    "ok": False,
+                    "post_engine": post_engine,
+                    "stage": "plate",
+                    "stages": stages_receipt,
+                    "error": (proc.stderr or proc.stdout or "render_final failed")[:2000],
+                    "ffmpeg": ffmpeg_result,
+                }
+            )
+        return ffmpeg_result, proc.returncode
+    return ffmpeg_result, None
 
 
 def cmd_review_final(args: argparse.Namespace) -> int:
