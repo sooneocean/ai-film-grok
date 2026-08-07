@@ -766,12 +766,22 @@ class MediaQueue:
                 raise _queue_error(str(exc)) from exc
             # Wave G: pilot-approved bulk defaults to bulk-preflight hard gate
             # (pilot window ≤3 shots without approval stays open; canary/skip env opt-out).
-            skip_pf = os.environ.get("AIFILM_SKIP_BULK_PREFLIGHT", "").strip().lower() in {
-                "1",
-                "true",
-                "yes",
-                "on",
-            }
+            try:
+                from core.skip_audit import skip_flag
+
+                skip_pf = skip_flag(
+                    "AIFILM_SKIP_BULK_PREFLIGHT",
+                    origin="env",
+                    film_root=self.root,
+                    call_site="media_queue.add bulk_preflight",
+                )
+            except Exception:
+                skip_pf = os.environ.get("AIFILM_SKIP_BULK_PREFLIGHT", "").strip().lower() in {
+                    "1",
+                    "true",
+                    "yes",
+                    "on",
+                }
             force_pf = require_preflight or os.environ.get(
                 "AIFILM_REQUIRE_BULK_PREFLIGHT", ""
             ).strip().lower() in {"1", "true", "yes", "on"}

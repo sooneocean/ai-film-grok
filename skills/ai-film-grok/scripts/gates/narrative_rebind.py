@@ -195,13 +195,24 @@ def check_narrative_rebind(root: Path | str, *, write: bool = True) -> dict[str,
 
 
 def assert_narrative_rebind(root: Path | str, *, hard: bool = True) -> dict[str, Any]:
-    if os.environ.get("AIFILM_SKIP_NARRATIVE_REBIND", "").strip().lower() in {
-        "1",
-        "true",
-        "yes",
-        "on",
-    }:
-        return {"ok": True, "skipped": True, "escape": "AIFILM_SKIP_NARRATIVE_REBIND=1"}
+    try:
+        from core.skip_audit import skip_flag
+
+        if skip_flag(
+            "AIFILM_SKIP_NARRATIVE_REBIND",
+            origin="env",
+            film_root=root,
+            call_site="assert_narrative_rebind",
+        ):
+            return {"ok": True, "skipped": True, "escape": "AIFILM_SKIP_NARRATIVE_REBIND=1"}
+    except Exception:
+        if os.environ.get("AIFILM_SKIP_NARRATIVE_REBIND", "").strip().lower() in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        }:
+            return {"ok": True, "skipped": True, "escape": "AIFILM_SKIP_NARRATIVE_REBIND=1"}
     rep = check_narrative_rebind(root, write=True)
     if hard and not rep.get("ok"):
         codes = ",".join(

@@ -29,13 +29,23 @@ class GenerationRequestError(ValueError):
     """Generation request could not be built or validated."""
 
 
-def generation_request_skip_strict() -> bool:
-    return os.environ.get("AIFILM_SKIP_GENERATION_REQUEST", "").strip().lower() in {
-        "1",
-        "true",
-        "yes",
-        "on",
-    }
+def generation_request_skip_strict(root: Path | str | None = None) -> bool:
+    try:
+        from core.skip_audit import skip_flag
+
+        return skip_flag(
+            "AIFILM_SKIP_GENERATION_REQUEST",
+            origin="env",
+            film_root=root,
+            call_site="generation_request.generation_request_skip_strict",
+        )
+    except Exception:
+        return os.environ.get("AIFILM_SKIP_GENERATION_REQUEST", "").strip().lower() in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        }
 
 
 def _text_hash(text: str) -> str:

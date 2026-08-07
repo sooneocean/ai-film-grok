@@ -120,15 +120,25 @@ class ScalePromoteBanError(ValueError):
     """Blind promote blocked while scale-fallback promote_ban is active."""
 
 
-def scale_promote_skip() -> bool:
+def scale_promote_skip(root: Path | str | None = None) -> bool:
     import os
 
-    return os.environ.get("AIFILM_SKIP_SCALE_PROMOTE_GATE", "").strip().lower() in {
-        "1",
-        "true",
-        "yes",
-        "on",
-    }
+    try:
+        from core.skip_audit import skip_flag
+
+        return skip_flag(
+            "AIFILM_SKIP_SCALE_PROMOTE_GATE",
+            origin="env",
+            film_root=root,
+            call_site="scale_fallback.scale_promote_skip",
+        )
+    except Exception:
+        return os.environ.get("AIFILM_SKIP_SCALE_PROMOTE_GATE", "").strip().lower() in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        }
 
 
 def load_scale_fallback_receipt(root: Path | str) -> dict[str, Any] | None:

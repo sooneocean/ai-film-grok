@@ -434,12 +434,25 @@ def ship_native(
         write_json(root_p / "receipts" / "h3-ship-native.json", report)
         return report
 
-    if os.environ.get("AIFILM_SKIP_H3_SHIP_NATIVE", "").strip().lower() in {
-        "1",
-        "true",
-        "yes",
-    }:
-        raise H3ShipNativeError("AIFILM_SKIP_H3_SHIP_NATIVE=1")
+    try:
+        from core.skip_audit import skip_flag
+
+        if skip_flag(
+            "AIFILM_SKIP_H3_SHIP_NATIVE",
+            origin="env",
+            film_root=root_p,
+            call_site="h3_ship_native",
+        ):
+            raise H3ShipNativeError("AIFILM_SKIP_H3_SHIP_NATIVE=1")
+    except H3ShipNativeError:
+        raise
+    except Exception:
+        if os.environ.get("AIFILM_SKIP_H3_SHIP_NATIVE", "").strip().lower() in {
+            "1",
+            "true",
+            "yes",
+        }:
+            raise H3ShipNativeError("AIFILM_SKIP_H3_SHIP_NATIVE=1")
 
     _hard_concat(parts, out)
     if not out.is_file() or out.stat().st_size <= 0:

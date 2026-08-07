@@ -208,13 +208,24 @@ def check_continuity_programmatic(
 
 
 def assert_continuity_programmatic(root: Path | str, *, hard: bool = True) -> dict[str, Any]:
-    if os.environ.get("AIFILM_SKIP_CONTINUITY_PROG", "").strip().lower() in {
-        "1",
-        "true",
-        "yes",
-        "on",
-    }:
-        return {"ok": True, "skipped": True, "escape": "AIFILM_SKIP_CONTINUITY_PROG=1"}
+    try:
+        from core.skip_audit import skip_flag
+
+        if skip_flag(
+            "AIFILM_SKIP_CONTINUITY_PROG",
+            origin="env",
+            film_root=root,
+            call_site="assert_continuity_programmatic",
+        ):
+            return {"ok": True, "skipped": True, "escape": "AIFILM_SKIP_CONTINUITY_PROG=1"}
+    except Exception:
+        if os.environ.get("AIFILM_SKIP_CONTINUITY_PROG", "").strip().lower() in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        }:
+            return {"ok": True, "skipped": True, "escape": "AIFILM_SKIP_CONTINUITY_PROG=1"}
     report = check_continuity_programmatic(root, write=True)
     if hard and not report.get("ok"):
         codes = ",".join(i.get("code", "?") for i in report.get("issues") or [])

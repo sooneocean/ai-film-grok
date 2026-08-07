@@ -4,7 +4,7 @@
 
 | 项 | 本机探针（2026-08-06 · plugins checkout） |
 |----|------------------------------------------|
-| 版本 | `plugin.json` **2.40.42**（落档/G0+A1 本批） |
+| 版本 | `plugin.json` **2.40.75**（R5 skip 触达 + 账实 · 本轮） |
 | 源码 | scripts **~688** `.py` / **~170k** LOC |
 | 巨石函数 ≥200 行 | **74**；最大 `render_final` **2456** / `validate_film_spec` **2322** / `run_preflight` **1937** / `build_dispatch` **1249** |
 | 顶层模块 | ~349（约 **256** 薄 shim + ~**93** 仍厚） |
@@ -18,7 +18,7 @@
 | 旧板 / 子板 | 角色 |
 |------|------|
 | **`docs/plans/2026-08-07-iron-internalization-todoplan.md`** | **铁律→代码内化子板** · **I0–I4 产品链 CLOSED 2.40.51**；I5 ops deferred |
-| **`docs/plans/2026-08-07-delivery-honesty-rail-todoplan.md`** | **出片诚实审计轨** · **CLOSED R0–R4** 2.40.71（skip/attest/drift/I5 soft-hog+pgrep+OPEN_OPS） |
+| **`docs/plans/2026-08-07-delivery-honesty-rail-todoplan.md`** | **出片诚实审计轨** · **CLOSED R0–R5** 2.40.75（+ skip 热路径触达 wave） |
 | `docs/plans/2026-08-06-nutrient-matrix.md` | L3/L4/L5 养分对账（I0 刷新） |
 | `docs/plans/2026-08-06-next-optimization-todoplan.md` | 近期 W0–N 执行板（多数 SHIPPED） |
 | `docs/plans/2026-08-06-optimization-todoplan.md` | 出片 A–G · A1–A5 SHIPPED |
@@ -249,7 +249,7 @@
 | 1 | gates 静默 except → fail-closed | A1 | **P0 · 2.40.67** heat-final 收据写盘 fail-closed + skip_audit pilot；2.40.66 state_index ladder |
 | 2 | final/hotpath + plate≠master 永不回退 | A1/A2 | **P0** |
 | 3 | 双 checkout + 单一执行板 | G0 | **P0 · G0.2 ✅** 2026-08-07 git ff 对齐（禁手拷） |
-| 4 | 真片 ship-prep 人链 / 诚实 PARTIAL | A2 | **P0** · honesty-rail R1 partial (`skip_audit` closeout) 2.40.67 |
+| 4 | 真片 ship-prep 人链 / 诚实 PARTIAL | A2 | **P0** · honesty-rail R0–R5 CLOSED 2.40.75（skip 触达 + closeout PARTIAL） |
 | 5 | 5090 drain 或 OPEN_OPS | B3 | **P0 ops** |
 | 6 | 触达式 peel：final / validate / preflight | C4 | **P1** |
 | 7 | logging + FilmError + JSON I/O 增量 | C5 | **P1** · C5.1 pilot ✅ 2.40.74 |

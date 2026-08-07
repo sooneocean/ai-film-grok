@@ -37,8 +37,23 @@ def _utc_now() -> str:
     return datetime.now(UTC).replace(microsecond=0).isoformat()
 
 
-def _env_skip() -> bool:
-    return os.environ.get("AIFILM_SKIP_ANTI_HIJACK", "").strip() in {"1", "true", "yes", "on"}
+def _env_skip(root: Path | str | None = None) -> bool:
+    try:
+        from core.skip_audit import skip_flag
+
+        return skip_flag(
+            "AIFILM_SKIP_ANTI_HIJACK",
+            origin="env",
+            film_root=root,
+            call_site="composition_anti_hijack._env_skip",
+        )
+    except Exception:
+        return os.environ.get("AIFILM_SKIP_ANTI_HIJACK", "").strip() in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        }
 
 
 def multi_seed_anti_hijack_gate(

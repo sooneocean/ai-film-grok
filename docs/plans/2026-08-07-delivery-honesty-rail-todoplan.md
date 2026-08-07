@@ -6,8 +6,8 @@
 
 | 项 | 值 |
 |----|-----|
-| Status | **CLOSED 产品链 R0–R4 (2.40.71)** · R5=周账实指针 · 主执行板 [CTO](2026-08-06-cto-optimization-todoplan.md) |
-| Repo | `ai-film-grok`（target）· 版本探针 `plugin.json` = **2.40.71**（本轮） |
+| Status | **CLOSED 产品链 R0–R5 (2.40.75)** · skip 触达 wave + 账实对账 · 主执行板 [CTO](2026-08-06-cto-optimization-todoplan.md) |
+| Repo | `ai-film-grok`（target）· 版本探针 `plugin.json` = **2.40.75**（本轮） |
 | 内化子板 | [iron](2026-08-07-iron-internalization-todoplan.md)（I0–I4 产品链 CLOSED · I5 ops 待收编） |
 | 养分对账 | [nutrient-matrix](2026-08-06-nutrient-matrix.md) |
 | 治理 | [MEMORY_GOVERNANCE](../MEMORY_GOVERNANCE.md) |

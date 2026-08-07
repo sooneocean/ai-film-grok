@@ -273,12 +273,25 @@ def run_cinematic_gate(
         )
 
     # 4) variety + variety_pixel (A1 · probe fail must not silent-green)
-    if skip_variety or os.environ.get("AIFILM_SKIP_VARIETY_PREFLIGHT", "").strip().lower() in {
-        "1",
-        "true",
-        "yes",
-        "on",
-    }:
+    variety_skip = bool(skip_variety)
+    if not variety_skip:
+        try:
+            from core.skip_audit import skip_flag
+
+            variety_skip = skip_flag(
+                "AIFILM_SKIP_VARIETY_PREFLIGHT",
+                origin="env",
+                film_root=base,
+                call_site="cinematic_gate.variety",
+            )
+        except Exception:
+            variety_skip = os.environ.get("AIFILM_SKIP_VARIETY_PREFLIGHT", "").strip().lower() in {
+                "1",
+                "true",
+                "yes",
+                "on",
+            }
+    if variety_skip:
         steps.append(_step("variety", ok=True, hard=False, skipped=True, detail="skipped"))
     else:
         try:

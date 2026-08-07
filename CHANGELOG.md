@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.40.75] - 2026-08-07
+
+### Added (honesty-rail R5 + skip touch-migrate wave)
+- **R5 board reconcile:** honesty + CTO headers aligned to **2.40.75**; evidence report closed R0–R5.
+- **skip_flag touch wave:** anti-hijack · generation_request · scale_promote · endframe · composition_fill · five_track · fidelity final · variety (cinematic/ship/bulk) · variety_pixel · dialogue package · motion core · meaning · narrative rebind · continuity prog · pilot-go · bulk preflight · crop-master · ship PK · h3 ship-native · caption pixel · render_final package skip.
+- **IRON_SKIP_FLAGS** expanded: fidelity / composition_fill / motion_core / dialogue_package / meaning.
+- **Tests:** `test_round2_hotpath_skips_ledger` in `test_skip_audit`.
+
 ## [2.40.74] - 2026-08-07
 
 ### Added (CTO C5.1 logging pilot)

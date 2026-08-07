@@ -294,12 +294,12 @@ def assert_dialogue_drama_production_evidence(
     H3 prefer_native / post-lipsync freeze: skip when force or
     AIFILM_SKIP_DIALOGUE_PACKAGE_GATE=1 (plate path; not master).
     """
-    if force or os.environ.get("AIFILM_SKIP_DIALOGUE_PACKAGE_GATE", "").strip().lower() in {
-        "1",
-        "true",
-        "yes",
-        "on",
-    }:
+    if force or _env_skip_armed(
+        "AIFILM_SKIP_DIALOGUE_PACKAGE_GATE",
+        root,
+        env_skip=True,
+        call_site="assert_dialogue_drama_production_evidence",
+    ):
         return {
             "checked": False,
             "reason": "skipped_force_or_env",

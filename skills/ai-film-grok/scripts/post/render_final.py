@@ -478,12 +478,26 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
         "true",
         "yes",
         "on",
-    } or os.environ.get("AIFILM_SKIP_DIALOGUE_PACKAGE_GATE", "").strip().lower() in {
-        "1",
-        "true",
-        "yes",
-        "on",
     }
+    if not force_allow_clips:
+        try:
+            from core.skip_audit import skip_flag
+
+            force_allow_clips = skip_flag(
+                "AIFILM_SKIP_DIALOGUE_PACKAGE_GATE",
+                origin="env",
+                film_root=root,
+                call_site="render_final.force_allow_clips",
+            )
+        except Exception:
+            force_allow_clips = os.environ.get(
+                "AIFILM_SKIP_DIALOGUE_PACKAGE_GATE", ""
+            ).strip().lower() in {
+                "1",
+                "true",
+                "yes",
+                "on",
+            }
     shot_audio: list[dict[str, Any]] = []
     for i, shot in enumerate(shots):
         sid = shot["id"]

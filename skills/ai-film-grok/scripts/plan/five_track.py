@@ -45,13 +45,23 @@ class FiveTrackError(ValueError):
     pass
 
 
-def policy_skip_enabled() -> bool:
-    return os.environ.get("AIFILM_SKIP_FIVE_TRACK", "").strip().lower() in {
-        "1",
-        "true",
-        "yes",
-        "on",
-    }
+def policy_skip_enabled(root: Path | str | None = None) -> bool:
+    try:
+        from core.skip_audit import skip_flag
+
+        return skip_flag(
+            "AIFILM_SKIP_FIVE_TRACK",
+            origin="env",
+            film_root=root,
+            call_site="five_track.policy_skip_enabled",
+        )
+    except Exception:
+        return os.environ.get("AIFILM_SKIP_FIVE_TRACK", "").strip().lower() in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        }
 
 
 def five_track_enabled(spec: dict[str, Any] | None) -> bool:

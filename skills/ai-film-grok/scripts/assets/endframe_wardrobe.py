@@ -26,13 +26,23 @@ class EndframeWardrobeError(ValueError):
     pass
 
 
-def _env_skip() -> bool:
-    return os.environ.get("AIFILM_SKIP_ENDFRAME_WARDROBE", "").strip().lower() in {
-        "1",
-        "true",
-        "yes",
-        "on",
-    }
+def _env_skip(root: Path | str | None = None) -> bool:
+    try:
+        from core.skip_audit import skip_flag
+
+        return skip_flag(
+            "AIFILM_SKIP_ENDFRAME_WARDROBE",
+            origin="env",
+            film_root=root,
+            call_site="endframe_wardrobe._env_skip",
+        )
+    except Exception:
+        return os.environ.get("AIFILM_SKIP_ENDFRAME_WARDROBE", "").strip().lower() in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        }
 
 
 def _extract(video: Path, t_mode: str, out: Path) -> Path | None:

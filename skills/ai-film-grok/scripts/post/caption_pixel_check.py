@@ -28,13 +28,23 @@ def _first_file(root: Path, *relative: str) -> Path | None:
     return next((root / item for item in relative if (root / item).is_file()), None)
 
 
-def _skip_enabled() -> bool:
-    return str(os.environ.get("AIFILM_SKIP_CAPTION_PIXEL") or "").strip().lower() in {
-        "1",
-        "true",
-        "yes",
-        "on",
-    }
+def _skip_enabled(root: Path | str | None = None) -> bool:
+    try:
+        from core.skip_audit import skip_flag
+
+        return skip_flag(
+            "AIFILM_SKIP_CAPTION_PIXEL",
+            origin="env",
+            film_root=root,
+            call_site="caption_pixel_check._skip_enabled",
+        )
+    except Exception:
+        return str(os.environ.get("AIFILM_SKIP_CAPTION_PIXEL") or "").strip().lower() in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        }
 
 
 _CJK_SPACE = re.compile(r"[\u4e00-\u9fff]\s+[\u4e00-\u9fff]")

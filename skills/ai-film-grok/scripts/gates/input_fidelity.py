@@ -1116,13 +1116,24 @@ def assert_fidelity_allows_final(
     floor: float = DEFAULT_FINAL_FLOOR,
 ) -> dict[str, Any]:
     """Optional hard gate for final/export (Wave F3). Respects skip env."""
-    if (os.environ.get("AIFILM_SKIP_FIDELITY_FINAL_GATE") or "").strip().lower() in {
-        "1",
-        "true",
-        "yes",
-        "on",
-    }:
-        return {"ok": True, "skipped": True, "reason": "AIFILM_SKIP_FIDELITY_FINAL_GATE"}
+    try:
+        from core.skip_audit import skip_flag
+
+        if skip_flag(
+            "AIFILM_SKIP_FIDELITY_FINAL_GATE",
+            origin="env",
+            film_root=root,
+            call_site="assert_fidelity_allows_final",
+        ):
+            return {"ok": True, "skipped": True, "reason": "AIFILM_SKIP_FIDELITY_FINAL_GATE"}
+    except Exception:
+        if (os.environ.get("AIFILM_SKIP_FIDELITY_FINAL_GATE") or "").strip().lower() in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        }:
+            return {"ok": True, "skipped": True, "reason": "AIFILM_SKIP_FIDELITY_FINAL_GATE"}
     report = build_input_fidelity_report(root, write=True)
     report["human_summary"] = human_fidelity_summary(report)
     score = float(report.get("score") or 0.0)

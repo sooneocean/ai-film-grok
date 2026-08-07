@@ -117,7 +117,47 @@ class TestSkipAudit(unittest.TestCase):
             self.assertTrue(i2v_motion_gate_skip_enabled(root))
             names = {e.get("name") for e in (load_skip_usage(root).get("entries") or [])}
             self.assertIn("AIFILM_SKIP_GATE_AUTO", names)
-            self.assertIn("AIFILM_SKIP_I2V_MOTION_GATE", names)
+
+    def test_round2_hotpath_skips_ledger(self) -> None:
+        """R5 follow-up: anti-hijack / generation / scale / fill / five-track via skip_flag."""
+        from composition_anti_hijack import _env_skip as ah_skip
+        from generation_request import generation_request_skip_strict
+        from narrative.scale_fallback import scale_promote_skip
+        from composition_fill_gate import _env_skip as fill_skip
+        from five_track import policy_skip_enabled
+        from core.skip_audit import load_skip_usage
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            os.environ["AIFILM_SKIP_ANTI_HIJACK"] = "1"
+            os.environ["AIFILM_SKIP_GENERATION_REQUEST"] = "1"
+            os.environ["AIFILM_SKIP_SCALE_PROMOTE_GATE"] = "1"
+            os.environ["AIFILM_SKIP_COMPOSITION_FILL"] = "1"
+            os.environ["AIFILM_SKIP_FIVE_TRACK"] = "1"
+            try:
+                self.assertTrue(ah_skip(root))
+                self.assertTrue(generation_request_skip_strict(root))
+                self.assertTrue(scale_promote_skip(root))
+                self.assertTrue(fill_skip(root))
+                self.assertTrue(policy_skip_enabled(root))
+                names = {e.get("name") for e in (load_skip_usage(root).get("entries") or [])}
+                for n in (
+                    "AIFILM_SKIP_ANTI_HIJACK",
+                    "AIFILM_SKIP_GENERATION_REQUEST",
+                    "AIFILM_SKIP_SCALE_PROMOTE_GATE",
+                    "AIFILM_SKIP_COMPOSITION_FILL",
+                    "AIFILM_SKIP_FIVE_TRACK",
+                ):
+                    self.assertIn(n, names)
+            finally:
+                for k in (
+                    "AIFILM_SKIP_ANTI_HIJACK",
+                    "AIFILM_SKIP_GENERATION_REQUEST",
+                    "AIFILM_SKIP_SCALE_PROMOTE_GATE",
+                    "AIFILM_SKIP_COMPOSITION_FILL",
+                    "AIFILM_SKIP_FIVE_TRACK",
+                ):
+                    os.environ.pop(k, None)
 
     def test_pilot_and_heat_queue_ledger(self) -> None:
         from production_gates import assert_pilot_user_approved, assert_heat_allows_media

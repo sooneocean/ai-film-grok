@@ -22,4 +22,5 @@
 ## 链
 
 - hard-defaults 行：SKIP 运行期记账
-- 测：`test_skip_audit` · `test_attestation_provenance` · `test_checkout_drift`
+- 测：`test_skip_audit`（round2 hotpath）· attestation · checkout · soft-hog · pgrep · openops
+- 板：**R0–R5 CLOSED** @ 2.40.75

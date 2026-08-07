@@ -370,12 +370,22 @@ def bulk_preflight(
         add("still_uniqueness", True, skipped=True, error=str(exc)[:120])
 
     # Q1.4 crop-master dominance (savani): soft warn / hard if most stills are master crops
-    skip_crop = os.environ.get("AIFILM_SKIP_CROP_MASTER_STILL", "").strip().lower() in {
-        "1",
-        "true",
-        "yes",
-        "on",
-    }
+    try:
+        from core.skip_audit import skip_flag
+
+        skip_crop = skip_flag(
+            "AIFILM_SKIP_CROP_MASTER_STILL",
+            origin="env",
+            film_root=root,
+            call_site="workflow_pack.bulk_preflight.crop_master",
+        )
+    except Exception:
+        skip_crop = os.environ.get("AIFILM_SKIP_CROP_MASTER_STILL", "").strip().lower() in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        }
     if skip_crop:
         add("crop_master_still", True, skipped=True, escape="AIFILM_SKIP_CROP_MASTER_STILL=1")
     else:
@@ -496,12 +506,22 @@ def bulk_preflight(
 
     # variety (design anti-boring) — hard door for bulk (P1 · 2026-08-04 · Wave 4)
     # Adult meat films: field floors (≥4 pose / ≥2 face CU / ≥2 L4) must pass before queue.
-    skip_variety = os.environ.get("AIFILM_SKIP_VARIETY_PREFLIGHT", "").strip().lower() in {
-        "1",
-        "true",
-        "yes",
-        "on",
-    }
+    try:
+        from core.skip_audit import skip_flag
+
+        skip_variety = skip_flag(
+            "AIFILM_SKIP_VARIETY_PREFLIGHT",
+            origin="env",
+            film_root=root,
+            call_site="workflow_pack.bulk_preflight.variety",
+        )
+    except Exception:
+        skip_variety = os.environ.get("AIFILM_SKIP_VARIETY_PREFLIGHT", "").strip().lower() in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        }
     if skip_variety:
         add("variety", True, skipped=True, escape="AIFILM_SKIP_VARIETY_PREFLIGHT=1")
     else:
@@ -531,12 +551,22 @@ def bulk_preflight(
 
     # Q4.1 duration target honesty (planned + optional media sum vs target)
     # Soft by default; hard when DURATION_*_HARD (planned or media gap >20%).
-    skip_dur = os.environ.get("AIFILM_SKIP_DURATION_TARGET", "").strip().lower() in {
-        "1",
-        "true",
-        "yes",
-        "on",
-    }
+    try:
+        from core.skip_audit import skip_flag
+
+        skip_dur = skip_flag(
+            "AIFILM_SKIP_DURATION_TARGET",
+            origin="env",
+            film_root=root,
+            call_site="workflow_pack.bulk_preflight.duration",
+        )
+    except Exception:
+        skip_dur = os.environ.get("AIFILM_SKIP_DURATION_TARGET", "").strip().lower() in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        }
     if skip_dur:
         add("duration_target", True, skipped=True, escape="AIFILM_SKIP_DURATION_TARGET=1")
     else:
@@ -952,17 +982,33 @@ def variety_pixel_bind(root: Path | str, *, write: bool = True) -> dict[str, Any
 
     Escape: ``AIFILM_SKIP_VARIETY_PIXEL=1`` or ``AIFILM_SKIP_VARIETY_PREFLIGHT=1``.
     """
-    if os.environ.get("AIFILM_SKIP_VARIETY_PIXEL", "").strip().lower() in {
-        "1",
-        "true",
-        "yes",
-        "on",
-    } or os.environ.get("AIFILM_SKIP_VARIETY_PREFLIGHT", "").strip().lower() in {
-        "1",
-        "true",
-        "yes",
-        "on",
-    }:
+    try:
+        from core.skip_audit import skip_flag
+
+        _pix_skip = skip_flag(
+            "AIFILM_SKIP_VARIETY_PIXEL",
+            origin="env",
+            film_root=root,
+            call_site="variety_pixel_bind",
+        ) or skip_flag(
+            "AIFILM_SKIP_VARIETY_PREFLIGHT",
+            origin="env",
+            film_root=root,
+            call_site="variety_pixel_bind",
+        )
+    except Exception:
+        _pix_skip = os.environ.get("AIFILM_SKIP_VARIETY_PIXEL", "").strip().lower() in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        } or os.environ.get("AIFILM_SKIP_VARIETY_PREFLIGHT", "").strip().lower() in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        }
+    if _pix_skip:
         return {
             "schema_version": 1,
             "kind": "variety-pixel",
@@ -1099,17 +1145,32 @@ def assert_variety_preflight(
     Escape: ``AIFILM_SKIP_VARIETY_PREFLIGHT=1``.
     Reuses green receipt when film-spec mtime is not newer.
     """
-    if os.environ.get("AIFILM_SKIP_VARIETY_PREFLIGHT", "").strip().lower() in {
-        "1",
-        "true",
-        "yes",
-        "on",
-    }:
-        return {
-            "ok": True,
-            "skipped": True,
-            "escape": "AIFILM_SKIP_VARIETY_PREFLIGHT=1",
-        }
+    try:
+        from core.skip_audit import skip_flag
+
+        if skip_flag(
+            "AIFILM_SKIP_VARIETY_PREFLIGHT",
+            origin="env",
+            film_root=root,
+            call_site="assert_variety_preflight",
+        ):
+            return {
+                "ok": True,
+                "skipped": True,
+                "escape": "AIFILM_SKIP_VARIETY_PREFLIGHT=1",
+            }
+    except Exception:
+        if os.environ.get("AIFILM_SKIP_VARIETY_PREFLIGHT", "").strip().lower() in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        }:
+            return {
+                "ok": True,
+                "skipped": True,
+                "escape": "AIFILM_SKIP_VARIETY_PREFLIGHT=1",
+            }
     root_p = _root(root)
     receipt_path = root_p / "receipts" / VARIETY_NAME
     spec_path = root_p / "film-spec.json"
@@ -1684,12 +1745,22 @@ def ship_prep(
             }
         )
 
-    if skip_variety or os.environ.get("AIFILM_SKIP_VARIETY_PREFLIGHT", "").strip().lower() in {
-        "1",
-        "true",
-        "yes",
-        "on",
-    }:
+    variety_env_skip = bool(skip_variety)
+    if not variety_env_skip:
+        try:
+            from core.skip_audit import skip_flag
+
+            variety_env_skip = skip_flag(
+                "AIFILM_SKIP_VARIETY_PREFLIGHT",
+                origin="env",
+                film_root=root,
+                call_site="ship_prep.variety",
+            )
+        except Exception:
+            variety_env_skip = os.environ.get(
+                "AIFILM_SKIP_VARIETY_PREFLIGHT", ""
+            ).strip().lower() in {"1", "true", "yes", "on"}
+    if variety_env_skip:
         steps.append(
             {
                 "id": "variety",
@@ -1783,12 +1854,25 @@ def ship_prep(
     )
 
     # Fill-Idle / multi-take PK advisory (never hard-fail; never auto-promote)
-    if skip_pk or os.environ.get("AIFILM_SKIP_SHIP_PK", "").strip().lower() in {
-        "1",
-        "true",
-        "yes",
-        "on",
-    }:
+    pk_env_skip = bool(skip_pk)
+    if not pk_env_skip:
+        try:
+            from core.skip_audit import skip_flag
+
+            pk_env_skip = skip_flag(
+                "AIFILM_SKIP_SHIP_PK",
+                origin="env",
+                film_root=root,
+                call_site="ship_prep.pk_compare",
+            )
+        except Exception:
+            pk_env_skip = os.environ.get("AIFILM_SKIP_SHIP_PK", "").strip().lower() in {
+                "1",
+                "true",
+                "yes",
+                "on",
+            }
+    if pk_env_skip:
         steps.append(
             {
                 "id": "pk_compare",

@@ -541,8 +541,19 @@ def assert_pilot_go_allows_bulk(root: Path | str, *, force: bool = False) -> dic
 
     if force:
         return {"skipped": True, "reason": "force"}
-    if os.environ.get("AIFILM_SKIP_PILOT_GO_GATE", "").strip() in {"1", "true", "yes"}:
-        return {"skipped": True, "reason": "env"}
+    try:
+        from core.skip_audit import skip_flag
+
+        if skip_flag(
+            "AIFILM_SKIP_PILOT_GO_GATE",
+            origin="env",
+            film_root=root,
+            call_site="assert_pilot_go_allows_bulk",
+        ):
+            return {"skipped": True, "reason": "env"}
+    except Exception:
+        if os.environ.get("AIFILM_SKIP_PILOT_GO_GATE", "").strip() in {"1", "true", "yes"}:
+            return {"skipped": True, "reason": "env"}
     base = _root(root)
     path = base / RECEIPT_REL
     if not path.is_file():

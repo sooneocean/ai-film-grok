@@ -66,14 +66,24 @@ _PROMPT_TIERS = frozenset({"soft", "medium", "high"})
 _OPTICAL_TIERS = frozenset({"soft", "medium", "normal", "meat", "high"})
 
 
-def motion_core_skip_enabled() -> bool:
+def motion_core_skip_enabled(root: Path | str | None = None) -> bool:
     """Escape hatch for legacy films / emergency bulk (AIFILM_SKIP_MOTION_CORE=1)."""
-    return os.environ.get("AIFILM_SKIP_MOTION_CORE", "").strip().lower() in {
-        "1",
-        "true",
-        "yes",
-        "on",
-    }
+    try:
+        from core.skip_audit import skip_flag
+
+        return skip_flag(
+            "AIFILM_SKIP_MOTION_CORE",
+            origin="env",
+            film_root=root,
+            call_site="motion_prompt_spine.motion_core_skip_enabled",
+        )
+    except Exception:
+        return os.environ.get("AIFILM_SKIP_MOTION_CORE", "").strip().lower() in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        }
 
 
 def motion_tier_resolve(

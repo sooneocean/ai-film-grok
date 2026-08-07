@@ -686,12 +686,22 @@ def meaning_gate_enabled(spec: dict[str, Any] | None) -> bool:
     write-spec still fail-closes via cinematic_audit (always applies meaning
     issues) regardless of this flag.
     """
-    if os.environ.get("AIFILM_SKIP_MEANING_GATE", "").strip().lower() in {
-        "1",
-        "true",
-        "yes",
-        "on",
-    }:
+    try:
+        from core.skip_audit import skip_flag
+
+        meaning_skip = skip_flag(
+            "AIFILM_SKIP_MEANING_GATE",
+            origin="env",
+            call_site="dramatic_meaning.strict_enabled",
+        )
+    except Exception:
+        meaning_skip = os.environ.get("AIFILM_SKIP_MEANING_GATE", "").strip().lower() in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        }
+    if meaning_skip:
         flag = spec.get("dramatic_meaning_strict") if isinstance(spec, dict) else None
         return flag is True
     if not isinstance(spec, dict):

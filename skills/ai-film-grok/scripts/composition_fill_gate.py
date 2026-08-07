@@ -50,13 +50,23 @@ _CAST_FULLBODY_MARKERS = (
 Mode = Literal["open", "chain"]
 
 
-def _env_skip() -> bool:
-    return os.environ.get("AIFILM_SKIP_COMPOSITION_FILL", "").strip().lower() in {
-        "1",
-        "true",
-        "yes",
-        "on",
-    }
+def _env_skip(root: Path | str | None = None) -> bool:
+    try:
+        from core.skip_audit import skip_flag
+
+        return skip_flag(
+            "AIFILM_SKIP_COMPOSITION_FILL",
+            origin="env",
+            film_root=root,
+            call_site="composition_fill_gate._env_skip",
+        )
+    except Exception:
+        return os.environ.get("AIFILM_SKIP_COMPOSITION_FILL", "").strip().lower() in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        }
 
 
 def measure_subject_fill(path: Path | str) -> dict[str, Any]:
