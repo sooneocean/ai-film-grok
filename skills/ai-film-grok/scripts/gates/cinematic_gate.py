@@ -229,7 +229,7 @@ def run_cinematic_gate(
         try:
             from i2v_motion_gate import i2v_motion_gate_skip_enabled
 
-            if i2v_motion_gate_skip_enabled():
+            if i2v_motion_gate_skip_enabled(base):
                 auto_ok = True
                 detail = "AIFILM_SKIP_I2V_MOTION_GATE"
                 codes = []

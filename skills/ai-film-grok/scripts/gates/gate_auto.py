@@ -41,13 +41,24 @@ class GateAutoError(FilmError):
     pass
 
 
-def skip_enabled() -> bool:
-    return os.environ.get("AIFILM_SKIP_GATE_AUTO", "").strip().lower() in {
-        "1",
-        "true",
-        "yes",
-        "on",
-    }
+def skip_enabled(root: Path | str | None = None) -> bool:
+    """Honesty-rail: ledger AIFILM_SKIP_GATE_AUTO when film root known."""
+    try:
+        from core.skip_audit import skip_flag
+
+        return skip_flag(
+            "AIFILM_SKIP_GATE_AUTO",
+            origin="env",
+            film_root=root,
+            call_site="gate_auto.skip_enabled",
+        )
+    except Exception:
+        return os.environ.get("AIFILM_SKIP_GATE_AUTO", "").strip().lower() in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        }
 
 
 def machine_receipts_green(root: Path | str) -> dict[str, Any]:
@@ -321,7 +332,7 @@ def run_gate_auto(
     return a fast_path receipt without re-measuring means (export/closeout thrash).
     """
     base = Path(root).expanduser().resolve()
-    if skip_enabled():
+    if skip_enabled(base):
         out = {
             "schema_version": 1,
             "kind": "gate-auto",

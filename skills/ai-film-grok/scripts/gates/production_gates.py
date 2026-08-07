@@ -39,6 +39,29 @@ class ProductionGateError(FilmError):
     """Raised when a production gate blocks the operation."""
 
 
+def _env_skip_armed(
+    name: str,
+    root: Path | str | None,
+    *,
+    env_skip: bool = True,
+    call_site: str,
+) -> bool:
+    """Honesty-rail: env SKIP via central skip_flag (ledger when root known)."""
+    if not env_skip:
+        return False
+    try:
+        from core.skip_audit import skip_flag
+
+        return skip_flag(
+            name,
+            origin="env",
+            film_root=root,
+            call_site=call_site,
+        )
+    except Exception:
+        return os.environ.get(name, "").strip().lower() in {"1", "true", "yes", "on"}
+
+
 def _open_gate_root(root: Path) -> tuple[Path, int]:
     raw = Path(root).expanduser()
     base = Path(os.path.abspath(raw))
@@ -366,7 +389,12 @@ def assert_pilot_user_approved(
     """Strict check: user pilot must already be on disk (used by final / status helpers)."""
     if force:
         return {"skipped": True, "reason": "force"}
-    if env_skip and os.environ.get("AIFILM_SKIP_PILOT_GATE", "").strip() in {"1", "true", "yes"}:
+    if _env_skip_armed(
+        "AIFILM_SKIP_PILOT_GATE",
+        root,
+        env_skip=env_skip,
+        call_site="assert_pilot_user_approved",
+    ):
         return {"skipped": True, "reason": "env"}
     data = load_pilot_approval(root)
     if pilot_is_user_approved(data):
@@ -504,7 +532,12 @@ def assert_pilot_allows_add(
             )
     if force:
         return {"skipped": True, "reason": "force"}
-    if env_skip and os.environ.get("AIFILM_SKIP_PILOT_GATE", "").strip() in {"1", "true", "yes"}:
+    if _env_skip_armed(
+        "AIFILM_SKIP_PILOT_GATE",
+        root,
+        env_skip=env_skip,
+        call_site="assert_pilot_user_approved_for_queue",
+    ):
         return {"skipped": True, "reason": "env"}
     pilot = load_pilot_approval(root)
     if pilot_is_user_approved(pilot):
@@ -559,11 +592,12 @@ def assert_heat_allows_media(
     """
     if force:
         return {"skipped": True, "reason": "force"}
-    if env_skip and os.environ.get("AIFILM_SKIP_HEAT_QUEUE_GATE", "").strip() in {
-        "1",
-        "true",
-        "yes",
-    }:
+    if _env_skip_armed(
+        "AIFILM_SKIP_HEAT_QUEUE_GATE",
+        root,
+        env_skip=env_skip,
+        call_site="assert_heat_allows_media",
+    ):
         return {"skipped": True, "reason": "env"}
     try:
         from heat_check import heat_agent_status
@@ -965,11 +999,12 @@ def assert_no_loop_risk(
 
     if force:
         return []
-    if env_skip and os.environ.get("AIFILM_SKIP_LOOP_RISK_GATE", "").strip() in {
-        "1",
-        "true",
-        "yes",
-    }:
+    if _env_skip_armed(
+        "AIFILM_SKIP_LOOP_RISK_GATE",
+        root,
+        env_skip=env_skip,
+        call_site="assert_no_loop_risk",
+    ):
         return []
     if data is None:
         return []

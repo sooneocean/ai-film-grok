@@ -126,13 +126,24 @@ class TrueVideoPolicyError(ValueError):
     """Hero clip violates true-video-only policy."""
 
 
-def policy_skip_enabled() -> bool:
-    return os.environ.get("AIFILM_SKIP_TRUE_VIDEO_POLICY", "").strip().lower() in {
-        "1",
-        "true",
-        "yes",
-        "on",
-    }
+def policy_skip_enabled(root: Path | str | None = None) -> bool:
+    """Honesty-rail: ledger AIFILM_SKIP_TRUE_VIDEO_POLICY when film root known."""
+    try:
+        from core.skip_audit import skip_flag
+
+        return skip_flag(
+            "AIFILM_SKIP_TRUE_VIDEO_POLICY",
+            origin="env",
+            film_root=root,
+            call_site="true_video_policy.policy_skip_enabled",
+        )
+    except Exception:
+        return os.environ.get("AIFILM_SKIP_TRUE_VIDEO_POLICY", "").strip().lower() in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        }
 
 
 def production_mode_of(root: Path | str | None = None, spec: dict[str, Any] | None = None) -> str:
@@ -241,7 +252,7 @@ def assert_hero_clip_source(
 
     Environment/bridge role is lighter but still must be real video (not png).
     """
-    if policy_skip_enabled():
+    if policy_skip_enabled(root):
         return {
             "ok": True,
             "skipped": True,
@@ -397,7 +408,7 @@ def scan_manifest_true_video(
 ) -> dict[str, Any]:
     """Audit all approved clips for still-motion / non-video smuggling."""
     base = Path(root).expanduser().resolve()
-    if policy_skip_enabled():
+    if policy_skip_enabled(base):
         return {
             "ok": True,
             "skipped": True,

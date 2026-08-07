@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.40.70] - 2026-08-07
+
+### Fixed (honesty-rail R1 expand · more skip_flag wires)
+- **skip_flag wired:** `gate_auto.skip_enabled(root)` · `i2v_motion_gate_skip_enabled(root)` · pilot / heat-queue / loop-risk via `production_gates._env_skip_armed` · `true_video_policy.policy_skip_enabled(root)`.
+- **call sites:** closeout + cinematic pass film root into i2v skip.
+- **Tests:** `test_skip_audit` pilot/gate_auto/i2v ledger scenarios.
+
 ## [2.40.69] - 2026-08-07
 
 ### Added (delivery honesty-rail R1 complete + R2 + R3)

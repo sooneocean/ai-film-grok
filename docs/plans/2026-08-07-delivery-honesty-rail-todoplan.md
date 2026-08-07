@@ -6,8 +6,8 @@
 
 | 项 | 值 |
 |----|-----|
-| Status | **Active** · 2026-08-07 **R0–R3 SHIPPED (2.40.68)** · R4 I5 ops / R5 weekly reconcile residual · 主执行板 [CTO](2026-08-06-cto-optimization-todoplan.md) |
-| Repo | `ai-film-grok`（target）· 版本探针 `plugin.json` = **2.40.68**（本轮） |
+| Status | **Active** · 2026-08-07 **R0–R3 SHIPPED (2.40.70)** · R4 I5 ops / R5 weekly reconcile residual · 主执行板 [CTO](2026-08-06-cto-optimization-todoplan.md) |
+| Repo | `ai-film-grok`（target）· 版本探针 `plugin.json` = **2.40.70**（本轮） |
 | 内化子板 | [iron](2026-08-07-iron-internalization-todoplan.md)（I0–I4 产品链 CLOSED · I5 ops 待收编） |
 | 养分对账 | [nutrient-matrix](2026-08-06-nutrient-matrix.md) |
 | 治理 | [MEMORY_GOVERNANCE](../MEMORY_GOVERNANCE.md) |
@@ -57,8 +57,8 @@
 
 | ID | Todo | 验收 |
 |----|------|------|
-| R0.1 | 本 plan 顶部 `Status` 标记为 `Active`；与 CTO「OPEN 冻结集」互映 | 两板 header 账实一致 | ✅ 2.40.67 |
-| R0.2 | 补 diff：版本号对齐实码；iron 板 I1.4/I1.1 pending↔✅ 对齐 | reconcile 一次 | ✅ 2.40.67 pointer |
+| R0.1 | 本 plan 顶部 `Status` 标记为 `Active`；与 CTO「OPEN 冻结集」互映 | 两板 header 账实一致 | ✅ 2.40.70 |
+| R0.2 | 补 diff：版本号对齐实码；iron 板 I1.4/I1.1 pending↔✅ 对齐 | reconcile 一次 | ✅ 2.40.70 pointer |
 
 ### Wave R1 · SKIP 逃生记账闭环（P0 · 支柱 A）
 
@@ -86,7 +86,7 @@
 | IRON 级 SKIP + 有 `skip_reason` | 收据 + 列出，不拦（合法逃生） |
 | 未设任何 SKIP 片 | `skips_used=[]` 完全干净 |
 
-**Test file：** `skills/ai-film-grok/tests/test_skip_audit.py` · **PARTIAL SHIP 2.40.67:** `core/skip_audit.py` + heat-final/cinematic pilot + closeout `verify_skip_usage` step（`test_opt_round_a1_heat_final_receipt.py`）
+**Test file：** `skills/ai-film-grok/tests/test_skip_audit.py` · **PARTIAL SHIP 2.40.70:** `core/skip_audit.py` + heat-final/cinematic pilot + closeout `verify_skip_usage` step（`test_opt_round_a1_heat_final_receipt.py`）
 **Execution note：** 首个 test 先 RED（断言 usage.json 有写入）→ GREEN；`skip_flag` 试点应用在 `closeout` + `cinematic_gate` 两条 hot 路径，其余 112 处触达式进 follow-up（非本板全清）。
 **Non-target：** 不与 `I4.2 iron-status`（静态列门 + 逃生 env 表）撞车；本板管**运行期记账**，I4.2 管静态清点，只引用不重复。
 

@@ -516,15 +516,26 @@ def write_motion_gate_receipts(
     return out
 
 
-def i2v_motion_gate_skip_enabled() -> bool:
+def i2v_motion_gate_skip_enabled(root: Path | str | None = None) -> bool:
+    """Honesty-rail: ledger AIFILM_SKIP_I2V_MOTION_GATE when film root known."""
     import os
 
-    return os.environ.get("AIFILM_SKIP_I2V_MOTION_GATE", "").strip().lower() in {
-        "1",
-        "true",
-        "yes",
-        "on",
-    }
+    try:
+        from core.skip_audit import skip_flag
+
+        return skip_flag(
+            "AIFILM_SKIP_I2V_MOTION_GATE",
+            origin="env",
+            film_root=root,
+            call_site="i2v_motion_gate_skip_enabled",
+        )
+    except Exception:
+        return os.environ.get("AIFILM_SKIP_I2V_MOTION_GATE", "").strip().lower() in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        }
 
 
 class I2VMotionGateError(RuntimeError):
@@ -538,7 +549,7 @@ def assert_i2v_final_gate_for_export(root: Path | str) -> dict[str, Any]:
     Missing receipt counts as fail (not silent pass).
     """
     base = Path(root).expanduser().resolve()
-    if i2v_motion_gate_skip_enabled():
+    if i2v_motion_gate_skip_enabled(base):
         return {
             "ok": True,
             "skipped": True,

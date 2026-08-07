@@ -463,7 +463,7 @@ def closeout_status(root: Path | str) -> dict[str, Any]:
     try:
         from i2v_motion_gate import assert_i2v_final_gate_for_export, i2v_motion_gate_skip_enabled
 
-        if i2v_motion_gate_skip_enabled():
+        if i2v_motion_gate_skip_enabled(base):
             motion_gate_step = {
                 "id": "i2v_motion",
                 "ok": True,

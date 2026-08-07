@@ -104,5 +104,37 @@ class TestSkipAudit(unittest.TestCase):
             self.assertEqual(rep["skip_audit"]["classification"], "SKIP_DOCUMENTED")
 
 
+    def test_i2v_and_gate_auto_ledger(self) -> None:
+        from gate_auto import skip_enabled as ga_skip
+        from i2v_motion_gate import i2v_motion_gate_skip_enabled
+        from core.skip_audit import load_skip_usage
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            os.environ["AIFILM_SKIP_GATE_AUTO"] = "1"
+            os.environ["AIFILM_SKIP_I2V_MOTION_GATE"] = "1"
+            self.assertTrue(ga_skip(root))
+            self.assertTrue(i2v_motion_gate_skip_enabled(root))
+            names = {e.get("name") for e in (load_skip_usage(root).get("entries") or [])}
+            self.assertIn("AIFILM_SKIP_GATE_AUTO", names)
+            self.assertIn("AIFILM_SKIP_I2V_MOTION_GATE", names)
+
+    def test_pilot_and_heat_queue_ledger(self) -> None:
+        from production_gates import assert_pilot_user_approved, assert_heat_allows_media
+        from core.skip_audit import load_skip_usage
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            os.environ["AIFILM_SKIP_PILOT_GATE"] = "1"
+            os.environ["AIFILM_SKIP_HEAT_QUEUE_GATE"] = "1"
+            rep = assert_pilot_user_approved(root, env_skip=True)
+            self.assertTrue(rep.get("skipped"))
+            rep2 = assert_heat_allows_media(root, env_skip=True)
+            self.assertTrue(rep2.get("skipped"))
+            names = {e.get("name") for e in (load_skip_usage(root).get("entries") or [])}
+            self.assertIn("AIFILM_SKIP_PILOT_GATE", names)
+            self.assertIn("AIFILM_SKIP_HEAT_QUEUE_GATE", names)
+
+
 if __name__ == "__main__":
     unittest.main()
