@@ -12,12 +12,14 @@ def append_premium_vertical_issues(
     hard: list[dict[str, str]],
     soft: list[dict[str, str]] | None = None,
 ) -> None:
-    """Append premium_vertical creative/preproduction hard issues (mutates hard)."""
-    from util import require_json as read_json  # local import pattern
+    """Append premium_vertical creative/preproduction hard issues (mutates hard).
 
+    Missing production-book is soft-empty (standard roots stay compatible).
+    Only quality_target=premium_vertical hard-blocks.
+    """
     # re-use soft for API symmetry
     _ = soft
-    from util import require_json as read_json
+    from util import read_json
 
     # Premium vertical is an authored creative contract, not a styling hint.
     # Keep standard/legacy roots compatible while failing closed before paid work.
@@ -53,5 +55,3 @@ def append_premium_vertical_issues(
                 )
         except Exception as exc:  # noqa: BLE001
             hard.append(_issue("hard", "PREPRODUCTION_READINESS_FAILED", str(exc)[:200]))
-
-

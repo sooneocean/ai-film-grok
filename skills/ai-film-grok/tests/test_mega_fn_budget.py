@@ -18,7 +18,8 @@ BUDGET_LINES = 800
 ALLOWLIST: frozenset[tuple[str, str]] = frozenset(
     {
         # P0 orchestrators (Wave 1–3 targets)
-        ("plan/film_spec_validate.py", "validate_film_spec"),
+        # validate_film_spec peeled under budget (W2) — residual body leaf allowlisted
+        ("plan/film_spec_validate_body.py", "apply_bgm_shots_and_edit_body"),
         ("gates/preflight.py", "run_preflight"),
         # Secondary mega-fns discovered 2026-08-07 probe (Wave 6 watch)
         ("post/closeout.py", "closeout_status"),
@@ -97,9 +98,9 @@ def test_no_new_mega_functions_without_allowlist() -> None:
         "ALLOWLIST entry under budget — remove to keep the list honest:\n  "
         + "\n  ".join(stale)
     )
-    # Known P0 mega-fns must still be present (don't silently delete files)
+    # Known P0 mega-fns / peel targets must still be present (don't silently delete)
     for required in (
-        ("plan/film_spec_validate.py", "validate_film_spec"),
+        ("plan/film_spec_validate_body.py", "apply_bgm_shots_and_edit_body"),
         ("gates/preflight.py", "run_preflight"),
     ):
         assert required in ALLOWLIST
@@ -107,3 +108,10 @@ def test_no_new_mega_functions_without_allowlist() -> None:
         assert path.is_file(), f"missing {required[0]}"
         names = {n for n, _, _ in _iter_function_spans(path)}
         assert required[1] in names, f"{required[1]} missing from {required[0]}"
+    # Orchestrator entry must remain thin and importable after W2 peels
+    vpath = SCRIPTS / "plan" / "film_spec_validate.py"
+    assert vpath.is_file()
+    vnames = {n for n, _, span in _iter_function_spans(vpath)}
+    assert "validate_film_spec" in vnames
+    vspan = next(span for n, _, span in _iter_function_spans(vpath) if n == "validate_film_spec")
+    assert vspan <= BUDGET_LINES, f"validate_film_spec re-grew to {vspan}"

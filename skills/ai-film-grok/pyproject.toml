@@ -23,6 +23,10 @@ ignore = [
 "scripts/plan/film_spec.py" = ["F405"]
 "scripts/plan/film_spec_lints.py" = ["F405"]
 "scripts/plan/film_spec_validate.py" = ["F405"]
+"scripts/plan/film_spec_validate_body.py" = ["F405"]
+"scripts/plan/film_spec_validate_provider.py" = ["F405"]
+"scripts/plan/film_spec_validate_soft_gates.py" = ["F405"]
+"scripts/plan/film_spec_validate_heat.py" = ["F405"]
 
 [tool.ruff.format]
 quote-style = "double"

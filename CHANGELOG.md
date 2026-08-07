@@ -1,5 +1,18 @@
 # Changelog
 
+## [2.41.20] - 2026-08-07
+
+### Changed (monolith orchestrator relief · go next 到最后 · closeout)
+- **W2 residual:** `plan/film_spec_validate_body.py` — BGM + shot loop + edit craft (~941 LOC allowlist).
+- **`validate_film_spec` orchestrator ~136 LOC** (provider → body → soft → heat); drop from mega allowlist.
+- **W3:** `preflight_premium` soft-read production-book (no hard crash on standard roots); harness `test_preflight_harness_w3`.
+- **W4:** export builders already each <800 — file residual frozen bug-driven.
+- **W5–W6:** deferred frozen; W7 board CLOSED — no third monolith plan.
+- **Guard:** mega-fn allowlist tracks body + preflight + closeout + dispatch only.
+
+### Fixed
+- Premium preflight used `require_json` for optional production-book → bare roots raised FilmError.
+
 ## [2.41.19] - 2026-08-07
 
 ### Added (effect ROI · E1–E5 default muscle)

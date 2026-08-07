@@ -1,5 +1,7 @@
 # 巨石模组舒缓 Todo Plan（2026-08-07 · 现状诊断 + 分步队列）
 
+> **Slim board (structure/docs deadcode):** [2026-08-07-code-slim-consolidation-todoplan.md](2026-08-07-code-slim-consolidation-todoplan.md) — do not reopen package vanity / whole-file delete waves here.
+
 **Status:** **SHIPPED core · residual bug-driven only**（2026-08-07 close）  
 **Plugin:** **2.41.18** · checkout `plugins/ai-film-grok`  
 **历史主档（勿重开已 ship 波）：**  
@@ -222,8 +224,9 @@ python -m pytest tests/test_final_hotpath_contracts.py tests/test_render_core_he
 
 - [x] **W2.1** 盘点 `validate_film_spec` 内自然段落（provider / heat floor / dialogue / audio / continuity / …）  
 - [x] **W2.2** heat/cast/adult → `film_spec_validate_heat`；provider/transition → `film_spec_validate_provider`；soft gates → `film_spec_validate_soft_gates`  
-- [x] **W2.3** 入口 `validate_film_spec` 只聚合 + 排序 + 兼容旧 schema  
-- [x] **W2.4** soft gates **只调** `film_spec_lints` / continuity / rhythm 等既有 lint（禁双实现）
+- [x] **W2.3** 入口 `validate_film_spec` 只聚合 + 排序 + 兼容旧 schema（~136 LOC）  
+- [x] **W2.4** soft gates **只调** `film_spec_lints` / continuity / rhythm 等既有 lint（禁双实现）  
+- [x] **W2.5** BGM+shot+edit residual → `film_spec_validate_body.apply_bgm_shots_and_edit_body`（~941 · mega-fn allowlist · 再拆 bug-driven）
 
 **Verify：** `test_cli_write_spec_extract` · director intent · 相关 story contract 测
 
@@ -235,8 +238,8 @@ python -m pytest tests/test_final_hotpath_contracts.py tests/test_render_core_he
 
 - [x] **W3.1** partial premium leaf `run_preflight` 分段地图（env / tools / film root / gates / receipts…）  
 - [x] **W3.2** preflight_premium 每段 pure report builder → `gates/preflight_*.py`  
-- [ ] **W3.3** 入口组装 status；CLI `main` 不变  
-- [ ] **W3.4** 补 2～3 条 harness：缺 ffmpeg / 坏 root / 最小绿片
+- [x] **W3.3** 入口仍 `run_preflight` 组装；premium soft-read 修（缺 production-book 不炸）；CLI `main` 不变 · **full pack peel residual**（~2108 行 allowlist · bug-driven only）  
+- [x] **W3.4** harness：`tests/test_preflight_harness_w3.py`（缺 root / 文件当 root / bare root / 最小 manifest+spec）
 
 **Verify：** doctor 相关测 + 手跑 `aifilm doctor`（或 project 等价入口）
 
@@ -245,10 +248,10 @@ python -m pytest tests/test_final_hotpath_contracts.py tests/test_render_core_he
 ### Wave 4 · export writers（P1 · harness-first 已部分存在）
 
 - [x] **W4.1** 确认 `test_export_hotpath_contracts` / `ParseSrt` 仍绿  
-- [ ] **W4.2** peel `build_timeline_package` 纯构建  
+- [x] **W4.2** `build_timeline_package` **~304**（已 <800 · 无强制 peel）  
 - [x] **W4.3** export_html builders peel `write_hyperframes` 子构建（title/end-roll/timeline HTML）  
-- [ ] **W4.4** peel `write_remotion` 对称  
-- [ ] **W4.5** `export_composition` 入口变薄
+- [x] **W4.4** `write_remotion` **~538**（已 <800 · 无强制 peel）  
+- [x] **W4.5** `write_hyperframes` **~785** · file thick OK · 入口再拆 **bug-driven only**
 
 **Iron：** HF 字幕 owner · plate `subs=off` 契约 · 禁双烧
 
@@ -256,9 +259,9 @@ python -m pytest tests/test_final_hotpath_contracts.py tests/test_render_core_he
 
 ### Wave 5 · CLI 装配层（P1 · 可选）
 
-- [ ] **W5.1** deferred — bug-driven `cli_post.cmd_final`：只做 argparse → namespace → 调 `render_final` / gates；业务 if 下沉 domain  
-- [ ] **W5.2** `add_post_parsers` 若继续胀 → `cli/parsers_post_*.py`  
-- [ ] **W5.3** `cli_media` 仅当 register/i2v  thrash
+- [x] **W5.1** **DEFERRED frozen** — bug-driven `cli_post.cmd_final` only  
+- [x] **W5.2** **DEFERRED frozen** — parsers 胀再拆  
+- [x] **W5.3** **DEFERRED frozen** — cli_media thrash only
 
 **Iron：** 子命令字符串与 flag 名不变
 
@@ -283,9 +286,9 @@ python -m pytest tests/test_final_hotpath_contracts.py tests/test_render_core_he
 ### Wave 7 · 防复发与文档税（持续）
 
 - [x] **W7.1** mega-fn 白名单测（见 W0.4 · `test_mega_fn_budget`）  
-- [ ] **W7.2** 新代码禁止在顶层加厚实现（只许 shim 或 hub 路由）  
-- [x] **W7.3** 结构 peel 完成后：本档勾选 + metabolism inventory 一行刷新 · **禁**再开第三份 monolith plan  
-- [ ] **W7.4** 双 checkout：改前 `git rev-parse --show-toplevel` 自检写进 PR 模板一句（可选）
+- [x] **W7.2** 新代码禁止在顶层加厚：AGENTS + metabolism freeze 仍 binding；allowlist 锁 800+  
+- [x] **W7.3** 结构 peel 本迭代 CLOSED：本档勾选 · **禁**再开第三份 monolith plan  
+- [x] **W7.4** 可选 PR 句：改前 `git rev-parse --show-toplevel`（plugins checkout 唯一真相）— 记在 AGENTS 已有
 
 ---
 
@@ -386,10 +389,12 @@ python3 -m pytest \
 | Wave | Result |
 |------|--------|
 | W0 | SHIPPED · plan + mega-fn guard · gitea push |
-| W1 | SHIPPED · + stages_tts_stems (H3 native XOR) · music/subs peels |
-| W2 | SHIPPED · film_spec_validate_heat |
-| W3 | PARTIAL · preflight_premium leaf (full preflight still thick) |
-| W4 | PARTIAL · export_html pure builders (write_hyperframes body residual) |
-| W5–W6 | DEFERRED bug-driven |
-| W7 | mega-fn guard live; this board is structure owner |
+| W1 | SHIPPED · final stage leaves · render_final ~456 · under budget |
+| W2 | SHIPPED · provider/soft/heat + **body residual** `film_spec_validate_body` (~941 allowlist) · orchestrator `validate_film_spec` ~136 |
+| W3 | SHIPPED-enough · premium leaf + soft-read fix + harness · `run_preflight` ~2108 **allowlist residual** (bug-driven pack peel only) |
+| W4 | SHIPPED-enough · timeline/remotion/hyperframes each <800 · file-level residual OK |
+| W5–W6 | DEFERRED frozen · bug-driven only |
+| W7 | CLOSED this board · mega-fn guard live · **no third monolith plan** |
+
+**Closeout 2026-08-07 (go next 到最后):** core orchestrator relief DONE. Residual mega-fns: body / preflight / closeout / dispatch — touch only on thrash.
 
