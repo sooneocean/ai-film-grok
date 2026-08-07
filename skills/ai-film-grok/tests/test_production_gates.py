@@ -618,29 +618,45 @@ class FaceIdentityGateTests(unittest.TestCase):
             with self.assertRaisesRegex(ProductionGateError, "FACE_IDENTITY_DRIFT"):
                 assert_face_identity_passed(root)
 
-    def test_no_receipt_soft_only(self) -> None:
+    def test_no_receipt_hard_by_default(self) -> None:
+        """Lock-face necessary: cast_masters without enroll/audit → hard fail."""
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             (root / "style-bible.json").write_text(
                 json.dumps({"cast_masters": {"hero": "canonical/cast/hero.png"}}),
                 encoding="utf-8",
             )
+            (root / "film-spec.json").write_text("{}", encoding="utf-8")
+            with self.assertRaisesRegex(ProductionGateError, "FACE_IDENTITY_NOT_AUDITED"):
+                assert_face_identity_passed(root)
+
+    def test_no_receipt_soft_when_opt_out(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "style-bible.json").write_text(
+                json.dumps({"cast_masters": {"hero": "canonical/cast/hero.png"}}),
+                encoding="utf-8",
+            )
+            (root / "film-spec.json").write_text(
+                json.dumps({"face_identity_soft": True}), encoding="utf-8"
+            )
             out = assert_face_identity_passed(root)
             self.assertTrue(out.get("ok"))
             self.assertTrue(out.get("soft"))
 
-    def test_enroll_gap_hard_under_strict(self) -> None:
+    def test_enroll_gap_hard_by_default(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = self._write_cast_root(tmp, verified=False, n_fail=0, enrolled={})
-            (root / "film-spec.json").write_text(
-                json.dumps({"face_identity_strict": True}), encoding="utf-8"
-            )
+            (root / "film-spec.json").write_text("{}", encoding="utf-8")
             with self.assertRaisesRegex(ProductionGateError, "FACE_IDENTITY_ENROLL_GAP"):
                 assert_face_identity_passed(root)
 
-    def test_enroll_gap_soft_without_strict(self) -> None:
+    def test_enroll_gap_soft_when_opt_out(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = self._write_cast_root(tmp, verified=False, n_fail=0, enrolled={})
+            (root / "film-spec.json").write_text(
+                json.dumps({"face_identity_soft": True}), encoding="utf-8"
+            )
             out = assert_face_identity_passed(root)
             self.assertTrue(out.get("ok"))
             self.assertTrue(out.get("soft"))

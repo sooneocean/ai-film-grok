@@ -245,6 +245,13 @@
   .recent .r-time { color: var(--text-lo); margin-left: auto; flex: none; font-variant-numeric: tabular-nums; }
   .ico-btn { display: inline-flex; align-items: center; justify-content: center; }
 
+  /* review iframe pane (B1 single-shell workbench) */
+  #review-frame {
+    width: 100%; height: calc(100vh - 150px); border: 0; border-radius: var(--radius);
+    background: var(--panel); display: block;
+  }
+  @media (max-width: 640px) { #review-frame { height: calc(100vh - 200px); } }
+
   /* ===== responsive (T10) ===== */
   @media (max-width: 640px) {
     header { padding: .7rem .9rem; gap: .6rem; }
@@ -268,15 +275,16 @@
 </head>
 <body>
 <header>
-  <div class="brand">AI Film 控制台<small>工作台 · 选素材 · 门禁 · 起步</small></div>
+  <div class="brand">AI Film 控制台<small>工作台 · 选素材 · 验片 · 门禁 · 起步</small></div>
   <div class="spacer"></div>
   <nav class="tabs" role="tablist" aria-label="控制台分区">
-    <button class="tab magnetic" role="tab" data-tab="dashboard" aria-controls="dashboard" aria-selected="true">工作台</button>
+    <button class="tab magnetic" role="tab" data-tab="overview" aria-controls="dashboard" aria-selected="true">工作台</button>
     <button class="tab magnetic" role="tab" data-tab="assets" aria-controls="assets" aria-selected="false">选素材</button>
+    <button class="tab magnetic" role="tab" data-tab="review" aria-controls="review" aria-selected="false">验片</button>
     <button class="tab magnetic" role="tab" data-tab="gates" aria-controls="gates" aria-selected="false">门禁</button>
     <button class="tab magnetic" role="tab" data-tab="onboarding" aria-controls="onboarding" aria-selected="false">起步</button>
-    <a class="tab magnetic" href="/" style="text-decoration:none">验片 ↗</a>
   </nav>
+  <a class="ghost-btn magnetic" id="review-popout" href="/review" target="_blank" rel="noopener" title="新标签打开验片专页" aria-label="新标签打开验片">↗</a>
   <button class="ghost-btn magnetic" id="theme" title="切换主题" aria-label="切换深/浅色主题">
     <svg class="ico-btn" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
   </button>
@@ -331,6 +339,13 @@
       </div>
       <div id="assets-grid" class="grid" aria-live="polite"></div>
       <button class="ghost-btn more-btn hidden" id="more">显示更多…</button>
+    </div>
+  </section>
+
+  <section id="review" class="tabpane hidden" role="tabpanel" aria-labelledby="tab-review">
+    <div class="panel">
+      <h3 style="margin-top:0">验片 <span class="muted" style="font-weight:400;font-size:.8rem">队列 · 批准/驳回 · 终片审核 · 内嵌同源页</span></h3>
+      <iframe id="review-frame" title="验片控制台" loading="lazy" referrerpolicy="same-origin"></iframe>
     </div>
   </section>
 
@@ -471,7 +486,8 @@ function activateTab(b){
   document.querySelectorAll('.tabpane').forEach(p => p.classList.add('hidden'));
   document.getElementById(b.dataset.tab).classList.remove('hidden');
   if (b.dataset.tab === 'gates') loadGates();
-  if (b.dataset.tab === 'dashboard') loadDashboard();
+  if (b.dataset.tab === 'overview') loadDashboard();
+  if (b.dataset.tab === 'review') ensureReviewFrame();
 }
 tabButtons.forEach((b, i) => {
   b.onclick = () => activateTab(b);
@@ -492,6 +508,17 @@ document.getElementById('theme').onclick = () => {
   document.documentElement.setAttribute('data-theme', next);
   localStorage.setItem('theme', next);
 };
+// review iframe (B1 single-shell workbench) — lazy-load once on first open
+let reviewFrameLoaded = false;
+function reviewSrc(){ return token ? ('/review?token=' + encodeURIComponent(token)) : '/review'; }
+function ensureReviewFrame(){
+  const frame = document.getElementById('review-frame');
+  if (!frame || reviewFrameLoaded) return;
+  frame.src = reviewSrc();
+  reviewFrameLoaded = true;
+}
+const reviewPopout = document.getElementById('review-popout');
+if (reviewPopout) reviewPopout.href = reviewSrc();
 // magnetic + particle hero — disabled when user prefers reduced motion
 const REDUCE = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 if (!REDUCE) {

@@ -692,6 +692,7 @@ def meaning_gate_enabled(spec: dict[str, Any] | None) -> bool:
         meaning_skip = skip_flag(
             "AIFILM_SKIP_MEANING_GATE",
             origin="env",
+            film_root=None,  # root optional at lint time; closeout sync_armed still catches
             call_site="dramatic_meaning.strict_enabled",
         )
     except Exception:

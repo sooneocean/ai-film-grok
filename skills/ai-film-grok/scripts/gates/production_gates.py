@@ -1422,7 +1422,10 @@ def assert_headroom_protected(
 # 禁 whip/grid 等花哨转场；段落转场限 fade/dissolve。把"编辑语法"固化成可程序化
 # 校验的默认门：spec 作者写错转场意图/风格时提前报错，而非渲染时才被
 # enforce_continue_hard_joins 静默改掉（掩盖意图漂移）。
-# Soft advisory by default; hard under transition_policy_strict or adult max heat.
+#
+# Hardness (2026-08-07 · face-transition plan): **default HARD** for all policy /
+# read-back issues. Legacy soft only when film-spec sets transition_policy_soft=true
+# (continue-seam violations stay hard even then). Escape env still wins.
 _TRANSITION_POLICY_CONTINUE = frozenset(
     {"continue", "match", "match_cut", "match-cut", "byte"}
 )
@@ -1432,6 +1435,35 @@ _FLASHY_SCENE_STYLES = frozenset({"whip", "grid"})
 _PARAGRAPH_STYLES = frozenset({"fade", "fadeblack", "fadewhite", "dissolve", None})
 # intro/outro / 纯 MG 段：放开 HF 转场全目录
 _RELAX_ROLES = frozenset({"intro", "outro", "title", "credit", "mg"})
+# Soft-style soup: consecutive identical soft xfade (9:16 reads as mush)
+_SOFT_SOUP_STYLES = frozenset(
+    {
+        "fade",
+        "fadeblack",
+        "fadewhite",
+        "dissolve",
+        "smoothleft",
+        "smoothright",
+        "smoothup",
+        "smoothdown",
+        "hblur",
+    }
+)
+
+
+def _transition_policy_hard_default(spec: dict[str, Any]) -> bool:
+    """True = raise on issues. Soft only when film-spec opts into transition_policy_soft."""
+    if not isinstance(spec, dict):
+        return True
+    if spec.get("transition_policy_soft") is True:
+        return False
+    # Explicit strict / adult heat still hard (legacy keys keep working).
+    if spec.get("transition_policy_strict") is True:
+        return True
+    if str(spec.get("heat_scale") or "").lower() in {"max", "hot", "extreme"}:
+        return True
+    # Default: hard (new-film muscle memory).
+    return True
 
 
 def _shot_chain_mode(shot: dict[str, Any]) -> str:
@@ -1559,6 +1591,46 @@ def transition_policy_report(spec: dict[str, Any]) -> dict[str, Any]:
                 }
             )
 
+    # Soft-style soup: consecutive identical soft xfade reads as mush on 9:16.
+    # punchy → max run 2; silk/auto → max run 3 (third/fourth same style fails).
+    fluency = str(spec.get("transition_fluency") or spec.get("edit_fluency") or "auto").strip().lower()
+    max_same = 2 if fluency == "punchy" else 3
+    run_style: str | None = None
+    run_len = 0
+    for i in range(n_joins):
+        intent = str(intents[i] if i < len(intents) else "").strip().lower()
+        style = styles[i] if i < len(styles) else None
+        style_s = str(style).strip().lower() if style else None
+        incoming = shots[i + 1] if i + 1 < n else {}
+        chain = _shot_chain_mode(incoming)
+        role = str(
+            (incoming or {}).get("role") or (incoming or {}).get("kind") or ""
+        ).strip().lower()
+        if role in _RELAX_ROLES or chain in _TRANSITION_POLICY_CONTINUE:
+            run_style, run_len = None, 0
+            continue
+        if intent not in {"soft", "hold"} or not style_s or style_s not in _SOFT_SOUP_STYLES:
+            run_style, run_len = None, 0
+            continue
+        if style_s == run_style:
+            run_len += 1
+        else:
+            run_style, run_len = style_s, 1
+        if run_len > max_same:
+            issues.append(
+                {
+                    "code": "HF_TRANSITION_SOFT_SOUP",
+                    "join_index": i,
+                    "intent": intent,
+                    "style": style_s,
+                    "message": (
+                        f"join {i}: soft style {style_s!r} repeated {run_len} times "
+                        f"(max {max_same} under fluency={fluency!r}) — rotate xfade "
+                        f"(smoothleft/hblur/dissolve/fade) to avoid soft-soup"
+                    ),
+                }
+            )
+
     return {
         "ok": len(issues) == 0,
         "checked": True,
@@ -1574,10 +1646,12 @@ def assert_transition_policy(
     force: bool = False,
     env_skip: bool = True,
 ) -> dict[str, Any]:
-    """P2 controlled transition-policy hard gate (HF 转场受控策略全量).
+    """Controlled transition-policy gate (HF 转场受控策略).
 
-    HARD when film-spec ``transition_policy_strict`` is True, or adult ``heat_scale``
-    is max/hot/extreme. Otherwise surfaces as a soft advisory (incremental rollout).
+    **Default HARD** on any policy issue (continue not hard, flashy scene cut,
+    paragraph bad style, soft-soup). Opt into legacy soft advisories only with
+    film-spec ``transition_policy_soft: true`` — but **continue-seam** violations
+    stay hard even then (接戏铁律).
 
     Emergency escapes: ``force=True`` or ``AIFILM_SKIP_TRANSITION_POLICY_GATE=1``.
     """
@@ -1597,27 +1671,34 @@ def assert_transition_policy(
     if not isinstance(data, dict) or not data:
         return {"ok": True, "checked": False, "reason": "no_spec"}
 
-    strict = bool(data.get("transition_policy_strict") is True) or str(
-        data.get("heat_scale") or ""
-    ).lower() in {"max", "hot", "extreme"}
+    hard_default = _transition_policy_hard_default(data)
     report = transition_policy_report(data)
     if not report["codes"]:
         return {"ok": True, "checked": report.get("checked", False), "codes": []}
-    if not strict:
+
+    # Continue-seam IRON: always hard even under transition_policy_soft.
+    _continue = "HF_TRANSITION_CONTINUE_NOT_HARD"
+    continue_issues = [i for i in report["issues"] if i.get("code") == _continue]
+    other_issues = [i for i in report["issues"] if i.get("code") != _continue]
+    raise_issues = list(report["issues"]) if hard_default else list(continue_issues)
+    if raise_issues:
+        message = "; ".join(f"[{i['code']}] {i['message']}" for i in raise_issues[:6])
+        raise ProductionGateError(
+            f"transition-policy gate: {message} "
+            "Fix: continue seams → hard match-cut; scene cuts → no whip/grid; "
+            "chapter transitions → soft fade/dissolve; rotate soft styles. "
+            "Legacy soft (non-continue): transition_policy_soft=true. "
+            "Emergency: AIFILM_SKIP_TRANSITION_POLICY_GATE=1"
+        )
+    if other_issues:
         return {
             "ok": True,
             "checked": True,
             "soft": True,
-            "codes": report["codes"],
-            "issues": report["issues"],
+            "codes": sorted({i["code"] for i in other_issues}),
+            "issues": other_issues,
         }
-    message = "; ".join(f"[{i['code']}] {i['message']}" for i in report["issues"][:6])
-    raise ProductionGateError(
-        f"transition-policy gate (strict): {message} "
-        "Fix: continue seams → hard match-cut; scene cuts → no whip/grid; "
-        "chapter transitions → soft fade/dissolve. "
-        "Emergency: --skip-transition-policy or AIFILM_SKIP_TRANSITION_POLICY_GATE=1"
-    )
+    return {"ok": True, "checked": True, "codes": [], "issues": []}
 
 
 def transition_export_readback_report(spec: dict[str, Any]) -> dict[str, Any]:
@@ -1872,11 +1953,10 @@ def assert_transition_export_readback(
     force: bool = False,
     env_skip: bool = True,
 ) -> dict[str, Any]:
-    """P2 export read-back hard gate (HF 转场 export read-back 全量).
+    """Export read-back gate (HF 转场 export read-back).
 
-    Verifies the built transition_ops fully cover and match the declared
-    transition_intents/transition_styles. HARD under transition_policy_strict or
-    adult max heat; otherwise a soft advisory (incremental rollout).
+    Verifies built transition_ops fully cover and match declared intents/styles.
+    **Default HARD**; legacy soft only when ``transition_policy_soft: true``.
 
     Emergency escapes: ``force=True`` or ``AIFILM_SKIP_TRANSITION_READBACK_GATE=1``.
     """
@@ -1896,9 +1976,7 @@ def assert_transition_export_readback(
     if not isinstance(data, dict) or not data:
         return {"ok": True, "checked": False, "reason": "no_spec"}
 
-    strict = bool(data.get("transition_policy_strict") is True) or str(
-        data.get("heat_scale") or ""
-    ).lower() in {"max", "hot", "extreme"}
+    hard_default = _transition_policy_hard_default(data)
     report = transition_export_readback_report(data)
     if not report["codes"]:
         return {
@@ -1908,7 +1986,7 @@ def assert_transition_export_readback(
             "seam_count": report.get("seam_count", 0),
             "ops_count": report.get("ops_count", 0),
         }
-    if not strict:
+    if not hard_default:
         return {
             "ok": True,
             "checked": True,
@@ -2162,6 +2240,21 @@ def _face_identity_report(root: Path) -> dict[str, Any]:
     }
 
 
+def _face_identity_hard_default(spec: dict[str, Any]) -> bool:
+    """True = raise on enroll/audit gaps. Soft only when face_identity_soft=true."""
+    if not isinstance(spec, dict):
+        return True
+    if spec.get("face_identity_soft") is True:
+        return False
+    # Legacy opt-in keys still mean hard.
+    if spec.get("face_identity_strict") is True:
+        return True
+    if str(spec.get("heat_scale") or "").lower() in {"max", "hot", "extreme"}:
+        return True
+    # Default HARD (2026-08-07 · lock-face is necessary).
+    return True
+
+
 def assert_face_identity_passed(
     root: Path,
     *,
@@ -2171,13 +2264,14 @@ def assert_face_identity_passed(
 ) -> dict[str, Any]:
     """P0 face-identity post_audit gate (lessons face-identity-pixel).
 
-    Fail-closed on proven drift: a post_audit that ran and found n_fail>0 means the
-    approved clip would carry a face break, so it must be rejected. Enroll/audit gaps
-    are hard only when the film opts into ``face_identity_strict`` (or adult max heat);
-    otherwise they surface as soft advisory — matching the project's incremental rollout.
+    Fail-closed on proven drift always. Enroll/audit gaps (no receipt, missing
+    cast enroll) are **default HARD** when cast_masters exist — lock-face is
+    necessary for claiming character stability. Legacy soft advisories only when
+    film-spec sets ``face_identity_soft: true``.
 
-    ``proven_drift_only=True`` (used by register-clip) blocks exclusively on a failed
-    post_audit, so normal approval flows are never surprised by a soft advisory.
+    ``proven_drift_only=True`` (register-clip path) blocks exclusively on failed
+    post_audit / infra, so approval is not blocked solely by enroll gap at that
+    call site (enroll gap is enforced at preflight/ship).
 
     Emergency escapes: ``force=True`` or ``AIFILM_SKIP_FACE_IDENTITY_GATE=1``.
     """
@@ -2195,9 +2289,7 @@ def assert_face_identity_passed(
     report = _face_identity_report(root)
     if not report.get("codes"):
         return {"ok": True, "checked": report.get("checked", False), "codes": []}
-    strict = bool(spec.get("face_identity_strict") is True) or (
-        str(spec.get("heat_scale") or "").lower() in {"max", "hot", "extreme"}
-    )
+    hard_default = _face_identity_hard_default(spec if isinstance(spec, dict) else {})
     proven_drift = "FACE_IDENTITY_DRIFT" in report["codes"]
     # Infrastructure failures (corrupt bible) are always hard — never soft-skip.
     infra_fail = "STYLE_BIBLE_PARSE_FAILED" in (report.get("codes") or [])
@@ -2223,7 +2315,7 @@ def assert_face_identity_passed(
                 "Emergency: --skip-face-identity or AIFILM_SKIP_FACE_IDENTITY_GATE=1"
             )
         # infra_fail falls through to hard raise below
-    if not (proven_drift or strict or infra_fail):
+    if not (proven_drift or hard_default or infra_fail):
         return {
             "ok": True,
             "checked": True,
@@ -2236,6 +2328,7 @@ def assert_face_identity_passed(
         f"face-identity gate: {message} "
         "Re-run aifilm face-identity enroll-bible && aifilm face-identity audit --root … "
         "(re-shoot/re-edit drifting stills before approving). "
+        "Legacy soft gaps: face_identity_soft=true. "
         "Emergency: --skip-face-identity or AIFILM_SKIP_FACE_IDENTITY_GATE=1"
     )
 

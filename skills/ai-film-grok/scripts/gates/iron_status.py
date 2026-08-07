@@ -34,6 +34,48 @@ _IRON_GATES: list[tuple[str, str, str, str]] = [
         "AIFILM_I_OWN_THE_GPU",
         "until-empty needs --i-own-the-gpu; foreign LEASE_HELD blocks; unowned run-next max 5",
     ),
+    (
+        "composition_fill",
+        "I2V first-frame subject fill ≥~75%",
+        "AIFILM_SKIP_COMPOSITION_FILL",
+        "register-still / H3 / generation_ready",
+    ),
+    (
+        "identity_generation",
+        "one cast generation / no archive mix / verified honesty",
+        "AIFILM_SKIP_IDENTITY_GEN",
+        "closeout / ship-prep; IDENTITY_PARTIAL if unverified",
+    ),
+    (
+        "partner_cast",
+        "on-camera cast_master+face_lock; style.locked not heroine-only",
+        "AIFILM_SKIP_PARTNER_CAST",
+        "preflight / style lock",
+    ),
+    (
+        "face_lock_triple",
+        "face_identity ∧ identity_gen ∧ partner; master_eligible honesty",
+        "AIFILM_SKIP_FACE_IDENTITY_GATE",
+        "closeout / ship-prep; plate if not master_eligible",
+    ),
+    (
+        "transition_frame_audit",
+        "final+delivery requires non-stale transition-frame-audit",
+        "AIFILM_SKIP_TRANSITION_FRAME_AUDIT",
+        "closeout / ship-prep",
+    ),
+    (
+        "still_provenance",
+        "ban midframe composite / poison archive still as I2V source",
+        "AIFILM_SKIP_STILL_PROVENANCE",
+        "register-still / H3",
+    ),
+    (
+        "skip_audit",
+        "AIFILM_SKIP_* runtime ledger → receipts/skip-usage.json",
+        "AIFILM_SKIP_REASON",
+        "closeout verify_skip_usage; IRON skip needs reason",
+    ),
 ]
 
 

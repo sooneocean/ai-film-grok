@@ -113,9 +113,20 @@ def main() -> int:
 
     try:
         conn = HTTPConnection("127.0.0.1", port)
-        # 1) console page
+        # 1) console page (B1 single shell + review tab)
         st, body = req(conn, "GET", "/console", token=token)
-        check("GET /console", st == 200 and "选素材" in body.decode("utf-8"), f"status={st}")
+        text = body.decode("utf-8") if body else ""
+        check(
+            "GET /console",
+            st == 200 and "选素材" in text and 'data-tab="review"' in text,
+            f"status={st}",
+        )
+        st, body = req(conn, "GET", "/review", token=token)
+        check(
+            "GET /review",
+            st == 200 and "审核控制台" in body.decode("utf-8", "ignore"),
+            f"status={st}",
+        )
         # 2) gates panel
         st, body = req(conn, "GET", "/api/gates", token=token)
         d = json.loads(body) if st == 200 else {}

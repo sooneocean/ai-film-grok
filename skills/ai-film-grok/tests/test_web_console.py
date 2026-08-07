@@ -156,7 +156,20 @@ def test_console_page_served_at_dedicated_route(film_root):
     try:
         status, payload = _request(server, "GET", "/console")
         assert status == 200
-        assert "选素材" in payload.decode("utf-8")
+        text = payload.decode("utf-8")
+        assert "选素材" in text
+        # B1 single shell: five primary tabs including review iframe host
+        assert 'data-tab="review"' in text
+        assert 'data-tab="overview"' in text
+        assert 'id="review-frame"' in text
+        # root is also shell (not the legacy review-only page)
+        st2, root_body = _request(server, "GET", "/")
+        assert st2 == 200
+        assert "选素材" in root_body.decode("utf-8")
+        # dedicated review page still available for iframe / pop-out
+        st3, rev = _request(server, "GET", "/review")
+        assert st3 == 200
+        assert "审核控制台" in rev.decode("utf-8")
     finally:
         server.shutdown()
         server.server_close()

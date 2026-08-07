@@ -5,8 +5,9 @@ Serializes film-spec shots into the MiniMax VIDEO_PROMPT_WRITING_GUIDE formats:
 * **Base** (T2VA / I2VA / FL2VA / L2VA): alignment line + three core fields
 * **Ref2VA**: six sections (subject_definitions … non_diegetic_music)
 
-Default dialect **auto** (live densify canary 2026-08-07 seed 202608073):
-  dialogue / high / else → official (high mean 24.86 > legacy 20.67).
+Default dialect **auto** (live densify canaries 2026-08-07):
+  dialogue → official; high → official (mean 24.86>20.67);
+  soft → legacy (soft densify mean 1.28≪legacy 4.13); else official.
 Force: ``AIFILM_H3_PROMPT_DIALECT=official|legacy|auto``
   Escape high→legacy: ``AIFILM_H3_HIGH_MOTION_OFFICIAL=0``
 
@@ -66,10 +67,11 @@ def resolve_prompt_dialect(
 
 
 def high_motion_official_enabled() -> bool:
-    """High-motion auto dialect uses official densify (default on after live canary).
+    """High-motion auto dialect uses official densify (default on after P3.5).
 
-    Live densify 2026-08-07 seed 202608073: official mean 24.86 > legacy 20.67.
-    Escape back to legacy timeline: ``AIFILM_H3_HIGH_MOTION_OFFICIAL=0``.
+    P3.5 densify reburn seed 202608074: official mean 28.92 > legacy 26.92 (Δ+2).
+    Earlier live densify seed 202608073 also beat O3 legacy. Escape:
+    ``AIFILM_H3_HIGH_MOTION_OFFICIAL=0`` restores high→legacy timeline.
     """
     raw = os.environ.get("AIFILM_H3_HIGH_MOTION_OFFICIAL", "1").strip().lower()
     return raw not in {"0", "false", "no", "off"}
@@ -104,8 +106,17 @@ def _auto_dialect_for_shot(shot: dict[str, Any]) -> str:
         return "official"
     if has_dlg:
         return "official"
-    if tier == "high":
+    # Prefer explicit IR prompt_tier when spine collapses soft→medium.
+    dsl = shot.get("dsl") if isinstance(shot.get("dsl"), dict) else {}
+    explicit_tier = str(
+        dsl.get("prompt_tier") or shot.get("prompt_tier") or tier or ""
+    ).strip().lower()
+    if tier == "high" or explicit_tier == "high":
         return "official" if high_motion_official_enabled() else "legacy"
+    # Soft densify live canary 2026-08-07 seed 202608074: official 1.28 ≪ legacy 4.13
+    # → keep micro-life energy on legacy timeline (structure still forceable via env).
+    if tier == "soft" or explicit_tier == "soft":
+        return "legacy"
     return "official"
 
 

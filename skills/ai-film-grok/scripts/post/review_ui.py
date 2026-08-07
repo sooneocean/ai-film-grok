@@ -29,6 +29,7 @@ from review_control import (
 )
 from util import exclusive_file_lock, write_json
 from web_core import WebConsoleConflict, WebConsoleError, WebConsoleForbidden
+from web_routes import error_body
 
 MAX_BODY = 128 * 1024
 MAX_UPLOAD = 20 * 1024 * 1024
@@ -144,6 +145,11 @@ def make_handler(root: Path, token: str):
             return
 
         def _json(self, status: int, payload: dict[str, Any]) -> None:
+            # Unify error shape with FastAPI gateway: always expose both keys.
+            if status >= 400 and "error" in payload and "detail" not in payload:
+                payload = {**error_body(str(payload["error"])), **payload}
+            elif status >= 400 and "detail" in payload and "error" not in payload:
+                payload = {**error_body(str(payload["detail"])), **payload}
             data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
             self.send_response(status)
             self.send_header("Content-Type", "application/json; charset=utf-8")
@@ -176,50 +182,50 @@ def make_handler(root: Path, token: str):
                 raise ReviewUIError("request body must be a JSON object")
             return value
 
-        def do_GET(self) -> None:
-            parsed = urlparse(self.path)
-            if parsed.path in ("/console", "/studio"):
-                console = Path(__file__).resolve().parent.parent / "web" / "console.html"
-                if console.is_file():
-                    try:
-                        data = console.read_bytes()
-                    except OSError:
-                        self._json(HTTPStatus.NOT_FOUND, {"error": "console unreadable"})
-                        return
-                    self.send_response(200)
-                    self.send_header("Content-Type", "text/html; charset=utf-8")
-                    self.send_header("Content-Length", str(len(data)))
-                    self.send_header("Cache-Control", "no-store")
-                    self.send_header("X-Content-Type-Options", "nosniff")
-                    self.end_headers()
-                    self.wfile.write(data)
-                    return
+        def _send_html(self, data: bytes) -> None:
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(data)))
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("X-Content-Type-Options", "nosniff")
+            self.end_headers()
+            self.wfile.write(data)
+
+        def _send_console(self) -> None:
+            console = Path(__file__).resolve().parent.parent / "web" / "console.html"
+            if not console.is_file():
                 self._json(HTTPStatus.NOT_FOUND, {"error": "console not found"})
                 return
-            if parsed.path == "/":
+            try:
+                data = console.read_bytes()
+            except OSError:
+                self._json(HTTPStatus.NOT_FOUND, {"error": "console unreadable"})
+                return
+            self._send_html(data)
+
+        def do_GET(self) -> None:
+            parsed = urlparse(self.path)
+            # B1 single shell: / and /console serve workbench; /review is验片专页.
+            if parsed.path in ("/", "/console", "/studio"):
                 invite = (parse_qs(parsed.query).get("invite") or [""])[0]
-                if invite:
+                if invite and parsed.path == "/":
                     if not _consume_invite(root, invite):
                         self._json(
                             HTTPStatus.UNAUTHORIZED, {"error": "invalid or expired review invite"}
                         )
                         return
                     self.send_response(HTTPStatus.SEE_OTHER)
-                    self.send_header("Location", "/")
+                    self.send_header("Location", "/console")
                     self.send_header(
                         "Set-Cookie", f"AIFILM_REVIEW={token}; HttpOnly; SameSite=Strict; Path=/"
                     )
                     self.send_header("Cache-Control", "no-store")
                     self.end_headers()
                     return
-                data = _PAGE.encode("utf-8")
-                self.send_response(200)
-                self.send_header("Content-Type", "text/html; charset=utf-8")
-                self.send_header("Content-Length", str(len(data)))
-                self.send_header("Cache-Control", "no-store")
-                self.send_header("X-Content-Type-Options", "nosniff")
-                self.end_headers()
-                self.wfile.write(data)
+                self._send_console()
+                return
+            if parsed.path == "/review":
+                self._send_html(_PAGE.encode("utf-8"))
                 return
             if not self._authorized():
                 self._json(HTTPStatus.UNAUTHORIZED, {"error": "invalid session token"})
@@ -447,7 +453,7 @@ def serve(root: Path | str, *, port: int = 0) -> dict[str, Any]:
         json.dumps(
             {
                 "ok": True,
-                "url": f"http://127.0.0.1:{server.server_port}/?token={token}",
+                "url": f"http://127.0.0.1:{server.server_port}/console?token={token}",
                 "root": str(base),
                 "token": token,
             },

@@ -138,7 +138,7 @@
     },
     {
       "path": "scripts/asset_picker.py",
-      "sha256": "68d006872005669d611f272e473a5d8cd37e41ee156c977f921e2c9d5f4c0b15"
+      "sha256": "61fc2019fc32e13e3dd79867049994eefc4fdd5b886b7e39660e87dff1b34abe"
     },
     {
       "path": "scripts/asset_registry.py",
@@ -981,6 +981,10 @@
       "sha256": "bda173dc14b385969a64f0fe944e71c2eaaa650ceda8607f3906cc5dbc462735"
     },
     {
+      "path": "scripts/console_projection.py",
+      "sha256": "93e56b9f161a362dd73ec5edb609b4f9e402ee1848e92eec51e5af9e39b5aead"
+    },
+    {
       "path": "scripts/content_channels.py",
       "sha256": "f0404c810ba94d57afa6f28f3fb3565207ed5049606190e7ee7d6d54fa62240d"
     },
@@ -1042,7 +1046,7 @@
     },
     {
       "path": "scripts/core/skip_audit.py",
-      "sha256": "0ff566f4c47287babbd5670dc668f8011d274b6b52c15ced53072606ea4cc1f2"
+      "sha256": "649d75f64278d1823c71260fa0adaa4484926c81aecf1c2946934342da78f9f1"
     },
     {
       "path": "scripts/craft_spine.py",
@@ -1425,12 +1429,16 @@
       "sha256": "8597c7b1c7f368a01c2195bf84c25d3f5a8178a78a933e8215cfb67018b58938"
     },
     {
+      "path": "scripts/gates/identity_generation_lock.py",
+      "sha256": "2c9aa964316c4cf4b5180672659cc27aa4721a983f39f347448e8766a1f738c4"
+    },
+    {
       "path": "scripts/gates/input_fidelity.py",
       "sha256": "38998c599a6125768cbe39c8642b988f77548747a72c54e84747da98bee3b454"
     },
     {
       "path": "scripts/gates/iron_status.py",
-      "sha256": "97727ad7028eb53c179b7023c8b08da6d9ff6349e4f92ec7446132901f13538d"
+      "sha256": "38c8a97a695cbef447f4dd13fed008e367908e06aaf0deea405c03c33dc2fe4b"
     },
     {
       "path": "scripts/gates/manifest_truth.py",
@@ -1445,12 +1453,16 @@
       "sha256": "28cbbc9e594f3595927f5aec98bb40e3b01ef37d0c786d9bb75c25a33cb5b187"
     },
     {
+      "path": "scripts/gates/partner_cast_gate.py",
+      "sha256": "698bcebf8cf027652242c49533f711f7bf73ccf7caa11e594c4a9423f5bcb2ba"
+    },
+    {
       "path": "scripts/gates/preflight.py",
-      "sha256": "949dbd78694d096784466084eb133a9198015207df01613048f8316e0d2d29da"
+      "sha256": "c0c0cbb6f8e316d38b462cbec4986238a6b8abfacbd54171536c65b13c6c3e57"
     },
     {
       "path": "scripts/gates/production_gates.py",
-      "sha256": "9d005124e344b5070ab1ccdc243306edce167a40de3e0f7a3ce37c1e095a7fc2"
+      "sha256": "edaa379bdc19a354e3499f74500e51ab59d1e681860214e285f9f36c6e84bbe8"
     },
     {
       "path": "scripts/gates/quality_evidence.py",
@@ -1463,6 +1475,10 @@
     {
       "path": "scripts/gates/state_index_gate.py",
       "sha256": "528e80239b3c09d0e1195de197525ef58adcfce4a6825633bf6859c858eddc5b"
+    },
+    {
+      "path": "scripts/gates/still_provenance.py",
+      "sha256": "7363234c8a54e5b9d0dbe6ee6e79c8d67943d5c94e2ad4ce7ad1cd5d330748fc"
     },
     {
       "path": "scripts/generation_ready.py",
@@ -1559,6 +1575,10 @@
     {
       "path": "scripts/i2v_provider.py",
       "sha256": "adcd6a417df08be3bb762c96f88b72180f758deb1f0bc78d3579dfd96a89b26c"
+    },
+    {
+      "path": "scripts/identity_generation_lock.py",
+      "sha256": "6efb90f432f637ebad4130a27afe8f630b8235aaaa57f6c2e7b33344897eda9d"
     },
     {
       "path": "scripts/identity_refs.py",
@@ -1722,7 +1742,7 @@
     },
     {
       "path": "scripts/media/h3_official_prompt.py",
-      "sha256": "b2edb9abe5a172ed6a87767c962f192a98ef7e6fa3a93079d4e732db0a8ac65d"
+      "sha256": "de00a1ae17ed72531e7a108e28e231971eb549e1c79b80b8ecd1c5e25fb4e3f5"
     },
     {
       "path": "scripts/media/h3_ship_native.py",
@@ -1734,7 +1754,7 @@
     },
     {
       "path": "scripts/media/h3_workflow.py",
-      "sha256": "ab6f39d7b390f996b4552dce85a3af3d7d888aa1ee75aeb147442856fb6fc6a2"
+      "sha256": "34a8bf7fabc4ed0fd9cec73c3a91ef119c6d200c3ca07601677d21b9e2846a3b"
     },
     {
       "path": "scripts/media/i2v_motion_gate.py",
@@ -1982,7 +2002,7 @@
     },
     {
       "path": "scripts/narrative/dramatic_meaning.py",
-      "sha256": "fdf149662a752e0998cc68efdeb550dca014457ae8d04c395d3216c8934893c2"
+      "sha256": "4372a86605a427fb276eaaec45cbb4cee1dbd698f7505b4c614c3a26ce9272e3"
     },
     {
       "path": "scripts/narrative/edit_edl_merge.py",
@@ -2119,6 +2139,10 @@
     {
       "path": "scripts/optimization_taxonomy.py",
       "sha256": "90f951c6c038014977e63b74b9aa4475d773d706f02e595c90143386e802964a"
+    },
+    {
+      "path": "scripts/partner_cast_gate.py",
+      "sha256": "c635733adf50c7dd31dfa72752c7be1e493066d40ada23a768790fe277615db0"
     },
     {
       "path": "scripts/performance_candidates.py",
@@ -2498,7 +2522,7 @@
     },
     {
       "path": "scripts/post/closeout.py",
-      "sha256": "efcf16a20fb254378b763be9eea552df85e074f3a2d9e5522cf63c072a3f595c"
+      "sha256": "94cc3fdd6eff2e4bb9be89596887c77d09a0f46c12c935ca7c97f49c3ea607c8"
     },
     {
       "path": "scripts/post/color_grade.py",
@@ -2614,7 +2638,7 @@
     },
     {
       "path": "scripts/post/review_ui.py",
-      "sha256": "896dcc701188599d345d1a169d45ddf32f46df8e58b2a4348d693a4435a921e2"
+      "sha256": "8f8e821b6d6b2156ef1b2d44740a196747d8c364701e8552772574479a09b2ba"
     },
     {
       "path": "scripts/post/show_package.py",
@@ -2886,7 +2910,7 @@
     },
     {
       "path": "scripts/smoke_console.py",
-      "sha256": "e9a35f5963494f924e5b5f188520c41e370857287f789910510e9cf2ae74bef8"
+      "sha256": "b6a12e64a32eab1cbaeb4f525e9146ba41954605ecc25c15eccb470e83c02996"
     },
     {
       "path": "scripts/sound_plan.py",
@@ -2995,6 +3019,10 @@
     {
       "path": "scripts/still_challenge.py",
       "sha256": "29c0d254afd0aa1d0668a844b63e69f002d5ea384d1a494a809f7344badf4002"
+    },
+    {
+      "path": "scripts/still_provenance.py",
+      "sha256": "353d2c0cd79b4f4e3faaca4cb1045d9bb4b2164f562fc247ac99c37137dadb5b"
     },
     {
       "path": "scripts/still_source.py",
@@ -3198,11 +3226,15 @@
     },
     {
       "path": "scripts/web_api.py",
-      "sha256": "a61b526d3ed66f15cbac64265a0ca8f239ffbb9e0fa05a951ecebaff74bac842"
+      "sha256": "2e11faae14e32cce6f1e9804ef93b895f9079f6cdee9f0a9e0656d46ab6c57e3"
     },
     {
       "path": "scripts/web_core.py",
       "sha256": "5588510470b1df68b594918d0457113b6b788b2f13d07ab0669155dedb94d43e"
+    },
+    {
+      "path": "scripts/web_routes.py",
+      "sha256": "e27f2f015da27e2865c237ab1d3eb9b8d6fb8ee37765d0a723617376ba9f78ff"
     },
     {
       "path": "scripts/workflow_pack.py",

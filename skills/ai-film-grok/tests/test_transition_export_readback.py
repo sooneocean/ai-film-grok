@@ -229,11 +229,10 @@ class TransitionReadbackAssertTests(unittest.TestCase):
             **extra,
         )
 
-    def test_soft_by_default(self):
-        out = assert_transition_export_readback(spec=self._violating_spec())
-        self.assertTrue(out["ok"])  # soft, never raises
-        self.assertTrue(out["soft"])
-        self.assertIn("EXPORT_READBACK_CONTINUE_NOT_HARD", out["codes"])
+    def test_hard_by_default(self):
+        with self.assertRaises(ProductionGateError) as ctx:
+            assert_transition_export_readback(spec=self._violating_spec())
+        self.assertIn("EXPORT_READBACK_CONTINUE_NOT_HARD", str(ctx.exception))
 
     def test_hard_under_strict(self):
         with self.assertRaises(ProductionGateError):
@@ -244,6 +243,14 @@ class TransitionReadbackAssertTests(unittest.TestCase):
     def test_hard_under_adult_max_heat(self):
         with self.assertRaises(ProductionGateError):
             assert_transition_export_readback(spec=self._violating_spec(heat_scale="max"))
+
+    def test_soft_when_opt_out(self):
+        out = assert_transition_export_readback(
+            spec=self._violating_spec(transition_policy_soft=True)
+        )
+        self.assertTrue(out["ok"])
+        self.assertTrue(out["soft"])
+        self.assertIn("EXPORT_READBACK_CONTINUE_NOT_HARD", out["codes"])
 
     def test_escape_env(self):
         try:
@@ -262,7 +269,7 @@ class TransitionReadbackAssertTests(unittest.TestCase):
         self.assertTrue(out["skipped"])
 
     def test_from_root_spec_file(self):
-        spec = self._violating_spec(transition_policy_strict=True)
+        spec = self._violating_spec()
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)
             (root / "film-spec.json").write_text(json.dumps(spec), encoding="utf-8")

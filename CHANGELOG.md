@@ -1,6 +1,6 @@
 # Changelog
 
-## [2.40.97] - 2026-08-07
+## [2.40.106] - 2026-08-07
 
 ### Changed (Web console UI · 电影工作室美学收尾 T3+T6–T12)
 - **字体：** 引入 JetBrains Mono 作 `--font-mono`，asset/引擎 id 等机器串用等宽体提升扫读性（Space Grotesk + Sora 已就位）。
@@ -9,7 +9,92 @@
 - **对比模式：** 每卡「对比」切换（上限 3），底部托盘 + 模态框按字段并排；切换 kind 清空对比集。
 - **空/加载/错误态：** 骨架屏 shimmer、API 失败「重试」、空列表引导态。
 - **响应式 + 动效：** 640px 表头横滚/网格单列/KPI 两列→单列；统一 `--ease` 缓动 token，保留 reduced-motion 降级。
-- 纯前端改动，后端契约零修改，`console` 门禁持续绿。
+- 纯前端改动，后端契约零修改，`console` 门禁持续绿。注：本提交覆盖远端一度回退的 AI 味紫青渐变旧版 console.html，确认采用电影工作室暖墨底+琥珀单强调美学。
+
+## [2.40.105] - 2026-08-07
+
+### Added (F2 face-lock triple · T3 transition-frame closeout)
+- **`gates/face_lock_triple.py`**: AND of face_identity · identity_generation · partner_cast; `master_eligible=false` on hard fail or IDENTITY_PARTIAL; `receipts/face-lock-triple.json`.
+- **Official-final honesty**: annotate forces `OFFICIAL_FINAL_PLATE` when triple not master-eligible.
+- **Closeout + ship-prep steps**: `face_lock_triple` · `transition_frame_audit`.
+- **T3** `transition_frame_audit_closeout_status`: final+delivery → missing/stale audit hard (`transition_policy_soft` / `AIFILM_SKIP_TRANSITION_FRAME_AUDIT` escape).
+- **Tests:** `test_face_lock_triple_f2.py` · `test_transition_frame_closeout_t3.py`.
+- **Docs:** hard-defaults F2/T3 rows · face-transition plan progress.
+
+## [2.40.104] - 2026-08-07
+
+### Added / Changed (WebUI workbench · Wave B1 single shell)
+- **Single shell nav:** 起步 · 选素材 · **验片** · 门禁 · **仪表** in `console.html` (no split external link as primary).
+- **验片 tab:** lazy iframe → `/review` (token via sessionStorage); ↗ pop-out to dedicated page.
+- **stdlib pages:** `/` and `/console` serve shell; `/review` serves review `_PAGE`; invite 303 → `/console`; serve URL → `/console?token=…`.
+- **FastAPI serve URL** aligned to `/console?token=…`.
+- **Tests / smoke:** shell tabs + `/review` page checks.
+- **Docs:** `web-review-console.md` B1 page map.
+
+## [2.40.103] - 2026-08-07
+
+### Added (WebUI workbench · Wave B2 dispatch projection)
+- **`console_projection.py`:** read-only `project_dispatch_for_console` (from `receipts/dispatch.json`, never rebuilds dispatch on GET) + `project_queue_snapshot` (media-queue + takes count).
+- **`console_state`:** embeds `dispatch_projection` + `queue_snapshot` (fail-soft).
+- **`console.html` overview:** production meter, next_cmd/why/weapon/blocked, **copy next CLI** button (clipboard only).
+- **Tests:** `tests/test_console_projection.py`.
+- **Docs:** `web-review-console.md` B2 fields.
+
+## [2.40.102] - 2026-08-07
+
+### Added / Changed (WebUI workbench · Wave A contract + FastAPI review parity)
+- **`scripts/web_routes.py`:** single route table for stdlib + FastAPI (`handler_id`, domain, loopback flags); unified `error_body` → `{error, detail}`.
+- **FastAPI `web_api` review parity:** `/api/status|action|settings|advance|final-review-*` + `/media/*`; exception handler emits dual error keys.
+- **VALID_KINDS single source:** gateway no longer hardcodes a subset; `asset_picker.list_assets` owns kinds (incl. scene/prop).
+- **stdlib `review_ui`:** error JSON also fills `detail` for parity.
+- **Tests:** `tests/test_web_routes.py` (contract + openapi coverage + error body + status).
+- **Docs:** `references/web-review-console.md` full route table; onboarding plan status → 主体已落地.
+
+## [2.40.101] - 2026-08-07
+
+### Changed (lock-face + edit transitions · default HARD)
+- **Face identity default hard:** with `cast_masters`, missing enroll/audit receipt and enroll gaps raise at preflight (`assert_face_identity_passed`). Proven drift remains always hard. Legacy soft: `face_identity_soft: true` or `AIFILM_SKIP_FACE_IDENTITY_GATE=1`.
+- **Transition policy / export read-back default hard:** continue soft-intent always hard; scene flashy / paragraph bad / soft-soup hard by default. Legacy soft: `transition_policy_soft: true` (continue still hard). Soft-style soup: `HF_TRANSITION_SOFT_SOUP` (punchy max run 2, auto/silk max 3).
+- **Preflight** severity aligned with the above.
+- **Tests:** FaceIdentityGateTests + transition policy/assert/readback + soft-soup cases.
+- **Docs:** `docs/plans/2026-08-07-codebase-opt-face-transition-todoplan.md` · hard-defaults rows.
+
+## [2.40.100] - 2026-08-07
+
+### Added / Changed (H3 official P3.5 real-burn canary)
+- **P3.5 densify A/B reburn** seed `202608074` · 6/6 takes at `artifacts/5090-evaluation/h3-official-ab-20260807/`.
+- **Score (raw mean):** high official **28.92 >** legacy 26.92 (Δ+2); dialogue/soft mean still favor legacy.
+- **Policy:** high auto → **official** densify (escape `AIFILM_H3_HIGH_MOTION_OFFICIAL=0`); dialogue stays official for `<d>` structure.
+- **Evidence:** `artifacts/2026-08-07-h3-official-p35-canary.json` · `run_p35_reburn.py`.
+- **Harden:** dialogue gate import soft-path; canary register=False + skip existing + inter-burn free.
+
+## [2.40.99] - 2026-08-07
+
+### Added / Changed (error internalization · E5 + E6.3 + F5)
+- **E5 H3 mode override receipt:** `record_h3_mode_override` → `receipts/h3-mode-override.json` when CLI `--mode` ≠ plan resolve (no silent full-film i2v cover).
+- **E6.3 SKIP iron set expand:** identity/partner/still/bulk/crop/pilot-go/caption-pixel/… in `IRON_SKIP_FLAGS` (hotpaths already on `skip_flag`; fallbacks remain).
+- **F5 memory slim:** active cards **≤40** (archived 21 L4/session/canary cards); README refresh; hard-defaults/AGENTS archive pointers; soft-cap pytest.
+- **Tests:** `test_h3_mode_override_e5.py` · F5 cap in `test_error_internalization_e1_e4`.
+
+## [2.40.98] - 2026-08-07
+
+### Added (error internalization · E1/E2/E4 + F4 flywheel)
+- **E1 identity generation lock:** `gates/identity_generation_lock.py` — archive-path mix hard-fail; `face-identity.verified≠true` → `IDENTITY_PARTIAL`; closeout step + `receipts/cast-generation.json`; escape `AIFILM_SKIP_IDENTITY_GEN`.
+- **E2 partner cast gate:** `gates/partner_cast_gate.py` — cast_master+face_lock paths; `style.locked` false-green when multi-cast incomplete; escape `AIFILM_SKIP_PARTNER_CAST`.
+- **E4 still provenance:** `gates/still_provenance.py` — ban `midframe_paste`/composite provenance + `_archive_poison_*` paths on H3 I2V; escape `AIFILM_SKIP_STILL_PROVENANCE`.
+- **E3 dual-truth fix:** hard-defaults native-speech row → light-process default (aligned with no-midframe card).
+- **F4 dead-link test:** hard-defaults `memory/*` links must resolve; fixed archive pointers for input-fidelity / frw-i2i.
+- **iron-status:** register composition_fill · identity_generation · partner_cast · still_provenance · skip_audit.
+- **Tests:** `tests/test_error_internalization_e1_e4.py`.
+- **Docs:** MEMORY_GOVERNANCE F0 flywheel · nutrient-matrix §2b.
+
+## [2.40.97] - 2026-08-07
+
+### Changed (H3 official · soft densify live canary DONE)
+- **Live burn DONE:** `s_soft_portrait_official` seed `202608074` ~70s; mean **1.28** vs legacy **4.13** (−2.84) vs O3 official **1.47**.
+- **Auto soft → legacy** (micro-life energy; densify did not close mean gap). High stays official densify; dialogue stays official.
+- **Evidence:** `skills/ai-film-grok/artifacts/2026-08-07-h3-official-soft-live-canary.json`.
+- **Escape:** force soft official via `AIFILM_H3_PROMPT_DIALECT=official`.
 
 ## [2.40.96] - 2026-08-07
 

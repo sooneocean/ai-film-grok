@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from util.errors import FilmError
 
+import os
 import subprocess
 from pathlib import Path
 from typing import Any
@@ -16,12 +17,71 @@ from typing import Any
 from h3_mode import effect_tips as _h3_effect_tips
 from h3_mode import resolve_h3_mode
 from production_router import build_shot_intent
-from util import read_json, sha256_file, write_json
+from util import read_json, sha256_file, write_json, utc_now
 from util.film_spec import _iter_shots, _load_spec, _root
 
 
 class H3WorkflowError(FilmError):
     pass
+
+
+H3_MODE_OVERRIDE_REL = Path("receipts/h3-mode-override.json")
+
+
+def record_h3_mode_override(
+    root: Path | str,
+    *,
+    shot_id: str,
+    resolved: str,
+    cli: str,
+    reason: str | None = None,
+) -> dict[str, Any]:
+    """E5 · durable ledger when CLI --mode overrides plan/list resolve.
+
+    Appends one entry per (shot_id, resolved, cli) hit. Never silent: agents must
+    be able to ``cat receipts/h3-mode-override.json`` after bulk recovery.
+    """
+    base = Path(root).expanduser().resolve()
+    path = base / H3_MODE_OVERRIDE_REL
+    path.parent.mkdir(parents=True, exist_ok=True)
+    data = read_json(path) if path.is_file() else {}
+    if not isinstance(data, dict):
+        data = {}
+    entries = data.get("entries")
+    if not isinstance(entries, list):
+        entries = []
+    entry = {
+        "shot_id": str(shot_id),
+        "resolved": str(resolved),
+        "cli": str(cli),
+        "reason": (str(reason)[:240] if reason else None),
+        "at": utc_now(),
+        "note": "prefer resolve unless energy/pilot fail; ban silent full-film --mode i2v",
+    }
+    # idempotent same triple in one process session (keep last reason)
+    replaced = False
+    for e in entries:
+        if (
+            isinstance(e, dict)
+            and e.get("shot_id") == entry["shot_id"]
+            and e.get("resolved") == entry["resolved"]
+            and e.get("cli") == entry["cli"]
+        ):
+            e.update(entry)
+            replaced = True
+            break
+    if not replaced:
+        entries.append(entry)
+    payload = {
+        "schema_version": 1,
+        "kind": "h3-mode-override",
+        "root": str(base),
+        "count": len(entries),
+        "entries": entries,
+        "at": utc_now(),
+    }
+    write_json(path, payload)
+    return payload
 
 
 _H3_ENDPOINTS = frozenset(
@@ -380,11 +440,17 @@ def _prompt_for_shot(
     # Wave 2 · dialogue shots must not ship "no speech" custom prompts
     try:
         from dialogue_speaker_frame_gate import assert_dialogue_prompt_allows_speech
-        from production_gates import ProductionGateError
 
-        assert_dialogue_prompt_allows_speech(prompt, work_shot)
-    except ProductionGateError as exc:
-        raise H3WorkflowError(str(exc)) from exc
+        try:
+            from production_gates import ProductionGateError as _PGE
+        except Exception:  # noqa: BLE001 — dual-module / import-path soft
+            _PGE = ()  # type: ignore[assignment,misc]
+        try:
+            assert_dialogue_prompt_allows_speech(prompt, work_shot)
+        except _PGE as exc:  # type: ignore[misc]
+            raise H3WorkflowError(str(exc)) from exc
+    except H3WorkflowError:
+        raise
     except Exception:
         pass
     return prompt
@@ -1038,13 +1104,24 @@ def run_h3_shot(
         plan["source_endpoint"] = H3_MODE_ENDPOINT[mode_norm]
         plan["requires_still"] = mode_norm in {"i2v", "flf", "r2v"}
         plan["requires_last"] = mode_norm == "flf"
-        # Record CLI override vs list/plan truth (energy/pilot recovery only)
+        # E5 · CLI --mode overrode list/plan resolve → durable receipt (no silent cover)
         if resolved and mode_norm != resolved:
             plan["mode_cli_override"] = {
                 "resolved": resolved,
                 "cli": mode_norm,
+                "shot_id": str(shot_id),
                 "note": "CLI --mode overrode h3 list/plan resolve; prefer resolve unless energy fail",
             }
+            try:
+                record_h3_mode_override(
+                    base,
+                    shot_id=str(shot_id),
+                    resolved=resolved,
+                    cli=mode_norm,
+                    reason=os.environ.get("AIFILM_H3_MODE_OVERRIDE_REASON"),
+                )
+            except Exception:
+                pass
 
     if plan["requires_still"] and not plan.get("still_path"):
         raise H3WorkflowError(
@@ -1086,6 +1163,29 @@ def run_h3_shot(
                 base, shot_id, inputs=inputs, build_if_missing=True
             )
         except GenerationRequestError as exc:
+            raise H3WorkflowError(str(exc)) from exc
+        except Exception:
+            pass
+        # E4 · ban midframe composite / poison-archive still as I2V source
+        try:
+            from still_provenance import StillProvenanceError, assert_still_record_safe_for_i2v
+
+            still_rec: dict = {}
+            try:
+                from util import read_json
+
+                man = read_json(base / "film-manifest.json") or {}
+                st = (man.get("stills") or {}).get(str(shot_id))
+                if isinstance(st, dict):
+                    still_rec = st
+            except Exception:
+                still_rec = {}
+            assert_still_record_safe_for_i2v(
+                still_rec,
+                path=plan.get("still_path"),
+                root=base,
+            )
+        except StillProvenanceError as exc:
             raise H3WorkflowError(str(exc)) from exc
         except Exception:
             pass

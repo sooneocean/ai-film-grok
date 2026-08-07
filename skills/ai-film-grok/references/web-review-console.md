@@ -28,9 +28,10 @@
 
 - **两套传输，一套真相**：`review_ui.py`（标准库 `http.server`）与 `web_api.py`
   （FastAPI）都只调用 `web_core` 做鉴权 + loopback 校验，再委托同一批域函数
-  （`asset_picker.select_asset`、`gate_panel.collect_gates`、`onboarding.*`）。
-  网关测试（`tests/test_web_api.py`）与标准库测试（`tests/test_web_console.py`）
-  验证**相同安全契约**。无 FastAPI 时网关测试自动跳过。
+  （`asset_picker.select_asset`、`gate_panel.collect_gates`、`onboarding.*`、
+  `review_control.*`）。路由表在 `scripts/web_routes.py`（单一真相）。
+  网关测试（`tests/test_web_api.py` · `tests/test_web_routes.py`）与标准库测试
+  （`tests/test_web_console.py`）验证**相同安全契约 + API 覆盖**。无 FastAPI 时网关测试自动跳过。
 - 前端 `console.html`：原生 JS，无构建步骤，玻璃拟态 + 磁吸 + 粒子 hero
   （`prefers-reduced-motion` 时全部降级），含深/浅色主题、ARIA tablist、键盘方向键导航、
   焦点环、`aria-live` 状态播报、音频懒加载（`preload="none"`）、长列表分块渲染。
@@ -76,18 +77,77 @@
 ## 6. 运行
 
 ```bash
-# 标准库服务器（零新增依赖）
+# 标准库服务器（零新增依赖 · 生产主入口）
 aifilm review-ui serve --root <你的 film 根目录>
-# 打开 http://127.0.0.1:<port>/console?token=<stdout token>
+# stdout URL → http://127.0.0.1:<port>/console?token=…
+# 单壳导航：起步 | 选素材 | 验片(iframe /review) | 门禁 | 仪表
 
 # FastAPI 网关（引入 Web 框架，共享同一安全内核）
 python skills/ai-film-grok/scripts/web_api.py --root <film 根> --port 0
 # stdout 打印 {"ok":true,"url":"http://127.0.0.1:<port>/console?token=...",...}
 ```
 
+### 页面路由（B1 单壳）
+
+| Path | 内容 |
+|------|------|
+| `/` · `/console` · `/studio` | 工作台 shell（`console.html`） |
+| `/review` | 验片专页（`_PAGE`；shell 内 iframe 或 ↗ 新标签） |
+| invite `/?invite=` | 种 cookie 后 303 → `/console` |
+
 API 速查：`GET /api/gates` · `GET /api/assets?kind=` · `POST /api/select`
 （body `{kind,asset_id,expected_revision,value?}`）· `GET /api/console-state`
-（总览 + 多标签页同步）· `GET|POST /api/onboarding[/step|/go]`。
+（总览 + 多标签页同步 + **dispatch 只读投影** + queue 快照）·
+`GET|POST /api/onboarding[/step|/go]` · 验片
+`GET /api/status` · `POST /api/action|settings|advance|final-review-input`。
+
+**console-state 扩展字段（B2，fail-soft）**：
+
+| 字段 | 来源 | 说明 |
+|---|---|---|
+| `dispatch_projection` | `receipts/dispatch.json`（**不**在 GET 上重算 `build_dispatch`） | `next_cmd` / `next_why` / `stage_public` / `weapon_line` / `blocked_by` / `copy_cmd` |
+| `queue_snapshot` | `review_control.runtime_status` + `takes/` 文件数 | running/unknown/job_counts/takes_count |
+
+实现：`scripts/console_projection.py` · UI 总览「复制命令」只剪贴板，**不**从浏览器执行 H3/final。
+
+### 完整路由表（单一真相）
+
+机读：`scripts/web_routes.py` → `ROUTES`（`stdlib` / `fastapi` 标志 + `handler_id`）。
+双网关须与表对齐；`pytest -m console` 中 `test_web_routes` 断言 FastAPI 注册面覆盖
+`fastapi=True` 的全部 `/api/*`。
+
+| Method | Path | Domain | stdlib | FastAPI | loopback POST |
+|--------|------|--------|:------:|:-------:|:-------------:|
+| GET | `/` | review/console page | ✓ | ✓ | — |
+| GET | `/console` | console.html | ✓ | ✓ | — |
+| GET | `/studio` | console alias | ✓ | — | — |
+| GET | `/review` | review HTML | — | ✓ | — |
+| GET | `/api/status` | review_control | ✓ | ✓ | — |
+| GET | `/api/final-review-template` | final_review_input | ✓ | ✓ | — |
+| POST | `/api/action` | review_control | ✓ | ✓ | ✓ |
+| POST | `/api/settings` | review_control | ✓ | ✓ | ✓ |
+| POST | `/api/advance` | review_control | ✓ | ✓ | ✓ |
+| POST | `/api/final-review-input` | final_review_input | ✓ | ✓ | ✓ |
+| POST | `/api/stop` | session stop | ✓ | — | ✓ |
+| GET | `/api/gates` | gate_panel | ✓ | ✓ | — |
+| GET | `/api/assets` | asset_picker | ✓ | ✓ | — |
+| GET | `/api/console-state` | asset_picker | ✓ | ✓ | — |
+| GET | `/api/file` | workspace media | ✓ | ✓ | — |
+| POST | `/api/select` | asset_picker | ✓ | ✓ | ✓ |
+| GET | `/api/onboarding` | onboarding | ✓ | ✓ | — |
+| POST | `/api/onboarding/step` | onboarding | ✓ | ✓ | ✓ |
+| POST | `/api/onboarding/go` | onboarding | ✓ | ✓ | ✓ |
+| POST | `/api/onboarding/brief` | onboarding | ✓ | ✓ | ✓ |
+| POST | `/api/onboarding/decompose` | onboarding | ✓ | ✓ | ✓ |
+| POST | `/api/onboarding/plan` | onboarding | ✓ | ✓ | ✓ |
+| POST | `/api/upload` | onboarding | ✓ | ✓ | ✓ |
+| GET | `/media/*` | film media | ✓ | ✓ | — |
+| GET | `/media-lib/*` | BGM library | ✓ | ✓ | — |
+
+**错误体契约**：HTTP ≥400 时 JSON 同时含 `error` 与 `detail`（同文案），前端只读 `error` 即可。
+
+**VALID_KINDS**：唯一来源 `asset_picker.VALID_KINDS`（`bgm|character|voice|shot|scene|prop`）；
+网关不得再维护本地子集。
 
 ## 7. 测试 & 评审
 

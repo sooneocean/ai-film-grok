@@ -1,0 +1,103 @@
+{
+  "status": "DONE",
+  "ok": true,
+  "kind": "h3-official-p35-canary",
+  "plugin": "2.40.94",
+  "seed": 202608074,
+  "at": "2026-08-07T06:24:39Z",
+  "eval_root": "/Users/dex/.grok/plugins/ai-film-grok/skills/ai-film-grok/artifacts/5090-evaluation/h3-official-ab-20260807",
+  "score_raw_preferred": {
+    "dialogue_cu": {
+      "legacy": {
+        "path": "artifacts/5090-evaluation/h3-official-ab-20260807/takes/s_dialogue_cu_legacy/s_dialogue_cu_legacy_h3_i2v_202608074.mp4",
+        "mean": 10.2255,
+        "size": 312568
+      },
+      "official": {
+        "path": "artifacts/5090-evaluation/h3-official-ab-20260807/takes/s_dialogue_cu_official/s_dialogue_cu_official_h3_i2v_202608074.mp4",
+        "mean": 0.8289,
+        "size": 249540
+      },
+      "motion_mean_winner": "legacy",
+      "delta_official_minus_legacy": -9.3966
+    },
+    "high_motion": {
+      "legacy": {
+        "path": "artifacts/5090-evaluation/h3-official-ab-20260807/takes/s_high_motion_legacy/s_high_motion_legacy_h3_i2v_202608074.mp4",
+        "mean": 26.9204,
+        "size": 777925
+      },
+      "official": {
+        "path": "artifacts/5090-evaluation/h3-official-ab-20260807/takes/s_high_motion_official/s_high_motion_official_h3_i2v_202608074.mp4",
+        "mean": 28.9175,
+        "size": 685728
+      },
+      "motion_mean_winner": "official",
+      "delta_official_minus_legacy": 1.9971
+    },
+    "soft_portrait": {
+      "legacy": {
+        "path": "artifacts/5090-evaluation/h3-official-ab-20260807/takes/s_soft_portrait_legacy/s_soft_portrait_legacy_h3_i2v_202608074.mp4",
+        "mean": 8.5885,
+        "size": 428073
+      },
+      "official": {
+        "path": "artifacts/5090-evaluation/h3-official-ab-20260807/takes/s_soft_portrait_official/s_soft_portrait_official_h3_i2v_202608074.mp4",
+        "mean": 1.2831,
+        "size": 273864
+      },
+      "motion_mean_winner": "legacy",
+      "delta_official_minus_legacy": -7.3054
+    }
+  },
+  "score": {
+    "dialogue_cu": {
+      "legacy_mean": 10.2255,
+      "official_mean": 0.8289,
+      "motion_mean_winner": "legacy",
+      "delta_official_minus_legacy": -9.3966
+    },
+    "high_motion": {
+      "legacy_mean": 26.9204,
+      "official_mean": 28.9175,
+      "motion_mean_winner": "official",
+      "delta_official_minus_legacy": 1.9971
+    },
+    "soft_portrait": {
+      "legacy_mean": 8.5885,
+      "official_mean": 1.2831,
+      "motion_mean_winner": "legacy",
+      "delta_official_minus_legacy": -7.3054
+    }
+  },
+  "policy": {
+    "default_dialect": "auto",
+    "dialogue": "official",
+    "high_motion": "official",
+    "else": "official",
+    "default_flip_ready": true,
+    "high_motion_official_env": "default on; escape AIFILM_H3_HIGH_MOTION_OFFICIAL=0",
+    "note": "P3.5 densify reburn seed 202608074: high official 28.92>legacy 26.92 (Δ+2). Soft/dialogue mean still favor legacy but keep official structure for GUIDE fields / <d>. Human lip review still required for dialogue ship."
+  },
+  "compare_o3": {
+    "dialogue_cu": {
+      "legacy": 1.104,
+      "official": 1.236
+    },
+    "high_motion": {
+      "legacy": 20.67,
+      "official": 18.58
+    },
+    "soft_portrait": {
+      "legacy": 4.13,
+      "official": 1.47
+    }
+  },
+  "prior_live_high": {
+    "seed": 202608073,
+    "official_mean": 24.8562,
+    "legacy_o3": 20.6656
+  },
+  "burns_ok": true,
+  "n_pairs": 3
+}

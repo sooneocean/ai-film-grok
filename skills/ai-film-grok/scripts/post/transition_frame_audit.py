@@ -205,6 +205,126 @@ def transition_frame_audit_fresh(root: Path) -> dict[str, Any]:
     }
 
 
+def transition_frame_audit_closeout_status(
+    root: Path | str,
+    *,
+    write_receipt: bool = True,
+    try_build: bool = False,
+) -> dict[str, Any]:
+    """T3 · ship/closeout gate: final present → transition-frame-audit required.
+
+    Missing/stale audit is hard when final MP4 + final-delivery exist (unless
+    film-spec ``transition_policy_soft`` or env skip). No final → skipped ok.
+    """
+    import os
+
+    root = Path(root).expanduser().resolve()
+    try:
+        from core.skip_audit import skip_flag
+
+        if skip_flag(
+            "AIFILM_SKIP_TRANSITION_FRAME_AUDIT",
+            origin="env",
+            film_root=root,
+            call_site="transition_frame_audit_closeout_status",
+        ):
+            return {
+                "ok": True,
+                "skipped": True,
+                "checked": False,
+                "codes": [],
+                "detail": "AIFILM_SKIP_TRANSITION_FRAME_AUDIT",
+            }
+    except Exception:
+        if os.environ.get("AIFILM_SKIP_TRANSITION_FRAME_AUDIT", "").strip().lower() in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        }:
+            return {
+                "ok": True,
+                "skipped": True,
+                "checked": False,
+                "codes": [],
+                "detail": "AIFILM_SKIP_TRANSITION_FRAME_AUDIT",
+            }
+
+    final = _final_path(root)
+    delivery = root / "out" / "final-delivery.json"
+    if final is None or not delivery.is_file():
+        out = {
+            "ok": True,
+            "checked": False,
+            "skipped": True,
+            "codes": [],
+            "detail": "no final+delivery yet — transition frame audit N/A",
+        }
+        if write_receipt:
+            write_json(root / "receipts" / "transition-frame-audit-status.json", out)
+        return out
+
+    soft = False
+    try:
+        spec = read_json(root / "film-spec.json") or {}
+        soft = isinstance(spec, dict) and spec.get("transition_policy_soft") is True
+    except Exception:
+        soft = False
+
+    fresh = transition_frame_audit_fresh(root)
+    codes: list[str] = []
+    if not fresh.get("present"):
+        codes.append("TRANSITION_FRAME_AUDIT_MISSING")
+    elif fresh.get("stale"):
+        codes.append("TRANSITION_FRAME_AUDIT_STALE")
+
+    if codes and try_build:
+        try:
+            build_transition_frame_audit(root)
+            fresh = transition_frame_audit_fresh(root)
+            codes = []
+            if not fresh.get("present"):
+                codes.append("TRANSITION_FRAME_AUDIT_MISSING")
+            elif fresh.get("stale"):
+                codes.append("TRANSITION_FRAME_AUDIT_STALE")
+        except Exception as exc:  # noqa: BLE001
+            codes = list(dict.fromkeys([*codes, "TRANSITION_FRAME_AUDIT_BUILD_FAILED"]))
+            out = {
+                "ok": soft,
+                "soft": soft,
+                "checked": True,
+                "codes": codes,
+                "stale": True,
+                "detail": f"build failed: {exc}"[:200],
+                "fresh": fresh,
+                "next_cmd": f'aifilm transition-frame-audit --root "{root}"',
+            }
+            if write_receipt:
+                write_json(root / "receipts" / "transition-frame-audit-status.json", out)
+            return out
+
+    ok = not codes or soft
+    out = {
+        "ok": ok,
+        "soft": soft and bool(codes),
+        "checked": True,
+        "codes": codes,
+        "stale": bool(fresh.get("stale")),
+        "present": bool(fresh.get("present")),
+        "transition_count": fresh.get("transition_count") or 0,
+        "audit_path": fresh.get("audit_path"),
+        "detail": "fresh" if not codes else f"codes={codes} soft={soft}",
+        "next_cmd": (
+            None if not codes else f'aifilm transition-frame-audit --root "{root}"'
+        ),
+        "fresh": fresh,
+    }
+    if write_receipt:
+        write_json(root / "receipts" / "transition-frame-audit-status.json", out)
+        out["status_path"] = str(root / "receipts" / "transition-frame-audit-status.json")
+    return out
+
+
 def _human_transition_phrase(phrase: str) -> bool:
     text = (phrase or "").strip().lower()
     rejected = (

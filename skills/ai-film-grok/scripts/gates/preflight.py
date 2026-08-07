@@ -913,7 +913,8 @@ def run_preflight(root: Path) -> dict[str, Any]:
             )
 
         # --- Face-identity post_audit (face-identity-pixel P0) ---
-        # Proven drift (post_audit n_fail>0) is always hard; gaps hard under strict/adult max.
+        # Proven drift always hard; enroll/audit gaps default HARD (lock-face necessary).
+        # Legacy soft: film-spec face_identity_soft=true.
         try:
             fi_report = assert_face_identity_passed(root, force=False, env_skip=False)
             if fi_report.get("skipped") is True:
@@ -1000,28 +1001,33 @@ def run_preflight(root: Path) -> dict[str, Any]:
                 )
             )
 
-        # --- Controlled transition policy (P2 · HF 转场受控策略全量) ---
-        # continue 接戏缝必须 hard match-cut；场景硬切禁 whip/grid；段落转场限
-        # fade/dissolve。Soft advisory by default; hard on transition_policy_strict
-        # or adult max heat. 把"编辑语法"固化成默认门，提前暴露转场意图漂移。
+        # --- Controlled transition policy (HF 转场受控) ---
+        # Default HARD; legacy soft only when transition_policy_soft=true.
+        # Continue-seam violations always hard (接戏铁律).
         try:
             tp = transition_policy_report(spec)
             tp_codes = list(tp.get("codes") or [])
             if tp_codes:
-                tp_strict = spec.get("transition_policy_strict") is True or str(
-                    spec.get("heat_scale") or ""
-                ).lower() in {"max", "hot", "extreme"}
+                tp_soft = spec.get("transition_policy_soft") is True
+                continue_hard = "HF_TRANSITION_CONTINUE_NOT_HARD" in tp_codes
+                tp_hard = (not tp_soft) or continue_hard
+                # When soft mode, only continue codes go hard; others soft.
+                if tp_soft and not continue_hard:
+                    severity = "soft"
+                else:
+                    severity = "hard" if tp_hard else "soft"
                 tp_issue = _issue(
-                    "hard" if tp_strict else "soft",
+                    severity,
                     "transition_policy",
-                    f"transition-policy {'hard' if tp_strict else 'soft'}: {tp_codes} — "
+                    f"transition-policy {severity}: {tp_codes} — "
                     f"{(tp.get('issues') or [{}])[0].get('message', '')[:120]}",
                     fix=(
                         "continue 接戏缝→hard match-cut；场景硬切→禁 whip/grid；"
-                        "段落转场→soft fade/dissolve。lessons/hf-transition-policy"
+                        "段落转场→soft fade/dissolve；soft 风格轮转防粥。"
+                        "旧片 soft：transition_policy_soft=true"
                     ),
                 )
-                if tp_strict:
+                if severity == "hard":
                     hard.append(tp_issue)
                 else:
                     soft.append(tp_issue)
@@ -1035,30 +1041,25 @@ def run_preflight(root: Path) -> dict[str, Any]:
                 )
             )
 
-        # --- Controlled transition export read-back (P2 · HF 转场 export read-back 全量) ---
-        # Read back built transition_ops and verify full seam coverage + policy
-        # consistency (continue→hard_cut/0.0s/no overlay; soft→xfade w/ declared
-        # style; chapter→soft fade/dissolve; scene cut→no whip/grid). Soft advisory
-        # by default; hard on transition_policy_strict or adult max heat.
+        # --- Controlled transition export read-back ---
+        # Default HARD; legacy soft when transition_policy_soft=true.
         try:
             rb = transition_export_readback_report(spec)
             rb_codes = list(rb.get("codes") or [])
             if rb_codes:
-                rb_strict = spec.get("transition_policy_strict") is True or str(
-                    spec.get("heat_scale") or ""
-                ).lower() in {"max", "hot", "extreme"}
+                rb_hard = spec.get("transition_policy_soft") is not True
                 rb_issue = _issue(
-                    "hard" if rb_strict else "soft",
+                    "hard" if rb_hard else "soft",
                     "transition_readback",
-                    f"transition export read-back {'hard' if rb_strict else 'soft'}: "
+                    f"transition export read-back {'hard' if rb_hard else 'soft'}: "
                     f"{rb_codes} — {((rb.get('issues') or [{}])[0].get('message', '') or '')[:120]}",
                     fix=(
                         "build one operation per declared seam (continue→hard_cut/0.0s/no "
                         "overlay; soft→xfade with declared style; chapter→soft fade/dissolve; "
-                        "scene cut→no whip/grid).lessons/hf-transition-policy"
+                        "scene cut→no whip/grid). 旧片 soft：transition_policy_soft=true"
                     ),
                 )
-                if rb_strict:
+                if rb_hard:
                     hard.append(rb_issue)
                 else:
                     soft.append(rb_issue)

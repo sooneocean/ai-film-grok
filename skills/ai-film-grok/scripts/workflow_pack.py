@@ -2147,6 +2147,76 @@ def ship_prep(
             }
         )
 
+    # F2 · face-lock triple (necessary for master claim honesty)
+    try:
+        from gates.face_lock_triple import (
+            annotate_official_final_for_face_lock,
+            audit_face_lock_triple,
+        )
+
+        face_lock_triple = audit_face_lock_triple(root, write_receipt=write)
+        if write:
+            annotate_official_final_for_face_lock(root, face_lock_triple)
+        hard_fl = not bool(face_lock_triple.get("ok"))
+        steps.append(
+            {
+                "id": "face_lock_triple",
+                "ok": bool(face_lock_triple.get("ok")),
+                "detail": (
+                    f"master_eligible={face_lock_triple.get('master_eligible')} "
+                    f"partial={face_lock_triple.get('identity_partial')} "
+                    f"codes={face_lock_triple.get('codes') or []}"
+                )[:220],
+                "hard": hard_fl,
+                "advisory": bool(
+                    face_lock_triple.get("ok") and face_lock_triple.get("identity_partial")
+                ),
+                "partial": not bool(face_lock_triple.get("master_eligible")),
+                "master_eligible": bool(face_lock_triple.get("master_eligible")),
+                "next_cmd": face_lock_triple.get("next_cmd"),
+            }
+        )
+    except Exception as exc:  # noqa: BLE001
+        steps.append(
+            {
+                "id": "face_lock_triple",
+                "ok": False,
+                "detail": f"probe: {exc}"[:160],
+                "hard": True,
+                "next_cmd": f'aifilm face-identity enroll-bible --root "{root}"',
+            }
+        )
+
+    # T3 · transition frame audit when final exists
+    try:
+        from transition_frame_audit import transition_frame_audit_closeout_status
+
+        tfa = transition_frame_audit_closeout_status(
+            root, write_receipt=write, try_build=False
+        )
+        tfa_hard = bool(tfa.get("checked")) and not bool(tfa.get("ok")) and not tfa.get("soft")
+        steps.append(
+            {
+                "id": "transition_frame_audit",
+                "ok": bool(tfa.get("ok", True)),
+                "detail": (tfa.get("detail") or "")[:200],
+                "hard": tfa_hard,
+                "advisory": bool(tfa.get("skipped") or tfa.get("soft") or not tfa_hard),
+                "codes": tfa.get("codes") or [],
+                "next_cmd": tfa.get("next_cmd"),
+            }
+        )
+    except Exception as exc:  # noqa: BLE001
+        steps.append(
+            {
+                "id": "transition_frame_audit",
+                "ok": True,
+                "detail": f"skipped: {exc}"[:160],
+                "advisory": True,
+                "skipped": True,
+            }
+        )
+
     # Single machine-lane entry (no second full i2v if already ok above)
     try:
         from gate_auto import ensure_machine_lane
