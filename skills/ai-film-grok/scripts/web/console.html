@@ -1,76 +1,80 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="zh-CN" data-theme="dark">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>AI Film · 验片选素材控制台</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Sora:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>AI Film · 导演工作室</title>
+<link rel="stylesheet" href="/static/tokens.css" />
 <style>
-  :root {
-    --bg: #15130f; --bg2: #1e1a15; --surface: #1e1a15; --raised: #272019;
-    --panel: var(--surface); --panel-brd: rgba(255,245,230,.09);
-    --line: rgba(255,245,230,.09); --line-strong: rgba(255,245,230,.16);
-    --txt: #f3ede2; --muted: #b9b0a2; --text-lo: #7d7568;
-    --accent: #e8a463; --accent-press: #d98f47; --accent2: #b9893a;
-    --danger: #d97a5f; --warn: #e0b15f; --ok: #84b86a; --slate: #7d7568;
-    --info: #7ba6c4; --radius: 14px;
-    --font-display: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
-    --font-body: "Sora", ui-sans-serif, system-ui, sans-serif;
-    --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
-    --ease: cubic-bezier(.16, 1, .3, 1);
-  }
-  html[data-theme="light"] {
-    --bg: #f6f3ee; --bg2: #fffdfa; --surface: #fffdfa; --raised: #fffaf3;
-    --panel: var(--surface); --panel-brd: rgba(33,29,24,.10);
-    --line: rgba(33,29,24,.10); --line-strong: rgba(33,29,24,.18);
-    --txt: #211d18; --muted: #5c544a; --text-lo: #8c8377;
-    --accent: #c8843f; --accent-press: #b3722f; --accent2: #a86f2e;
-    --danger: #c25e45; --warn: #b9893a; --ok: #5f9447; --slate: #8c8377;
-    --info: #3f7da0;
-  }
+  /* Component skin on top of tokens.css (Phase E5). No dual-gradient AI-slop. */
   * { box-sizing: border-box; }
   body {
     margin: 0; font: 15px/1.5 var(--font-body);
     background: var(--bg);
     color: var(--txt); min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
   }
   /* WCAG: clear keyboard focus ring */
-  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 8px; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--r-sm); }
   .mono { font-family: var(--font-mono); font-variant-ligatures: none; font-feature-settings: "calt" 0; }
   header {
-    display: flex; align-items: center; gap: 1rem; padding: 1rem 1.6rem;
+    display: flex; align-items: center; gap: var(--sp-4); padding: var(--sp-3) var(--sp-6);
     border-bottom: 1px solid var(--line);
-    position: sticky; top: 0; z-index: 10; background: color-mix(in srgb, var(--bg) 90%, transparent);
+    position: sticky; top: 0; z-index: 10;
+    background: color-mix(in srgb, var(--bg) 88%, transparent);
+    min-height: calc(var(--touch) + var(--sp-3));
   }
-  .brand { font-weight: 700; font-size: 1.05rem; letter-spacing: .3px; }
-  .brand small { display:block; color: var(--muted); font-weight: 400; font-size: .72rem; }
+  .brand {
+    display: flex; align-items: center; gap: var(--sp-3);
+    font-family: var(--font-display); font-weight: 700; font-size: 1.05rem; letter-spacing: .2px;
+  }
+  .brand-mark {
+    width: 34px; height: 34px; border-radius: 10px; flex: none;
+    background: linear-gradient(150deg, var(--accent), var(--accent-press));
+    color: var(--ink-on-accent); display: grid; place-items: center;
+    font-family: var(--font-display); font-weight: 700; font-size: .95rem;
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 30%, transparent);
+  }
+  .brand-text { display: flex; flex-direction: column; gap: 1px; }
+  .brand small { display: block; color: var(--text-lo); font-weight: 500; font-size: .68rem;
+    letter-spacing: .5px; text-transform: uppercase; font-family: var(--font-body); }
+  .env-pill {
+    display: inline-flex; align-items: center; gap: 6px; margin-left: var(--sp-2);
+    font-size: .7rem; color: var(--text-lo); font-weight: 500;
+  }
+  .env-pill i { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); display: inline-block; }
   .spacer { flex: 1; }
   .tabs { display: flex; gap: .4rem; flex-wrap: wrap; }
   .tab {
     border: 1px solid var(--panel-brd); background: var(--panel); color: var(--txt);
-    padding: .45rem .9rem; border-radius: 999px; cursor: pointer; font-size: .9rem;
-    transition: transform .25s var(--ease), background .2s;
+    padding: .45rem .9rem; min-height: var(--touch); border-radius: var(--r-pill); cursor: pointer; font-size: .9rem;
+    transition: transform .25s var(--ease), background .2s, border-color .2s, color .2s;
   }
-  .tab[aria-selected="true"] { background: var(--accent); color: #06121a; border-color: transparent; }
+  .tab[aria-selected="true"] {
+    background: var(--accent); color: var(--ink-on-accent); border-color: transparent;
+    font-weight: 600;
+  }
+  .tab:hover:not([aria-selected="true"]) { border-color: var(--line-strong); background: var(--raised); }
   .magnetic { transition: transform .2s var(--ease); }
   .ghost-btn {
     border: 1px solid var(--panel-brd); background: var(--panel); color: var(--txt);
-    padding: .45rem .75rem; border-radius: 12px; cursor: pointer;
+    min-width: var(--touch); min-height: var(--touch); padding: .45rem .75rem;
+    border-radius: var(--r-md); cursor: pointer;
   }
-  main { padding: 1.6rem; max-width: 1180px; margin: 0 auto; }
+  .ghost-btn:hover { border-color: var(--line-strong); color: var(--accent); }
+  main { padding: var(--sp-6); max-width: 1240px; margin: 0 auto; }
   .panel {
     background: var(--panel); border: 1px solid var(--panel-brd); border-radius: var(--radius);
     padding: 1.1rem 1.2rem; margin-bottom: 1.2rem;
+    box-shadow: var(--shadow);
   }
   .hidden { display: none; }
   .kindrow { display: flex; gap: .5rem; flex-wrap: wrap; margin-bottom: 1rem; }
   .chip {
     border: 1px solid var(--panel-brd); background: var(--panel); color: var(--txt);
-    padding: .4rem .85rem; border-radius: 999px; cursor: pointer; font-size: .85rem;
+    padding: .4rem .85rem; min-height: 36px; border-radius: var(--r-pill); cursor: pointer; font-size: .85rem;
   }
-  .chip[aria-selected="true"] { background: var(--accent); color: #06121a; border-color: transparent; }
+  .chip[aria-selected="true"] { background: var(--accent); color: var(--ink-on-accent); border-color: transparent; }
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px,1fr)); gap: .9rem; }
   .card {
     border: 1px solid var(--panel-brd); border-radius: 14px; padding: .9rem; background: color-mix(in srgb, var(--panel) 80%, transparent);
@@ -81,13 +85,13 @@
   .card h4 { margin: .1rem 0 .4rem; font-size: .98rem; }
   .meta { color: var(--muted); font-size: .78rem; }
   .pick {
-    margin-top: .7rem; width: 100%; border: 0; border-radius: 10px; padding: .5rem;
-    background: var(--accent); color: #06121a;
+    margin-top: .7rem; width: 100%; border: 0; border-radius: var(--r-md);
+    padding: .55rem; min-height: var(--touch);
+    background: var(--accent); color: var(--ink-on-accent);
     font-weight: 600; cursor: pointer; transition: background .2s, transform .2s;
   }
   .pick:hover:not(:disabled) { background: var(--accent-press); }
-  .pick:disabled { color: #06121a; }
-  .pick:disabled { cursor: default; }
+  .pick:disabled { color: var(--ink-on-accent); cursor: default; opacity: .85; }
   audio { width: 100%; margin-top: .5rem; }
   .voice-select {
     width: 100%; margin-top: .5rem; padding: .4rem; border-radius: 10px;
@@ -122,7 +126,7 @@
   .btn-skip:hover { color: var(--danger); border-color: var(--danger); }
   .cmp-btn { align-self: flex-start; border: 1px solid var(--panel-brd); background: transparent; color: var(--muted); border-radius: 8px; padding: .2rem .55rem; cursor: pointer; font: inherit; font-size: .72rem; transition: color .2s var(--ease), border-color .2s var(--ease), background .2s var(--ease); white-space: nowrap; }
   .cmp-btn:hover { color: var(--accent); border-color: var(--accent); }
-  .cmp-btn[aria-pressed="true"] { background: var(--accent); color: #06121a; border-color: transparent; }
+  .cmp-btn[aria-pressed="true"] { background: var(--accent); color: var(--ink-on-accent); border-color: transparent; }
   .card.skipped { opacity: .4; }
 
   /* skeleton loading (T9) */
@@ -182,7 +186,7 @@
   .ob-image .rm { position: absolute; top: -6px; right: -6px; background: var(--danger); color: #fff; border: 0;
     border-radius: 50%; width: 20px; height: 20px; cursor: pointer; line-height: 1; font-size: .7rem; }
   .hintrow { display: flex; gap: .5rem; flex-wrap: wrap; }
-  .chip.hint[aria-pressed="true"] { background: var(--accent); color: #06121a; border-color: transparent; }
+  .chip.hint[aria-pressed="true"] { background: var(--accent); color: var(--ink-on-accent); border-color: transparent; }
   .thinking { margin: 1.1rem 0; }
   .tk-step { display: flex; align-items: center; gap: .6rem; padding: .5rem .2rem; color: var(--muted); transition: color .3s; }
   .tk-step.done { color: var(--txt); }
@@ -199,7 +203,7 @@
   .ob-plan .grp { margin: 1.1rem 0; border-top: 1px solid var(--panel-brd); padding-top: 1rem; }
   .ob-plan .grp > h4 { margin: .1rem 0 .6rem; }
   .char-card { position: relative; }
-  .char-card .lead { position: absolute; top: .6rem; right: .6rem; font-size: .68rem; background: var(--accent2); color: #06121a;
+  .char-card .lead { position: absolute; top: .6rem; right: .6rem; font-size: .68rem; background: var(--accent2); color: var(--ink-on-accent);
     padding: .1rem .55rem; border-radius: 999px; font-weight: 600; }
   .char-card .rmc { position: absolute; top: .5rem; left: .5rem; background: var(--danger); color: #fff; border: 0;
     border-radius: 50%; width: 20px; height: 20px; cursor: pointer; line-height: 1; }
@@ -279,8 +283,9 @@
     padding: .55rem 1rem; border-radius: 12px; cursor: pointer; font-size: .9rem; font-weight: 600;
     transition: transform .2s var(--ease), background .2s, border-color .2s;
   }
-  .cmd-btn:hover:not(:disabled) { background: var(--accent); color: #06121a; border-color: transparent; }
-  .cmd-btn.primary { background: var(--accent); color: #06121a; border-color: transparent; }
+  .cmd-btn { min-height: var(--touch); }
+  .cmd-btn:hover:not(:disabled) { background: var(--accent); color: var(--ink-on-accent); border-color: transparent; }
+  .cmd-btn.primary { background: var(--accent); color: var(--ink-on-accent); border-color: transparent; }
   .cmd-btn.primary:hover:not(:disabled) { background: var(--accent-press); }
   .cmd-log { font-size: .82rem; color: var(--muted); min-height: 1.2rem; margin-top: .2rem; }
   .cmd-log.ok { color: var(--ok); }
@@ -296,7 +301,11 @@
 </head>
 <body>
 <header>
-  <div class="brand">AI Film 控制台<small>工作台 · 选素材 · 验片 · 门禁 · 起步</small></div>
+  <div class="brand">
+    <span class="brand-mark" aria-hidden="true">A</span>
+    <span class="brand-text">AI Film 工作室<small>Director Center · 验片 · 选片 · 门禁</small></span>
+    <span class="env-pill" title="loopback only"><i></i>127.0.0.1</span>
+  </div>
   <div class="spacer"></div>
   <nav class="tabs" role="tablist" aria-label="控制台分区">
     <button class="tab magnetic" role="tab" data-tab="overview" aria-controls="dashboard" aria-selected="true">工作台</button>
@@ -1164,7 +1173,7 @@ function renderChars(){
 function renderStepper(state){
   document.getElementById('ob-stepper').innerHTML = ['references','story','characters'].map(s => {
     const done = state.steps[s].done;
-    return `<span class="chip" style="${done?'background:var(--ok);color:#06121a;border-color:transparent':''}"><span class="dot ${done?'s-pass':'s-unknown'}" style="display:inline-block;margin-right:.35rem;vertical-align:middle"></span>${STEP_LABEL[s]}</span>`;
+    return `<span class="chip" style="${done?'background:var(--ok);color:var(--ink-on-accent);border-color:transparent':''}"><span class="dot ${done?'s-pass':'s-unknown'}" style="display:inline-block;margin-right:.35rem;vertical-align:middle"></span>${STEP_LABEL[s]}</span>`;
   }).join('');
 }
 function updateGo(state){

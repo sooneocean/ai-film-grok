@@ -2866,7 +2866,7 @@
     },
     {
       "path": "scripts/post/review_ui.py",
-      "sha256": "86d0ba3448688d752f6e643bcb8e6782ab66c7c5698c83ea084bc679c70971d8"
+      "sha256": "e2678fc1815b1eb38c99c81269150f2b6838827cacd42aed68316a5b449d5a3d"
     },
     {
       "path": "scripts/post/show_package.py",
@@ -3522,7 +3522,7 @@
     },
     {
       "path": "scripts/web/routes.py",
-      "sha256": "43c0fcc3f57d300d7cf77d15fa90625cc4b8bd10ec86d8f0360a930d8adda998"
+      "sha256": "26ac2a6d838efad69e1ada0e0babe545d31f5d31dbda6dc6b45f6c4f84ee8992"
     },
     {
       "path": "scripts/web/shot_card_api.py",
@@ -3530,7 +3530,7 @@
     },
     {
       "path": "scripts/web/smoke_console.py",
-      "sha256": "4eb593c8a91228f06575e78665fddb058a2c76332f78f49f8c5849c0015adfea"
+      "sha256": "b704feff56c3a8d5fa3ea41204277441f999dc1d740011f765fc9e0ea9ae974a"
     },
     {
       "path": "scripts/web/sse_stream.py",
@@ -3542,11 +3542,11 @@
     },
     {
       "path": "scripts/web/web_api.py",
-      "sha256": "48dcf06965fe320ec02b676c1bdcbfc12f07fe571c772f9665feb2f6da3b7e65"
+      "sha256": "4b4472dbc95d4b816a55eb22fd22a74b7dfa18313266593d8a8ae27b72e1f056"
     },
     {
       "path": "scripts/web/web_core.py",
-      "sha256": "5588510470b1df68b594918d0457113b6b788b2f13d07ab0669155dedb94d43e"
+      "sha256": "b10e55e84adca282559ebab4f355005b63e85518a8d5f45e9e849a25afda977e"
     },
     {
       "path": "scripts/web_api.py",
@@ -3567,6 +3567,10 @@
     {
       "path": "scripts/workflow_spine.py",
       "sha256": "f0dcbc6657e32b74c998f571b11ec29ca6b8c2d568d1b6cd589732b64a12d561"
+    },
+    {
+      "path": "scripts/web/tokens.css",
+      "sha256": "f93044d09ef2dbaa830b834af412e334a9e2f369f3131904d39da9032337dfdc"
     }
   ],
   "requirements_sha256": "f8c098495135ea53c62cfd94778efcf059f16c8e83852303f900c3eea5615001"

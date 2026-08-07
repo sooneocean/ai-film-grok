@@ -386,7 +386,21 @@ def main() -> int:
             and 'data-tab="assets"' in text
             and 'data-tab="review"' in text,
         )
-        check("served console: film-studio accent token present", "--accent:" in text)
+        check(
+            "served console: E5 tokens link + brand mark",
+            'href="/static/tokens.css"' in text
+            and 'class="brand-mark"' in text
+            and "导演工作室" in text
+            and "fonts.googleapis.com" not in text,
+        )
+        st_tok, body_tok = req(conn, "GET", "/static/tokens.css")
+        tok = body_tok.decode("utf-8", "ignore") if body_tok else ""
+        check(
+            "GET /static/tokens.css film-studio tokens",
+            st_tok == 200 and "--accent:" in tok and "#e8a463" in tok and "--sp-4:" in tok,
+            f"status={st_tok}",
+        )
+        check("served console: film-studio accent token present", "--accent:" in text or "tokens.css" in text)
         check(
             "served console: 6 material tabs wired",
             all(f'data-kind="{k}"' in text for k in ["bgm", "character", "voice", "shot", "scene", "prop"]),

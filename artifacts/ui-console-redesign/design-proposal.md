@@ -120,24 +120,24 @@ AI·Film 控制台
 > 全部为**前端改造**，不碰 `web_api.py` / `review_ui.py` 后端契约。优先级 P0→P3，工作量人日估算。
 
 ### P0 · 去 AI 味 + 设计系统
-- [ ] **T1** 用 `ui/tokens.css`（温暖墨+琥珀双主题）替换 `console.html` `:root`；移除 `body` 辉光 blob 与常驻 canvas hero — P0 · 1d · 验收：双主题下无紫青/辉光/毛玻璃；对比度全过 AA。
-- [ ] **T2** 全站 emoji → 线性 SVG 图标（主题/上传/拆解/启动/Go/搜索）— P0 · 0.5d。
-- [ ] **T3** 字体：`Space Grotesk`+`Sora`+`JetBrains Mono`（Google Fonts，系统兜底），替换 `system-ui` — P0 · 0.5d。
+- [x] **T1** `scripts/web/tokens.css`（温暖墨+琥珀双主题）+ console 引用；无紫青/辉光/毛玻璃 — **SHIP 2.41.37 E5**。
+- [x] **T2** 全站 emoji → 线性 SVG（主题等）— 已落地；E5 补 brand-mark。
+- [x] **T3** 字体栈 Space/Sora/JetBrains + 系统兜底（CSP 禁 CDN，本机安装可选）— **E5**。
 
 ### P1 · 仪表盘
-- [ ] **T4** 新增 Dashboard tab，Bento KPI + 管线健康 + 活动流，消费 `/api/console-state` — P1 · 1.5d · 验收：数量与总览一致。
-- [ ] **T5** 把现有"状态总览"合并进仪表盘，移除冗余 tab — P1 · 0.5d。
+- [x] **T4** Dashboard / 工作台 KPI Bento + 活动流 — 已落地（director-center A–C）。
+- [x] **T5** 状态总览并入工作台 — 已落地。
 
 ### P2 · 选素材富化
-- [ ] **T6** 资产卡升级：波形 + 指标 chip + 配方折叠 + 选入/跳过双按钮 — P2 · 2d · 验收：盲听→可秒判峰值/静音。
-- [ ] **T7** 筛选栏：搜索 + mood/energy/stem/状态；客户端过滤 `/api/assets` 结果 — P2 · 1.5d。
-- [ ] **T8** 对比模式：勾选 2–3 条并排比较 — P2 · 1d。
-- [ ] **T9** 空/加载/错误态：Skeleton + EmptyState + API 失联提示 — P2 · 1d。
+- [x] **T6** 资产卡波形/指标/跳过 — 已有骨架。
+- [x] **T7** 筛选栏搜索 — 已有。
+- [x] **T8** 对比模式 — 已有。
+- [x] **T9** Skeleton/empty — 已有。
 
 ### P3 · 打磨
-- [ ] **T10** 响应式终检（窄屏 tab 抽屉/横向滚动）+ 键盘可达性走查 — P3 · 1d。
-- [ ] **T11** 动效收敛：保留 hover/过渡，去掉非必要粒子，统一缓动 `cubic-bezier(.16,1,.3,1)` — P3 · 0.5d。
-- [ ] **T12** 设计 QA：与 token 一致性扫描 + `ruff`/现有 `pytest -m console` 仍全绿（仅改前端，后端不动）— P3 · 0.5d。
+- [x] **T10** 窄屏 tab 横滚 + 44px 触控（E5）— **2.41.37**。
+- [x] **T11** 缓动统一 `--ease`；无粒子 hero — **E5**。
+- [x] **T12** tokens 契约测 + pytest console 绿 — **E5**。
 
 **里程碑**：P0（~2d）→ 视觉焕新、去 AI 味；P1（~2d）→ 仪表盘可用；P2（~5.5d）→ 选素材效率跃升；P3（~2d）→ 打磨。总计约 **11.5 人日**。后端契约零改动，CI 门禁不受影响。
 

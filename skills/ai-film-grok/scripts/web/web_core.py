@@ -60,6 +60,36 @@ def generate_token() -> str:
     return secrets.token_urlsafe(32)
 
 
+# Phase E CSP: loopback console. Inline scripts required by console.html;
+# fonts self-only (tokens use system stack; no Google Fonts CDN).
+CONSOLE_CSP = (
+    "default-src 'self'; script-src 'self' 'unsafe-inline'; "
+    "style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; "
+    "media-src 'self' blob:; connect-src 'self'; font-src 'self' data:; "
+    "frame-ancestors 'self'; base-uri 'self'; form-action 'self'"
+)
+
+# Allowlisted static files under scripts/web/ (Phase E5 design tokens).
+_WEB_STATIC_ALLOW = frozenset({"tokens.css"})
+
+
+def web_static_dir() -> Path:
+    return Path(__file__).resolve().parent
+
+
+def resolve_web_static(name: str) -> Path:
+    """Resolve a same-origin static asset under ``scripts/web/`` (no path escape)."""
+    base = name.strip().lstrip("/").replace("\\", "/")
+    if not base or base != Path(base).name or base not in _WEB_STATIC_ALLOW:
+        raise WebConsoleError("static asset not allowed")
+    path = (web_static_dir() / base).resolve()
+    if web_static_dir() not in path.parents and path != web_static_dir():
+        raise WebConsoleError("static asset path escape")
+    if not path.is_file() or path.is_symlink():
+        raise WebConsoleError("static asset missing")
+    return path
+
+
 def sha256_text(value: str) -> str:
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
 

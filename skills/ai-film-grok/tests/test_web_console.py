@@ -168,6 +168,13 @@ def test_console_page_served_at_dedicated_route(film_root):
         assert 'data-tab="review"' in text
         assert 'data-tab="overview"' in text
         assert 'id="review-frame"' in text
+        # E5 design system
+        assert 'href="/static/tokens.css"' in text
+        assert "brand-mark" in text
+        assert "fonts.googleapis.com" not in text
+        st_tok, tok = _request(server, "GET", "/static/tokens.css")
+        assert st_tok == 200
+        assert b"--accent:" in tok and b"#e8a463" in tok
         # root is also shell (not the legacy review-only page)
         st2, root_body = _request(server, "GET", "/")
         assert st2 == 200
@@ -176,6 +183,7 @@ def test_console_page_served_at_dedicated_route(film_root):
         st3, rev = _request(server, "GET", "/review")
         assert st3 == 200
         assert "审核控制台" in rev.decode("utf-8")
+        assert b"tokens.css" in rev or b"--accent" in rev or "tokens.css" in rev.decode("utf-8")
     finally:
         server.shutdown()
         server.server_close()

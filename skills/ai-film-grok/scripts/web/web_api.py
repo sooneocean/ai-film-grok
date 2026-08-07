@@ -30,11 +30,13 @@ from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, JSONResponse, Response, StreamingResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from web_core import (
+    CONSOLE_CSP,
     WebConsoleConflict,
     WebConsoleError,
     WebConsoleForbidden,
     generate_token,
     loopback_origin_ok,
+    resolve_web_static,
     safe_media_path,
     token_matches,
 )
@@ -145,58 +147,40 @@ def create_app(root: str | Path, token: str, port: int) -> FastAPI:
         if origin and not loopback_origin_ok(origin, port):
             raise _http_error(403, "cross-origin request rejected")
 
+    def _html_headers() -> dict[str, str]:
+        return {
+            "Cache-Control": "no-store",
+            "X-Content-Type-Options": "nosniff",
+            "X-Frame-Options": "SAMEORIGIN",
+            "Content-Security-Policy": CONSOLE_CSP,
+        }
+
     # ---- pages ----
     @app.get("/", dependencies=[Depends(require_auth)])
     def console_root() -> Response:
-        return HTMLResponse(
-            _console_html(),
-            headers={
-                "Cache-Control": "no-store",
-                "X-Content-Type-Options": "nosniff",
-                "X-Frame-Options": "SAMEORIGIN",
-                "Content-Security-Policy": (
-                    "default-src 'self'; script-src 'self' 'unsafe-inline'; "
-                    "style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; "
-                    "media-src 'self' blob:; connect-src 'self'; frame-ancestors 'self'; "
-                    "base-uri 'self'; form-action 'self'"
-                ),
-            },
-        )
+        return HTMLResponse(_console_html(), headers=_html_headers())
 
     @app.get("/console", dependencies=[Depends(require_auth)])
     def console_page() -> Response:
-        return HTMLResponse(
-            _console_html(),
-            headers={
-                "Cache-Control": "no-store",
-                "X-Content-Type-Options": "nosniff",
-                "X-Frame-Options": "SAMEORIGIN",
-                "Content-Security-Policy": (
-                    "default-src 'self'; script-src 'self' 'unsafe-inline'; "
-                    "style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; "
-                    "media-src 'self' blob:; connect-src 'self'; frame-ancestors 'self'; "
-                    "base-uri 'self'; form-action 'self'"
-                ),
-            },
-        )
+        return HTMLResponse(_console_html(), headers=_html_headers())
 
     @app.get("/review", dependencies=[Depends(require_auth)])
     def review_page() -> Response:
         from review_ui import _PAGE
 
-        return HTMLResponse(
-            _PAGE.encode("utf-8"),
-            headers={
-                "Cache-Control": "no-store",
-                "X-Content-Type-Options": "nosniff",
-                "X-Frame-Options": "SAMEORIGIN",
-                "Content-Security-Policy": (
-                    "default-src 'self'; script-src 'self' 'unsafe-inline'; "
-                    "style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; "
-                    "media-src 'self' blob:; connect-src 'self'; frame-ancestors 'self'; "
-                    "base-uri 'self'; form-action 'self'"
-                ),
-            },
+        return HTMLResponse(_PAGE.encode("utf-8"), headers=_html_headers())
+
+    @app.get("/static/{name}")
+    def static_asset(name: str) -> Response:
+        try:
+            path = resolve_web_static(name)
+        except WebConsoleError as exc:
+            raise _http_error(404, str(exc)) from exc
+        media = "text/css; charset=utf-8" if path.suffix == ".css" else "application/octet-stream"
+        return Response(
+            path.read_bytes(),
+            media_type=media,
+            headers={"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"},
         )
 
     # ---- media ----

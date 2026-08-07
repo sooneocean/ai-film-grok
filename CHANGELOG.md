@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.41.37] - 2026-08-07
+
+### Added (director-center · Phase E5 design system)
+- **`web/tokens.css`**: film-studio tokens (warm ink + amber; light/dark); served at `/static/tokens.css`.
+- **console shell**: brand mark · loopback env pill · 44px touch · soft shadows · no Google Fonts CDN (CSP-safe).
+- **review page**: same tokens (drop slate/purple AI-slop palette).
+- **CSP**: shared `CONSOLE_CSP` + `font-src 'self'`; static allowlist in `web_core`.
+- **Tests:** tokens.css contract + console brand/link asserts.
+
 ## [2.41.36] - 2026-08-07
 
 ### Fixed (director-center · quality closeout S2/S4/S5/S8)

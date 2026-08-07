@@ -45,6 +45,14 @@ ROUTES: tuple[RouteSpec, ...] = (
     RouteSpec("GET", "/console", "page.console", "web.console_html"),
     RouteSpec("GET", "/studio", "page.console_alias", "web.console_html", fastapi=False),
     RouteSpec("GET", "/review", "page.review", "review_ui", note="验片专页（可 iframe）"),
+    RouteSpec(
+        "GET",
+        "/static/{name}",
+        "page.static",
+        "web.web_core",
+        auth=False,
+        note="E5 design tokens (allowlisted)",
+    ),
     # ---- review (stdlib complete; FastAPI parity target) ----
     RouteSpec("GET", "/api/status", "review.status", "review_control"),
     RouteSpec(

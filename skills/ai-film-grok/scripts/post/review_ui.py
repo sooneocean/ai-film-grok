@@ -34,7 +34,13 @@ from review_control import (
     update_settings,
 )
 from util import exclusive_file_lock, write_json
-from web_core import WebConsoleConflict, WebConsoleError, WebConsoleForbidden
+from web_core import (
+    CONSOLE_CSP,
+    WebConsoleConflict,
+    WebConsoleError,
+    WebConsoleForbidden,
+    resolve_web_static,
+)
 from web_routes import error_body
 
 MAX_BODY = 128 * 1024
@@ -43,9 +49,21 @@ MEDIA_SUFFIXES = frozenset(
     {".mp4", ".mov", ".m4v", ".webm", ".wav", ".mp3", ".m4a", ".png", ".jpg", ".jpeg", ".webp"}
 )
 
-_PAGE = r"""<!doctype html><meta charset=utf-8><title>AI Film 审核控制台</title><style>
-body{font:15px system-ui;margin:2rem;background:#111827;color:#e5e7eb;max-width:1100px}.panel,.item{border:1px solid #374151;padding:1rem;margin:.7rem 0;border-radius:.4rem}.approved{border-color:#15803d}.stale,.blocked,.notice-error{border-color:#dc2626}.notice-success{border-color:#15803d}button{margin:.2rem;padding:.4rem}textarea{width:100%;min-height:4rem}code{word-break:break-all;white-space:pre-wrap}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:.5rem}.media{max-width:360px;max-height:280px;margin:.5rem .5rem .2rem 0;background:#000}label{display:block}.muted{color:#9ca3af}
- </style><h1>AI Film 审核控制台</h1><p id=summary>载入中…</p><p id=notice class="panel muted" role=status aria-live=polite>等待操作。</p><section class=panel><b>自动推进</b><p class=muted id=runtime></p><p class=muted id=autopilot-status>尚无自动驾驶记录。</p><button id=advance>自动推进至下一审核关</button></section><section class=panel><b>预算与审核者</b><div class=grid id=budgets></div><label>审核者 <input id=reviewer maxlength=80></label><label><input id=autopilot-enabled type=checkbox> 启用预算自动驾驶</label><label>允许 provider（逗号分隔）<input id=autopilot-providers></label><label>抽检间隔 <input id=autopilot-sample type=number min=1 value=5></label><label><input id=telegram-notify type=checkbox> Telegram 停机提醒</label><button id=save-settings>保存设置</button></section><section class=panel id=final-review-form hidden><b>终片完整审核</b><p class=muted>完整播放后逐项填入时间码、证据与 1–5 分；这里只写审核输入，不会自动批准成片。</p><label><input id=watched-full type=checkbox> 已完整观看</label><label>审核说明<textarea id=final-notes></textarea></label><div id=final-dimensions></div><button id=save-final-review>保存终片审核输入</button></section><div id=items></div><script>
+_PAGE = r"""<!doctype html><html lang=zh-CN data-theme=dark><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>AI Film 审核控制台</title>
+<link rel=stylesheet href=/static/tokens.css>
+<style>
+body{font:15px/1.5 var(--font-body);margin:0;padding:1.5rem;background:var(--bg);color:var(--txt);max-width:1100px}
+h1{font-family:var(--font-display);font-size:1.4rem;margin:0 0 .6rem}
+.panel,.item{border:1px solid var(--panel-brd);padding:1rem;margin:.7rem 0;border-radius:var(--r-md);background:var(--surface);box-shadow:var(--shadow)}
+.approved{border-color:var(--ok)}.stale,.blocked,.notice-error{border-color:var(--danger)}.notice-success{border-color:var(--ok)}
+button{margin:.2rem;padding:.45rem .75rem;min-height:36px;border-radius:var(--r-sm);border:1px solid var(--panel-brd);background:var(--raised);color:var(--txt);cursor:pointer}
+button:hover{border-color:var(--accent);color:var(--accent)}
+textarea,input,select{width:100%;background:var(--bg2);color:var(--txt);border:1px solid var(--panel-brd);border-radius:var(--r-sm);padding:.45rem;font:inherit}
+textarea{min-height:4rem}code{word-break:break-all;white-space:pre-wrap;color:var(--muted)}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:.5rem}
+.media{max-width:360px;max-height:280px;margin:.5rem .5rem .2rem 0;background:#000;border-radius:var(--r-sm)}
+label{display:block;margin:.35rem 0}.muted{color:var(--muted)}
+</style><h1>AI Film 审核控制台</h1><p id=summary>载入中…</p><p id=notice class="panel muted" role=status aria-live=polite>等待操作。</p><section class=panel><b>自动推进</b><p class=muted id=runtime></p><p class=muted id=autopilot-status>尚无自动驾驶记录。</p><button id=advance>自动推进至下一审核关</button></section><section class=panel><b>预算与审核者</b><div class=grid id=budgets></div><label>审核者 <input id=reviewer maxlength=80></label><label><input id=autopilot-enabled type=checkbox> 启用预算自动驾驶</label><label>允许 provider（逗号分隔）<input id=autopilot-providers></label><label>抽检间隔 <input id=autopilot-sample type=number min=1 value=5></label><label><input id=telegram-notify type=checkbox> Telegram 停机提醒</label><button id=save-settings>保存设置</button></section><section class=panel id=final-review-form hidden><b>终片完整审核</b><p class=muted>完整播放后逐项填入时间码、证据与 1–5 分；这里只写审核输入，不会自动批准成片。</p><label><input id=watched-full type=checkbox> 已完整观看</label><label>审核说明<textarea id=final-notes></textarea></label><div id=final-dimensions></div><button id=save-final-review>保存终片审核输入</button></section><div id=items></div><script>
 const token=new URLSearchParams(location.search).get('token');if(token)history.replaceState(null,'',location.pathname);const h=token?{'X-Review-Token':token}:{};const reviewActions=new Set(['approve','reject','reshoot','needs_changes']);let rev=0,settingsRev=0,renderedStages=new Set(),finalTemplate=null,reviewStartedAt=Date.now();
 async function api(p,o={}){o.headers={...h,...(o.headers||{})};let r=await fetch(p,o),j=await r.json();if(!r.ok)throw Error(j.error||r.status);return j}
 function esc(s){return String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))}function mediaUrl(p){return '/media/'+p.split('/').map(encodeURIComponent).join('/')}
@@ -203,15 +221,25 @@ def make_handler(root: Path, token: str):
             self.send_header("Content-Length", str(len(data)))
             self.send_header("Cache-Control", "no-store")
             self.send_header("X-Content-Type-Options", "nosniff")
-            # Phase E: loopback console CSP (inline scripts required by console.html)
-            self.send_header(
-                "Content-Security-Policy",
-                "default-src 'self'; script-src 'self' 'unsafe-inline'; "
-                "style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; "
-                "media-src 'self' blob:; connect-src 'self'; frame-ancestors 'self'; "
-                "base-uri 'self'; form-action 'self'",
-            )
+            # Phase E/E5: loopback CSP; tokens.css is same-origin static
+            self.send_header("Content-Security-Policy", CONSOLE_CSP)
             self.send_header("X-Frame-Options", "SAMEORIGIN")
+            self.end_headers()
+            self.wfile.write(data)
+
+        def _send_static(self, name: str) -> None:
+            try:
+                path = resolve_web_static(name)
+            except WebConsoleError as exc:
+                self._json(HTTPStatus.NOT_FOUND, {"error": str(exc)})
+                return
+            data = path.read_bytes()
+            ctype = "text/css; charset=utf-8" if path.suffix == ".css" else "application/octet-stream"
+            self.send_response(200)
+            self.send_header("Content-Type", ctype)
+            self.send_header("Content-Length", str(len(data)))
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("X-Content-Type-Options", "nosniff")
             self.end_headers()
             self.wfile.write(data)
 
@@ -229,6 +257,11 @@ def make_handler(root: Path, token: str):
 
         def do_GET(self) -> None:
             parsed = urlparse(self.path)
+            if parsed.path.startswith("/static/"):
+                # Same-origin design tokens (E5); auth optional for CSS so
+                # first paint is not blocked, but path is allowlisted.
+                self._send_static(unquote(parsed.path.removeprefix("/static/")))
+                return
             # Studio mode: the "active film" is the per-request root. When not in
             # studio mode, self.server.active_film is unset and we fall back to the
             # serve-time root (keeps single-root tests / CLI working unchanged).
