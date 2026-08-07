@@ -434,6 +434,18 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
             recorded_audible = native_record.get("audible")
             native_audio_audible = recorded_audible if isinstance(recorded_audible, bool) else None
             native_audio_gain = resolve_native_audio_gain(native_record)
+            # Music Director desk: prefer directed stem (mute windows / peak) when apply receipt ok.
+            try:
+                from music_director import resolve_directed_native_path
+
+                directed = resolve_directed_native_path(
+                    root, str(sid), source_path=native_audio
+                )
+                if directed is not None:
+                    native_audio = directed
+                    native_audio_gain = 1.0
+            except Exception:
+                pass
         caption_lang = str(
             spec.get("caption_lang") or (spec.get("voice_policy") or {}).get("caption_lang") or "zh"
         )
@@ -1371,6 +1383,19 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
     # Auto light SFX accents from dramatic_function when author left events empty
     flat = {str(s["id"]): s for s in flatten_shots(spec) if isinstance(s, dict) and s.get("id")}
     shot_dicts = [flat.get(str(item["id"]), {"id": item["id"]}) for item in shot_audio]
+    try:
+        from music_director import apply_bgm_to_shots, load_plan
+
+        _md_plan = load_plan(root)
+        if _md_plan is not None:
+            _n_bgm = apply_bgm_to_shots(shot_dicts, _md_plan)
+            mix_spotting["music_director_bgm"] = {
+                "ok": True,
+                "patched_shots": _n_bgm,
+                "default_mood": (_md_plan.get("bgm") or {}).get("default_mood"),
+            }
+    except Exception as exc:  # noqa: BLE001
+        mix_spotting["music_director_bgm"] = {"ok": False, "error": str(exc)[:160]}
     heat_scale = str(spec.get("heat_scale") or "").strip().lower() or None
     sound_plan = inject_auto_sfx_if_empty(sound_plan, shot_dicts, heat_scale=heat_scale)
     # sound_cues on shots → extra sfx_accent events (声景轨，不进旁白)

@@ -20,5 +20,17 @@
 - **口白窗**：TTS ≤ cue ≤ slot；超窗 **砍 spoken / vo_rate**，禁只拉长 cue。
 - **抽听（AD B3）**：ship 前每场 ≥1 句人耳可懂中文；有 aac ≠ 可懂。
 
+### H3 原声 · 音乐总监（2026-08-07）
+
+> 口白走 **prefer_native** 时：BGM / 爆音 / 错台词 mute **取决于总监 plan**，禁止各镜私拧旋钮。
+
+1. `aifilm music-director draft --root …` → `audio/music-director-plan.json`
+2. 导演改 plan：`mute_windows`（plate 内错句静音）· `mute_entire`/`lane=silence` · `peak_fix=auto` · BGM `duck_db`
+3. `aifilm music-director apply --root …` → `audio/native_directed/{shot}.wav` + apply 回执
+4. `aifilm music-director review --root …` → 抽听点 / mute 列表 / peak
+5. `aifilm final …` 自动优先 directed stem（仍 XOR 禁叠 Edge）
+
+v1 **只 mute 音频**，不改画面时长（剪画面走 editor_cut）。
+
 色气 BGM 默认 **rnb**。中文 VO primary=Edge。机读：[hard-defaults](../hard-defaults.md) · [weapon-inventory](../weapon-inventory.md)。  
 深入：[dialogue-first-workflow](../dialogue-first-workflow.md) · [vo-modes](../vo-modes.md) · [voices](../voices.md) · [caption-hardburn](../memory/2026-08-03-huangdao-caption-hardburn-meat-variety.md)
