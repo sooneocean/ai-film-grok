@@ -270,193 +270,68 @@ def write_final_mix_partial_receipt(
     )
 
 
-def resolve_render_dimension(*sources: object, default: int) -> int:
-    """Resolve a render dimension with CLI > timeline > manifest > default fallback.
-
-    Pure helper extracted from ``render_final`` (P1, senior-dev quality plan):
-    previously the width/height/fps fallback chains were inlined three times.
-    Every source is coerced defensively so a non-numeric value degrades to the
-    next fallback instead of raising mid-render.
-    """
-    for src in sources:
-        if src in (None, "", 0):
-            continue
-        try:
-            return int(src)  # type: ignore[arg-type]
-        except (TypeError, ValueError):
-            continue
-    return default
-
-
-
-def resolve_plate_slot_sec(
-    shot: object,
-    *,
-    default: float = 1.0,
-    min_sec: float = 0.05,
-) -> float:
-    """Resolve a plate clock duration from shot.duration_sec (pure helper).
-
-    Used for silence / native caption-clock VO stems that must match the plate
-    slot. Invalid or missing values degrade to ``default`` rather than raising
-    mid-render. Values at or below ``min_sec`` are treated as unusable.
-    """
-    try:
-        if isinstance(shot, dict):
-            raw = shot.get("duration_sec")
-        else:
-            raw = None
-        plate_slot = float(raw or 0.0)
-    except (TypeError, ValueError):
-        plate_slot = 0.0
-    if plate_slot <= min_sec:
-        return float(default)
-    return float(plate_slot)
-
-
-
-def coerce_optional_float(value: object) -> float | None:
-    """Coerce a present value to float; None stays None (conversion errors raise).
-
-    Pure helper for optional timeline fields such as ``in_point_sec``.
-    """
-    if value is None:
-        return None
-    return float(value)  # type: ignore[arg-type]
+# W1 peel: pure helpers live in final.render_helpers; re-export for hard-compat.
+from final.render_helpers import (  # noqa: E402, F401
+    coerce_optional_float,
+    resolve_plate_slot_sec,
+    resolve_render_dimension,
+)
 
 
 def render_final(args: argparse.Namespace) -> dict[str, Any]:
-    root = Path(args.root).expanduser().resolve()
-    bgm_source_receipt: dict[str, Any] | None = None
-    _hb_stage = "start"
+    # W1.1 · bootstrap paths/spec/vo/workspace (leaf: final.render_context)
+    from final.render_context import load_render_context
 
-    def _hb(stage: str, detail: str | None = None) -> None:
-        nonlocal _hb_stage
-        _hb_stage = stage
-        try:
-            from final.heartbeat import write_final_heartbeat
-
-            write_final_heartbeat(root, stage=stage, detail=detail)
-        except Exception:
-            pass
-
-    try:
-        from final.heartbeat import apply_final_ffmpeg_timeout_env
-
-        ff_to = apply_final_ffmpeg_timeout_env()
-        _hb("start", f"render_final enter ffmpeg_timeout={ff_to}s")
-    except Exception:
-        _hb("start", "render_final enter")
-    try:
-        paths = resolve_render_paths(root, args.out_name)
-    except RenderWorkspaceError as exc:
-        raise RenderError(str(exc)) from exc
-    out_dir = paths["out_dir"]
-    final_path = paths["final"]
-    if not shutil.which("ffmpeg") or not shutil.which("ffprobe"):
-        raise RenderError("ffmpeg/ffprobe required")
-
-    if tts_synthesize is None:
-        raise RenderError("tts_backend.py missing next to render_final.py")
-
-    manifest = read_json(root / "manifest.json")
-    spec = read_json(root / "film-spec.json")
-    scene_sound_report = reconcile_scene_sound(root, write=True)
-    if bool(spec.get("audio_timeline_v1", False)) and scene_sound_report["status"] == "blocked":
-        raise RenderError(
-            "scene-sound required assets missing: "
-            + ", ".join(scene_sound_report["blocking_shot_ids"])
-        )
-    audio_contract = validate_audio_tracks_contract(spec)
-    for warning in audio_contract.get("warnings") or []:
-        log(f"audio contract warning: {warning}")
-    # Hard gate: long VO on short plates → stream_loop (boring). Split nars first.
-    from production_gates import ProductionGateError, assert_no_loop_risk
-
-    try:
-        assert_no_loop_risk(root, force=bool(getattr(args, "allow_loop_risk", False)))
-    except ProductionGateError as exc:
-        raise RenderError(str(exc)) from exc
-    timeline = read_json(root / "timeline.json") if (root / "timeline.json").is_file() else {}
-    width = resolve_render_dimension(args.width, timeline.get("width"), manifest.get("width"), default=720)
-    height = resolve_render_dimension(args.height, timeline.get("height"), manifest.get("height"), default=1280)
-    fps = resolve_render_dimension(args.fps, timeline.get("fps"), default=30)
-    # Film-spec / CLI → VO strategy (peeled leaf)
-    _vm = resolve_final_voice_mix_config(args, spec)
-    vo_mode = _vm["vo_mode"]
-    voice = _vm["voice"]
-    cast_voices = _vm["cast_voices"]
-    vo_rate = _vm["vo_rate"]
-    vo_pitch = _vm["vo_pitch"]
-    vo_tts_vol = _vm["vo_tts_vol"]
-    tts_backend = _vm["tts_backend"]
-    tts_allow_network_fallback = _vm["tts_allow_network_fallback"]
-    cast_tts_backends = _vm["cast_tts_backends"]
-    vo_gain = _vm["vo_gain"]
-    voice_policy = _vm["voice_policy"]
-    native_audio_volume = _vm["native_audio_volume"]
-    film_vocal_color_gain = _vm["film_vocal_color_gain"]
-    mood = _vm["mood"]
-    lipsync_mode = _vm["lipsync_mode"]
-    tts_info = tts_probe() if tts_probe else {}
-    log(
-        f"vo_mode={vo_mode} tts={tts_backend}->{tts_info.get('active')} voice={voice} "
-        f"rate={vo_rate} pitch={vo_pitch} vo_gain={vo_gain} music_vol={args.music_volume} "
-        f"mood={mood} lipsync={lipsync_mode}"
+    ctx = load_render_context(
+        args,
+        tts_synthesize=tts_synthesize,
+        tts_probe=tts_probe,
+        resolve_font=resolve_font,
+        enforce_dialogue_lipsync=enforce_dialogue_lipsync,
+        lipsync_error_cls=LipSyncError,
     )
-    font_path = resolve_font()
-
-    shots = flatten_shots(spec, film_root=root)
-    if enforce_dialogue_lipsync is None:
-        if lipsync_mode != "off":
-            raise RenderError(
-                "post lipsync removed (v2.40); use --lipsync off and prefer_native dialogue"
-            )
-    else:
-        try:
-            lipsync_mode = enforce_dialogue_lipsync(
-                vo_mode=vo_mode,
-                shots=shots,
-                requested=lipsync_mode,
-            )
-        except (LipSyncError, Exception) as exc:
-            raise RenderError(str(exc)) from exc
-    try:
-        # The validator runs in flatten_shots; this makes the renderer's TTS
-        # selection explicit and refuses ambiguous multi-turn shots.
-        shot_voice_cues = {str(shot["id"]): primary_voice_cue(shot) for shot in shots}
-    except AudioCueError as exc:
-        raise RenderError(str(exc)) from exc
-    clips_map = manifest.get("clips") or {}
-    try:
-        prepare_render_workspace(paths)
-    except RenderWorkspaceError as exc:
-        raise RenderError(str(exc)) from exc
-    clips_dir = paths["clips_dir"]
-    audio_dir = paths["audio_dir"]
-    native_dir = paths["native_dir"]
-    work = paths["work"]
-    overlays_dir = work / "overlays"
-    checkpoint = CheckpointManager(root)
-    if bool(getattr(args, "force", False)):
-        checkpoint.clear()
-    resume = bool(getattr(args, "resume", False))
-
-    dialogue_spoken_lang = str(
-        spec.get("dialogue_spoken_lang")
-        or (spec.get("voice_policy") or {}).get("dialogue_spoken_lang")
-        or "zh"
-    )
-    if dialogue_spoken_lang.strip().lower() in {"ja", "jp", "japanese"}:
-        raise RenderError(
-            "Japanese dialogue is retired; set dialogue_spoken_lang=zh (Chinese-only product)"
-        )
-    dialogue_spoken_lang = "zh"
-    narration_spoken_lang = str(
-        spec.get("narration_spoken_lang")
-        or (spec.get("voice_policy") or {}).get("narration_spoken_lang")
-        or "zh"
-    )
+    root = ctx.root
+    paths = ctx.paths
+    out_dir = ctx.out_dir
+    final_path = ctx.final_path
+    manifest = ctx.manifest
+    spec = ctx.spec
+    scene_sound_report = ctx.scene_sound_report
+    timeline = ctx.timeline
+    width = ctx.width
+    height = ctx.height
+    fps = ctx.fps
+    vo_mode = ctx.vo_mode
+    voice = ctx.voice
+    cast_voices = ctx.cast_voices
+    vo_rate = ctx.vo_rate
+    vo_pitch = ctx.vo_pitch
+    vo_tts_vol = ctx.vo_tts_vol
+    tts_backend = ctx.tts_backend
+    tts_allow_network_fallback = ctx.tts_allow_network_fallback
+    cast_tts_backends = ctx.cast_tts_backends
+    vo_gain = ctx.vo_gain
+    voice_policy = ctx.voice_policy
+    native_audio_volume = ctx.native_audio_volume
+    film_vocal_color_gain = ctx.film_vocal_color_gain
+    mood = ctx.mood
+    lipsync_mode = ctx.lipsync_mode
+    tts_info = ctx.tts_info
+    font_path = ctx.font_path
+    shots = ctx.shots
+    shot_voice_cues = ctx.shot_voice_cues
+    clips_map = ctx.clips_map
+    clips_dir = ctx.clips_dir
+    audio_dir = ctx.audio_dir
+    native_dir = ctx.native_dir
+    work = ctx.work
+    overlays_dir = ctx.overlays_dir
+    checkpoint = ctx.checkpoint
+    resume = ctx.resume
+    dialogue_spoken_lang = ctx.dialogue_spoken_lang
+    narration_spoken_lang = ctx.narration_spoken_lang
+    _hb = ctx.heartbeat
+    bgm_source_receipt: dict[str, Any] | None = ctx.bgm_source_receipt
 
     # 1) Per-shot TTS
     validate_voice_language_locks(shots, dialogue_spoken_lang=dialogue_spoken_lang)
@@ -559,6 +434,18 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
             recorded_audible = native_record.get("audible")
             native_audio_audible = recorded_audible if isinstance(recorded_audible, bool) else None
             native_audio_gain = resolve_native_audio_gain(native_record)
+            # Music Director desk: prefer directed stem (mute windows / peak) when apply receipt ok.
+            try:
+                from music_director import resolve_directed_native_path
+
+                directed = resolve_directed_native_path(
+                    root, str(sid), source_path=native_audio
+                )
+                if directed is not None:
+                    native_audio = directed
+                    native_audio_gain = 1.0
+            except Exception:
+                pass
         caption_lang = str(
             spec.get("caption_lang") or (spec.get("voice_policy") or {}).get("caption_lang") or "zh"
         )
@@ -1496,6 +1383,19 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
     # Auto light SFX accents from dramatic_function when author left events empty
     flat = {str(s["id"]): s for s in flatten_shots(spec) if isinstance(s, dict) and s.get("id")}
     shot_dicts = [flat.get(str(item["id"]), {"id": item["id"]}) for item in shot_audio]
+    try:
+        from music_director import apply_bgm_to_shots, load_plan
+
+        _md_plan = load_plan(root)
+        if _md_plan is not None:
+            _n_bgm = apply_bgm_to_shots(shot_dicts, _md_plan)
+            mix_spotting["music_director_bgm"] = {
+                "ok": True,
+                "patched_shots": _n_bgm,
+                "default_mood": (_md_plan.get("bgm") or {}).get("default_mood"),
+            }
+    except Exception as exc:  # noqa: BLE001
+        mix_spotting["music_director_bgm"] = {"ok": False, "error": str(exc)[:160]}
     heat_scale = str(spec.get("heat_scale") or "").strip().lower() or None
     sound_plan = inject_auto_sfx_if_empty(sound_plan, shot_dicts, heat_scale=heat_scale)
     # sound_cues on shots → extra sfx_accent events (声景轨，不进旁白)
@@ -1562,381 +1462,81 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
         )
 
 
-    # Anti-fatigue seed first (pool pick + procedural style share it)
-    plan_mood = (sound_plan or {}).get("mood") if sound_plan else None
-    if plan_mood:
-        mood = str(plan_mood)
-    seed_arg = getattr(args, "music_seed", None)
-    policy_seed = None
-    ap = spec.get("audio_policy") if isinstance(spec.get("audio_policy"), dict) else {}
-    if ap.get("music_seed") is not None:
-        try:
-            policy_seed = int(ap["music_seed"])
-        except (TypeError, ValueError):
-            policy_seed = None
-    if seed_arg is not None:
-        music_seed = int(seed_arg)
-    elif policy_seed is not None:
-        music_seed = policy_seed
-    else:
-        title_s = str(spec.get("title") or root.name)
-        # v3: style families; include recipe summary so different arcs reshuffle beds
-        route = spec.get("_audio_routing") if isinstance(spec.get("_audio_routing"), dict) else {}
-        counts = route.get("counts") if isinstance(route.get("counts"), dict) else {}
-        count_key = ",".join(f"{k}{counts.get(k, 0)}" for k in sorted(counts))
-        raw_seed = f"{title_s}|{mood}|{total_dur:.2f}|v3-multi-style|{count_key}"
-        music_seed = int(hashlib.sha256(raw_seed.encode("utf-8")).hexdigest()[:8], 16)
-
-    # P1 · long-plate BGM anti-fatigue receipt (soft/hard advice before bed render)
-    try:
-        from bgm_anti_fatigue import check_bgm_anti_fatigue
-
-        bed_src = str(ap.get("bed_source") or "auto")
-        tmpl_preview = str(
-            getattr(args, "music_template", None)
-            or (sound_plan or {}).get("music_template")
-            or "auto"
-        )
-        fatigue = check_bgm_anti_fatigue(
-            root,
-            total_dur_sec=float(total_dur),
-            music_seed=music_seed,
-            bed_source=bed_src,
-            template_mode=tmpl_preview,
-            mood=mood,
-            write=True,
-        )
-        mix_spotting["bgm_anti_fatigue"] = {
-            "ok": fatigue.get("ok"),
-            "issues": fatigue.get("issues"),
-            "recommend": fatigue.get("recommend"),
-        }
-        # Auto multi-chapter when hard single-loop risk (procedural bed path)
-        hard_fat = [
-            i for i in (fatigue.get("issues") or []) if i.get("severity") == "hard"
-        ]
-        mix_spotting["bgm_anti_fatigue"]["hard_count"] = len(hard_fat)
-        if hard_fat:
-            log(
-                "bgm anti-fatigue HARD: inject multi-chapter procedural motifs "
-                f"(dur={total_dur:.0f}s)"
-            )
-            mix_spotting["bgm_anti_fatigue"]["auto_chapters"] = True
-    except Exception as exc:  # noqa: BLE001
-        mix_spotting["bgm_anti_fatigue"] = {"ok": True, "error": str(exc)[:120]}
-        hard_fat = []
-
-    # Phase 4: Plot-Adaptive Mood Timeline
-    if isinstance(sound_plan, dict):
-        sound_plan["mood_timeline"] = build_mood_timeline(
-            shot_dicts, shot_starts=shot_start_map, shot_ends=shot_end_map, default_mood=mood
-        )
-        if build_music_timeline is not None:
-            try:
-                sound_plan["music_timeline"] = build_music_timeline(
-                    shot_dicts,
-                    shot_starts=shot_start_map,
-                    shot_ends=shot_end_map,
-                    default_mood=mood,
-                )
-                mix_spotting["music_cue_routing"] = summarize_music_timeline(
-                    sound_plan["music_timeline"]
-                )
-                # Procedural generators consume the richer cue fields.
-                sound_plan["mood_timeline"] = sound_plan["music_timeline"]
-            except ValueError as exc:
-                raise RenderError(f"invalid shot music_cue: {exc}") from exc
-        # Force multi-chapter motif rotation for long single-loop risk
-        if hard_fat or (
-            float(total_dur) >= 180.0
-            and (mix_spotting.get("bgm_anti_fatigue") or {}).get("auto_chapters")
-        ):
-            try:
-                from bgm_anti_fatigue import inject_anti_fatigue_chapters
-
-                base_tl = (
-                    sound_plan.get("music_timeline")
-                    or sound_plan.get("mood_timeline")
-                    or []
-                )
-                injected = inject_anti_fatigue_chapters(
-                    base_tl if isinstance(base_tl, list) else [],
-                    total_dur_sec=float(total_dur),
-                    default_mood=mood,
-                    chapter_sec=45.0,
-                )
-                sound_plan["mood_timeline"] = injected
-                sound_plan["music_timeline"] = injected
-                mix_spotting["bgm_anti_fatigue"] = {
-                    **(mix_spotting.get("bgm_anti_fatigue") or {}),
-                    "chapters_injected": len(injected),
-                    "auto_chapters": True,
-                }
-                log(f"bgm anti-fatigue: {len(injected)} chapters injected for procedural variety")
-            except Exception as exc:  # noqa: BLE001
-                log(f"bgm anti-fatigue chapter inject skip: {exc}")
-
-    # Phase H: local template pool. `timeline` is opt-in because it requires a
-    # licensed mood-specific file for every cue; it never degrades to one loop.
-    bed_source = str(ap.get("bed_source") or "auto").lower()
-    template_mode = str(
-        getattr(args, "music_template", None)
-        or ("approved_library" if bed_source == "approved_library" else None)
-        or (sound_plan or {}).get("music_template")
-        or "auto"
-    ).lower()
-    template_timeline_samples: np.ndarray | None = None
-    template_timeline_selections: list[dict[str, Any]] = []
-    if template_mode in {"timeline", "approved_library"}:
-        try:
-            template_timeline_samples, template_timeline_selections = (
-                render_music_template_timeline(
-                    root=root,
-                    work=work,
-                    timeline=(sound_plan or {}).get("music_timeline") or [],
-                    plan=sound_plan if isinstance(sound_plan, dict) else None,
-                    music_license=getattr(args, "music_license", None),
-                    seed=music_seed,
-                    total_dur=total_dur,
-                    approved_library=template_mode == "approved_library",
-                    film_id=str(spec.get("id") or spec.get("title") or root.name),
-                    series_id=str(spec.get("series_id") or ""),
-                )
-            )
-        except (SoundPlanError, RenderError) as exc:
-            raise RenderError(str(exc)) from exc
-        music_resolved = None
-    else:
-        try:
-            music_resolved = resolve_music_template(
-                root,
-                mood=mood,
-                plan=sound_plan if isinstance(sound_plan, dict) else None,
-                music_arg=getattr(args, "music", None),
-                mode=getattr(args, "music_template", None),
-                music_license=getattr(args, "music_license", None),
-                seed=music_seed,
-            )
-        except SoundPlanError as exc:
-            raise RenderError(str(exc)) from exc
-
-    # Optional external AI music (ACE-Step / MusicGen…) when no local bed
-    if music_resolved is None and template_timeline_samples is None:
-        ext_music = _try_external_music_gen(
-            work=work,
-            duration=total_dur,
-            mood=mood,
-            seed=music_seed,
-            title=str(spec.get("title") or root.name),
-        )
-        if ext_music is not None:
-            music_resolved = ext_music
-
-    mix_spotting["music_template"] = (
-        {
-            "source": music_resolved.get("source"),
-            "path": music_resolved.get("relative") or music_resolved.get("path"),
-            "mode": music_resolved.get("mode"),
-            "pool_size": music_resolved.get("pool_size"),
-            "pool_index": music_resolved.get("pool_index"),
-        }
-        if music_resolved
-        else {"source": "procedural", "mode": getattr(args, "music_template", None) or "auto"}
+    # W1.2 · music seed / anti-fatigue / bed materialize (leaf: final.stages_music_bed)
+    from final.stages_music_bed import (
+        apply_plan_mood,
+        enrich_sound_plan_music_timelines,
+        materialize_music_bed,
+        resolve_music_seed,
+        run_bgm_anti_fatigue,
     )
-    if template_timeline_samples is not None:
-        mix_spotting["music_template"] = {
-            "source": (
-                "approved_library" if template_mode == "approved_library" else "timeline_templates"
-            ),
-            "mode": template_mode,
-            "cue_count": len(template_timeline_selections),
-            "catalog_revision": (
-                template_timeline_selections[0].get("catalog_revision")
-                if template_timeline_selections
-                else None
-            ),
-            "catalog_sha256": (
-                template_timeline_selections[0].get("catalog_sha256")
-                if template_timeline_selections
-                else None
-            ),
-            "selections": [
-                {
-                    "shot_id": item["shot_id"],
-                    "path": item["relative"],
-                    "mood": item["mood"],
-                    "motif_id": item["motif_id"],
-                    "asset_id": item.get("asset_id"),
-                    "sha256": item.get("sha256"),
-                    "motif_family": item.get("motif_family"),
-                    "parent_asset_id": item.get("parent_asset_id"),
-                    "similarity_cluster": item.get("similarity_cluster"),
-                    "selection_reason": item.get("selection_reason"),
-                    "take_seed": item["take_seed"],
-                    "license_note": item["license_note"],
-                }
-                for item in template_timeline_selections
-            ],
-        }
-    mix_spotting["music_seed"] = music_seed
 
-    if template_timeline_samples is not None:
-        license_note = (
-            "approved shared BGM library; see mix_report music_template.selections"
-            if template_mode == "approved_library"
-            else "timeline of licensed local BGM templates; see mix_report music_template.selections"
-        )
-        user_f, sfx_f, spotting_only = _apply_spotting_and_convert_to_stereo(
-            template_timeline_samples
-        )
-        mix_spotting = {**mix_spotting, **spotting_only}
-        mix_spotting["mood"] = "timeline"
-        mix_spotting["bed_source"] = (
-            "approved_library" if template_mode == "approved_library" else "timeline_templates"
-        )
-        mix_spotting["music_seed"] = music_seed
-        mix_spotting["note"] = "mood-routed local BGM templates — mute/duck on bgm, sfx separated"
-        if sound_plan and sound_plan.get("bed") is False:
-            user_f = np.zeros_like(user_f)
-            mix_spotting["bed_applied"] = False
-        else:
-            mix_spotting["bed_applied"] = True
-        stereo = work / "bgm_stereo.wav"
-        sfx_stereo_path = work / "sfx_stereo.wav"
-        write_wav_stereo(stereo, (np.clip(user_f, -1.0, 1.0) * 32767.0).astype(np.int16))
-        write_wav_stereo(sfx_stereo_path, (np.clip(sfx_f, -1.0, 1.0) * 32767.0).astype(np.int16))
-        music_path = stereo
-    elif music_resolved and Path(music_resolved["path"]).is_file():
-        music_src = Path(music_resolved["path"]).expanduser().resolve()
-        license_note = str(music_resolved.get("license_note") or "user-supplied file")
-        mono_tmp = work / "bgm_user_mono.wav"
-        # loop/trim to total mono for spotting, then stereo
-        run(
-            [
-                "ffmpeg",
-                "-y",
-                "-stream_loop",
-                "-1",
-                "-i",
-                str(music_src),
-                "-t",
-                f"{total_dur:.3f}",
-                "-ar",
-                str(SR),
-                "-ac",
-                "1",
-                "-c:a",
-                "pcm_s16le",
-                str(mono_tmp),
-            ]
-        )
-        # load mono int16
-        with wave.open(str(mono_tmp), "rb") as handle:
-            frames = handle.readframes(handle.getnframes())
-            user_i16 = np.frombuffer(frames, dtype=np.int16).astype(np.float64) / 32767.0
-        user_f, sfx_f, spotting_only = _apply_spotting_and_convert_to_stereo(user_i16)
-        # keep multi-track voice metadata (not wiped by bed spotting)
-        mix_spotting = {**mix_spotting, **spotting_only}
-        mix_spotting["mood"] = (sound_plan or {}).get("mood", mood) if sound_plan else mood
-        mix_spotting["bed_source"] = str(music_resolved.get("source") or "user_music_file")
-        mix_spotting["music_seed"] = music_seed
-        mix_spotting["note"] = "user/external music — mute/duck on bgm, sfx separated"
-        if sound_plan and sound_plan.get("bed") is False:
-            user_f = np.zeros_like(user_f)
-            mix_spotting["bed_applied"] = False
-        else:
-            mix_spotting["bed_applied"] = True
-        stereo = work / "bgm_stereo.wav"
-        sfx_stereo_path = work / "sfx_stereo.wav"
-        write_wav_stereo(stereo, (np.clip(user_f, -1.0, 1.0) * 32767.0).astype(np.int16))
-        write_wav_stereo(sfx_stereo_path, (np.clip(sfx_f, -1.0, 1.0) * 32767.0).astype(np.int16))
-        music_path = stereo
-    else:
-        license_note = "original generative numpy score (ai-film-grok procedural v3 multi-style, no third-party samples)"
-        # IMPORTANT: generate BGM at fixed healthy amp — do NOT multiply by music_volume here
-        # (music_volume is applied once in the dual-track mix below)
-        gen_amp = float(getattr(args, "bgm_gen_amp", None) or DEFAULT_BGM_GEN_AMP)
-        bg_hint = 1.0
-        try:
-            bg_hint = float(
-                (sound_plan or {}).get("bed_gain_hint")
-                or (spec.get("_audio_routing") or {}).get("mean_bed_gain")
-                or 1.0
-            )
-        except (TypeError, ValueError):
-            bg_hint = 1.0
-        s_starts = []
-        acc = title_dur
-        for item in shot_audio:
-            s_starts.append(acc)
-            acc += float(item.get("target") or 6.0)
-
-        samples = procedural_music(
-            total_dur,
-            emo=1.1,
-            curve="swell",
-            amp=gen_amp,
+    mood = apply_plan_mood(mood, sound_plan if isinstance(sound_plan, dict) else None)
+    music_seed, ap, mood = resolve_music_seed(
+        args=args,
+        spec=spec if isinstance(spec, dict) else {},
+        root=root,
+        mood=mood,
+        total_dur=float(total_dur),
+    )
+    hard_fat = run_bgm_anti_fatigue(
+        root=root,
+        args=args,
+        sound_plan=sound_plan if isinstance(sound_plan, dict) else None,
+        mix_spotting=mix_spotting,
+        mood=mood,
+        music_seed=music_seed,
+        total_dur=float(total_dur),
+        ap=ap,
+    )
+    if isinstance(sound_plan, dict):
+        sound_plan = enrich_sound_plan_music_timelines(
+            sound_plan=sound_plan,
+            mix_spotting=mix_spotting,
             mood=mood,
-            seed=music_seed,
-            shot_starts=s_starts,
-            events=(sound_plan or {}).get("events"),
-            mood_timeline=(sound_plan or {}).get("mood_timeline"),
+            total_dur=float(total_dur),
+            hard_fat=hard_fat,
+            shot_dicts=shot_dicts,
+            shot_start_map=shot_start_map,
+            shot_end_map=shot_end_map,
+            build_mood_timeline=build_mood_timeline,
+            build_music_timeline=build_music_timeline,
+            summarize_music_timeline=summarize_music_timeline,
+            render_error_cls=RenderError,
         )
-        float_bed = samples.astype(np.float64) / 32767.0
-        float_bed, sfx_f, spotting_only = _apply_spotting_and_convert_to_stereo(float_bed)
-        mix_spotting = {**mix_spotting, **spotting_only}
-        mix_spotting["bed_source"] = "procedural"
-        mix_spotting["music_seed"] = music_seed
-        mix_spotting["bed_gain_hint"] = bg_hint
-        try:
-            from make_sfx_bed import last_rnb_style, pick_rnb_style  # type: ignore
 
-            mix_spotting["procedural_style"] = last_rnb_style() or pick_rnb_style(music_seed)
-        except Exception:
-            mix_spotting["procedural_style"] = "unknown"
-        log(
-            f"BGM procedural seed={music_seed} style={mix_spotting.get('procedural_style')} "
-            f"(change --music-seed for another take/style)"
-        )
-        if sound_plan and sound_plan.get("bed") is False:
-            float_bed = np.zeros_like(float_bed)
-            mix_spotting["bed_applied"] = False
-        else:
-            mix_spotting["bed_applied"] = True
-        stereo = work / "bgm_stereo.wav"
-        sfx_stereo_path = work / "sfx_stereo.wav"
-        write_wav_stereo(stereo, (np.clip(float_bed, -1.0, 1.0) * 32767.0).astype(np.int16))
-        write_wav_stereo(sfx_stereo_path, (np.clip(sfx_f, -1.0, 1.0) * 32767.0).astype(np.int16))
-        music_path = stereo
-
-    # A4 · 2026-08-06: honest BGM provenance (rnb license-only → procedural)
-    bgm_source_receipt: dict[str, Any] | None = None
-    try:
-        from sound_plan import build_bgm_source_receipt, mood_library_status
-
-        bed_src = str(mix_spotting.get("bed_source") or "unknown")
-        mood_st = mood_library_status(mood, film_root=root)
-        bgm_source_receipt = build_bgm_source_receipt(
-            bed_source=bed_src,
-            mood=mood,
-            license_note=str(license_note or ""),
-            music_resolved=music_resolved if isinstance(music_resolved, dict) else None,
-            mood_status=mood_st,
-        )
-        write_json(root / "receipts" / "bgm-source.json", bgm_source_receipt)
-        mix_spotting["bgm_source_receipt"] = {
-            "bed_source": bgm_source_receipt.get("bed_source"),
-            "partial": bgm_source_receipt.get("partial"),
-            "honest_limits": bgm_source_receipt.get("honest_limits"),
-            "mood_library": bgm_source_receipt.get("mood_library"),
-        }
-        if bgm_source_receipt.get("partial"):
-            log(
-                "BGM honesty: "
-                + "; ".join(str(x) for x in (bgm_source_receipt.get("honest_limits") or [])[:3])
-            )
-    except Exception as bgm_exc:  # noqa: BLE001 — never block final on receipt
-        log(f"bgm-source receipt skip: {bgm_exc}")
+    bed = materialize_music_bed(
+        root=root,
+        work=work,
+        args=args,
+        spec=spec if isinstance(spec, dict) else {},
+        sound_plan=sound_plan if isinstance(sound_plan, dict) else None,
+        mix_spotting=mix_spotting,
+        mood=mood,
+        music_seed=music_seed,
+        total_dur=float(total_dur),
+        title_dur=float(title_dur),
+        shot_audio=shot_audio,
+        ap=ap,
+        apply_spotting=_apply_spotting_and_convert_to_stereo,
+        resolve_music_template=resolve_music_template,
+        render_music_template_timeline=render_music_template_timeline,
+        try_external_music_gen=_try_external_music_gen,
+        procedural_music=procedural_music,
+        write_wav_stereo=write_wav_stereo,
+        run=run,
+        sample_rate=SR,
+        default_bgm_gen_amp=DEFAULT_BGM_GEN_AMP,
+        render_error_cls=RenderError,
+        sound_plan_error_cls=SoundPlanError,
+    )
+    music_path = bed["music_path"]
+    sfx_stereo_path = bed["sfx_stereo_path"]
+    license_note = bed["license_note"]
+    mix_spotting = bed["mix_spotting"]
+    music_resolved = bed["music_resolved"]
+    bgm_source_receipt = bed["bgm_source_receipt"]
+    mood = bed["mood"]
 
     # 7) Dual-track mix: VO primary + BGM always audible (两条音轨)
     # Sidechain: rnb default longer release so groove returns in VO pauses (Phase E)
@@ -1988,25 +1588,10 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
         sidechain["performance_duck_db"] = performance_bgm.get("duck_db")
     sc_frag = sidechain_filter_fragment(sidechain)
     filters_help = run(["ffmpeg", "-filters"], check=False).stdout
-    # I1.4 · default broadband duck (no acrossover) — multiband hang 30–60m+.
-    # AIFILM_FORCE_SIMPLE_AMIX=1 → plain amix (no duck).
-    # AIFILM_ALLOW_ACROSSOVER_MIX=1 → opt-in legacy sidechain+acrossover dynamic_eq.
-    # AIFILM_FORCE_BROADBAND_DUCK=1 → explicit broadband (same as default now).
-    _env_on = lambda k: os.environ.get(k, "").strip().lower() in {"1", "true", "yes", "on"}
-    if _env_on("AIFILM_FORCE_SIMPLE_AMIX"):
-        filters_help = ""
-        mix_spotting["force_simple_amix"] = True
-        mix_spotting["mix_path"] = "simple_amix"
-    elif _env_on("AIFILM_ALLOW_ACROSSOVER_MIX"):
-        mix_spotting["allow_acrossover_mix"] = True
-        mix_spotting["mix_path"] = "acrossover_multiband"
-    else:
-        # Default + FORCE_BROADBAND: strip acrossover so sidechaincompress-only path runs
-        filters_help = (filters_help or "").replace("acrossover", "___disabled_acrossover___")
-        mix_spotting["force_broadband_duck"] = True
-        mix_spotting["mix_path"] = "broadband_default"
-        if _env_on("AIFILM_FORCE_BROADBAND_DUCK"):
-            mix_spotting["force_broadband_duck_env"] = True
+    # I1.4 · default broadband duck (no acrossover) — leaf: final.stages_dual_mix
+    from final.stages_dual_mix import apply_mix_path_env_policy
+
+    filters_help = apply_mix_path_env_policy(filters_help, mix_spotting=mix_spotting)
 
     try:
         from acoustic_policy import resolve_acoustic_space
@@ -2137,23 +1722,13 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
         item["id"] for item in shot_audio if item.get("dialogue_audio_lane") == "post_tts"
     ]
     # Fail-closed bookkeeping: same shot must never keep native + audible TTS.
-    xor_violations = [
-        item["id"]
-        for item in shot_audio
-        if item.get("dialogue_audio_lane") == "native"
-        and float(item.get("tts_mix_gain") or 0.0) > 0.0
-    ] + [
-        item["id"]
-        for item in shot_audio
-        if item.get("dialogue_audio_lane") == "post_tts"
-        and item.get("native_audio")
-        and not item.get("native_audio_suppressed_for_tts")
-        and item.get("native_audio_audible") is not False
-    ]
+    from final.stages_dual_mix import dialogue_xor_violations
+
+    xor_violations = dialogue_xor_violations(shot_audio)
     if xor_violations:
         raise RenderError(
             "dialogue audio XOR violated (native + TTS both audible) for: "
-            + ", ".join(sorted({str(x) for x in xor_violations}))
+            + ", ".join(xor_violations)
         )
     mix_spotting["native_audio"] = {
         "role": (
@@ -2231,89 +1806,27 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
     )
     # Wave D · sidechain can hang or fail mid-plate → simple amix PARTIAL (not silent)
     _hb("audio_mix", "sidechain_or_amix")
-    try:
-        run(mix_cmd)
-    except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as mix_exc:
-        prior_sc = mix_spotting.get("sidechain_applied")
-        if not prior_sc:
-            raise RenderError(
-                f"audio mix failed (no sidechain to fall back from): {mix_exc}"
-            ) from mix_exc
-        log(
-            f"sidechain mix failed ({type(mix_exc).__name__}) → simple amix PARTIAL "
-            f"(was {prior_sc!r})"
-        )
-        # Remove partial output if any
-        with contextlib.suppress(OSError):
-            if mixed.is_file():
-                mixed.unlink()
-        color_in = "[6:a]" if use_color else ""
-        # Input order: 0 narr, 1 music, 2 native, 3 sfx, 4 scene, 5 ambience, [6 color]
-        n_in = 6 + (1 if use_color else 0)
-        simple_fc = (
-            f"[0:a][1:a][2:a][3:a][4:a][5:a]{color_in}"
-            f"amix=inputs={n_in}:duration=first:normalize=0,alimiter=limit=0.95[aout]"
-        )
-        simple_cmd = [
-            "ffmpeg",
-            "-y",
-            "-i",
-            str(voice_cat),
-            "-i",
-            str(music_path),
-            "-i",
-            str(native_track),
-            "-i",
-            str(sfx_stereo_path),
-            "-i",
-            str(scene_sound_path),
-            "-i",
-            str(ambience_path),
-        ]
-        if use_color:
-            simple_cmd.extend(["-i", str(color_track)])
-        simple_cmd.extend(
-            [
-                "-filter_complex",
-                simple_fc,
-                "-map",
-                "[aout]",
-                "-ar",
-                str(mix_sample_rate),
-                "-ac",
-                "2",
-                "-c:a",
-                "pcm_s16le",
-                str(mixed),
-            ]
-        )
-        try:
-            run(simple_cmd)
-        except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as amix_exc:
-            raise RenderError(
-                f"audio mix failed after sidechain→amix fallback: {amix_exc}"
-            ) from amix_exc
-        mix_spotting["sidechain_applied"] = False
-        mix_spotting["sidechain_fallback"] = {
-            "from": prior_sc,
-            "to": "amix_simple",
-            "partial": True,
-            "error": str(mix_exc)[:300],
-            "error_type": type(mix_exc).__name__,
-        }
-        mix_spotting["delivery_partial"] = True
-        mix_spotting["partial_reason"] = "sidechain_mix_failed_amix_fallback"
-        # Persist PARTIAL receipt for closeout / agents (not silent quality pass)
-        try:
-            partial_path = write_final_mix_partial_receipt(
-                root,
-                prior_sc=str(prior_sc),
-                error=str(mix_exc),
-                mixed=mixed,
-            )
-            mix_spotting["partial_receipt"] = str(partial_path)
-        except Exception as rec_exc:  # noqa: BLE001
-            mix_spotting["partial_receipt_error"] = str(rec_exc)[:160]
+    from final.stages_dual_mix import run_sidechain_mix_with_amix_fallback
+
+    run_sidechain_mix_with_amix_fallback(
+        mix_cmd=mix_cmd,
+        voice_cat=voice_cat,
+        music_path=music_path,
+        native_track=native_track,
+        sfx_stereo_path=sfx_stereo_path,
+        scene_sound_path=scene_sound_path,
+        ambience_path=ambience_path,
+        color_track=color_track if use_color else None,
+        use_color=use_color,
+        mixed=mixed,
+        mix_sample_rate=mix_sample_rate,
+        mix_spotting=mix_spotting,
+        root=root,
+        run=run,
+        log=log,
+        write_partial_receipt=write_final_mix_partial_receipt,
+        render_error_cls=RenderError,
+    )
 
     # Phase F/G: loudness probe + optional/auto loudnorm toward shortform target
     try:
@@ -2436,157 +1949,50 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
                     json.dumps(mix_spotting, ensure_ascii=False, indent=2) + "\n",
                 )
 
-    # 8) Subtitle cues — char-weighted, early; same xfade clock as picture/VO/native
-    # P0 · 2026-07-24: default 0 — positive lead caused SRT overlap hard-fail on dense ZH units
-    sub_lead = float(getattr(args, "sub_lead", 0.0) or 0.0)
-    sub_min = float(getattr(args, "sub_min_unit", 0.48) or 0.48)
-    sub_max = float(getattr(args, "sub_max_unit", 1.75) or 1.75)
-    cues, film_tl = build_subtitle_cues_for_shots(
-        shot_audio,
-        title_duration=title_dur,
-        end_duration=end_dur,
-        transition_sec=active_transition,
-        sub_lead=sub_lead,
-        sub_min=sub_min,
-        sub_max=sub_max,
-        story_join_intents=list(story_intents) if story_intents is not None else None,
-        default_intent=default_intent if active_transition > 0 else "hard",
+    # 8) Subtitle cues + SRT + optional PIL burn (leaf: final.stages_subs)
+    from final.stages_subs import materialize_subs_stage
+
+    _subs = materialize_subs_stage(
+        args=args,
+        out_dir=out_dir,
+        audio_dir=audio_dir,
+        work=work,
+        overlays_dir=overlays_dir,
+        silent=silent,
+        shot_audio=shot_audio,
+        shot_dicts=shot_dicts,
+        title_duration=float(title_dur),
+        end_duration=float(end_dur),
+        active_transition=float(active_transition),
+        story_intents=list(story_intents) if story_intents is not None else None,
+        default_intent=default_intent,
+        use_event_tts=use_event_tts,
+        formal_timeline=formal_timeline,
+        timeline_caption_bindings=timeline_caption_bindings,
+        width=width,
+        height=height,
+        font_path=font_path,
+        run=run,
+        render_error_cls=RenderError,
     )
-    event_caption_bindings: list[dict[str, Any]] | None = None
-    if use_event_tts and formal_timeline is not None:
-        event_caption_bindings = timeline_caption_bindings(formal_timeline)
-        cues = [
-            {
-                "start": row["start_sec"],
-                "end": row["end_sec"],
-                "text": row["caption_text"],
-                "audio_event_id": row["audio_event_id"],
-            }
-            for row in event_caption_bindings
-        ]
-        write_json(audio_dir / "event-subtitle-bindings.json", event_caption_bindings)
+    cues = _subs["cues"]
+    film_tl = _subs["film_tl"]
+    event_caption_bindings = _subs["event_caption_bindings"]
+    srt_path = _subs["srt_path"]
+    srt_stable = _subs["srt_stable"]
+    video_subbed = _subs["video_subbed"]
+    subs_mode = _subs["subs_mode"]
 
-    try:
-        srt_path = safe_output_path(
-            out_dir, "final.srt", suffixes={".srt"}, field="subtitle sidecar"
-        )
-    except SecurityPolicyError as exc:
-        raise RenderError(str(exc)) from exc
-    write_srt(srt_path, cues, preserve_overlaps=use_event_tts)
-    # Wave D · if film root path has spaces, also mirror SRT to /tmp for any
-    # libass/subtitles= consumers (PIL burn already uses PNG overlays, no force_style).
-    srt_stable = stable_path_for_ffmpeg_filter(srt_path, suffix=".srt", prefix="aifilm-srt")
-    if srt_stable != srt_path:
-        log(f"SRT mirrored to space-free path for ffmpeg filters: {srt_stable}")
+    # 9) Mux final + verify streams (leaf: final.stages_mux_manifest)
+    from final.stages_mux_manifest import mux_final_mp4, verify_final_streams
 
-    # Burn subs with PIL overlays (no drawtext dependency).
-    # --subs off keeps SRT only (for HyperFrames designed captions underlay path).
-    subs_mode = resolve_subtitle_mode(args)
-    video_subbed = work / "video_subbed.mp4"
-    if subs_mode == "off" or not cues:
-        shutil.copy2(silent, video_subbed)
-    else:
-        overlay_inputs: list[str] = ["-i", str(silent)]
-        filter_parts: list[str] = []
-        last = "[0:v]"
-        oidx = 1
-        for i, cue in enumerate(cues):
-            png = overlays_dir / f"sub_{i:03d}.png"
-            shot_index = cue.get("shot_index", 0)
-            shot = shot_dicts[shot_index] if shot_dicts and shot_index < len(shot_dicts) else {}
-            safe_area = (shot.get("dsl") or {}).get("safe_area") or {}
-
-            # Subtitles default to bottom, but we dodge to top if subtitle_clear is explicitly false
-            dodge = safe_area.get("subtitle_clear") is False
-            italic = cue.get("is_monologue", False)
-
-            sub_png(
-                cue["text"],
-                png,
-                width=width,
-                height=height,
-                font_path=font_path,
-                dodge=dodge,
-                italic=italic,
-            )
-            overlay_inputs += ["-i", str(png)]
-            out_label = f"[o{i}]"
-            filter_parts.append(
-                f"{last}[{oidx}:v]overlay=0:0:enable='between(t,{cue['start']:.3f},{cue['end']:.3f})'{out_label}"
-            )
-            last = out_label
-            oidx += 1
-        if filter_parts:
-            run(
-                [
-                    "ffmpeg",
-                    "-y",
-                    *overlay_inputs,
-                    "-filter_complex",
-                    ";".join(filter_parts),
-                    "-map",
-                    last,
-                    "-c:v",
-                    "libx264",
-                    "-preset",
-                    "medium",
-                    "-crf",
-                    "16",
-                    "-pix_fmt",
-                    "yuv420p",
-                    str(video_subbed),
-                ]
-            )
-        else:
-            shutil.copy2(silent, video_subbed)
-
-    # 9) Mux final
-    run(
-        [
-            "ffmpeg",
-            "-y",
-            "-i",
-            str(video_subbed),
-            "-i",
-            str(mixed),
-            "-c:v",
-            "copy",
-            "-c:a",
-            "aac",
-            "-b:a",
-            "256k",
-            "-movflags",
-            "+faststart",
-            "-shortest",
-            str(final_path),
-        ]
+    mux_final_mp4(video_subbed=video_subbed, mixed=mixed, final_path=final_path, run=run)
+    streams = verify_final_streams(
+        final_path=final_path,
+        audio_timeline_v1=bool(spec.get("audio_timeline_v1", False)),
+        run=run,
+        render_error_cls=RenderError,
     )
-
-    # Verify streams
-    probe = run(
-        [
-            "ffprobe",
-            "-v",
-            "error",
-            "-show_entries",
-            "stream=codec_type,codec_name,sample_rate,channels,bit_rate",
-            "-of",
-            "json",
-            str(final_path),
-        ]
-    )
-    streams = json.loads(probe.stdout).get("streams") or []
-    has_v = any(s.get("codec_type") == "video" for s in streams)
-    has_a = any(s.get("codec_type") == "audio" for s in streams)
-    if not has_v or not has_a:
-        raise RenderError("Final MP4 missing video or audio stream")
-    audio_stream = next((stream for stream in streams if stream.get("codec_type") == "audio"), None)
-    if bool(spec.get("audio_timeline_v1", False)) and (
-        not audio_stream
-        or str(audio_stream.get("sample_rate")) != "48000"
-        or int(audio_stream.get("channels") or 0) != 2
-    ):
-        raise RenderError("audio_timeline_v1 final must be 48kHz stereo")
 
     timeline_path = root / "timeline.json"
     mix_report_path = root / "audio" / "mix_report.json"
@@ -2755,88 +2161,24 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
     manifest["updated_at"] = utc_now()
     write_json(root / "manifest.json", manifest)
 
-    # A5 · 2026-08-06: plate vs master — never auto master_lock
-    # B · scale-fallback wardrobe honesty (soft-max / hard-on ban)
-    official_final: dict[str, Any] | None = None
-    scale_fallback_receipt: dict[str, Any] | None = None
-    try:
-        from final.delivery_class import (
-            classify_official_final,
-            read_gate_auto_ok,
-            write_official_final_report,
-        )
+    # A5 · 2026-08-06: plate vs master — never auto master_lock (leaf)
+    from final.stages_official_finalize import apply_official_final_classification
 
-        gate_ok = read_gate_auto_ok(root)
-        official_final = classify_official_final(
-            skip_preflight=bool(getattr(args, "skip_preflight", False)),
-            skip_heat_gate=bool(getattr(args, "skip_heat_gate", False)),
-            allow_loop_risk=bool(getattr(args, "allow_loop_risk", False)),
-            force=bool(getattr(args, "force", False)),
-            gate_auto_ok=gate_ok,
-            cinematic_ok=None,
-            final_complete=False,
-            bgm_partial=bool((bgm_source_receipt or {}).get("partial")),
-            root=root,
-        )
-        try:
-            from final.delivery_class import write_plate_boring_receipt
-
-            write_plate_boring_receipt(root)
-        except Exception:  # noqa: BLE001
-            pass
-        try:
-            from narrative.scale_fallback import (
-                flatten_spec_shots,
-                report_scale_fallback_for_shots,
-                write_scale_fallback_receipt,
-            )
-
-            sf = report_scale_fallback_for_shots(
-                flatten_spec_shots(spec if isinstance(spec, dict) else {}),
-                heat_scale=str((spec or {}).get("heat_scale") or "max"),
-            )
-            scale_fallback_receipt = sf
-            write_scale_fallback_receipt(root, sf)
-            official_final["achieved_wardrobe_tier"] = sf.get("achieved_wardrobe_tier")
-            official_final["scale_fallback"] = {
-                "codes": sf.get("codes"),
-                "partial": sf.get("partial"),
-                "recommended_tier": sf.get("recommended_tier"),
-                "promote_ban": sf.get("promote_ban"),
-                "honest_limits": sf.get("honest_limits"),
-            }
-            if sf.get("partial"):
-                official_final["partial"] = True
-                limits = list(official_final.get("honest_limits") or [])
-                for h in sf.get("honest_limits") or []:
-                    if h not in limits:
-                        limits.append(h)
-                official_final["honest_limits"] = limits
-                if official_final.get("status") == "TECHNICAL_FINAL":
-                    official_final["status"] = "OFFICIAL_FINAL_PLATE"
-        except Exception as sf_exc:  # noqa: BLE001
-            log(f"scale-fallback receipt skip: {sf_exc}")
-        write_official_final_report(root, official_final)
-        report["official_final"] = official_final
-        report["scale_fallback"] = scale_fallback_receipt
-        write_json(report_path, report)
-
-        final_film = manifest.setdefault("outputs", {}).setdefault("final_film", {})
-        if isinstance(final_film, dict) and isinstance(official_final, dict):
-            final_film.update(
-                build_final_film_manifest_entry(
-                    final_path=final_path,
-                    output_sha256=report["output_sha256"],
-                    duration_sec=report["duration_sec"],
-                    report_path=report_path,
-                    technical_qa=technical_qa,
-                    official_final=official_final,
-                )
-            )
-            manifest["updated_at"] = utc_now()
-            write_json(root / "manifest.json", manifest)
-    except Exception as of_exc:  # noqa: BLE001
-        log(f"official-final-report skip: {of_exc}")
+    official_final = apply_official_final_classification(
+        root=root,
+        args=args,
+        spec=spec if isinstance(spec, dict) else {},
+        report=report,
+        report_path=report_path,
+        manifest=manifest,
+        final_path=final_path,
+        technical_qa=technical_qa,
+        bgm_source_receipt=bgm_source_receipt,
+        build_final_film_manifest_entry=build_final_film_manifest_entry,
+        write_json=write_json,
+        utc_now=utc_now,
+        log=log,
+    )
 
     return {
         "ok": True,

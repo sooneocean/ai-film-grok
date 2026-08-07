@@ -15,6 +15,7 @@
 | 验收 | 抽帧人眼有中文 ≠ ledger 有 caption_text |
 | H3 槽 | 默认 ≤~5.2s；forbid_loop 上限 ~5.9；禁空写 10s |
 | mix | **默认 broadband duck**（禁死等 acrossover）；`AIFILM_ALLOW_ACROSSOVER_MIX=1` 才多带 |
+| H3 原声总监 | final 前 `music-director apply`；读 `native_directed` + plan BGM duck；错句 mute≠剪画面 |
 | plate≠master | gate 红 / boring mean → `OFFICIAL_FINAL_PLATE` PARTIAL |
 | true-video | final 拒 still/Ken Burns hero |
 | 超时 | 长片 floor ≥1800s；假 1s 绿已禁 |

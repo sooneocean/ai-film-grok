@@ -460,6 +460,38 @@ def add_audio_parsers(sub: argparse._SubParsersAction[argparse.ArgumentParser]) 
         help="Only register mode; requires --register-json",
     )
 
+    md = sub.add_parser(
+        "music-director",
+        help="H3 native Music Director desk: plan BGM + mute wrong lines + peak fix (prefer_native)",
+    )
+    md_sub = md.add_subparsers(dest="music_director_action", required=True)
+    md_draft = md_sub.add_parser(
+        "draft", help="Draft audio/music-director-plan.json from film-spec + music_cue"
+    )
+    md_draft.add_argument("--root", required=True)
+    md_draft.add_argument(
+        "--force",
+        action="store_true",
+        help="Overwrite existing plan (default: refuse if plan already exists)",
+    )
+    md_apply = md_sub.add_parser(
+        "apply",
+        help="Apply plan: native_directed stems (mute/peak) + optional film-spec music_cue patch",
+    )
+    md_apply.add_argument("--root", required=True)
+    md_apply.add_argument(
+        "--dry-run", action="store_true", help="Validate/plan only; do not write stems"
+    )
+    md_apply.add_argument(
+        "--patch-spec",
+        action="store_true",
+        help="Write music_cue / dialogue_audio_lane from plan into film-spec.json",
+    )
+    md_review = md_sub.add_parser(
+        "review", help="Human listen map: mutes, peaks, BGM ducks (no picture retimes)"
+    )
+    md_review.add_argument("--root", required=True)
+
 
 def cmd_audio_plan(args: argparse.Namespace) -> int:
     from audio_plan import build_audio_plan
@@ -552,6 +584,56 @@ def cmd_audio_produce(args: argparse.Namespace) -> int:
     except AudioProductionError as exc:
         raise FilmError(str(exc)) from exc
     return 0
+
+
+def cmd_music_director(args: argparse.Namespace) -> int:
+    """Music Director desk for H3 prefer_native: draft / apply / review."""
+    from music_director import (
+        MusicDirectorError,
+        apply_plan,
+        build_review,
+        draft_and_save,
+        load_plan,
+        plan_path,
+        save_plan,
+    )
+
+    root = Path(args.root).expanduser().resolve()
+    action = str(getattr(args, "music_director_action", "") or "")
+    try:
+        if action == "draft":
+            path = plan_path(root)
+            if path.is_file() and not bool(getattr(args, "force", False)):
+                raise FilmError(
+                    f"plan exists: {path}; re-run with --force to overwrite, or edit then apply"
+                )
+            report = draft_and_save(root)
+            _emit(report)
+            return 0
+        if action == "apply":
+            plan = load_plan(root)
+            if plan is None:
+                raise FilmError(
+                    f"no plan at {plan_path(root)}; run: aifilm music-director draft --root …"
+                )
+            if not bool(getattr(args, "dry_run", False)):
+                save_plan(root, plan)
+            report = apply_plan(
+                root,
+                plan,
+                dry_run=bool(getattr(args, "dry_run", False)),
+                patch_spec=bool(getattr(args, "patch_spec", False)),
+            )
+            _emit(report)
+            return 0 if report.get("ok") else 1
+        if action == "review":
+            plan = load_plan(root)
+            report = build_review(root, plan)
+            _emit(report)
+            return 0
+        raise FilmError(f"unknown music-director action: {action}")
+    except MusicDirectorError as exc:
+        raise FilmError(str(exc)) from exc
 
 
 def cmd_audio_event(args: argparse.Namespace) -> int:

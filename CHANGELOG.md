@@ -1,12 +1,54 @@
 # Changelog
 
-## [2.41.5] - 2026-08-07
+## [2.41.10] - 2026-08-07
 
 ### Fixed (Web 控制台 · 让"点画面会动" + 工作台指挥台)
 - **起步 tab 复活：** `activateTab` 现对 `onboarding` tab 调用 `loadOnboarding()`（此前函数已定义却从未在切 tab 时触发，导致"点画面不会动"）。
 - **工作台变指挥台：** 仪表盘新增「指挥台」面板——刷新状态 / 开始·继续起步 / 启动流水线(`POST /api/onboarding/go`) / 推进审核队列(`POST /api/advance`)，并给出下一步引导文案。
 - **致命错误不再静默冻结：** 全局 `error` / `unhandledrejection` 监听 → 底部红色浮条，脚本崩溃可直接看见原因。
 - **e2e 守护：** `smoke_console.py` 新增断言——指挥台 DOM(`dash-command`/`cmd-go`/`cmd-advance`)随页面下发、`onboarding` tab 懒加载、`/api/onboarding/go` 与 `/api/advance` 端点可达。
+
+## [2.41.9] - 2026-08-07
+
+### Changed (monolith W2–W4 peels)
+- heat validate tail · preflight_premium · export_html
+
+## [2.41.8] - 2026-08-07
+
+### Changed (monolith orchestrator relief · W1.4 subs)
+- **`final/stages_subs.py`:** cue clock · SRT write/mirror · PIL burn or copy (`subs=off` default).
+- **`render_final`:** stage 8 delegates to leaf (structure-only; HF caption owner / no double-burn policy unchanged).
+- **Tests:** `tests/test_stages_subs.py`.
+
+## [2.41.7] - 2026-08-07
+
+### Changed (monolith orchestrator relief · W2)
+- **film_spec_validate heat tail** → `plan/film_spec_validate_heat.py` (`apply_heat_cast_and_adult_tail`, ~650 LOC) structure-only.
+- validate_film_spec body ~2360→~1727 span.
+
+## [2.41.6] - 2026-08-07
+
+### Changed (monolith orchestrator relief · follow-through)
+- **W1.1:** `final/render_context.py` / `load_render_context` (shipped in prior commit on 2.41.5 line; documented here).
+- **Tests:** `tests/test_final_stages_peel.py` (helpers, dual-mix, mux, context exports).
+- **Docs:** `docs/plans/2026-08-07-dispatch-stage-map.md` · orchestrator relief W1.1 full.
+
+## [2.41.6] - 2026-08-07
+
+### Added (Music Director · H3 native desk)
+- **`audio/music_director.py`**: draft / normalize / merge / apply / review for BGM + native voice (mute windows, mute_entire, peak_fix).
+- **CLI** `aifilm music-director draft|apply|review` — plan at `audio/music-director-plan.json`; stems at `audio/native_directed/`.
+- **final**: prefer directed native stems when apply receipt matches; overlay plan BGM duck on music_cue path.
+- **Stages/memory/hard-defaults** pointers; tests `test_music_director_plan.py`.
+- Wrong-line v1 = **audio mute** (picture unchanged).
+
+
+## [2.41.5] - 2026-08-07
+
+### Changed (monolith orchestrator relief · W1 peels)
+- **`render_final` leaves:** `final/render_helpers.py` · `final/stages_dual_mix.py` · `final/stages_mux_manifest.py` · `final/stages_official_finalize.py` (structure-only; A5/PARTIAL/XOR semantics unchanged).
+- **Guard:** `tests/test_mega_fn_budget.py` · dual-mix unit tests.
+- **Plan:** `docs/plans/2026-08-07-monolith-orchestrator-relief-todoplan.md`.
 
 ## [2.41.4] - 2026-08-07
 
