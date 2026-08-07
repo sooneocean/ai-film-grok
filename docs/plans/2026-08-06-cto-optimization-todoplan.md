@@ -17,6 +17,7 @@
 
 | 旧板 / 子板 | 角色 |
 |------|------|
+| **`docs/plans/2026-08-07-film-production-os-todoplan.md`** | **制片 OS 对齐愿景** · W0–W2 SHIPPED（CreativeIntent · story structure · Shot Card）· 禁第二导演系统 |
 | **`docs/plans/2026-08-07-iron-internalization-todoplan.md`** | **铁律→代码内化子板** · **I0–I4 产品链 CLOSED 2.40.51**；I5 ops deferred |
 | **`docs/plans/2026-08-07-delivery-honesty-rail-todoplan.md`** | **出片诚实审计轨** · **CLOSED R0–R5** 2.40.75（+ skip 热路径触达 wave） |
 | **`docs/plans/2026-08-07-codebase-opt-face-transition-todoplan.md`** | **锁脸 + 剪辑转场 + 模组** · **CLOSED F1–F3 + T1–T5 @ 2.40.109**（禁绿地重开） |

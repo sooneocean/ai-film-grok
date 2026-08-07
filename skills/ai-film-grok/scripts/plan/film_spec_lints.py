@@ -377,6 +377,37 @@ def validate_director_intent(spec: dict[str, Any]) -> dict[str, Any]:
                 f"character_bible_strict: director_intent.{pfield} required when strict mode is enabled"
             )
 
+    # Film Production OS W1: CreativeIntent fields (optional unless creative_intent_strict)
+    creative_strict = bool(spec.get("creative_intent_strict"))
+    creative_fields = (
+        "theme",
+        "audience_emotion",
+        "protagonist_pov",
+        "genre",
+        "visual_language",
+        "pacing",
+    )
+    nested = raw.get("creative_intent") if isinstance(raw.get("creative_intent"), dict) else {}
+    for cfield in creative_fields:
+        val = raw.get(cfield)
+        if val is None and nested:
+            val = nested.get(cfield)
+        if val is None and cfield == "pacing" and raw.get("tone") is not None:
+            val = raw.get("tone")
+        if val is not None:
+            intent[cfield] = _required_text(val, field=f"director_intent.{cfield}")
+        elif creative_strict:
+            raise FilmSpecError(
+                f"creative_intent_strict: director_intent.{cfield} required "
+                "(CreativeIntent: theme/audience_emotion/protagonist_pov/genre/visual_language/pacing)"
+            )
+    if nested:
+        intent["creative_intent"] = {
+            k: _required_text(nested[k], field=f"director_intent.creative_intent.{k}")
+            for k in creative_fields
+            if nested.get(k) is not None
+        }
+
     spec["director_intent"] = intent
     return intent
 

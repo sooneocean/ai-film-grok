@@ -1,5 +1,16 @@
 # Changelog
 
+## [2.40.112] - 2026-08-07
+
+### Added (Film Production OS · W0–W2)
+- **W0 docs:** `docs/plans/2026-08-07-film-production-os-todoplan.md` · `references/production-state-map.md` · hard-defaults / INDEX / CTO pointers; freeze anti-patterns (no second DirectorAgent, no screenplay→model).
+- **W1 CreativeIntent:** `director_intent` fields theme/audience_emotion/protagonist_pov/genre/visual_language/pacing (+ nested `creative_intent`); `creative_intent_strict` gate.
+- **W1 story structure:** `plan/story_structure.py` · `aifilm plan validate-structure` · receipt `receipts/story-structure.json`.
+- **W2 Shot Cards:** `plan/shot_card.py` · purpose enum + aesthetic-only reject · `aifilm plan shot-cards`.
+- **W2 Director Interpretation:** `plan/director_interpretation.py` · `aifilm director interpret-scene`.
+- **Meaning gate:** `lint_shot_meaning` merges `SHOT_PURPOSE_AESTHETIC_ONLY`.
+- **Tests:** `test_film_production_os_w1_w2.py` (18).
+
 ## [2.40.111] - 2026-08-07
 
 ### Added (Error Internalization & Web Console Integration)

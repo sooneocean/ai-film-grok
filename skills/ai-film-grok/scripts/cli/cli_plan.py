@@ -85,6 +85,31 @@ def add_plan_parsers(subparsers: Any) -> None:
     )
     validate_parser.add_argument("--root", required=True)
     validate_parser.add_argument("--strict", action="store_true")
+    validate_structure = plan_sub.add_parser(
+        "validate-structure",
+        help="Story structure gate: goal/opposition/scene turn/beat layer (Film Production OS W1)",
+    )
+    validate_structure.add_argument("--root", required=True)
+    validate_structure.add_argument(
+        "--strict",
+        action="store_true",
+        help="Fail closed on weak structure; blocks media_spend_allowed",
+    )
+    shot_cards = plan_sub.add_parser(
+        "shot-cards",
+        help="Export Shot Cards + SHOT_LIST.md from film-spec (Film Production OS W2)",
+    )
+    shot_cards.add_argument("--root", required=True)
+    shot_cards.add_argument(
+        "--strict-purpose",
+        action="store_true",
+        help="Warn on purposes outside SHOT_PURPOSES enum",
+    )
+    shot_cards.add_argument(
+        "--no-write",
+        action="store_true",
+        help="Dry-run: do not write shot-cards/ files",
+    )
     edit = plan_sub.add_parser("edit", help="Edit one unlocked narrative node")
     edit.add_argument("--root", required=True)
     edit.add_argument("--node", required=True, help="Node id/ref, e.g. story or ep01_sc01_bt03")
@@ -279,6 +304,18 @@ def validate(args: Namespace, root: Path) -> tuple[dict[str, Any], int]:
             report["story_quality"] = check_story_quality(graph, root=root)
         except Exception as exc:  # noqa: BLE001
             report["story_quality"] = {"ok": True, "error": str(exc)[:160]}
+    try:
+        from story_structure import validate_story_structure
+
+        graph = read_json(graph_path) if graph_path.is_file() else {}
+        spec = read_json(root / "film-spec.json") or {}
+        report["story_structure"] = validate_story_structure(
+            graph if isinstance(graph, dict) else {},
+            spec=spec if isinstance(spec, dict) else None,
+            strict=False,
+        )
+    except Exception as exc:  # noqa: BLE001
+        report["story_structure"] = {"ok": True, "error": str(exc)[:160]}
     return report, 0 if report.get("ok") else 1
 
 

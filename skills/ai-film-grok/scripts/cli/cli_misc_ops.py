@@ -623,6 +623,32 @@ def cmd_plan(args: argparse.Namespace) -> int:
         )
         emit(report)
         return code
+    if action == "validate-structure":
+        from story_structure import validate_story_structure_at_root
+
+        root_s = getattr(args, "root", None)
+        if not root_s:
+            raise FilmError("plan validate-structure requires --root")
+        report = validate_story_structure_at_root(
+            Path(root_s).expanduser().resolve(),
+            strict=bool(getattr(args, "strict", False)),
+            write_receipt=True,
+        )
+        emit(report)
+        return 0 if report.get("ok") else 1
+    if action == "shot-cards":
+        from shot_card import export_shot_cards
+
+        root_s = getattr(args, "root", None)
+        if not root_s:
+            raise FilmError("plan shot-cards requires --root")
+        report = export_shot_cards(
+            Path(root_s).expanduser().resolve(),
+            write_files=not bool(getattr(args, "no_write", False)),
+            strict_purpose=bool(getattr(args, "strict_purpose", False)),
+        )
+        emit(report)
+        return 0 if report.get("ok") else 1
     if action == "debrief":
         from cli_plan import run_debrief
 

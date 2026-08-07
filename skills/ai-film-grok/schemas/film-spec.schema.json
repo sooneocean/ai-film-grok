@@ -968,6 +968,40 @@
             "minLength": 1
           }
         },
+        "theme": {
+          "type": "string",
+          "minLength": 1,
+          "description": "CreativeIntent.theme — what the film is really about"
+        },
+        "audience_emotion": {
+          "type": "string",
+          "minLength": 1,
+          "description": "CreativeIntent: intended audience feeling arc"
+        },
+        "protagonist_pov": {
+          "type": "string",
+          "minLength": 1,
+          "description": "CreativeIntent: whose experience drives the film"
+        },
+        "genre": {
+          "type": "string",
+          "minLength": 1
+        },
+        "visual_language": {
+          "type": "string",
+          "minLength": 1,
+          "description": "CreativeIntent: camera/look language all agents must respect"
+        },
+        "pacing": {
+          "type": "string",
+          "minLength": 1,
+          "description": "CreativeIntent: rhythm promise; may fall back from tone"
+        },
+        "creative_intent": {
+          "type": "object",
+          "description": "Optional nested CreativeIntent blob",
+          "additionalProperties": true
+        },
         "act_structure": {
           "type": "object",
           "description": "Three-act structure with ratio and beat anchors. See references/directors-lens.md. pace_chart_strict: true → write-spec enforces non-empty.",

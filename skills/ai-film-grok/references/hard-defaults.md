@@ -10,6 +10,7 @@
 
 | 规则 | 弹性默认 |
 |---|---|
+| **Film Production OS（P0 · 2026-08-07）** | **禁**剧本直灌模型；须 Scene→Beat→Shot→Take。CreativeIntent 挂 `director_intent`（`creative_intent_strict`）。`aifilm plan validate-structure` · `plan shot-cards` · `director interpret-scene`。Shot purpose 禁「好看/cinematic」sole。状态投影 [production-state-map](production-state-map.md) · 执行板 [film-production-os-todoplan](../../../docs/plans/2026-08-07-film-production-os-todoplan.md)。**禁**第二套 DirectorAgent 绿地。 |
 | 文本入口 | Director’s Lens → 再 film-spec；禁止原文一句一图 |
 | 规划 vs 剪辑 | clips 齐后建议 Editor’s Cut；用户赶交付可缩短 |
 | **成人尺度 IRON** | 成人信号 → **剧情驱动 `heat_scale:hot`（默认）；仅显式 marker 设 `max` + `spice_level:extreme`**；禁静默降档；允许 PARTIAL 诚实降档 |

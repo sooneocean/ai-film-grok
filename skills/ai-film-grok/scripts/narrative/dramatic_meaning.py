@@ -184,6 +184,26 @@ def lint_shot_meaning(shots: list[dict[str, Any]]) -> dict[str, Any]:
                     ref=f"{sid}.dsl.visible_change",
                 )
             )
+    # Film Production OS W2: reject aesthetic-only shot_purpose labels
+    try:
+        from shot_card import lint_shot_purpose
+
+        purpose_report = lint_shot_purpose(shots, strict=False)
+        for item in purpose_report.get("issues") or []:
+            if not isinstance(item, dict):
+                continue
+            code = str(item.get("code") or "")
+            if code == "SHOT_PURPOSE_AESTHETIC_ONLY":
+                issues.append(
+                    _issue(
+                        code,
+                        str(item.get("message") or "aesthetic-only purpose"),
+                        shot_ids=list(item.get("shot_ids") or []),
+                        ref=str(item.get("ref") or ""),
+                    )
+                )
+    except Exception:  # noqa: BLE001 — purpose lint is additive
+        pass
     codes = sorted({str(i["code"]) for i in issues})
     return {
         "ok": not issues,

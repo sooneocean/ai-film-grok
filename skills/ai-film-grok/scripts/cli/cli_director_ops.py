@@ -16,7 +16,7 @@ def add_director_ops_parsers(sub: argparse._SubParsersAction[argparse.ArgumentPa
         "director",
         help=(
             "Production book: init|migrate-audit|migrate|status|check|lock-stage|"
-            "impact|rebuild|verify"
+            "impact|rebuild|verify|interpret-scene"
         ),
     )
     director_sub = director_p.add_subparsers(dest="director_action", required=True)
@@ -91,6 +91,13 @@ def add_director_ops_parsers(sub: argparse._SubParsersAction[argparse.ArgumentPa
         if director_action == "rebuild":
             action_parser.add_argument("--expected-revision", type=int, required=True)
             action_parser.add_argument("--transaction-id", default=None)
+
+    d_interpret = director_sub.add_parser(
+        "interpret-scene",
+        help="Director Interpretation receipt before shot list (Film Production OS W2)",
+    )
+    d_interpret.add_argument("--root", required=True)
+    d_interpret.add_argument("--scene-id", default=None, help="Scene id; default first scene")
 
     department_p = sub.add_parser(
         "department",
@@ -237,6 +244,10 @@ def cmd_director(args: argparse.Namespace) -> int:
             )
         elif action == "verify":
             report = verify(root)
+        elif action == "interpret-scene":
+            from director_interpretation import interpret_scene_at_root
+
+            report = interpret_scene_at_root(root, scene_id=getattr(args, "scene_id", None))
         else:
             raise FilmError(f"unknown director action {action!r}")
     except (OSError, ValueError) as exc:
