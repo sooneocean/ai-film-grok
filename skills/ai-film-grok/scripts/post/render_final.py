@@ -1462,381 +1462,81 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
         )
 
 
-    # Anti-fatigue seed first (pool pick + procedural style share it)
-    plan_mood = (sound_plan or {}).get("mood") if sound_plan else None
-    if plan_mood:
-        mood = str(plan_mood)
-    seed_arg = getattr(args, "music_seed", None)
-    policy_seed = None
-    ap = spec.get("audio_policy") if isinstance(spec.get("audio_policy"), dict) else {}
-    if ap.get("music_seed") is not None:
-        try:
-            policy_seed = int(ap["music_seed"])
-        except (TypeError, ValueError):
-            policy_seed = None
-    if seed_arg is not None:
-        music_seed = int(seed_arg)
-    elif policy_seed is not None:
-        music_seed = policy_seed
-    else:
-        title_s = str(spec.get("title") or root.name)
-        # v3: style families; include recipe summary so different arcs reshuffle beds
-        route = spec.get("_audio_routing") if isinstance(spec.get("_audio_routing"), dict) else {}
-        counts = route.get("counts") if isinstance(route.get("counts"), dict) else {}
-        count_key = ",".join(f"{k}{counts.get(k, 0)}" for k in sorted(counts))
-        raw_seed = f"{title_s}|{mood}|{total_dur:.2f}|v3-multi-style|{count_key}"
-        music_seed = int(hashlib.sha256(raw_seed.encode("utf-8")).hexdigest()[:8], 16)
-
-    # P1 · long-plate BGM anti-fatigue receipt (soft/hard advice before bed render)
-    try:
-        from bgm_anti_fatigue import check_bgm_anti_fatigue
-
-        bed_src = str(ap.get("bed_source") or "auto")
-        tmpl_preview = str(
-            getattr(args, "music_template", None)
-            or (sound_plan or {}).get("music_template")
-            or "auto"
-        )
-        fatigue = check_bgm_anti_fatigue(
-            root,
-            total_dur_sec=float(total_dur),
-            music_seed=music_seed,
-            bed_source=bed_src,
-            template_mode=tmpl_preview,
-            mood=mood,
-            write=True,
-        )
-        mix_spotting["bgm_anti_fatigue"] = {
-            "ok": fatigue.get("ok"),
-            "issues": fatigue.get("issues"),
-            "recommend": fatigue.get("recommend"),
-        }
-        # Auto multi-chapter when hard single-loop risk (procedural bed path)
-        hard_fat = [
-            i for i in (fatigue.get("issues") or []) if i.get("severity") == "hard"
-        ]
-        mix_spotting["bgm_anti_fatigue"]["hard_count"] = len(hard_fat)
-        if hard_fat:
-            log(
-                "bgm anti-fatigue HARD: inject multi-chapter procedural motifs "
-                f"(dur={total_dur:.0f}s)"
-            )
-            mix_spotting["bgm_anti_fatigue"]["auto_chapters"] = True
-    except Exception as exc:  # noqa: BLE001
-        mix_spotting["bgm_anti_fatigue"] = {"ok": True, "error": str(exc)[:120]}
-        hard_fat = []
-
-    # Phase 4: Plot-Adaptive Mood Timeline
-    if isinstance(sound_plan, dict):
-        sound_plan["mood_timeline"] = build_mood_timeline(
-            shot_dicts, shot_starts=shot_start_map, shot_ends=shot_end_map, default_mood=mood
-        )
-        if build_music_timeline is not None:
-            try:
-                sound_plan["music_timeline"] = build_music_timeline(
-                    shot_dicts,
-                    shot_starts=shot_start_map,
-                    shot_ends=shot_end_map,
-                    default_mood=mood,
-                )
-                mix_spotting["music_cue_routing"] = summarize_music_timeline(
-                    sound_plan["music_timeline"]
-                )
-                # Procedural generators consume the richer cue fields.
-                sound_plan["mood_timeline"] = sound_plan["music_timeline"]
-            except ValueError as exc:
-                raise RenderError(f"invalid shot music_cue: {exc}") from exc
-        # Force multi-chapter motif rotation for long single-loop risk
-        if hard_fat or (
-            float(total_dur) >= 180.0
-            and (mix_spotting.get("bgm_anti_fatigue") or {}).get("auto_chapters")
-        ):
-            try:
-                from bgm_anti_fatigue import inject_anti_fatigue_chapters
-
-                base_tl = (
-                    sound_plan.get("music_timeline")
-                    or sound_plan.get("mood_timeline")
-                    or []
-                )
-                injected = inject_anti_fatigue_chapters(
-                    base_tl if isinstance(base_tl, list) else [],
-                    total_dur_sec=float(total_dur),
-                    default_mood=mood,
-                    chapter_sec=45.0,
-                )
-                sound_plan["mood_timeline"] = injected
-                sound_plan["music_timeline"] = injected
-                mix_spotting["bgm_anti_fatigue"] = {
-                    **(mix_spotting.get("bgm_anti_fatigue") or {}),
-                    "chapters_injected": len(injected),
-                    "auto_chapters": True,
-                }
-                log(f"bgm anti-fatigue: {len(injected)} chapters injected for procedural variety")
-            except Exception as exc:  # noqa: BLE001
-                log(f"bgm anti-fatigue chapter inject skip: {exc}")
-
-    # Phase H: local template pool. `timeline` is opt-in because it requires a
-    # licensed mood-specific file for every cue; it never degrades to one loop.
-    bed_source = str(ap.get("bed_source") or "auto").lower()
-    template_mode = str(
-        getattr(args, "music_template", None)
-        or ("approved_library" if bed_source == "approved_library" else None)
-        or (sound_plan or {}).get("music_template")
-        or "auto"
-    ).lower()
-    template_timeline_samples: np.ndarray | None = None
-    template_timeline_selections: list[dict[str, Any]] = []
-    if template_mode in {"timeline", "approved_library"}:
-        try:
-            template_timeline_samples, template_timeline_selections = (
-                render_music_template_timeline(
-                    root=root,
-                    work=work,
-                    timeline=(sound_plan or {}).get("music_timeline") or [],
-                    plan=sound_plan if isinstance(sound_plan, dict) else None,
-                    music_license=getattr(args, "music_license", None),
-                    seed=music_seed,
-                    total_dur=total_dur,
-                    approved_library=template_mode == "approved_library",
-                    film_id=str(spec.get("id") or spec.get("title") or root.name),
-                    series_id=str(spec.get("series_id") or ""),
-                )
-            )
-        except (SoundPlanError, RenderError) as exc:
-            raise RenderError(str(exc)) from exc
-        music_resolved = None
-    else:
-        try:
-            music_resolved = resolve_music_template(
-                root,
-                mood=mood,
-                plan=sound_plan if isinstance(sound_plan, dict) else None,
-                music_arg=getattr(args, "music", None),
-                mode=getattr(args, "music_template", None),
-                music_license=getattr(args, "music_license", None),
-                seed=music_seed,
-            )
-        except SoundPlanError as exc:
-            raise RenderError(str(exc)) from exc
-
-    # Optional external AI music (ACE-Step / MusicGen…) when no local bed
-    if music_resolved is None and template_timeline_samples is None:
-        ext_music = _try_external_music_gen(
-            work=work,
-            duration=total_dur,
-            mood=mood,
-            seed=music_seed,
-            title=str(spec.get("title") or root.name),
-        )
-        if ext_music is not None:
-            music_resolved = ext_music
-
-    mix_spotting["music_template"] = (
-        {
-            "source": music_resolved.get("source"),
-            "path": music_resolved.get("relative") or music_resolved.get("path"),
-            "mode": music_resolved.get("mode"),
-            "pool_size": music_resolved.get("pool_size"),
-            "pool_index": music_resolved.get("pool_index"),
-        }
-        if music_resolved
-        else {"source": "procedural", "mode": getattr(args, "music_template", None) or "auto"}
+    # W1.2 · music seed / anti-fatigue / bed materialize (leaf: final.stages_music_bed)
+    from final.stages_music_bed import (
+        apply_plan_mood,
+        enrich_sound_plan_music_timelines,
+        materialize_music_bed,
+        resolve_music_seed,
+        run_bgm_anti_fatigue,
     )
-    if template_timeline_samples is not None:
-        mix_spotting["music_template"] = {
-            "source": (
-                "approved_library" if template_mode == "approved_library" else "timeline_templates"
-            ),
-            "mode": template_mode,
-            "cue_count": len(template_timeline_selections),
-            "catalog_revision": (
-                template_timeline_selections[0].get("catalog_revision")
-                if template_timeline_selections
-                else None
-            ),
-            "catalog_sha256": (
-                template_timeline_selections[0].get("catalog_sha256")
-                if template_timeline_selections
-                else None
-            ),
-            "selections": [
-                {
-                    "shot_id": item["shot_id"],
-                    "path": item["relative"],
-                    "mood": item["mood"],
-                    "motif_id": item["motif_id"],
-                    "asset_id": item.get("asset_id"),
-                    "sha256": item.get("sha256"),
-                    "motif_family": item.get("motif_family"),
-                    "parent_asset_id": item.get("parent_asset_id"),
-                    "similarity_cluster": item.get("similarity_cluster"),
-                    "selection_reason": item.get("selection_reason"),
-                    "take_seed": item["take_seed"],
-                    "license_note": item["license_note"],
-                }
-                for item in template_timeline_selections
-            ],
-        }
-    mix_spotting["music_seed"] = music_seed
 
-    if template_timeline_samples is not None:
-        license_note = (
-            "approved shared BGM library; see mix_report music_template.selections"
-            if template_mode == "approved_library"
-            else "timeline of licensed local BGM templates; see mix_report music_template.selections"
-        )
-        user_f, sfx_f, spotting_only = _apply_spotting_and_convert_to_stereo(
-            template_timeline_samples
-        )
-        mix_spotting = {**mix_spotting, **spotting_only}
-        mix_spotting["mood"] = "timeline"
-        mix_spotting["bed_source"] = (
-            "approved_library" if template_mode == "approved_library" else "timeline_templates"
-        )
-        mix_spotting["music_seed"] = music_seed
-        mix_spotting["note"] = "mood-routed local BGM templates — mute/duck on bgm, sfx separated"
-        if sound_plan and sound_plan.get("bed") is False:
-            user_f = np.zeros_like(user_f)
-            mix_spotting["bed_applied"] = False
-        else:
-            mix_spotting["bed_applied"] = True
-        stereo = work / "bgm_stereo.wav"
-        sfx_stereo_path = work / "sfx_stereo.wav"
-        write_wav_stereo(stereo, (np.clip(user_f, -1.0, 1.0) * 32767.0).astype(np.int16))
-        write_wav_stereo(sfx_stereo_path, (np.clip(sfx_f, -1.0, 1.0) * 32767.0).astype(np.int16))
-        music_path = stereo
-    elif music_resolved and Path(music_resolved["path"]).is_file():
-        music_src = Path(music_resolved["path"]).expanduser().resolve()
-        license_note = str(music_resolved.get("license_note") or "user-supplied file")
-        mono_tmp = work / "bgm_user_mono.wav"
-        # loop/trim to total mono for spotting, then stereo
-        run(
-            [
-                "ffmpeg",
-                "-y",
-                "-stream_loop",
-                "-1",
-                "-i",
-                str(music_src),
-                "-t",
-                f"{total_dur:.3f}",
-                "-ar",
-                str(SR),
-                "-ac",
-                "1",
-                "-c:a",
-                "pcm_s16le",
-                str(mono_tmp),
-            ]
-        )
-        # load mono int16
-        with wave.open(str(mono_tmp), "rb") as handle:
-            frames = handle.readframes(handle.getnframes())
-            user_i16 = np.frombuffer(frames, dtype=np.int16).astype(np.float64) / 32767.0
-        user_f, sfx_f, spotting_only = _apply_spotting_and_convert_to_stereo(user_i16)
-        # keep multi-track voice metadata (not wiped by bed spotting)
-        mix_spotting = {**mix_spotting, **spotting_only}
-        mix_spotting["mood"] = (sound_plan or {}).get("mood", mood) if sound_plan else mood
-        mix_spotting["bed_source"] = str(music_resolved.get("source") or "user_music_file")
-        mix_spotting["music_seed"] = music_seed
-        mix_spotting["note"] = "user/external music — mute/duck on bgm, sfx separated"
-        if sound_plan and sound_plan.get("bed") is False:
-            user_f = np.zeros_like(user_f)
-            mix_spotting["bed_applied"] = False
-        else:
-            mix_spotting["bed_applied"] = True
-        stereo = work / "bgm_stereo.wav"
-        sfx_stereo_path = work / "sfx_stereo.wav"
-        write_wav_stereo(stereo, (np.clip(user_f, -1.0, 1.0) * 32767.0).astype(np.int16))
-        write_wav_stereo(sfx_stereo_path, (np.clip(sfx_f, -1.0, 1.0) * 32767.0).astype(np.int16))
-        music_path = stereo
-    else:
-        license_note = "original generative numpy score (ai-film-grok procedural v3 multi-style, no third-party samples)"
-        # IMPORTANT: generate BGM at fixed healthy amp — do NOT multiply by music_volume here
-        # (music_volume is applied once in the dual-track mix below)
-        gen_amp = float(getattr(args, "bgm_gen_amp", None) or DEFAULT_BGM_GEN_AMP)
-        bg_hint = 1.0
-        try:
-            bg_hint = float(
-                (sound_plan or {}).get("bed_gain_hint")
-                or (spec.get("_audio_routing") or {}).get("mean_bed_gain")
-                or 1.0
-            )
-        except (TypeError, ValueError):
-            bg_hint = 1.0
-        s_starts = []
-        acc = title_dur
-        for item in shot_audio:
-            s_starts.append(acc)
-            acc += float(item.get("target") or 6.0)
-
-        samples = procedural_music(
-            total_dur,
-            emo=1.1,
-            curve="swell",
-            amp=gen_amp,
+    mood = apply_plan_mood(mood, sound_plan if isinstance(sound_plan, dict) else None)
+    music_seed, ap, mood = resolve_music_seed(
+        args=args,
+        spec=spec if isinstance(spec, dict) else {},
+        root=root,
+        mood=mood,
+        total_dur=float(total_dur),
+    )
+    hard_fat = run_bgm_anti_fatigue(
+        root=root,
+        args=args,
+        sound_plan=sound_plan if isinstance(sound_plan, dict) else None,
+        mix_spotting=mix_spotting,
+        mood=mood,
+        music_seed=music_seed,
+        total_dur=float(total_dur),
+        ap=ap,
+    )
+    if isinstance(sound_plan, dict):
+        sound_plan = enrich_sound_plan_music_timelines(
+            sound_plan=sound_plan,
+            mix_spotting=mix_spotting,
             mood=mood,
-            seed=music_seed,
-            shot_starts=s_starts,
-            events=(sound_plan or {}).get("events"),
-            mood_timeline=(sound_plan or {}).get("mood_timeline"),
+            total_dur=float(total_dur),
+            hard_fat=hard_fat,
+            shot_dicts=shot_dicts,
+            shot_start_map=shot_start_map,
+            shot_end_map=shot_end_map,
+            build_mood_timeline=build_mood_timeline,
+            build_music_timeline=build_music_timeline,
+            summarize_music_timeline=summarize_music_timeline,
+            render_error_cls=RenderError,
         )
-        float_bed = samples.astype(np.float64) / 32767.0
-        float_bed, sfx_f, spotting_only = _apply_spotting_and_convert_to_stereo(float_bed)
-        mix_spotting = {**mix_spotting, **spotting_only}
-        mix_spotting["bed_source"] = "procedural"
-        mix_spotting["music_seed"] = music_seed
-        mix_spotting["bed_gain_hint"] = bg_hint
-        try:
-            from make_sfx_bed import last_rnb_style, pick_rnb_style  # type: ignore
 
-            mix_spotting["procedural_style"] = last_rnb_style() or pick_rnb_style(music_seed)
-        except Exception:
-            mix_spotting["procedural_style"] = "unknown"
-        log(
-            f"BGM procedural seed={music_seed} style={mix_spotting.get('procedural_style')} "
-            f"(change --music-seed for another take/style)"
-        )
-        if sound_plan and sound_plan.get("bed") is False:
-            float_bed = np.zeros_like(float_bed)
-            mix_spotting["bed_applied"] = False
-        else:
-            mix_spotting["bed_applied"] = True
-        stereo = work / "bgm_stereo.wav"
-        sfx_stereo_path = work / "sfx_stereo.wav"
-        write_wav_stereo(stereo, (np.clip(float_bed, -1.0, 1.0) * 32767.0).astype(np.int16))
-        write_wav_stereo(sfx_stereo_path, (np.clip(sfx_f, -1.0, 1.0) * 32767.0).astype(np.int16))
-        music_path = stereo
-
-    # A4 · 2026-08-06: honest BGM provenance (rnb license-only → procedural)
-    bgm_source_receipt: dict[str, Any] | None = None
-    try:
-        from sound_plan import build_bgm_source_receipt, mood_library_status
-
-        bed_src = str(mix_spotting.get("bed_source") or "unknown")
-        mood_st = mood_library_status(mood, film_root=root)
-        bgm_source_receipt = build_bgm_source_receipt(
-            bed_source=bed_src,
-            mood=mood,
-            license_note=str(license_note or ""),
-            music_resolved=music_resolved if isinstance(music_resolved, dict) else None,
-            mood_status=mood_st,
-        )
-        write_json(root / "receipts" / "bgm-source.json", bgm_source_receipt)
-        mix_spotting["bgm_source_receipt"] = {
-            "bed_source": bgm_source_receipt.get("bed_source"),
-            "partial": bgm_source_receipt.get("partial"),
-            "honest_limits": bgm_source_receipt.get("honest_limits"),
-            "mood_library": bgm_source_receipt.get("mood_library"),
-        }
-        if bgm_source_receipt.get("partial"):
-            log(
-                "BGM honesty: "
-                + "; ".join(str(x) for x in (bgm_source_receipt.get("honest_limits") or [])[:3])
-            )
-    except Exception as bgm_exc:  # noqa: BLE001 — never block final on receipt
-        log(f"bgm-source receipt skip: {bgm_exc}")
+    bed = materialize_music_bed(
+        root=root,
+        work=work,
+        args=args,
+        spec=spec if isinstance(spec, dict) else {},
+        sound_plan=sound_plan if isinstance(sound_plan, dict) else None,
+        mix_spotting=mix_spotting,
+        mood=mood,
+        music_seed=music_seed,
+        total_dur=float(total_dur),
+        title_dur=float(title_dur),
+        shot_audio=shot_audio,
+        ap=ap,
+        apply_spotting=_apply_spotting_and_convert_to_stereo,
+        resolve_music_template=resolve_music_template,
+        render_music_template_timeline=render_music_template_timeline,
+        try_external_music_gen=_try_external_music_gen,
+        procedural_music=procedural_music,
+        write_wav_stereo=write_wav_stereo,
+        run=run,
+        sample_rate=SR,
+        default_bgm_gen_amp=DEFAULT_BGM_GEN_AMP,
+        render_error_cls=RenderError,
+        sound_plan_error_cls=SoundPlanError,
+    )
+    music_path = bed["music_path"]
+    sfx_stereo_path = bed["sfx_stereo_path"]
+    license_note = bed["license_note"]
+    mix_spotting = bed["mix_spotting"]
+    music_resolved = bed["music_resolved"]
+    bgm_source_receipt = bed["bgm_source_receipt"]
+    mood = bed["mood"]
 
     # 7) Dual-track mix: VO primary + BGM always audible (两条音轨)
     # Sidechain: rnb default longer release so groove returns in VO pauses (Phase E)

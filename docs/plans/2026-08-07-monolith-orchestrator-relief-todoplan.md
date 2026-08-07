@@ -1,7 +1,7 @@
 # 巨石模组舒缓 Todo Plan（2026-08-07 · 现状诊断 + 分步队列）
 
 **Status:** ACTIVE · 结构债单一执行板（2026-08-07）  
-**Plugin:** **2.41.5** · checkout `plugins/ai-film-grok`  
+**Plugin:** **2.41.7** · checkout `plugins/ai-film-grok`  
 **历史主档（勿重开已 ship 波）：**  
 - [project-module-refactor](docs/plans/2026-08-05-project-module-refactor.md) · W0–W7 **DONE**  
 - [residual-monolith-w4](docs/plans/2026-08-05-residual-monolith-w4-todo.md) · 包边界 + pure leaf **DONE**  
@@ -125,7 +125,7 @@ S3 Stage peel → 编排函数只剩：load ctx → stage1()…stageN() → rece
 | Per-shot TTS / native XOR | `final/stages_tts_stems.py` |
 | stretch / visual_fit / plate slot | `final/stages_plate_stretch.py` |
 | concat + join transitions | `final/stages_picture_concat.py` |
-| Music / spotting / procedural bed | 深化 `render_final_music` + spotting |
+| Music / spotting / procedural bed | `final/stages_music_bed.py` + `render_final_music` |
 | Dual-track mix / sidechain / partial | `final/stages_dual_mix.py` |
 | Subtitle burn / SRT clock | `final/stages_subs.py` |
 | Mux + manifest delivery_class | `final/stages_mux_manifest.py` |
@@ -169,7 +169,7 @@ S3 Stage peel → 编排函数只剩：load ctx → stage1()…stageN() → rece
 
 - [x] **W1.0** stage 地图（上表）  
 - [x] **W1.1** `final/render_context.py` + `load_render_context` 已挂 `render_final`；helpers→`render_helpers`；**行为零变**  
-- [ ] **W1.2** peel **music/spotting 残留** 进既有 music leaf（最纯）  
+- [x] **W1.2** peel **music/spotting 残留** → `final/stages_music_bed.py`（seed/anti-fatigue/timelines/materialize + A4 receipt）  
 - [x] **W1.3** peel **dual mix + partial receipt**（已有 `mix_partial` / sidechain 诚实语义 · 禁改 PARTIAL 语义）  
 - [ ] **W1.4** peel **subs burn / caption clock**  
 - [ ] **W1.5** peel **TTS stems + native XOR + 口白窗三角**（A2 IRON · 测锁死）  
@@ -193,9 +193,9 @@ python -m pytest tests/test_final_hotpath_contracts.py tests/test_render_core_he
 
 ### Wave 2 · `film_spec_validate` 节拆（P0 · 触达 write-spec / lock）
 
-- [ ] **W2.1** 盘点 `validate_film_spec` 内自然段落（provider / heat floor / dialogue / audio / continuity / …）  
-- [ ] **W2.2** 每节 → `plan/validate_*.py` 或 `plan/film_spec_validate_*.py`，返回 issue 列表  
-- [ ] **W2.3** 入口 `validate_film_spec` 只聚合 + 排序 + 兼容旧 schema  
+- [x] **W2.1** 盘点 `validate_film_spec` 内自然段落（provider / heat floor / dialogue / audio / continuity / …）  
+- [x] **W2.2** (heat/cast/adult tail → film_spec_validate_heat) 每节 → `plan/validate_*.py` 或 `plan/film_spec_validate_*.py`，返回 issue 列表  
+- [x] **W2.3** 入口 `validate_film_spec` 只聚合 + 排序 + 兼容旧 schema  
 - [ ] **W2.4** 与已 peel 的 `film_spec_lints` **去重**（禁双实现）
 
 **Verify：** `test_cli_write_spec_extract` · director intent · 相关 story contract 测

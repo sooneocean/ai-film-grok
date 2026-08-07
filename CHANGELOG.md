@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.41.7] - 2026-08-07
+
+### Changed (monolith orchestrator relief · W2)
+- **film_spec_validate heat tail** → `plan/film_spec_validate_heat.py` (`apply_heat_cast_and_adult_tail`, ~650 LOC) structure-only.
+- validate_film_spec body ~2360→~1727 span.
+
 ## [2.41.6] - 2026-08-07
 
 ### Changed (monolith orchestrator relief · follow-through)
