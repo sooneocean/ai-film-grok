@@ -359,7 +359,7 @@ python3 -m pytest \
 | Wave | Result |
 |------|--------|
 | W0 | SHIPPED · plan + mega-fn guard · gitea push |
-| W1 | SHIPPED · render_helpers / dual_mix / mux / official_finalize / render_context |
+| W1 | SHIPPED · + stages_tts_stems (H3 native XOR) · music/subs peels |
 | W2 | SHIPPED · film_spec_validate_heat |
 | W3 | PARTIAL · preflight_premium leaf (full preflight still thick) |
 | W4 | PARTIAL · export_html pure builders (write_hyperframes body residual) |

@@ -362,7 +362,7 @@
     },
     {
       "path": "scripts/audio/music_director.py",
-      "sha256": "c9fbe022eb5ed67e178c41e0829d272c5accdb11c24d7b9e5ac9b1a2d0fdb875"
+      "sha256": "2e8705b7e027491be63222db9959859bb842b030e05503da14c31dcc17239fce"
     },
     {
       "path": "scripts/audio/music_editor.py",
@@ -606,7 +606,7 @@
     },
     {
       "path": "scripts/cli/cli_audio.py",
-      "sha256": "431c5b6876c74ad542459cf8b13ac18fc317c4e84df6671d7ff7d175889be9cd"
+      "sha256": "6049c5f5893a82f28007e1e9dd586b52ab32749a8b85049ba95c1915b23d5080"
     },
     {
       "path": "scripts/cli/cli_bgm_library.py",
@@ -1346,7 +1346,7 @@
     },
     {
       "path": "scripts/final/native_audio.py",
-      "sha256": "be14422b778ee5038f29c74418b4a97d618d14a5d5c5975c2f6e33366b3cb511"
+      "sha256": "8de9458ce87b4afe17e236c5c84cf67130827e59737e9575e9f56f150b45b8e6"
     },
     {
       "path": "scripts/final/render_context.py",
@@ -1359,6 +1359,10 @@
     {
       "path": "scripts/final/render_helpers.py",
       "sha256": "f24e604d615ea5b5e88c848b87ecbc18fff440279e2b806aacb016d865876206"
+    },
+    {
+      "path": "scripts/final/stages_dialogue_stems.py",
+      "sha256": "76d59092f86e5641f50c0aa1e4e461641b967c33df164a41b00cbc187e4c52f6"
     },
     {
       "path": "scripts/final/stages_dual_mix.py",
@@ -1379,6 +1383,10 @@
     {
       "path": "scripts/final/stages_subs.py",
       "sha256": "96693187cc18e4557c57a1ecf0a0803fa14efeecac718673f7e69166bc8c94e5"
+    },
+    {
+      "path": "scripts/final/stages_tts_stems.py",
+      "sha256": "38967d54e4723964a0790079040e49574ad549daf3bead64709bb42999e818fe"
     },
     {
       "path": "scripts/final/tts_tracks.py",
@@ -2382,7 +2390,7 @@
     },
     {
       "path": "scripts/plan/film_spec_constants.py",
-      "sha256": "51fdebe7b28ff80c16c765e21fa082d8fe9b60191c508a2f20ae866797107030"
+      "sha256": "a416fcf1726ea89be001afde06b3205fdb89049b134828182a11629d3c03b9a4"
     },
     {
       "path": "scripts/plan/film_spec_lints.py",
@@ -2782,7 +2790,7 @@
     },
     {
       "path": "scripts/post/render_final.py",
-      "sha256": "c7cb80c11b009f8c4df5d0e8d98b523c824cc0510ccd54abad2bfa8100cf96d7"
+      "sha256": "7367952d79f5797eb3524afab44aea954040e0354c6761a3dc99807fad558e20"
     },
     {
       "path": "scripts/post/render_final_music.py",

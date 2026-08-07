@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.41.11] - 2026-08-07
+
+### Added (Music Director R3 · batch + checklist)
+- **`music-director batch --file`**: JSON/JSONL multi-shot mute/duck/peak edits.
+- **`music-director checklist`**: export `receipts/music-director-checklist.{md,json}` prioritized listen list.
+- **`audit --apply-peak-auto`**: stamp `peak_fix=auto` on hot stems.
+- Tests for batch/checklist/peak suggestions.
+
+
 ## [2.41.10] - 2026-08-07
 
 ### Added (Music Director R2 · production harden)

@@ -12,6 +12,16 @@ NATIVE_AUDIO_TARGET_DB = -22.0
 NATIVE_AUDIO_GAIN_MIN = 0.50
 NATIVE_AUDIO_GAIN_MAX = 1.60
 
+# H3 原声轻处理（P0 · 2026-08-07）— single source; 禁默认 agate / 双 arnndn
+# memory: 2026-08-07-h3-native-speech-isolate · no-midframe-composite-flf-audio
+NATIVE_LIGHT_AF_FILTER = (
+    "highpass=f=80,lowpass=f=12000,afftdn=nr=12:nf=-25,adeclick,"
+    "loudnorm=I=-16:TP=-1.5:LRA=11"
+)
+NATIVE_LIGHT_AF_FILTER_NO_AGATE = NATIVE_LIGHT_AF_FILTER  # alias: never agate by default
+FILM_NATIVE_STABLE_BASENAME = "film_native_stable.mp4"
+FILM_NATIVE_SPEECH_BROKEN_BASENAME = "film_native_speech_BROKEN_gate.mp4"
+
 
 def resolve_native_audio_volume(
     args: argparse.Namespace,
