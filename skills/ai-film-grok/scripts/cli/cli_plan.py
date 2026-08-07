@@ -110,6 +110,75 @@ def add_plan_parsers(subparsers: Any) -> None:
         action="store_true",
         help="Dry-run: do not write shot-cards/ files",
     )
+    coverage = plan_sub.add_parser(
+        "coverage-check",
+        help="Coverage Checker: can scenes be edited? (Film Production OS W3)",
+    )
+    coverage.add_argument("--root", required=True)
+    coverage.add_argument(
+        "--strict",
+        action="store_true",
+        help="Fail-closed: COVERAGE_* / SCENE_UNEDITABLE block production_allowed",
+    )
+    coverage.add_argument(
+        "--no-write",
+        action="store_true",
+        help="Do not write receipts/coverage-check.json",
+    )
+    storyboard = plan_sub.add_parser(
+        "storyboard",
+        help="Storyboard status: set|gate (Film Production OS W3)",
+    )
+    storyboard.add_argument("--root", required=True)
+    storyboard.add_argument(
+        "--action",
+        choices=("set", "gate", "status"),
+        default="status",
+        help="set=write receipt; gate=check approved; status=read receipt",
+    )
+    storyboard.add_argument(
+        "--status",
+        choices=("draft", "review", "approved", "rejected"),
+        default=None,
+        help="For set: draft|review|approved|rejected",
+    )
+    storyboard.add_argument(
+        "--user-phrase",
+        default=None,
+        help="Required when setting approved (human sign-off)",
+    )
+    storyboard.add_argument("--notes", default=None, help="Optional notes for set")
+    storyboard.add_argument(
+        "--strict",
+        action="store_true",
+        help="gate: missing/unapproved storyboard is hard error",
+    )
+    continuity = plan_sub.add_parser(
+        "continuity-audit",
+        help="Continuity In→Out chain audit (Film Production OS W4)",
+    )
+    continuity.add_argument("--root", required=True)
+    continuity.add_argument("--strict", action="store_true")
+    continuity.add_argument(
+        "--no-write",
+        action="store_true",
+        help="Do not write receipts/continuity-audit.json",
+    )
+    scene_drama = plan_sub.add_parser(
+        "scene-drama",
+        help="Scene dramatic fields lint (Film Production OS W4)",
+    )
+    scene_drama.add_argument("--root", required=True)
+    scene_drama.add_argument(
+        "--strict",
+        action="store_true",
+        help="Force strict even when film-spec.scene_strict is false",
+    )
+    scene_drama.add_argument(
+        "--no-write",
+        action="store_true",
+        help="Do not write receipts/scene-drama.json",
+    )
     edit = plan_sub.add_parser("edit", help="Edit one unlocked narrative node")
     edit.add_argument("--root", required=True)
     edit.add_argument("--node", required=True, help="Node id/ref, e.g. story or ep01_sc01_bt03")

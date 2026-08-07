@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.41.1] - 2026-08-07
+
+### Added (Film Production OS · W3–W4 slice)
+- **W3 Coverage Checker:** `plan/coverage_check.py` · `aifilm plan coverage-check` · receipt `coverage-check.json`; roles establish/CU/reaction/…; strict blocks `production_allowed`.
+- **W3 Storyboard status:** `plan/storyboard_status.py` · `aifilm plan storyboard --action set|gate|status`; approve needs `--user-phrase`.
+- **W4 Scene drama:** `plan/scene_drama.py` · `aifilm plan scene-drama` (dramatic_goal/conflict/turn/arc).
+- **W4 Continuity audit:** `plan/continuity_audit.py` · `aifilm plan continuity-audit` (In→Out wardrobe/prop breaks).
+- **Shims** + tests: `test_film_production_os_w3_w4.py`.
+
 ## [2.41.0] - 2026-08-07
 
 ### Changed (Heat plot-driven · highest ROI)

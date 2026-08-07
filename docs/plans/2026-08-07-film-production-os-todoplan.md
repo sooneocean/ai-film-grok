@@ -6,8 +6,8 @@
 
 | 项 | 值 |
 |----|-----|
-| Status | **ACTIVE · W0–W2 SHIPPED**（W3+ 待推进） |
-| 基线版本 | `plugin.json` **2.40.112**（W0–W2 落地） |
+| Status | **ACTIVE · W0–W4 slice SHIPPED**（W3 coverage/storyboard · W4 scene-drama/continuity；P2.7 animatic harden 待加深） |
+| 基线版本 | `plugin.json` **2.41.1**（W3–W4 slice；2.41.0 heat plot-driven） |
 | 工作树 | `/Users/dex/.grok/plugins/ai-film-grok`（本会话真相） |
 | 战略约束 | CTO 板：禁止第二套导演系统 · 巨石挡路才拆 · 机读门禁 > 散文 IRON |
 | 北极星 | **剧本 → 可剪、可审、可接戏的 Shot Card**（用户 MVP §44）；生成质量是第二位 |

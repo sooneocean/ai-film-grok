@@ -649,6 +649,84 @@ def cmd_plan(args: argparse.Namespace) -> int:
         )
         emit(report)
         return 0 if report.get("ok") else 1
+    if action == "coverage-check":
+        from coverage_check import coverage_check_at_root
+
+        root_s = getattr(args, "root", None)
+        if not root_s:
+            raise FilmError("plan coverage-check requires --root")
+        report = coverage_check_at_root(
+            Path(root_s).expanduser().resolve(),
+            strict=bool(getattr(args, "strict", False)),
+            write_receipt=not bool(getattr(args, "no_write", False)),
+        )
+        emit(report)
+        return 0 if report.get("ok") else 1
+    if action == "storyboard":
+        from storyboard_status import (
+            check_storyboard_gate,
+            load_storyboard_receipt,
+            set_storyboard_status,
+        )
+
+        root_s = getattr(args, "root", None)
+        if not root_s:
+            raise FilmError("plan storyboard requires --root")
+        root_p = Path(root_s).expanduser().resolve()
+        sb_action = str(getattr(args, "action", "status") or "status")
+        if sb_action == "set":
+            st = getattr(args, "status", None)
+            if not st:
+                raise FilmError("plan storyboard set requires --status")
+            report = set_storyboard_status(
+                root_p,
+                status=str(st),
+                user_phrase=str(getattr(args, "user_phrase", None) or ""),
+                notes=str(getattr(args, "notes", None) or ""),
+            )
+        elif sb_action == "gate":
+            report = check_storyboard_gate(
+                root_p,
+                strict=bool(getattr(args, "strict", False)),
+            )
+        else:
+            rec = load_storyboard_receipt(root_p)
+            report = {
+                "ok": bool(rec),
+                "kind": "storyboard-status",
+                "status": (rec or {}).get("status"),
+                "receipt": rec or None,
+                "root": str(root_p),
+            }
+        emit(report)
+        return 0 if report.get("ok") else 1
+    if action == "continuity-audit":
+        from continuity_audit import continuity_audit_at_root
+
+        root_s = getattr(args, "root", None)
+        if not root_s:
+            raise FilmError("plan continuity-audit requires --root")
+        report = continuity_audit_at_root(
+            Path(root_s).expanduser().resolve(),
+            strict=bool(getattr(args, "strict", False)),
+            write_receipt=not bool(getattr(args, "no_write", False)),
+        )
+        emit(report)
+        return 0 if report.get("ok") else 1
+    if action == "scene-drama":
+        from scene_drama import scene_drama_at_root
+
+        root_s = getattr(args, "root", None)
+        if not root_s:
+            raise FilmError("plan scene-drama requires --root")
+        strict_flag = bool(getattr(args, "strict", False))
+        report = scene_drama_at_root(
+            Path(root_s).expanduser().resolve(),
+            strict=True if strict_flag else None,
+            write_receipt=not bool(getattr(args, "no_write", False)),
+        )
+        emit(report)
+        return 0 if report.get("ok") else 1
     if action == "debrief":
         from cli_plan import run_debrief
 
