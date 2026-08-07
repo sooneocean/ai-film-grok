@@ -1450,7 +1450,7 @@
     },
     {
       "path": "scripts/gates/state_index_gate.py",
-      "sha256": "f9014064da2ed36b1eebb8b4460ff0eed4acb0474a4fe5ed0a77497bd4d7403a"
+      "sha256": "528e80239b3c09d0e1195de197525ef58adcfce4a6825633bf6859c858eddc5b"
     },
     {
       "path": "scripts/generation_ready.py",

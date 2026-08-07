@@ -108,7 +108,7 @@
 | ID | Todo | 做法 | 验收 | 状态 |
 |----|------|------|------|------|
 | **G0.1** | **钉死本 CTO plan 为单一执行板** | 本 session plan 落档后，把 `docs/plans/2026-08-06-next-optimization-todoplan.md` header 改为 `SUPERSEDED → CTO plan`（或互指）；禁止第三块「综合板」 | 新会话只认一处 OPEN 表 | ✅ 2.40.42 |
-| **G0.2** | **双 checkout 收敛** | plugins 为主可写；禁手拷 | 两树用 git 同步 | 纪律（本会话 plugins） |
+| **G0.2** | **双 checkout 收敛** | plugins 为主可写；禁手拷 | 两树用 git 同步 | ✅ 2026-08-07 ff `~/.grok/ai-film-grok` → `c10cf4e`/`2.40.66` 链 |
 | **G0.3** | **OPEN 冻结集 ≤12** | 从 memory inventory + 本 plan §4 抽出；其余 DEFERRED | 表在本档 §5 | ✅ 见下 |
 | **G0.4** | **版本指针账实** | README/GRAPH 非 marker 硬编码 vs `plugin.json`；CI 可选 assert | `make sync-docs` + 抽检 | pending |
 
@@ -245,9 +245,9 @@
 
 | ID | 主题 | 波次 | 优先级 |
 |----|------|------|--------|
-| 1 | gates 静默 except → fail-closed | A1 | **P0 · 2.40.65** measured map 收据存在禁 silent `{}`；r4 edit_rhythm/bible 2.40.61；hotpath 2.40.62 |
+| 1 | gates 静默 except → fail-closed | A1 | **P0 · 2.40.66** state_index wardrobe_ladder ImportError；2.40.65 measured map；2.40.61–62 r4/hotpath |
 | 2 | final/hotpath + plate≠master 永不回退 | A1/A2 | **P0** |
-| 3 | 双 checkout + 单一执行板 | G0 | **P0** |
+| 3 | 双 checkout + 单一执行板 | G0 | **P0 · G0.2 ✅** 2026-08-07 git ff 对齐（禁手拷） |
 | 4 | 真片 ship-prep 人链 / 诚实 PARTIAL | A2 | **P0** |
 | 5 | 5090 drain 或 OPEN_OPS | B3 | **P0 ops** |
 | 6 | 触达式 peel：final / validate / preflight | C4 | **P1** |

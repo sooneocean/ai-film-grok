@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.40.66] - 2026-08-07
+
+### Fixed (CTO G0.2 dual-checkout + A1 state_index)
+- **G0.2:** synced `~/.grok/ai-film-grok` → plugins tip via **git ff-only** (no hand copy); local `.workbuddy-ai` dirty left uncommitted.
+- **state_index_gate:** `wardrobe_ladder` ImportError no longer silent-skip — hard `WARDROBE_LADDER_MODULE_MISSING` when non-full wardrobe / exact ids / heat max|hot; soft otherwise. Fallback `needs_ladder` for later missing-state checks.
+- **keyframe probe:** `pick_best_keyframe` failures surface as soft `KEYFRAME_PROBE_ERROR` (keyframes/ fallback kept).
+- **Tests:** `tests/test_opt_round_a1_state_index.py`.
+
 ## [2.40.65] - 2026-08-07
 
 ### Fixed (CTO A1 · measured VO map silent empty)

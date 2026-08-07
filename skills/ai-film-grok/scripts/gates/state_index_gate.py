@@ -85,7 +85,9 @@ def _path_exists(root: Path, p: str | None) -> bool:
     return path.is_file()
 
 
-def _find_keyframe(root: Path, shot_id: str) -> Path | None:
+def _find_keyframe(
+    root: Path, shot_id: str, *, probe_errors: list[str] | None = None
+) -> Path | None:
     # Prefer full-res geometry-ok still (lesson 2026-07-22 no-compress)
     try:
         from media_qa import pick_best_keyframe
@@ -93,8 +95,10 @@ def _find_keyframe(root: Path, shot_id: str) -> Path | None:
         best = pick_best_keyframe(root, shot_id)
         if best is not None and best.is_file():
             return best
-    except Exception:
-        pass
+    except Exception as exc:
+        # A1 · keep keyframes/ fallback but surface probe fail (no silent swallow)
+        if probe_errors is not None:
+            probe_errors.append(f"{shot_id}: pick_best_keyframe failed: {exc}"[:160])
     kf = root / "keyframes"
     for ext in (".png", ".jpg", ".jpeg", ".webp"):
         p = kf / f"{shot_id}{ext}"
@@ -131,6 +135,7 @@ def run_state_index_check(root: Path) -> dict[str, Any]:
     exact_state_ids: dict[str, set[str]] = {}
     heroes: set[str] = set()
 
+    kf_probe_errors: list[str] = []
     for sh in shots:
         sid = str(sh.get("id") or "")
         w = _wardrobe_of(sh)
@@ -141,7 +146,7 @@ def run_state_index_check(root: Path) -> dict[str, Any]:
             states_needed_by_hero.setdefault(h, set()).add(w)
             if _wardrobe_state_id(sh):
                 exact_state_ids.setdefault(h, set()).add(str(_wardrobe_state_id(sh)))
-        kf = _find_keyframe(root, sid) if sid else None
+        kf = _find_keyframe(root, sid, probe_errors=kf_probe_errors) if sid else None
         clip = _approved_clip(man, sid) if sid else None
         shot_rows.append(
             {
@@ -153,6 +158,15 @@ def run_state_index_check(root: Path) -> dict[str, Any]:
                 "keyframe": str(kf) if kf else None,
                 "keyframe_ok": bool(kf),
                 "clip_approved": bool(clip),
+            }
+        )
+    for err in kf_probe_errors[:12]:
+        soft.append(
+            {
+                "level": "soft",
+                "code": "KEYFRAME_PROBE_ERROR",
+                "message": err,
+                "fix": "check media_qa.pick_best_keyframe / keyframes stills",
             }
         )
 
@@ -176,14 +190,23 @@ def run_state_index_check(root: Path) -> dict[str, Any]:
     ladder_hard: list[dict[str, Any]] = []
     ladder_plan: list[dict[str, Any]] = []
     ladder_active_heroes: set[str] = set()
+
+    def _needs_ladder_fallback(states: set[str] | set[Any]) -> bool:
+        return any(str(s).lower() not in {"full", "default", "armored", ""} for s in states)
+
+    needs_ladder = _needs_ladder_fallback  # type: ignore[assignment]
     try:
         from wardrobe_ladder import (
             ladder_plan as build_ladder_plan,
         )
         from wardrobe_ladder import (
-            needs_ladder,
+            needs_ladder as _needs_ladder_impl,
+        )
+        from wardrobe_ladder import (
             state_for_id,
         )
+
+        needs_ladder = _needs_ladder_impl  # type: ignore[assignment]
 
         if needs_ladder(states_needed):
             for hid in sorted(heroes) or ["hero"]:
@@ -249,8 +272,19 @@ def run_state_index_check(root: Path) -> dict[str, Any]:
                                 "fix": "use the exact approved wardrobe_ladder state with the same wardrobe_state",
                             }
                         )
-    except ImportError:
-        pass
+    except ImportError as exc:
+        # A1 · never silently skip ladder when non-full wardrobe / exact ids / heat max
+        non_full = _needs_ladder_fallback(states_needed) or bool(exact_state_ids)
+        entry = {
+            "level": "hard" if (non_full or heat_maxish) else "soft",
+            "code": "WARDROBE_LADDER_MODULE_MISSING",
+            "message": f"wardrobe_ladder import failed: {exc}"[:200],
+            "fix": "ensure wardrobe_ladder is importable under scripts/; re-run state-index",
+        }
+        if entry["level"] == "hard":
+            hard.append(entry)
+        else:
+            soft.append(entry)
     hard.extend(ladder_hard)
     gen_plan.extend(ladder_plan)
 
