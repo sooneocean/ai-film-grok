@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.40.80] - 2026-08-07
+
+### Added (CTO C6.4 base contracts · config_loader + core.gates)
+- **`util.config_loader`:** env/bool/int resolve, fingerprint cache invalidate, `load_config` dict shape, `generate_example` safety header.
+- **`core.gates.recompute_gates`:** empty film all-closed keys; brief+spec flip; invalid spec stays closed.
+- CTO C6.4 mark expanded.
+
 ## [2.40.79] - 2026-08-07
 
 ### Fixed (CTO C5.5 subprocess timeout)
