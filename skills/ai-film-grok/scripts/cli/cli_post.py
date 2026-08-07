@@ -161,6 +161,12 @@ def cmd_final(args: argparse.Namespace) -> int:
     if not script.is_file():
         raise FilmError(f"Missing {script}")
     root = Path(args.root).expanduser().resolve()
+    try:
+        from review_mode_policy import ReviewModeError, assert_review_advance_allowed
+
+        assert_review_advance_allowed(root, boundary="final")
+    except ReviewModeError as exc:
+        raise FilmError(str(exc)) from exc
     import os as _os
 
     from production_truth import ProductionTruthError, require_current_canonical_truth
@@ -953,6 +959,12 @@ def cmd_final(args: argparse.Namespace) -> int:
 
 def cmd_review_final(args: argparse.Namespace) -> int:
     root = Path(args.root).expanduser().resolve()
+    try:
+        from review_mode_policy import ReviewModeError, assert_review_advance_allowed
+
+        assert_review_advance_allowed(root, boundary="review-final")
+    except ReviewModeError as exc:
+        raise FilmError(str(exc)) from exc
     from production_truth import ProductionTruthError, require_current_canonical_truth
 
     try:

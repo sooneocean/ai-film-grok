@@ -28,6 +28,9 @@ aifilm takes select --root <film> --shot-id s01 --take-id <id>
 
 放行写 ledger/manifest；Web 不执行 H3/final。
 
+**review_mode**（Phase D）：`async_dailies`|`gate_each`；`director-center set-mode|blockers`。
+
+
 ## 2. 架构
 
 ```

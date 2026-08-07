@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.41.30] - 2026-08-07
+
+### Added (Phase D · review_mode)
+- `review_mode_policy`: async_dailies (default) | gate_each.
+- gate_each blocks advance on multi-take picks; picture_lock/final hard-clear take backlog.
+- CLI: `director-center set-mode|blockers`; final/review-final gate hooks.
+
 ## [2.41.29] - 2026-08-07
 
 ### Added (edit-director · Round 2 production loop)
