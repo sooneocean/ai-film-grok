@@ -1146,6 +1146,60 @@ def run_h3_shot(
     prompt_dir = base / "receipts" / "prompts"
     prompt_dir.mkdir(parents=True, exist_ok=True)
     (prompt_dir / f"{shot_id}.h3.spine.txt").write_text(prompt + "\n", encoding="utf-8")
+    # P3 receipt: dialect / official_mode / word counts / combo family
+    try:
+        from h3_official_prompt import (
+            map_official_mode,
+            official_prompt_word_count,
+            resolve_prompt_dialect,
+            validate_official_prompt,
+        )
+
+        shot_meta = shot if isinstance(shot, dict) else {}
+        dial = resolve_prompt_dialect(shot_meta)
+        mode_s = str(plan.get("mode") or "i2v")
+        is_official_structure = (
+            "integrated_multimodal_description:" in prompt
+            or (
+                "subject_definitions:" in prompt
+                and "detailed_description:" in prompt
+            )
+        )
+        val = (
+            validate_official_prompt(prompt, mode=mode_s)
+            if is_official_structure
+            else {"ok": None, "issues": []}
+        )
+        meta = {
+            "kind": "h3-prompt-dialect-receipt",
+            "shot_id": shot_id,
+            "dialect": dial,
+            "official_mode": map_official_mode(mode_s) if is_official_structure else None,
+            "validate_ok": val.get("ok"),
+            "validate_issues": val.get("issues") or [],
+            "word_count_detailed": official_prompt_word_count(prompt),
+            "word_count_imd": official_prompt_word_count(prompt, field="imd"),
+            "prompt_family": (
+                (shot_meta.get("dsl") or {}).get("prompt_family")
+                if isinstance(shot_meta.get("dsl"), dict)
+                else None
+            )
+            or shot_meta.get("_combo_prompt_family_applied")
+            or shot_meta.get("prompt_family"),
+            "is_official_structure": is_official_structure,
+        }
+        import json as _json
+
+        (prompt_dir / f"{shot_id}.h3.meta.json").write_text(
+            _json.dumps(meta, ensure_ascii=False, indent=2) + "\n",
+            encoding="utf-8",
+        )
+        if is_official_structure:
+            (prompt_dir / f"{shot_id}.h3.official.txt").write_text(
+                prompt + "\n", encoding="utf-8"
+            )
+    except Exception:
+        pass
     takes_dir = base / "takes" / shot_id
     takes_dir.mkdir(parents=True, exist_ok=True)
     raw_out = takes_dir / f"{shot_id}_h3_{plan['mode']}_{seed}.mp4"

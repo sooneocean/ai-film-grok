@@ -242,3 +242,27 @@ def test_merge_refs_from_shot_last_path() -> None:
     assert "/tmp/extra.png" in paths
     assert "/tmp/end.png" in paths
 
+
+def test_ref2va_detailed_word_band() -> None:
+    from h3_official_prompt import official_prompt_word_count
+
+    shot = _hi_shot()
+    shot["dsl"]["location"] = "rain-soaked rooftop at night"
+    shot["media_pack"] = {
+        "last": {"path": "/tmp/last.png", "role": "pose"},
+        "refs": [{"path": "/tmp/face.png", "role": "identity"}],
+    }
+    text = compile_official_h3_prompt(shot, mode="r2v", duration_sec=5.0)
+    n = official_prompt_word_count(text)
+    assert n >= 350, n
+    assert n <= 520, n
+    assert validate_official_prompt(text, mode="r2v")["ok"] is True
+
+
+def test_base_i2va_has_half_second_densify() -> None:
+    shot = _hi_shot()
+    shot["dsl"]["location"] = "gym mats"
+    text = compile_official_h3_prompt(shot, mode="i2v", duration_sec=5.0)
+    assert "half-second" in text or "Within the same continuous take" in text
+    assert validate_official_prompt(text, mode="i2v")["ok"] is True
+

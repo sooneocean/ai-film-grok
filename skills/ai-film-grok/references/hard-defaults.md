@@ -52,6 +52,8 @@
 | 女主 | **默认 single**；multi 仅证据（Prompt/多图/显式字段）；勿臆造 |
 | 定妆 | style-v1 + cast masters + lookbook → pilot 3 镜用户批准 → bulk |
 | **身份代际锁 · 禁混代出片（P0 · 2026-08-07 · abroad 漂移 · 不准再犯）** | **一代一脸一集**：同一 film root active timeline **只许一个 cast generation**（restyle/换男主锚/换定妆 = 新 gen）。**禁止** `_archive_*` / 旧 gen takes 与新 gen **混剪成 final**；缺镜 **重 I2V**，禁 silent restore archive 填洞。`face-identity.verified≠true` → 禁声称角色稳定；技术 plate 须 **IDENTITY_PARTIAL** 诚实。final 前 identity drift 审计；worst 先 re-I2V。有声干净 ≠ 脸对。见 [memory](../memory/2026-08-07-identity-generation-lock-no-mix.md) |
+| **配角/男主定妆锁（P0 · 2026-08-07 · abroad 里昂 · 不准再犯）** | 凡上镜角色（含 partner）**立项日**须 `cast_master`+`face_lock` 图；文字 identity 不算锁。双人镜 prompt 必须有 `Character <id>:` + master 路径；禁只写 hero。`style.locked` 假绿：须全 cast 有 master，不能只认女主/style-v1。Imagine 裸双人易 moderated → 脸区 restyle/保留构图换男脸，再 H3。见 [memory](../memory/2026-08-07-partner-cast-master-iron.md) |
+| **H3 原声只留语音（P0 · 2026-08-07 · 禁错位 TTS）** | 用户要原声口型 → **禁 TTS 替换**；native XOR post_tts。怪声/只留关键语音：clip 原声 `arnndn(cb+sh)+afftdn+agate+loudnorm`（`~/.grok/run/audio-models/*.rnnn`），video copy 出 `film_native_speech`；禁 `film_watchable` 当交付。见 [memory](../memory/2026-08-07-h3-native-speech-isolate.md) |
 | 发色 | **硬锁**（P1）：`cast_locks` 写色名+NEVER 禁色；`hair_swatches` 建议；双人多 cast 锚；pilot 发色 fail=identity fail（2026-07-21） |
 | **画面工程字** | **致命禁**（P0）：禁烧 `shot##`/keyframe/cast master v#；prompt 不写镜号字串；register 前四角检；脏 still 先 scrub（2026-07-21） |
 | **资深剪辑** | Editor’s Cut 必写蒙太奇设计；craft **≥4 种**；60s insert≥2 / smash≥1 / montage 段≥1；禁顺序幻灯片（2026-07-21） |

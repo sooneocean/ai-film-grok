@@ -634,7 +634,7 @@
     },
     {
       "path": "scripts/cli/cli_media.py",
-      "sha256": "684f42580ddd18e1a9859b51e7a3c132fa8985f677c0d36436c9aa7c48ffe5af"
+      "sha256": "73ff2ec2be63a436ad733958218fbc4745881b5b6820fe819752b68df883e7f9"
     },
     {
       "path": "scripts/cli/cli_misc_ops.py",
@@ -1030,7 +1030,7 @@
     },
     {
       "path": "scripts/core/gates.py",
-      "sha256": "d75d113658ff65e77f82f0ed7f1f45a9b3cbd5a829f228a5978a399e6f49f2c7"
+      "sha256": "2e0e5b4886dcb27bc026da5bfd708bababc57ac0afd4d687ea999ebe2f860979"
     },
     {
       "path": "scripts/core/media_ops.py",
@@ -1038,7 +1038,7 @@
     },
     {
       "path": "scripts/core/paths.py",
-      "sha256": "bebea624d8acff16656cb29ad98537523d6de37b03e65ce0847af124e2282c5d"
+      "sha256": "08f8b4fd36d9b6588743dfb14686ee487bb9e8a24c6fe3e383f567e1f8236947"
     },
     {
       "path": "scripts/core/skip_audit.py",
@@ -1722,7 +1722,7 @@
     },
     {
       "path": "scripts/media/h3_official_prompt.py",
-      "sha256": "3096465d44cfc3161c0c0a7e6248eb4b400e7492dacd219c346232919d06956b"
+      "sha256": "5a0d0ec46ae8b8f13b7126e4f0ce89b125ec4958bb9b50520f53e2e5c09f6fa8"
     },
     {
       "path": "scripts/media/h3_ship_native.py",
@@ -1734,7 +1734,7 @@
     },
     {
       "path": "scripts/media/h3_workflow.py",
-      "sha256": "e201b7053df0aff07d158a7d00cce430e54020f45bd548a5ad779fd4f8a8f016"
+      "sha256": "046b3567af5baae0b70d829ea982ed64b64200b322a809dd3628a2deb248fa8f"
     },
     {
       "path": "scripts/media/i2v_motion_gate.py",
