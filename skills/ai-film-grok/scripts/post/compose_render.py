@@ -13,8 +13,6 @@ Optional --require-preview: need receipts/compose-preview.json from compose-prev
 
 from __future__ import annotations
 
-from util.errors import FilmError
-
 import argparse
 import json
 import os
@@ -37,6 +35,7 @@ from security_policy import (
     safe_workspace_directory,
 )
 from util import require_json_as, run_compose_env, utc_now, write_json
+from util.errors import FilmError
 
 SCHEMA_VERSION = 1
 

@@ -416,6 +416,7 @@ def end_still_dest(root: Path | str, shot_id: str) -> Path:
 def enrich_h3_last_frames(root: Path | str) -> dict[str, Any]:
     """Scan continue handoffs and auto-derive candidate end stills for FLF chains."""
     import shutil
+
     from util import read_json, utc_now
 
     base = _root(root)

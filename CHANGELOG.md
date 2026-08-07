@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.41.16] - 2026-08-07
+
+### Added (H3 native light re-encode)
+- **`apply_native_light_af_filter`**: post-concat optional audio re-encode with `NATIVE_LIGHT_AF_FILTER` (video copy); forbids agate/arnndn.
+- **CLI** `aifilm h3 ship-native --light-process` · env `AIFILM_H3_SHIP_LIGHT_PROCESS=1`.
+- Default remains concat `-c copy` for speed; light path is opt-in.
+
 ## [2.41.15] - 2026-08-07
 
 ### Merged

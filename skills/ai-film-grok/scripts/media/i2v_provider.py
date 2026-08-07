@@ -477,7 +477,6 @@ class GrokI2VProvider(I2VProvider):
                     detail={"canary_required": True, "receipt": str(receipt)},
                 )
             try:
-                import json
 
                 from util import soft_json
 
@@ -572,7 +571,6 @@ class SeedanceProvider(I2VProvider):
             receipt = root / "receipts" / "frw-key-capability.json"
             if receipt.is_file():
                 try:
-                    import json
 
                     from util import soft_json
 
@@ -1028,7 +1026,6 @@ class LocalComfyWan22Provider(I2VProvider):
                     WAN22_GENERAL_ADULT_EXPERIMENTAL_PROFILE,
                     WAN22_OFFICIAL_PROFILE,
                 )
-
                 from util import soft_json
 
                 detail = soft_json(receipt)

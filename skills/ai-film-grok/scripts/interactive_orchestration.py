@@ -4,7 +4,8 @@ Keeps `import interactive_orchestration` working after package move.
 """
 from __future__ import annotations
 
-from media import interactive_orchestration as _impl
 import sys as _sys
+
+from media import interactive_orchestration as _impl
 
 _sys.modules[__name__] = _impl

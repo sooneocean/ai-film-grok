@@ -7,7 +7,6 @@ report and an exit code; the top-level CLI owns output formatting and errors.
 from __future__ import annotations
 
 import argparse
-import json
 from pathlib import Path
 from typing import Any
 
@@ -20,7 +19,7 @@ from narrative_control import (
     graph_locked_for_projection,
 )
 from story_plan import project_graph_to_film_spec
-from util import utc_now, write_json, soft_json
+from util import soft_json, utc_now, write_json
 
 
 class GraphMutationError(RuntimeError):

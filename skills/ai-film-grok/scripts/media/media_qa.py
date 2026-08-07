@@ -3,8 +3,6 @@
 
 from __future__ import annotations
 
-from util.errors import FilmError
-
 import json
 import shutil
 import subprocess
@@ -13,6 +11,7 @@ from typing import Any
 
 from media_probe import MediaProbeError, probe_media, verify_full_decode
 from security_policy import minimal_subprocess_env
+from util.errors import FilmError
 
 # Grok Imagine + FRW video backends.
 # 2026-07-23 quality-first: hero provider is evidence-selected; never infer quality

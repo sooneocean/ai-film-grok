@@ -4,7 +4,8 @@ Keeps `import master_delivery` working after package move.
 """
 from __future__ import annotations
 
-from post import master_delivery as _impl
 import sys as _sys
+
+from post import master_delivery as _impl
 
 _sys.modules[__name__] = _impl

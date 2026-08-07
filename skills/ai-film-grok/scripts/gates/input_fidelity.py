@@ -10,14 +10,13 @@ and dialogue/caption fields. Does not rewrite story or approve pilot.
 
 from __future__ import annotations
 
-from util.errors import FilmError
-
 import os
 import re
 from pathlib import Path
 from typing import Any
 
 from util import read_json, utc_now, write_json
+from util.errors import FilmError
 
 RECEIPT_NAME = "input-fidelity.json"
 KIND = "input-fidelity"

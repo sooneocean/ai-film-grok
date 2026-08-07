@@ -16,7 +16,7 @@ import shutil
 import subprocess
 import tempfile
 import time
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
 

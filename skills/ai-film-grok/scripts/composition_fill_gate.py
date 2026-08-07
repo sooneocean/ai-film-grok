@@ -87,8 +87,8 @@ def measure_subject_fill(path: Path | str) -> dict[str, Any]:
         out["errors"].append("file_missing")
         return out
     try:
-        from PIL import Image
         import numpy as np
+        from PIL import Image
     except ImportError as e:
         out["errors"].append(f"deps:{e}")
         return out
@@ -168,8 +168,8 @@ def strip_letterbox(
         rep["errors"].append("file_missing")
         return rep
     try:
-        from PIL import Image
         import numpy as np
+        from PIL import Image
     except ImportError as e:
         rep["errors"].append(f"deps:{e}")
         return rep

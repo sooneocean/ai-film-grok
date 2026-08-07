@@ -246,6 +246,9 @@ class TestShipNativeDry(unittest.TestCase):
             self.assertIn("highpass", rep.get("native_light_af_filter") or "")
             self.assertNotIn("agate", rep.get("native_light_af_filter") or "")
             self.assertTrue(str(rep.get("out") or "").endswith("film_native_stable.mp4"))
+            # light process dry flag
+            pol = rep.get("native_light_policy") or {}
+            self.assertIn("light_process_requested", pol)
             # planned 10s vs 30s → hard shortfall flagged in duration_target subreport
             dt = rep.get("duration_target") or {}
             self.assertIn("DURATION_TARGET_SHORT_HARD", dt.get("codes") or [])

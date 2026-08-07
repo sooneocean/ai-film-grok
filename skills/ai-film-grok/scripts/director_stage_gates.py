@@ -4,7 +4,8 @@ Keeps `import director_stage_gates` working after package move.
 """
 from __future__ import annotations
 
-from gates import director_stage_gates as _impl
 import sys as _sys
+
+from gates import director_stage_gates as _impl
 
 _sys.modules[__name__] = _impl

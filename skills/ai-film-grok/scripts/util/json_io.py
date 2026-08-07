@@ -13,9 +13,9 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from util.security_policy import atomic_write_text
 from util import require_json, write_json
 from util.errors import FilmError  # noqa: F401 — re-export
+from util.security_policy import atomic_write_text
 
 
 def read_json(path: Path) -> dict[str, Any]:

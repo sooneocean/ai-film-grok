@@ -54,7 +54,6 @@ from typing import Any
 
 from config_loader import get_config
 from performance_cue import compile_edge, compile_instruction, cue_hash, normalize_performance_cue
-from util.paths import build_subprocess_path
 from security_policy import (
     SecurityPolicyError,
     atomic_write_bytes,
@@ -63,6 +62,7 @@ from security_policy import (
     minimal_subprocess_env,
     parse_argv_json,
 )
+from util.paths import build_subprocess_path
 
 
 class TTSError(RuntimeError):

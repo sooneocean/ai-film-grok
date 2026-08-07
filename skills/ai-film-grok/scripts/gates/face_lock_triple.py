@@ -18,7 +18,10 @@ def _leg_face_identity(root: Path) -> dict[str, Any]:
     try:
         from gates.production_gates import ProductionGateError, assert_face_identity_passed
     except ImportError:  # pragma: no cover
-        from production_gates import ProductionGateError, assert_face_identity_passed  # type: ignore
+        from production_gates import (  # type: ignore
+            ProductionGateError,
+            assert_face_identity_passed,
+        )
 
     try:
         out = assert_face_identity_passed(root, force=False, env_skip=True)

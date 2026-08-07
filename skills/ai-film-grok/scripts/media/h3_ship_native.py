@@ -9,8 +9,6 @@ Does not replace gate-auto green master.
 
 from __future__ import annotations
 
-from util.errors import FilmError
-
 import os
 import shutil
 import subprocess
@@ -18,17 +16,18 @@ from pathlib import Path
 from typing import Any
 
 from util import read_json, utc_now, write_json
+from util.errors import FilmError
 
 try:
     from final.native_audio import (
-        FILM_NATIVE_STABLE_BASENAME,
         FILM_NATIVE_SPEECH_BROKEN_BASENAME,
+        FILM_NATIVE_STABLE_BASENAME,
         NATIVE_LIGHT_AF_FILTER,
     )
 except ImportError:  # pragma: no cover — flat scripts path
     from native_audio import (  # type: ignore
-        FILM_NATIVE_STABLE_BASENAME,
         FILM_NATIVE_SPEECH_BROKEN_BASENAME,
+        FILM_NATIVE_STABLE_BASENAME,
         NATIVE_LIGHT_AF_FILTER,
     )
 
@@ -285,6 +284,78 @@ def _hard_concat(parts: list[Path], out: Path) -> None:
         raise H3ShipNativeError(f"ffmpeg concat failed: {err}")
 
 
+def _env_flag_on(name: str) -> bool:
+    return os.environ.get(name, "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def apply_native_light_af_filter(
+    src: Path,
+    dst: Path,
+    *,
+    af_filter: str | None = None,
+) -> dict[str, Any]:
+    """Re-encode audio with NATIVE_LIGHT_AF_FILTER; copy video.
+
+    P0 · no agate / dual arnndn — uses the single IRON string only.
+    Returns a small receipt dict (ok / filter / paths / error).
+    """
+    filt = (af_filter or NATIVE_LIGHT_AF_FILTER).strip()
+    if "agate" in filt or "arnndn" in filt:
+        raise H3ShipNativeError(
+            "native light filter must not contain agate/arnndn — use NATIVE_LIGHT_AF_FILTER"
+        )
+    src = Path(src)
+    dst = Path(dst)
+    if not src.is_file() or src.stat().st_size <= 0:
+        raise H3ShipNativeError(f"light-process source missing: {src}")
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    # Write to temp then replace so src==dst is safe
+    tmp = dst.parent / f".{dst.stem}_light_af{dst.suffix}"
+    cmd = [
+        "ffmpeg",
+        "-y",
+        "-i",
+        str(src),
+        "-c:v",
+        "copy",
+        "-af",
+        filt,
+        "-c:a",
+        "aac",
+        "-b:a",
+        "192k",
+        "-movflags",
+        "+faststart",
+        str(tmp),
+    ]
+    r = subprocess.run(cmd, capture_output=True, text=True, timeout=900, check=False)
+    if r.returncode != 0 or not tmp.is_file() or tmp.stat().st_size <= 0:
+        try:
+            tmp.unlink(missing_ok=True)
+        except OSError:
+            pass
+        err = (r.stderr or "")[-800:]
+        raise H3ShipNativeError(f"native light af filter failed: {err}")
+    try:
+        tmp.replace(dst)
+    except OSError:
+        import shutil as _sh
+
+        _sh.copy2(tmp, dst)
+        try:
+            tmp.unlink(missing_ok=True)
+        except OSError:
+            pass
+    return {
+        "ok": True,
+        "filter": filt,
+        "src": str(src),
+        "out": str(dst),
+        "bytes": dst.stat().st_size if dst.is_file() else 0,
+        "forbid": ["agate", "arnndn", "dual_arnndn"],
+    }
+
+
 def check_duration_vs_target(
     root: Path,
     spec: dict[str, Any],
@@ -329,11 +400,16 @@ def ship_native(
     sample_audio: int = 3,
     caption: str | None = None,
     music_mood: str | None = None,
+    light_process: bool | None = None,
 ) -> dict[str, Any]:
     """Build H3-native plate from approved (or candidate) clips.
 
     S1.1: optional ``caption`` / ``music_mood`` only attach stage-2 final
     command in the receipt — this path never silently claims hardburn/BGM.
+
+    ``light_process``: after concat, re-encode audio with
+    ``NATIVE_LIGHT_AF_FILTER`` (video copy). Default off for speed; enable via
+    arg or env ``AIFILM_H3_SHIP_LIGHT_PROCESS=1``. Never agate/dual-arnndn.
     """
     root_p = Path(root).expanduser().resolve()
     spec = read_json(root_p / "film-spec.json") or {}
@@ -356,6 +432,10 @@ def ship_native(
     out = Path(out_path).expanduser().resolve() if out_path else (
         root_p / "out" / FILM_NATIVE_STABLE_BASENAME
     )
+    if light_process is None:
+        light_process = _env_flag_on("AIFILM_H3_SHIP_LIGHT_PROCESS")
+    else:
+        light_process = bool(light_process)
     wants_stage2 = bool(
         (caption and str(caption).strip().lower() not in {"", "none", "off", "0"})
         or (music_mood and str(music_mood).strip().lower() not in {"", "none", "off", "0"})
@@ -418,13 +498,15 @@ def ship_native(
         # H3 原声轻处理 IRON — concat keeps aac; optional re-encode uses this filter only
         "native_light_af_filter": NATIVE_LIGHT_AF_FILTER,
         "native_light_policy": {
-            "default": "light",
+            "default": "copy_then_optional_light",
+            "light_process_requested": bool(light_process),
+            "light_process_env": "AIFILM_H3_SHIP_LIGHT_PROCESS=1",
             "forbid_default": ["agate", "arnndn", "dual_arnndn"],
             "stable_basename": FILM_NATIVE_STABLE_BASENAME,
             "broken_basename": FILM_NATIVE_SPEECH_BROKEN_BASENAME,
             "note": (
-                "concat path uses -c copy (no reprocess). Optional post-concat light "
-                "cleanup must use native_light_af_filter; never agate/dual-arnndn by default."
+                "concat uses -c copy. When light_process is on, post-concat audio "
+                "re-encode uses native_light_af_filter only (no agate/dual-arnndn)."
             ),
         },
         "out": str(out),
@@ -460,7 +542,11 @@ def ship_native(
     if dry_run:
         report["ok"] = True
         report["dry_run"] = True
-        report["message"] = f"dry: would concat {len(parts)} clips → {out}"
+        report["message"] = (
+            f"dry: would concat {len(parts)} clips → {out}"
+            + (" + light af" if light_process else "")
+        )
+        report["native_light_policy"]["would_apply_light_af"] = bool(light_process)
         write_json(root_p / "receipts" / "h3-ship-native.json", report)
         return report
 
@@ -487,6 +573,22 @@ def ship_native(
     _hard_concat(parts, out)
     if not out.is_file() or out.stat().st_size <= 0:
         raise H3ShipNativeError(f"output missing after concat: {out}")
+
+    if light_process:
+        try:
+            light_rep = apply_native_light_af_filter(out, out)
+            report["native_light_applied"] = light_rep
+            report["notes"].append(
+                f"post-concat light af applied: {light_rep.get('filter')}"
+            )
+        except H3ShipNativeError as exc:
+            report["native_light_applied"] = {"ok": False, "error": str(exc)[:300]}
+            report.setdefault("honest_limits", []).append(
+                f"light_af_failed:{str(exc)[:120]}"
+            )
+            report["notes"].append(
+                "light af failed — plate kept as concat copy (PARTIAL honesty)"
+            )
 
     # Legacy closeout path alias (film_native_h3) — same plate, not a second master
     try:

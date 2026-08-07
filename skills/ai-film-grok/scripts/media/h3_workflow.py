@@ -7,8 +7,6 @@ plan → generate on 5090 → optional silent plate → queue complete → regis
 
 from __future__ import annotations
 
-from util.errors import FilmError
-
 import os
 import subprocess
 from pathlib import Path
@@ -17,7 +15,8 @@ from typing import Any
 from h3_mode import effect_tips as _h3_effect_tips
 from h3_mode import resolve_h3_mode
 from production_router import build_shot_intent
-from util import read_json, sha256_file, write_json, utc_now
+from util import read_json, sha256_file, utc_now, write_json
+from util.errors import FilmError
 from util.film_spec import _iter_shots, _load_spec, _root
 
 

@@ -4,7 +4,8 @@ Keeps `import auto_cut` working after package move.
 """
 from __future__ import annotations
 
-from post import auto_cut as _impl
 import sys as _sys
+
+from post import auto_cut as _impl
 
 _sys.modules[__name__] = _impl

@@ -20,6 +20,9 @@ ignore = [
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["B017", "S101"]
 "scripts/adapters/*.py" = ["B008"]
+"scripts/plan/film_spec.py" = ["F405"]
+"scripts/plan/film_spec_lints.py" = ["F405"]
+"scripts/plan/film_spec_validate.py" = ["F405"]
 
 [tool.ruff.format]
 quote-style = "double"

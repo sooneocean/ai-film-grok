@@ -6,8 +6,6 @@ timeline/audio/subtitle stages remain focused on media decisions.
 
 from __future__ import annotations
 
-from util.errors import FilmError
-
 import shutil
 from pathlib import Path
 
@@ -17,6 +15,7 @@ from security_policy import (
     safe_output_path,
     safe_workspace_directory,
 )
+from util.errors import FilmError
 
 
 class RenderWorkspaceError(FilmError):

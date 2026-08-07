@@ -7,6 +7,7 @@ from typing import Any
 
 from core.film_io import director_notes_path, film_dirs, load_director_notes
 from core.paths import record_file_matches
+from media.media_qa import approved_clip_record
 from plan.director_review import (
     SCORECARD_DIMENSIONS,
     open_reshoot_items,
@@ -14,7 +15,6 @@ from plan.director_review import (
     scorecard_is_complete_and_passing,
 )
 from plan.film_spec_validate import FilmSpecError, validate_film_spec
-from media.media_qa import approved_clip_record
 from util import require_json as read_json
 
 

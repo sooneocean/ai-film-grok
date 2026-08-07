@@ -6,12 +6,11 @@ Does **not** auto-approve review-final (human scorecard required).
 
 from __future__ import annotations
 
-from util.errors import FilmError
-
 from pathlib import Path
 from typing import Any
 
 from util import read_json, utc_now, write_json
+from util.errors import FilmError
 
 RECEIPT_REL = Path("receipts/closeout.json")
 

@@ -325,7 +325,7 @@ def add_h3_parsers(sub: argparse._SubParsersAction[argparse.ArgumentParser]) -> 
         "--out",
         type=Path,
         default=None,
-        help="Output mp4 (default out/film_native_h3.mp4)",
+        help="Output mp4 (default out/film_native_stable.mp4)",
     )
     ship.add_argument(
         "--allow-candidate",
@@ -336,6 +336,14 @@ def add_h3_parsers(sub: argparse._SubParsersAction[argparse.ArgumentParser]) -> 
         "--dry-run",
         action="store_true",
         help="Plan + duration honesty only; no ffmpeg",
+    )
+    ship.add_argument(
+        "--light-process",
+        action="store_true",
+        help=(
+            "After concat, re-encode audio with NATIVE_LIGHT_AF_FILTER "
+            "(no agate/arnndn). Env: AIFILM_H3_SHIP_LIGHT_PROCESS=1"
+        ),
     )
     ship.add_argument(
         "--caption",
@@ -516,6 +524,9 @@ def run_h3(args: argparse.Namespace) -> dict[str, Any]:
                     sample_audio=int(getattr(args, "sample_audio", 3) or 3),
                     caption=getattr(args, "caption", None),
                     music_mood=getattr(args, "music_mood", None),
+                    light_process=(
+                        True if bool(getattr(args, "light_process", False)) else None
+                    ),
                 )
             except H3ShipNativeError as exc:
                 raise H3WorkflowError(str(exc)) from exc

@@ -24,8 +24,8 @@ import json
 from pathlib import Path
 from typing import Any
 
-from util import sha256_file as _sha256_file, soft_json
-from util import utc_now
+from util import sha256_file as _sha256_file
+from util import soft_json, utc_now
 
 RECEIPT_NAME = "face-identity.json"
 SCHEMA_VERSION = 1

@@ -4,7 +4,8 @@ Keeps `import creative_workshop` working after package move.
 """
 from __future__ import annotations
 
-from plan import creative_workshop as _impl
 import sys as _sys
+
+from plan import creative_workshop as _impl
 
 _sys.modules[__name__] = _impl
