@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.40.65] - 2026-08-07
+
+### Fixed (CTO A1 · measured VO map silent empty)
+- **production_gates `_measured_map_for_root`:** when `receipts/tts-rehearsal.json` exists, corrupt/unreadable parse or module ImportError → **ProductionGateError** (no silent `{}` → est_vo hide measured loop-risk).
+- Missing receipt still returns `{}` (est_vo path).
+- **Tests:** `LoopRiskGateTests` corrupt / missing / valid receipt.
+
 ## [2.40.64] - 2026-08-07
 
 ### Added (localhost review console · P6–P11)

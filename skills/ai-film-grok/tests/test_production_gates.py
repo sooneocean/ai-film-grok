@@ -431,6 +431,46 @@ class LoopRiskGateTests(unittest.TestCase):
                     env_skip=False,
                 )
 
+    def test_measured_map_corrupt_receipt_fail_closed(self) -> None:
+        """A1 · receipt present but unreadable must not silent-empty → est_vo."""
+        from production_gates import ProductionGateError, _measured_map_for_root
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "receipts").mkdir()
+            (root / "receipts" / "tts-rehearsal.json").write_text(
+                "{not-json", encoding="utf-8"
+            )
+            with self.assertRaises(ProductionGateError) as ctx:
+                _measured_map_for_root(root)
+            self.assertIn("unreadable", str(ctx.exception).lower())
+
+    def test_measured_map_missing_receipt_empty_ok(self) -> None:
+        from production_gates import _measured_map_for_root
+
+        with tempfile.TemporaryDirectory() as tmp:
+            self.assertEqual(_measured_map_for_root(Path(tmp)), {})
+
+    def test_measured_map_valid_receipt(self) -> None:
+        from production_gates import _measured_map_for_root
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "receipts").mkdir()
+            (root / "receipts" / "tts-rehearsal.json").write_text(
+                json.dumps(
+                    {
+                        "ok": True,
+                        "shots": [
+                            {"shot_id": "s1", "measured_duration_sec": 4.2},
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            m = _measured_map_for_root(root)
+            self.assertEqual(m.get("s1"), 4.2)
+
 
 class AntiBoringGateTests(unittest.TestCase):
     def _spec(self, shots: list[dict], **extra: Any) -> dict:

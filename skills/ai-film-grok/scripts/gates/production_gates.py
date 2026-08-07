@@ -706,14 +706,45 @@ def _flatten_shots(spec: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 def _measured_map_for_root(root: Path | None) -> dict[str, float]:
+    """Load measured VO map for loop-risk.
+
+    A1 · if ``receipts/tts-rehearsal.json`` exists, probe/import/parse failures
+    are **fail-closed** (ProductionGateError). Never silently return ``{}`` and
+    fall back to est_vo while a broken receipt is on disk.
+    """
     if root is None:
         return {}
+    base = Path(root).expanduser().resolve()
+    receipt = base / "receipts" / "tts-rehearsal.json"
     try:
         from tts_rehearsal import measured_vo_by_shot
-
-        return measured_vo_by_shot(Path(root))
-    except Exception:
+    except ImportError as exc:
+        if receipt.is_file():
+            raise ProductionGateError(
+                "loop-risk measured VO: tts-rehearsal.json present but "
+                f"tts_rehearsal module unavailable: {exc}"
+            ) from exc
         return {}
+
+    if receipt.is_file():
+        try:
+            raw = json.loads(receipt.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            raise ProductionGateError(
+                f"loop-risk measured VO: tts-rehearsal receipt unreadable: {exc}"
+            ) from exc
+        if not isinstance(raw, dict):
+            raise ProductionGateError(
+                "loop-risk measured VO: tts-rehearsal receipt must be a JSON object"
+            )
+
+    try:
+        out = measured_vo_by_shot(base)
+    except Exception as exc:
+        raise ProductionGateError(
+            f"loop-risk measured VO: probe failed: {exc}"
+        ) from exc
+    return out if isinstance(out, dict) else {}
 
 
 def _shot_would_stream_loop(

@@ -1438,7 +1438,7 @@
     },
     {
       "path": "scripts/gates/production_gates.py",
-      "sha256": "8eec92fc78f10fddbfb17fcc22b26faaab935ef65ce59019e2ac9efa9af688d8"
+      "sha256": "0b5119b93465c082633096943013da81aada70c6ac99331d4953ad0437653a57"
     },
     {
       "path": "scripts/gates/quality_evidence.py",
