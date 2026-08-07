@@ -1042,7 +1042,7 @@
     },
     {
       "path": "scripts/core/skip_audit.py",
-      "sha256": "0ff566f4c47287babbd5670dc668f8011d274b6b52c15ced53072606ea4cc1f2"
+      "sha256": "649d75f64278d1823c71260fa0adaa4484926c81aecf1c2946934342da78f9f1"
     },
     {
       "path": "scripts/craft_spine.py",
@@ -1750,7 +1750,7 @@
     },
     {
       "path": "scripts/media/h3_workflow.py",
-      "sha256": "546cfe46dd8eec34d9ffd1694d3db91d5930f2a3fc7d5aad1987ff2965f19fde"
+      "sha256": "34a8bf7fabc4ed0fd9cec73c3a91ef119c6d200c3ca07601677d21b9e2846a3b"
     },
     {
       "path": "scripts/media/i2v_motion_gate.py",
@@ -1998,7 +1998,7 @@
     },
     {
       "path": "scripts/narrative/dramatic_meaning.py",
-      "sha256": "fdf149662a752e0998cc68efdeb550dca014457ae8d04c395d3216c8934893c2"
+      "sha256": "4372a86605a427fb276eaaec45cbb4cee1dbd698f7505b4c614c3a26ce9272e3"
     },
     {
       "path": "scripts/narrative/edit_edl_merge.py",

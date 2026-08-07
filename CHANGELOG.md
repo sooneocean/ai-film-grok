@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.40.99] - 2026-08-07
+
+### Added / Changed (error internalization · E5 + E6.3 + F5)
+- **E5 H3 mode override receipt:** `record_h3_mode_override` → `receipts/h3-mode-override.json` when CLI `--mode` ≠ plan resolve (no silent full-film i2v cover).
+- **E6.3 SKIP iron set expand:** identity/partner/still/bulk/crop/pilot-go/caption-pixel/… in `IRON_SKIP_FLAGS` (hotpaths already on `skip_flag`; fallbacks remain).
+- **F5 memory slim:** active cards **≤40** (archived 21 L4/session/canary cards); README refresh; hard-defaults/AGENTS archive pointers; soft-cap pytest.
+- **Tests:** `test_h3_mode_override_e5.py` · F5 cap in `test_error_internalization_e1_e4`.
+
 ## [2.40.98] - 2026-08-07
 
 ### Added (error internalization · E1/E2/E4 + F4 flywheel)

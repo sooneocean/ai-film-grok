@@ -177,26 +177,33 @@ class HardDefaultsMemoryLinks(unittest.TestCase):
     def test_memory_links_exist(self) -> None:
         import re
 
-        hd = (
-            Path(__file__).resolve().parents[1]
-            / "references"
-            / "hard-defaults.md"
-        )
+        skill = Path(__file__).resolve().parents[1]
+        hd = skill / "references" / "hard-defaults.md"
         text = hd.read_text(encoding="utf-8")
-        refs_dir = hd.parent
+        mem = skill / "memory"
         # markdown links to ../memory/...
         links = re.findall(r"\((?:\.\./)+(memory/[^)#\s]+)\)", text)
         missing = []
         for rel in sorted(set(links)):
-            # strip any query
             rel = rel.split(" ")[0]
-            target = (refs_dir / ".." / rel).resolve()
-            # also try relative to skill root
-            if not target.is_file():
-                target = (refs_dir.parent / rel).resolve()
-            if not target.is_file():
+            name = Path(rel).name
+            candidates = [
+                skill / rel,
+                mem / name,
+                mem / "archive" / name,
+            ]
+            if not any(c.is_file() for c in candidates):
                 missing.append(rel)
         self.assertEqual(missing, [], f"dead memory links in hard-defaults: {missing}")
+
+    def test_active_memory_soft_cap(self) -> None:
+        mem = Path(__file__).resolve().parents[1] / "memory"
+        cards = [p for p in mem.glob("*.md") if p.name != "README.md"]
+        self.assertLessEqual(
+            len(cards),
+            40,
+            f"active memory cards {len(cards)} > 40 (F5); archive L4/session",
+        )
 
 
 if __name__ == "__main__":

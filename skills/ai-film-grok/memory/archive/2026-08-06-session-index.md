@@ -1,3 +1,4 @@
+| **禁半帧换脸/断FLF/狠gate** | [no-midframe-flf-audio](2026-08-07-no-midframe-composite-flf-audio-iron.md) | 崩片回滚；stable 轻音轨 |
 # Session index · 2026-08-06（slim · N0）
 
 | 主题 | 短卡 | 一句话 |
@@ -30,3 +31,6 @@
 ## 本轮 L5 归档
 
 `archive/`：shortform-s5-open-ops · effect-board-film-ops · h3-prompt-system-family-apply · ad-process-optimization
+
+### 2026-08-07 崩片回滚
+- 毒 composite 隔离；`film_native_stable.mp4`

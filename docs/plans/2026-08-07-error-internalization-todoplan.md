@@ -4,8 +4,8 @@
 
 | 项 | 值 |
 |----|-----|
-| Status | **PARTIAL SHIP 2.40.98** · F4+E1+E2+E3文+E4 机读 DONE · E5/E6.3/F5 residual |
-| 探针版本 | `plugin.json` **2.40.98** |
+| Status | **SHIP 2.40.99** · E1–E5 + F4/F5 + E6.3 iron set · 真 CV DEFERRED |
+| 探针版本 | `plugin.json` **2.40.99** |
 | 挂 CTO | [CTO 主执行板](docs/plans/2026-08-06-cto-optimization-todoplan.md)（不新开第三综合板） |
 | 既有子板（**勿重开**） | iron I0–I5 · honesty R0–R5 · shot-lane 0–6 |
 | 治理 | [MEMORY_GOVERNANCE](docs/MEMORY_GOVERNANCE.md) · [nutrient-matrix](docs/plans/2026-08-06-nutrient-matrix.md) |
