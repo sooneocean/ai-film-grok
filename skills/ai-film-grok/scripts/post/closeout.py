@@ -25,6 +25,29 @@ def _export_name(root: Path) -> str:
         return "GrokFilm"
 
 
+def _final_next_cmd(root: Path) -> str:
+    """Prefer edit-director final_cmd when plan exists; else classic final CLI."""
+    default = (
+        f'aifilm final --root "{root}" --lipsync off --music-mood rnb --tts-backend edge'
+    )
+    try:
+        from edit_director import plan_path as ed_plan_path
+        from edit_director import status as edit_director_status
+
+        if not ed_plan_path(root).is_file():
+            return default
+        st = edit_director_status(root)
+        if st.get("final_cmd"):
+            return str(st["final_cmd"])
+        if not st.get("apply_present"):
+            return f'aifilm edit-director apply --root "{root}"'
+        if st.get("next_cmd") and "edit-director" in str(st.get("next_cmd")):
+            return str(st["next_cmd"])
+    except Exception:
+        pass
+    return default
+
+
 class CloseoutError(FilmError):
     """Hard stop with a single next action for agents."""
 
@@ -195,7 +218,7 @@ def closeout_status(root: Path | str) -> dict[str, Any]:
             "next_cmd": (
                 None
                 if final_rec
-                else f'aifilm final --root "{base}" --lipsync off --music-mood rnb --tts-backend edge'
+                else _final_next_cmd(base)
             ),
         },
         {

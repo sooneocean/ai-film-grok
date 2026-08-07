@@ -34,6 +34,7 @@
 | E2.5 | dispatch / next_actions / workflow_spine 钩 | ✅ |
 | E3 | join_policy · snapshot/activate · audit | ✅ |
 | E4 | stages 卡 · memory · tests · bump | ✅ |
+| **R2** | ship-prep 自动 draft · post-doctor 路由对账 · final 读 plan · closeout next_cmd | ✅ |
 
 ## CLI
 

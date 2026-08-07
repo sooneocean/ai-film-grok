@@ -212,6 +212,30 @@ def cmd_final(args: argparse.Namespace) -> int:
         except Exception:  # noqa: BLE001
             pass
     post_engine = str(getattr(args, "post_engine", "hyperframes") or "hyperframes").strip().lower()
+    # R2 · edit-director plan supplies defaults when CLI did not pin route
+    try:
+        from edit_director import resolve_final_defaults
+
+        ed_defaults = resolve_final_defaults(
+            root,
+            post_engine=post_engine,
+            caption_path=getattr(args, "caption_path", None),
+            argv=list(sys.argv),
+        )
+        if ed_defaults.get("source") == "edit-director-plan":
+            post_engine = str(ed_defaults.get("post_engine") or post_engine)
+            if not getattr(args, "caption_path", None) and ed_defaults.get("caption_path"):
+                args.caption_path = ed_defaults["caption_path"]
+            if ed_defaults.get("caption_path") == "ship_hardburn" and not getattr(
+                args, "ship_hardburn", False
+            ):
+                # keep post_route resolver honest when plan is ship path
+                if str(ed_defaults.get("post_engine")) == "ffmpeg":
+                    pass
+            for note in ed_defaults.get("notes") or []:
+                log(f"edit-director: {note}")
+    except Exception as exc:  # noqa: BLE001 — final still works without desk
+        log(f"edit-director defaults skipped: {exc}"[:160])
     if post_engine not in {"ffmpeg", "hyperframes", "remotion"}:
         raise FilmError("--post-engine must be ffmpeg|hyperframes|remotion")
     post_plan: dict[str, Any] | None = None

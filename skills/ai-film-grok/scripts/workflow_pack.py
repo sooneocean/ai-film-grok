@@ -2011,6 +2011,46 @@ def ship_prep(
             }
         )
 
+    # R2 · edit-director draft before final thrash (advisory; always when missing)
+    try:
+        from edit_director import draft_and_save, plan_path as ed_plan_path
+
+        ed_path = ed_plan_path(root)
+        has_ed = ed_path.is_file()
+        ed_detail = "edit-director plan present"
+        if not has_ed and write:
+            try:
+                draft_and_save(root, force=False)
+                has_ed = ed_path.is_file()
+                ed_detail = "drafted edit-director plan"
+            except Exception as exc:
+                ed_detail = f"draft fail:{str(exc)[:100]}"
+        elif not has_ed:
+            ed_detail = "missing edit-director plan"
+        steps.append(
+            {
+                "id": "edit_director",
+                "ok": True,
+                "advisory": True,
+                "detail": ed_detail[:200],
+                "next_cmd": (
+                    None
+                    if has_ed
+                    else f'aifilm edit-director draft --root "{root}"'
+                ),
+            }
+        )
+    except Exception as exc:  # noqa: BLE001
+        steps.append(
+            {
+                "id": "edit_director",
+                "ok": True,
+                "advisory": True,
+                "detail": f"skip:{str(exc)[:120]}",
+                "next_cmd": None,
+            }
+        )
+
     # Fill-Idle / multi-take PK advisory (never hard-fail; never auto-promote)
     pk_env_skip = bool(skip_pk)
     if not pk_env_skip:

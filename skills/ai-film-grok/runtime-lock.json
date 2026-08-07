@@ -122,7 +122,7 @@
     },
     {
       "path": "scripts/aifilm_grok.py",
-      "sha256": "4de507d43224c5ae3e944464e8749ffaa152f77f5ca586a885fddfb0a51253d9"
+      "sha256": "891a8e6270a7e5dad167c56ba8c6dc64644cac28ad4a3fe4c8911f0f15c39e34"
     },
     {
       "path": "scripts/ambience_candidates.py",
@@ -658,7 +658,7 @@
     },
     {
       "path": "scripts/cli/cli_misc_ops.py",
-      "sha256": "74c91ccf9de5a617e9f21df90c6b5fd702a9d22d2ff4ee6b77e8ac7a1e89cb7e"
+      "sha256": "390dc9388f4d006934a10fb4fb3d57638a54fba112de042e09e7ce6cffed0585"
     },
     {
       "path": "scripts/cli/cli_motion.py",
@@ -710,7 +710,7 @@
     },
     {
       "path": "scripts/cli/cli_post.py",
-      "sha256": "6e6696c2f23315ced4a0bb8332e783a969f21cf2f786873fbb40a2914d871940"
+      "sha256": "12310af6a17dc89a7003ed1b33182aa0111fc1d763e26519aa8369e9fcffd445"
     },
     {
       "path": "scripts/cli/cli_quality.py",
@@ -718,7 +718,7 @@
     },
     {
       "path": "scripts/cli/cli_quality_ops.py",
-      "sha256": "5c9eb5be3e0a0c8288f00679d96b7ca801a89ba69e70ff1f98bb7f4aa14866ee"
+      "sha256": "fa95917d9e542e343c5fa9e258ec7efa887cf6f378a12c989afdb5e973d82f05"
     },
     {
       "path": "scripts/cli/cli_quality_reporting.py",
@@ -2738,7 +2738,7 @@
     },
     {
       "path": "scripts/post/closeout.py",
-      "sha256": "0810d1bce6ac4137312c2a166172deb56d989441bc62eaf73e7ec61ad08f6835"
+      "sha256": "791228e48d8e597881c025dd20e5703a8a01150c471407089a6a2bff2b4f4cf0"
     },
     {
       "path": "scripts/post/color_grade.py",
@@ -2762,7 +2762,7 @@
     },
     {
       "path": "scripts/post/edit_director.py",
-      "sha256": "c7e628d05d0857662bd8f6aa34352c0a03db601a7e702c2f7c68dfbc3ca0c15a"
+      "sha256": "4bbe4f826b14803ac84b81ac601c283a7c6d7ca62fb663d19f460b4914ebab8c"
     },
     {
       "path": "scripts/post/export_composition.py",
@@ -2826,7 +2826,7 @@
     },
     {
       "path": "scripts/post/post_doctor.py",
-      "sha256": "0153f42aaeaab3466ea2120eab6b9edadca6440ab73884f98d2907fd72842a6a"
+      "sha256": "5df68bf8bb9a87980c4921f3c1ea580129a40f1896ffa12e3dc43361a420791b"
     },
     {
       "path": "scripts/post/post_plan.py",
@@ -2862,7 +2862,7 @@
     },
     {
       "path": "scripts/post/review_ui.py",
-      "sha256": "1105deb342f81f8c76429f93aa34bfbc1dccb01da60917a8cdc57fec26c2024e"
+      "sha256": "cbe60864361e01a67ab4b7ba848eeea0731ea188d6bbd1bf838975771aa26388"
     },
     {
       "path": "scripts/post/show_package.py",
@@ -3489,6 +3489,14 @@
       "sha256": "61fc2019fc32e13e3dd79867049994eefc4fdd5b886b7e39660e87dff1b34abe"
     },
     {
+      "path": "scripts/web/director_center.py",
+      "sha256": "1d05f2be06960a7ef8f30ed16b182e140403a87dfdc480848b1b4b91c71b6f19"
+    },
+    {
+      "path": "scripts/web/director_live_ext.py",
+      "sha256": "ebb9d3771536c51a59dbb685eb4e4230417d40ebdf06f8caec7c4fdd5eeb0b2f"
+    },
+    {
       "path": "scripts/web/gate_panel.py",
       "sha256": "db8fa0ce4c8ca975a48b15791b40f5ba7d8e814116c0d0decf3942720198f477"
     },
@@ -3502,19 +3510,23 @@
     },
     {
       "path": "scripts/web/projection.py",
-      "sha256": "93e56b9f161a362dd73ec5edb609b4f9e402ee1848e92eec51e5af9e39b5aead"
+      "sha256": "ef56e306ddf68e8be975080717838a2e4b8f6bd7d4cb8df262fbbad81952b90c"
     },
     {
       "path": "scripts/web/routes.py",
-      "sha256": "e27f2f015da27e2865c237ab1d3eb9b8d6fb8ee37765d0a723617376ba9f78ff"
+      "sha256": "79b1c6a7a82f82399614f0e8b1e8d143a36b469bfd1bce1e6f05a3fca85c803c"
     },
     {
       "path": "scripts/web/smoke_console.py",
-      "sha256": "20f78a47e0115c3b9c3c1681e8f3f01ac867d58be6ba5e81db90c3318b2e6f95"
+      "sha256": "d9c59e5b887b43548e212ea7e239c17e22488ff6ef95a687d9c79f0b52b494a6"
+    },
+    {
+      "path": "scripts/web/takes_api.py",
+      "sha256": "1ce3d401cf88affbdc76e3ef7c81f1b3a4e4ed81ab35abd9a3e25c4b010822a4"
     },
     {
       "path": "scripts/web/web_api.py",
-      "sha256": "4a2740787d904c27a23d39446b4b6dc5bb2af9740b984ba485aac0a98479a26f"
+      "sha256": "8aa314b8ba2f778c3f970674e50521174932612a90f5fe1e278e0aff31e0e0f1"
     },
     {
       "path": "scripts/web/web_core.py",
@@ -3534,7 +3546,7 @@
     },
     {
       "path": "scripts/workflow_pack.py",
-      "sha256": "822981816506fbf2b58804bea596758e7f989aa8f704d7ea016b63b56154661d"
+      "sha256": "8bbfbabb1be9dfe86e4cd0fd790099f3e82cda722055d5bc0ec0a922bbb8d79d"
     },
     {
       "path": "scripts/workflow_spine.py",

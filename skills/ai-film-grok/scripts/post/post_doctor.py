@@ -118,6 +118,52 @@ def run_post_doctor(root: Path | str, *, write: bool = True) -> dict[str, Any]:
     else:
         soft.append(_issue("soft", "SRT_MISSING", "no final.srt yet"))
 
+    # R2 · edit-director desk health (soft unless route fights plan)
+    ed_plan = read_json(base / "post" / "edit-director-plan.json") or {}
+    if ed_plan.get("schema") == "aifilm-edit-director-plan-v1" or ed_plan.get(
+        "kind"
+    ) == "edit-director-plan":
+        er = ed_plan.get("engine_route") if isinstance(ed_plan.get("engine_route"), dict) else {}
+        soft.append(
+            _issue(
+                "soft",
+                "EDIT_DIRECTOR_PLAN",
+                (
+                    f"cut_state={ed_plan.get('cut_state')} "
+                    f"design={er.get('design')} caption={er.get('caption_path')}"
+                ),
+            )
+        )
+        plan_cp = str(er.get("caption_path") or "")
+        route_cp = str(caption_path or "")
+        if plan_cp and route_cp and plan_cp != route_cp:
+            hard.append(
+                _issue(
+                    "hard",
+                    "EDIT_DIRECTOR_ROUTE_MISMATCH",
+                    f"edit-director caption_path={plan_cp} but post-route={route_cp}",
+                    fix=f'aifilm edit-director apply --root "{base}"',
+                )
+            )
+        if ed_plan.get("errors"):
+            soft.append(
+                _issue(
+                    "soft",
+                    "EDIT_DIRECTOR_ERRORS",
+                    f"plan has {len(ed_plan.get('errors') or [])} readiness errors",
+                    fix=f'aifilm edit-director status --root "{base}"',
+                )
+            )
+    else:
+        soft.append(
+            _issue(
+                "soft",
+                "EDIT_DIRECTOR_UNSET",
+                "no post/edit-director-plan.json",
+                fix=f'aifilm edit-director draft --root "{base}"',
+            )
+        )
+
     ft = read_json(base / "receipts" / "five-track-plan.json") or {}
     if ft.get("kind") == "five-track-plan":
         if ft.get("ok") is False:

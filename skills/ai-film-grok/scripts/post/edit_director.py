@@ -623,6 +623,58 @@ def apply_plan(root: Path | str, *, write_route: bool = True) -> dict[str, Any]:
     return receipt
 
 
+def resolve_final_defaults(
+    root: Path | str,
+    *,
+    post_engine: str | None = None,
+    caption_path: str | None = None,
+    argv: list[str] | None = None,
+) -> dict[str, Any]:
+    """Prefer edit-director plan for final routing when CLI did not set flags.
+
+    Returns resolved post_engine / caption_path / plate flags + provenance.
+    """
+    base = Path(root).expanduser().resolve()
+    args = list(argv if argv is not None else sys.argv)
+    user_pe = any(a == "--post-engine" or a.startswith("--post-engine=") for a in args)
+    user_cp = any(
+        a == "--caption-path"
+        or a.startswith("--caption-path=")
+        or a == "--ship-hardburn"
+        for a in args
+    )
+    pe = str(post_engine or "hyperframes").strip().lower()
+    cp = str(caption_path or "").strip().lower() or None
+    source = "cli" if (user_pe or user_cp) else "default"
+    plan = load_plan(base, required=False)
+    notes: list[str] = []
+    if plan and not user_pe:
+        er = plan.get("engine_route") if isinstance(plan.get("engine_route"), dict) else {}
+        plan_pe = str(er.get("post_engine") or "").strip().lower()
+        if plan_pe in {"ffmpeg", "hyperframes", "remotion"}:
+            pe = plan_pe
+            source = "edit-director-plan"
+            notes.append(f"post_engine from edit-director ({pe})")
+    if plan and not user_cp:
+        er = plan.get("engine_route") if isinstance(plan.get("engine_route"), dict) else {}
+        plan_cp = str(er.get("caption_path") or "").strip().lower()
+        if plan_cp in CAPTION_PATHS:
+            cp = plan_cp
+            if source != "edit-director-plan":
+                source = "edit-director-plan"
+            notes.append(f"caption_path from edit-director ({cp})")
+    if not cp:
+        cp = "master_hf" if pe in {"hyperframes", "remotion"} else "ship_hardburn"
+    return {
+        "post_engine": pe,
+        "caption_path": cp,
+        "source": source,
+        "notes": notes,
+        "plan_present": plan is not None,
+        "cut_state": (plan or {}).get("cut_state"),
+    }
+
+
 def build_final_argv(root: Path, plan: dict[str, Any]) -> list[str]:
     """Argv for aifilm_grok final — reuses existing final path (no re-impl)."""
     er = plan.get("engine_route") or {}

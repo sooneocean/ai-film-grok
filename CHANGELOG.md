@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.41.29] - 2026-08-07
+
+### Added (edit-director · Round 2 production loop)
+- **ship-prep**: auto-draft `post/edit-director-plan.json` when missing (advisory step).
+- **final**: `resolve_final_defaults` — plan supplies `--post-engine` / caption when CLI does not pin.
+- **post-doctor**: EDIT_DIRECTOR_* health; hard fail on plan vs post-route caption mismatch.
+- **closeout**: plate next_cmd prefers plan `final_cmd` when plan exists.
+- **Tests:** resolve defaults · post-doctor mismatch · closeout cmd.
+
 ## [2.41.28] - 2026-08-07
 
 ### Added (director-center · Phase A–C)
@@ -10,7 +19,7 @@
 - **dispatch** `console_url` / `console_hint` 连动。
 - **Tests:** `test_director_center.py`。
 
-[2.41.27] - 2026-08-07
+## [2.41.27] - 2026-08-07
 
 ### Added (edit director · full desk)
 - **`aifilm edit-director`**: draft / normalize / status / set / apply / run / audit / snapshot / cuts / activate.

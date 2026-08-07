@@ -10,9 +10,11 @@
 
 ## 清单
 
-- [ ] `edit-director draft`
+- [ ] `edit-director draft`（**ship-prep 也会自动 draft**）
 - [ ] `apply` 锁 caption 路径
 - [ ] `run` 看 stages；确认后 `--execute`
+- [ ] `final` 无 CLI 时读 plan 路由（R2）
+- [ ] `post-doctor` 对账 plan vs post-route
 - [ ] `gate-auto` + `review-final`（final≠complete）
 - [ ] 可选 `snapshot` / `activate` 多版本 cut
 
@@ -21,3 +23,4 @@
 - 机读：`post/edit_director.py` · hard-defaults「剪辑总监」
 - stages/post 快卡 · [todoplan](../../../docs/plans/2026-08-07-edit-director-todoplan.md)
 - 姊妹桌：`music-director`（mute 不剪画面）
+- R2：`workflow_pack.ship_prep` · `post_doctor` · `cmd_final` · `closeout._final_next_cmd`

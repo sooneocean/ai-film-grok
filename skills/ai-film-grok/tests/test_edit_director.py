@@ -277,6 +277,101 @@ def test_snapshot_activate_and_audit(tmp_path: Path) -> None:
     assert (tmp_path / "receipts" / "edit-director-audit.json").is_file()
 
 
+def test_resolve_final_defaults_from_plan(tmp_path: Path) -> None:
+    from edit_director import resolve_final_defaults
+
+    (tmp_path / "film-spec.json").write_text(
+        json.dumps(_mini_spec("sh01")), encoding="utf-8"
+    )
+    (tmp_path / "manifest.json").write_text("{}", encoding="utf-8")
+    draft_and_save(tmp_path, force=True, design="remotion")
+    # No CLI flags → plan wins
+    resolved = resolve_final_defaults(
+        tmp_path,
+        post_engine="hyperframes",
+        caption_path=None,
+        argv=["aifilm", "final", "--root", str(tmp_path)],
+    )
+    assert resolved["post_engine"] == "remotion"
+    assert resolved["caption_path"] == "master_hf"
+    assert resolved["source"] == "edit-director-plan"
+    # Explicit CLI wins
+    resolved2 = resolve_final_defaults(
+        tmp_path,
+        post_engine="ffmpeg",
+        caption_path="ship_hardburn",
+        argv=[
+            "aifilm",
+            "final",
+            "--root",
+            str(tmp_path),
+            "--post-engine",
+            "ffmpeg",
+            "--caption-path",
+            "ship_hardburn",
+        ],
+    )
+    assert resolved2["post_engine"] == "ffmpeg"
+    assert resolved2["caption_path"] == "ship_hardburn"
+    assert resolved2["source"] == "cli"
+
+
+def test_post_doctor_edit_director_section(tmp_path: Path) -> None:
+    from post_doctor import run_post_doctor
+
+    (tmp_path / "film-spec.json").write_text("{}", encoding="utf-8")
+    (tmp_path / "manifest.json").write_text("{}", encoding="utf-8")
+    rep = run_post_doctor(tmp_path, write=False)
+    soft_codes = [i.get("code") for i in rep.get("soft") or []]
+    assert "EDIT_DIRECTOR_UNSET" in soft_codes
+    draft_and_save(tmp_path, force=True)
+    (tmp_path / "receipts").mkdir(exist_ok=True)
+    (tmp_path / "receipts" / "post-route.json").write_text(
+        json.dumps(
+            {
+                "kind": "post-route",
+                "caption_path": "ship_hardburn",
+                "plate_subs": "burn",
+            }
+        ),
+        encoding="utf-8",
+    )
+    rep2 = run_post_doctor(tmp_path, write=False)
+    hard_codes = [i.get("code") for i in rep2.get("hard") or []]
+    soft_codes2 = [i.get("code") for i in rep2.get("soft") or []]
+    assert "EDIT_DIRECTOR_PLAN" in soft_codes2
+    assert "EDIT_DIRECTOR_ROUTE_MISMATCH" in hard_codes
+
+
+def test_closeout_prefers_edit_director_cmd(tmp_path: Path) -> None:
+    from closeout import _final_next_cmd
+
+    clip = tmp_path / "takes" / "sh01.mp4"
+    clip.parent.mkdir(parents=True)
+    clip.write_bytes(b"x")
+    (tmp_path / "film-spec.json").write_text(
+        json.dumps(_mini_spec("sh01")), encoding="utf-8"
+    )
+    (tmp_path / "manifest.json").write_text(
+        json.dumps(
+            {
+                "clips": {
+                    "sh01": {
+                        "path": str(clip),
+                        "status": "approved",
+                        "state": "active",
+                        "duration_sec": 4.0,
+                    }
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    draft_and_save(tmp_path, force=True, design="hyperframes")
+    cmd = _final_next_cmd(tmp_path)
+    assert "edit-director" in cmd or "hyperframes" in cmd
+
+
 def test_next_actions_suggests_edit_director(tmp_path: Path) -> None:
     from next_actions import build_next_actions
 
