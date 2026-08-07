@@ -1,5 +1,76 @@
 # Changelog
 
+## [2.40.56] - 2026-08-07
+
+### Added (shot generation · Wave 0–4 lanes)
+- **Wave 0–1:** `shot_lane` + `aifilm shot-lane` + poison queue skip (`anatomy_safe=false`).
+- **Wave 2:** dialogue still recipe / no-speech prompt / `dialogue_audio_lane` / VO-fit cut_on.
+- **Wave 3:** `assert_still_path_ready_for_i2v` on h3 run + media-queue; pilot three_look fill+lane.
+- **Wave 4:** bulk variety hard floors surfaced; **restricted insert without still → no silent T2V** (`INSERT_NEEDS_DETAIL_STILL`).
+- **Tests:** `test_shot_lane` · `test_dialogue_wave2` · `test_composition_fill_wave3` · `test_wave4_variety_insert`.
+- **Plan:** [shot-generation-lane](docs/plans/2026-08-07-shot-generation-lane-todoplan.md).
+
+## [2.40.55] - 2026-08-07
+
+### Added (shot generation · Wave 3 composition fill closed-loop)
+- **`assert_still_path_ready_for_i2v`:** any I2V first-frame path + optional auto-remedy (stills/keyframes/handoff).
+- **H3 run hard-block** postage-stamp / tiny subject after anatomy; plan advisory `composition_fill` + `generation_lane`.
+- **media-queue** I2V/R2V first input same fill gate.
+- **pilot pack** three_look machine prefill: composition_fill + per-shot generation_lane.
+- **Tests:** `tests/test_composition_fill_wave3.py` · plan [shot-generation-lane](docs/plans/2026-08-07-shot-generation-lane-todoplan.md).
+
+## [2.40.54] - 2026-08-07
+
+### Fixed / Added (CTO A1 + iron residual optimization)
+- **A1 gate-auto silent green:** `auto_promote_single_takes` respects shortlist `ok`/`promote_blocked`; variety probe exception no longer soft-greens; gate-auto runs **variety_pixel** hard when meat≥2.
+- **I1.5 scale promote_ban:** shared `assert_scale_promote_allowed` on **register-still + register-clip** (root + nested decision).
+- **I4.2 iron-status CLI:** `aifilm iron-status [--root] [--strict]` lists IRON gates + armed `AIFILM_SKIP_*` + floors.
+- **Tests:** `tests/test_opt_round_a1_iron.py`.
+
+## [2.40.53] - 2026-08-07
+
+### Added (shot generation · Wave 2 dialogue chain)
+- **Still recipe:** `lint_dialogue_still_recipe` / `assert_dialogue_still_for_register` — on_camera 台词镜须 speaker + 禁 WS/fullbody still；挂 `register-still approved` + preflight。
+- **Prompt:** H3 `_prompt_for_shot` 对白镜禁 `no speech` / 禁开口类自定义句（`DIALOGUE_PROMPT_NO_SPEECH`）。
+- **Audio lane:** write-spec `apply_film_dialogue_audio_lanes` 默认 `native`；preflight lint missing/invalid；`resolve_dialogue_audio_lane` 认显式字段。
+- **VO-fit:** 对白镜自动 `cut_on=mid_motion` + `visual_fit=vo`（可无 dsl 时创建）。
+- **Tests:** `tests/test_dialogue_wave2.py`。
+
+## [2.40.52] - 2026-08-07
+
+### Added (shot generation lane · Wave 0–1)
+- **`shot_lane` projection:** `scripts/media/shot_lane.py` → lane ∈ setup/dialogue_*/meat/insert/env/continue/poison_blocked/reaction + H3 mode + gates + still/audio recipe.
+- **CLI:** `aifilm shot-lane --root [--shot-id] [--write]`.
+- **Fill-Idle:** `generation_lane` on rows; `anatomy_safe=false` → poison queue skip (aligned with `assert_still_anatomy_for_i2v`).
+- **Docs:** visual 分型表 + 毒镜 5 行 SOP；weapon-lane-matrix **lane id** 列；plan [shot-generation-lane](docs/plans/2026-08-07-shot-generation-lane-todoplan.md).
+- **Tests:** `tests/test_shot_lane.py`.
+
+## [2.40.51] - 2026-08-07
+
+### Added (iron internalization closeout · I2.2/I2.4/I1.4/I3/I4)
+- **I2.4 generation request hard:** `assert_generation_request_for_i2v` for restricted/adult; media-queue fail-closed; H3 auto-build if missing. Escape `AIFILM_SKIP_GENERATION_REQUEST=1`.
+- **I2.2 endframe no-redress:** `endframe_wardrobe` heuristic on `register-clip approved` (skin ratio drop → `ENDFRAME_REDRESS_RISK`). Escape `AIFILM_SKIP_ENDFRAME_WARDROBE=1`.
+- **I1.4 mix default broadband:** `render_final` no longer defaults to acrossover multiband; opt-in `AIFILM_ALLOW_ACROSSOVER_MIX=1`.
+- **I3 context:** slim `stages/visual.md` + `post.md`; routing adds `h3-core-day` + issue codes (wardrobe/plate-boring/shortlist/variety).
+- **I4.1 contract:** `test_hard_defaults` locks plate-boring floor = meat mean 20 + anti-hijack gate smoke.
+- **Plan:** iron internalization I0–I4 product path **SHIPPED** (I5 ops still OPEN_OPS).
+
+## [2.40.50] - 2026-08-07
+
+### Added (iron internalization I2 · anatomy + speaker-frame fail-closed)
+- **I2.1 anatomy attestation:** `assert_still_anatomy_for_i2v` shared gate; **H3 run** + media-queue use it; poison still always blocks; restricted meat/undress shots require attestation even without film heat=max; genre=adult film-level require; bulk-preflight anatomy hard; escape `AIFILM_SKIP_ANATOMY_SAFETY=1`.
+- **I2.3 speaker-frame hard unify:** `speaker_frame_hard_enabled` (dialogue_drama + max/hot/extreme|adult|genre adult); preflight + `assert_*` + **write-spec validate** fail-closed; escape `speaker_frame_strict:false`.
+- **Tests:** `tests/test_iron_i2_anatomy_speaker.py`.
+
+## [2.40.49] - 2026-08-07
+
+### Added (iron internalization I1 · fail-closed anti-fake-green)
+- **I1.1 multi-seed anti-hijack:** `composition_anti_hijack.multi_seed_anti_hijack_gate`; `select_shortlist` multi-seed without AH → `ok=false` (unless `AIFILM_SKIP_ANTI_HIJACK`); `pk_compare` multi-seed marks `not_promotable` + `PK_MULTI_SEED_NO_ANTI_HIJACK`.
+- **I1.2 variety pixel bind:** `workflow_pack.variety_pixel_bind` → `receipts/variety-pixel.json`; ship-prep hard step `variety_pixel` (`VARIETY_FIELD_ONLY_STALE` / `ADJACENT_MEAN_CLONE` / missing meat clip|mean). Escape `AIFILM_SKIP_VARIETY_PIXEL=1`.
+- **I1.3 plate-boring meat mean:** `final.delivery_class.assess_plate_boring_meat_mean` (meat avg&lt;20 or ≥50% weak) → force `OFFICIAL_FINAL_PLATE` + PARTIAL; closeout/export honesty; receipt `plate-boring-mean.json`. Escape `AIFILM_SKIP_PLATE_BORING=1`.
+- **Tests:** `tests/test_iron_i1_fail_closed.py` + shortlist promote test uses intentional AH skip for dummy bytes.
+- **Plan:** [iron-internalization](docs/plans/2026-08-07-iron-internalization-todoplan.md) I1 SHIPPED.
+
 ## [2.40.48] - 2026-08-07
 
 ### Changed (code metabolism terminal residual freeze)

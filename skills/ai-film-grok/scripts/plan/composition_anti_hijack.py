@@ -41,6 +41,57 @@ def _env_skip() -> bool:
     return os.environ.get("AIFILM_SKIP_ANTI_HIJACK", "").strip() in {"1", "true", "yes", "on"}
 
 
+def multi_seed_anti_hijack_gate(
+    *,
+    multi_take: bool,
+    anti_hijack_enabled: bool,
+    promote: bool = False,
+) -> dict[str, Any]:
+    """I1.1 · multi-seed must run composition anti-hijack (or intentional SKIP).
+
+    Returns promote_blocked / ok / codes. Single-take shots do not require the gate.
+    """
+    codes: list[str] = []
+    if not multi_take:
+        return {
+            "ok": True,
+            "required": False,
+            "promote_blocked": False,
+            "skip_intentional": False,
+            "codes": codes,
+        }
+    skip = _env_skip()
+    if skip:
+        codes.append("SHORTLIST_MEAN_ONLY_NO_ANTI_HIJACK")
+        return {
+            "ok": True,
+            "required": True,
+            "promote_blocked": False,
+            "skip_intentional": True,
+            "codes": codes,
+            "escape": "AIFILM_SKIP_ANTI_HIJACK=1",
+        }
+    if not anti_hijack_enabled:
+        codes.append("SHORTLIST_MEAN_ONLY_NO_ANTI_HIJACK")
+        if promote:
+            codes.append("SHORTLIST_PROMOTE_BLOCKED_MEAN_ONLY")
+        return {
+            "ok": False,
+            "required": True,
+            "promote_blocked": bool(promote),
+            "skip_intentional": False,
+            "codes": codes,
+            "next_cmd": 'aifilm anti-hijack --root "$ROOT"',
+        }
+    return {
+        "ok": True,
+        "required": True,
+        "promote_blocked": False,
+        "skip_intentional": False,
+        "codes": codes,
+    }
+
+
 def score_frame_array(im: Any, want: Want = "generic") -> dict[str, Any]:
     """Score a HxWx3 uint8 RGB array (or PIL-like). Returns metrics + score."""
     import numpy as np

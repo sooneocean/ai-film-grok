@@ -29,19 +29,22 @@
 
 ## 镜头路由
 
-| 类型 | Still | Motion | Audio |
-|------|-------|--------|-------|
-| Setup / 非敏感 hero（**h3_primary 默认**） | Grok/Qwen still | **H3 I2V**（非 Grok bulk） | Edge TTS + BGM / H3 native |
-| Foreplay soft clothed（**h3_primary**） | Grok/Qwen | **H3 I2V**；hybrid 兼容才 Grok bulk | 同上 |
-| Act / climax / bare / undressed | Qwen Edit / undress-anchor | **H3 I2V**（queue 硬拦云 bulk） | H3 `prefer_native` |
-| 高难（deep_thrust / creampie / L4+contact / force_local_h3） | 本地状态照 | **H3 I2V**；能量不够 → **R2V** | 同上 |
-| 对白近景（非敏感） | Grok face | **h3_primary→H3**；hybrid→Grok；**`ltx23_adult` → LTX 有声** | **原声** prefer_native（禁后期对嘴） |
-| **对白近景（restricted / bare）** | Qwen 状态照 | **H3 I2V**（台词注入）；狠嘴 CU / 状态链 → **H3 R2V** | H3 **原声** spoken Mandarin |
-| soft 亲密（clothed · `ltx23_adult`） | 批 still / FRW i2i | **LTX 2.3 有声 I2V**；失败→H3 | prefer_native |
-| Env / bridge | 可选 | FRW env 或 **H3 T2V**（无脸） | 环境 |
-| 续镜 / continue | **批准末帧** | **H3 I2V** | 原声或沿用策略 |
-| 毒镜 | Qwen 解剖修 | **禁 I2V** | — |
-| **Still 素材挑战** | **FRW `img2image`**（云 · 不占 5090）或 Qwen 修片 | promote 后 **I2V/R2V 重跑** | 续镜 endframe；毒 still |
+> 机读 lane：`aifilm shot-lane --root` · 码 `scripts/media/shot_lane.py`（与下表 lane id 对齐）。
+
+| 类型 | **lane id** | Still | Motion | Audio |
+|------|-------------|-------|--------|-------|
+| Setup / 非敏感 hero（**h3_primary 默认**） | `setup` | Grok/Qwen still | **H3 I2V**（非 Grok bulk） | Edge TTS + BGM / H3 native |
+| Foreplay soft clothed（**h3_primary**） | `setup` / soft meat | Grok/Qwen | **H3 I2V**；hybrid 兼容才 Grok bulk | 同上 |
+| Act / climax / bare / undressed | `meat` | Qwen Edit / undress-anchor | **H3 I2V**（queue 硬拦云 bulk） | H3 `prefer_native` |
+| 高难（deep_thrust / creampie / L4+contact / force_local_h3） | `meat` | 本地状态照 | **H3 I2V**；能量不够 → **R2V** | 同上 |
+| 对白近景（非敏感） | `dialogue_safe` | Grok face | **h3_primary→H3**；hybrid→Grok；**`ltx23_adult` → LTX 有声** | **原声** prefer_native（禁后期对嘴） |
+| **对白近景（restricted / bare）** | `dialogue_restricted` | Qwen 状态照 | **H3 I2V**（台词注入）；狠嘴 CU / 状态链 → **H3 R2V** | H3 **原声** spoken Mandarin |
+| soft 亲密（clothed · `ltx23_adult`） | `setup` / soft | 批 still / FRW i2i | **LTX 2.3 有声 I2V**；失败→H3 | prefer_native |
+| Env / bridge | `env` | 可选 | FRW env 或 **H3 T2V**（无脸） | 环境 |
+| 续镜 / continue | `continue` | **批准末帧** | **H3 I2V** | 原声或沿用策略 |
+| Insert / L4 | `insert` | 细节 still | I2V/FLF | Foley |
+| 毒镜 | `poison_blocked` | Qwen 解剖修 | **禁 I2V** | — |
+| **Still 素材挑战** | `still_challenge` | **FRW `img2image`**（云 · 不占 5090）或 Qwen 修片 | promote 后 **I2V/R2V 重跑** | 续镜 endframe；毒 still |
 
 ### FRW i2i 静帧挑战（2026-08-04 · ≥30s unit）
 
@@ -126,28 +129,29 @@ aifilm h3 run  --root "<film>" --shot-id shot03 --mode i2v|r2v|t2v --register --
 # restricted 误入 Grok queue → QueueError；逃生 AIFILM_ALLOW_CLOUD_RESTRICTED=1
 ```
 
-## 产能日历
+## 产能日历（h3_primary 默认）
 
-1. 云：Grok setup + 非敏感 pilot / bulk baseline  
-2. 本地：Qwen 卸装 / bare state masters  
-3. **5090 独占**：H3 按 **Fill-Idle 优先级** 串行（下节）  
-4. 云：桥接 / 对白 LTX（安全近景）  
-5. `select-shortlist` 建议 → **人审** promote → ship-prep → final（HyperFrames）
+1. **本地 Qwen / Grok**：still · 卸装 / bare state masters（辅线，先验后生）  
+2. **5090 H3 主烧**：`run-next --max 5` 串行；用户独占才 until-empty  
+3. 云：Grok Video / LTX **仅** escape 或 `ltx23_adult` opt-in（非默认 bulk）  
+4. `select-shortlist` 建议 → **人审** promote → ship-prep → final（HyperFrames）  
+5. 日课板：[h3-core-workflow-todoplan](../../../docs/plans/2026-08-06-h3-core-workflow-todoplan.md) · [h3-core-day](stages/h3-core-day.md)
 
-## Fill-Idle · Grok 主轴 + H3 挑战（2026-08-04 定策）
+## Fill-Idle · 队列优先级（2026-08-06 语义澄清）
 
-> 类比：Grok = 流水线铺底；H3 = 重工 + **空闲就去 PK**。  
-> 短卡：[memory/2026-08-04-h3-fill-idle-challenge.md](../memory/2026-08-04-h3-fill-idle-challenge.md) · 模式细则见上「H3 三模式」与 [h3-max-effect](lessons-2026-08-04-h3-max-effect.md)
+> **默认 profile = `h3_primary`**：H3 是全片动作主轨，**没有**「Grok 铺底再挑战」。  
+> **`hybrid_h3` 兼容轨** 才保留「Grok soft + H3 挑战 Grok take」。  
+> 短卡：[memory/2026-08-04-h3-fill-idle-challenge.md](../memory/2026-08-04-h3-fill-idle-challenge.md) · 日课 [h3-core-workflow](../memory/2026-08-06-h3-core-workflow.md) · [h3-max-effect](lessons-2026-08-04-h3-max-effect.md)
 
 ### 已定策三句
 
-1. **Soft / 已有 Grok take：能烧就烧**——5090 空闲就填挑战；**不得**抢 P0。  
+1. **`h3_primary`：缺 clip 就烧 H3**——P0=主生成，不是挑战云 take；平日 **max 5**，禁默认 until-empty。  
 2. **R2V = 能量位优先**（大嘴 CU / 高难体位 / I2V 偏静）——**不是**全片默认 R2V。  
 3. **机读建议 + 人最终拍板**——shortlist/mean 可推荐；`preferred` / approved **必须人一眼**（防换人、毒、回穿）。
 
 ### 谁是主轨
 
-**`h3_primary`（推荐 · 无限本地）**
+**`h3_primary`（推荐 · 无限本地 · 默认）**
 
 | 镜类 | 主生成 | 模式 |
 |------|--------|------|
@@ -158,36 +162,36 @@ aifilm h3 run  --root "<film>" --shot-id shot03 --mode i2v|r2v|t2v --register --
 | 续镜 continue | **H3** | I2V 末帧 / FLF |
 | Grok Video 1.5 | **仅**技术失败签名切换 / 云 escape | **非**默认 bulk |
 
-**`hybrid_h3`（双轨兼容）**
+**`hybrid_h3`（双轨兼容 · 非默认）**
 
 | 镜类 | 主生成 | H3 角色 |
 |------|--------|---------|
 | restricted / bare / 高难 | **H3** | 主轨（云硬拦） |
-| 非 restricted setup/soft | **Grok** | **填空挑战者** |
+| 非 restricted setup/soft | **Grok** | 可有 baseline；H3 可挑战 |
 | env 无脸 | FRW / H3 T2V | 气氛；不进锁脸 PK |
 
 ### 优先级（硬顺序）
 
-| 级 | 内容 | 默认 mode | 可被 P2 挤掉？ |
-|----|------|-----------|----------------|
-| **P0a** | restricted 肉戏主生成 | I2V；高难 flag → R2V | **否** |
-| **P0b** | restricted 对白近景 | R2V 或 I2V+台词注入 | **否** |
-| **P0c** | 续镜链 / 毒后重生 | **仅 I2V** 末帧 | **否** |
-| **P1** | 已有 take 但 gate 失败（mean 低 / 嘴死） | I2V 狠 prompt → 仍低则 R2V | 仅次 P0 |
-| **P2 填空** | 已有 Grok、尚无 H3 take、capacity idle | **先 I2V 挑战**；仍闷 → R2V | 新 P0/P1 可抢占 |
+| 级 | 内容 | 默认 mode | 说明 |
+|----|------|-----------|------|
+| **P0a** | 缺 clip 的 restricted 肉戏 | I2V；高难 → R2V | **h3_primary 主生成**；不可被挤 |
+| **P0b** | 缺 clip 的对白近景 / setup | I2V+台词；狠嘴 R2V | 同上 |
+| **P0c** | 续镜链 / 毒后重生 | **仅 I2V** 末帧 | 不可被挤 |
+| **P1** | 已有 take 但 gate 失败（mean 低 / 嘴死） | 狠 I2V → 仍低 R2V | **弱 take 补烧**（两 profile 同） |
+| **P2** | **仅 hybrid**：已有 Grok、尚无 H3、idle | 先 I2V 挑战 → 闷则 R2V | **h3_primary 通常无此层**（全镜本就是 H3） |
 | **P3 跳过** | 毒 still、空核、无 still 锁脸、T2V 挂人 | — | 永不入队 |
 
-**调度**：先耗尽 P0→P1 → idle 且 ready 才拉 P2 → 新 P0 **立即暂停 P2**。进度只认 `takes/` + register 收据。
+**调度**：先耗尽 P0→P1 →（hybrid 且 idle 才）P2 → 新 P0 **立即暂停 P2**。进度只认 `takes/` + register 收据。平日 `run-next --max 5`；until-empty 须 `--i-own-the-gpu`。
 
-**P2 排序（agree all · 2026-08-04）**：**mean 最低优先**（最弱 Grok 先挑战）→ 并列按时间轴。跨集 **不** 自动记 R2V/I2V 胜率。
+**P2 排序（hybrid only）**：**mean 最低优先** → 并列按时间轴。跨集 **不** 自动记 R2V/I2V 胜率。
 
-### 填空挑战口诀
+### 口诀（按 profile）
 
 ```text
-挑战 Grok soft：先 I2V（锁脸公平）→ 仍闷再 R2V
-P0 能量位：高难/大嘴/I2V 不够 → R2V 占满这些槽
-P2 优先 mean 最低；短 pilot；人说值得再 bulk 加长
-final 不阻塞于「P2 100% 完成」（能烧就烧=质量上限，≠发布门；高光不强制挑战）
+h3_primary：P0 缺片主烧 → P1 弱 take 补烧 → 无「挑战 Grok 铺底」
+hybrid_h3：restricted=H3 P0；soft 可 Grok；idle 才 P2 挑战 mean 最低
+能量：高难/大嘴/I2V 闷 → R2V；够动停盲 R2V
+final 不阻塞于「P2 100%」；高光不强制挑战；人 promote > mean
 ```
 
 ### PK（替换）

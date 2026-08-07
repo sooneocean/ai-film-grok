@@ -13,7 +13,8 @@
 - **`cast_voices` 必须跟 spoken_lang**：zh → 男 Yunxi / 女 Xiaoyi；**禁止** zh 片挂 `ja-JP-*`（2026-08-03 荒岛）。
 - 散文拆句 → 互动正反打（A 说 B 听 / reverse OTS）。
 - 有对白=角色口型；无对白=纯画面。
-- **对白镜 VO-fit**：时长≈pre+VO+post，禁短口白硬贴 6s 死气；见 [vo-drag](../lessons-2026-07-20-vo-drag-motion-snap.md) · [huangdao](../lessons-2026-08-03-huangdao-rhythm-still-voice-silk.md)。
+- **对白镜 VO-fit**：时长≈pre+VO+post，禁短口白硬贴 6s 死气；write-spec 自动 `cut_on=mid_motion` + `visual_fit=vo`；见 [vo-drag](../lessons-2026-07-20-vo-drag-motion-snap.md) · [huangdao](../lessons-2026-08-03-huangdao-rhythm-still-voice-silk.md)。
+- **Wave 2 生成链：** still=speaker 脸 MCU（禁 fullbody 挂台词）· H3 prompt 禁 `no speech` · 每镜 `dialogue_audio_lane=native|post_tts|silence`（write-spec 默认 native）。
 - **字幕验收 = 像素可见（P0 · v3）**：每条对白 cue 抽帧人眼可读；ship 硬烧优先。用户报「没字幕」先抽帧再改，勿只改 HF CSS。
 - final 前自检：`speaker | voice | spoken_lang=zh | screen_mode | caption_pixels=ok`。
 - **口白窗**：TTS ≤ cue ≤ slot；超窗 **砍 spoken / vo_rate**，禁只拉长 cue。

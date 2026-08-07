@@ -261,7 +261,7 @@ def run_cinematic_gate(
             )
         )
 
-    # 4) variety (hard when meat present)
+    # 4) variety + variety_pixel (A1 · probe fail must not silent-green)
     if skip_variety or os.environ.get("AIFILM_SKIP_VARIETY_PREFLIGHT", "").strip().lower() in {
         "1",
         "true",
@@ -271,18 +271,38 @@ def run_cinematic_gate(
         steps.append(_step("variety", ok=True, hard=False, skipped=True, detail="skipped"))
     else:
         try:
-            from workflow_pack import variety_precheck
+            from workflow_pack import variety_pixel_bind, variety_precheck
 
             var = variety_precheck(base, write=write)
+            meat_n = int(var.get("meat_shot_count") or 0)
             steps.append(
                 _step(
                     "variety",
                     ok=bool(var.get("ok")),
                     hard=True,
-                    detail=f"issues={len(var.get('issues') or [])}",
+                    detail=f"issues={len(var.get('issues') or [])} meat={meat_n}",
                     next_cmd=(None if var.get("ok") else f'aifilm variety-precheck --root "{r}"'),
                     codes=[
                         str(i.get("code")) for i in (var.get("issues") or []) if isinstance(i, dict)
+                    ],
+                )
+            )
+            vpx = variety_pixel_bind(base, write=write)
+            steps.append(
+                _step(
+                    "variety_pixel",
+                    ok=bool(vpx.get("ok") or vpx.get("skipped")),
+                    hard=bool(meat_n >= 2) and not bool(vpx.get("skipped")),
+                    detail=(
+                        "skipped"
+                        if vpx.get("skipped")
+                        else f"issues={len(vpx.get('issues') or [])}"
+                    ),
+                    next_cmd=vpx.get("next_cmd"),
+                    codes=[
+                        str(i.get("code"))
+                        for i in (vpx.get("issues") or [])
+                        if isinstance(i, dict)
                     ],
                 )
             )
@@ -290,10 +310,10 @@ def run_cinematic_gate(
             steps.append(
                 _step(
                     "variety",
-                    ok=True,
-                    hard=False,
-                    detail=f"advisory skip: {exc}"[:160],
-                    skipped=True,
+                    ok=False,
+                    hard=True,
+                    detail=f"variety probe failed: {exc}"[:200],
+                    next_cmd=f'aifilm variety-precheck --root "{r}"',
                 )
             )
 
@@ -320,14 +340,22 @@ def run_cinematic_gate(
                     codes=list(ft.get("codes") or []),
                 )
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:  # noqa: BLE001 — A1: enabled path never silent-green
+            # If film looks adult/max, treat probe fail as hard; else soft fail visible
+            heat = ""
+            try:
+                sp = read_json(base / "film-spec.json") or {}
+                heat = str((sp or {}).get("heat_scale") or "").lower()
+            except Exception:
+                heat = ""
+            hard_ft = heat in {"max", "hot", "extreme"}
             steps.append(
                 _step(
                     "five_track",
-                    ok=True,
-                    hard=False,
-                    detail=f"skip: {exc}"[:160],
-                    skipped=True,
+                    ok=False,
+                    hard=hard_ft,
+                    detail=f"five_track probe failed: {exc}"[:200],
+                    next_cmd=f'aifilm five-track plan --root "{r}"',
                 )
             )
 

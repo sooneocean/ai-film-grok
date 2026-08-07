@@ -1,0 +1,68 @@
+{
+  "schema_version": 1,
+  "kind": "h3-core-workflow-canary",
+  "at": "2026-08-07T02:11:19.247169+00:00",
+  "status": "OPEN_OPS",
+  "film_root": "/Users/dex/AI FILM SPACE/0806/abroad-slut-manhua-h3",
+  "profile": "h3_primary",
+  "checks": {
+    "tunnel_18188": true,
+    "weapon_primary_motion_h3": true,
+    "capacity_plan_ok": true,
+    "pending_jobs_film": 33,
+    "eta_hours_film": 4.4,
+    "next_shot": "ep01_sh06",
+    "comfy_queue_running": 1,
+    "comfy_queue_pending": 0,
+    "busy_zero_submit": true,
+    "run_next_execute": "skipped_comfy_busy_other_job",
+    "pilot_blockers": [
+      "PILOT_MEDIA_NOT_READY",
+      "three_look_unchecked",
+      "heat/state gaps"
+    ],
+    "note": "5090 already running MiniMaxH3 workflow (likely other session). multi-agent no-hog → zero submit. free-memory was attempted earlier; do not free-memory while queue_running."
+  },
+  "running_job": {
+    "prompt_id": "6a43a9ed-6b0b-4f1b-9996-f451fa5771f3",
+    "nodes": [
+      "1",
+      "2",
+      "3",
+      "4",
+      "5",
+      "6",
+      "7",
+      "8"
+    ],
+    "class_types": [
+      "UNETLoader",
+      "CLIPLoader",
+      "VAELoader",
+      "VAELoader",
+      "ResolutionSelector",
+      "PrimitiveFloat",
+      "ComfyMathExpression",
+      "MiniMaxH3ImageToVideo",
+      "RandomNoise",
+      "KSamplerSelect",
+      "BasicScheduler",
+      "BasicGuider"
+    ]
+  },
+  "ops_next": [
+    "Wait for queue_running empty + aifilm comfy capacity status=ready",
+    "Do NOT free-memory while another H3 job runs",
+    "Then: pilot pack/approve path if bulk blocked",
+    "aifilm h3 run-next --root film --execute --max 5",
+    "Exclusive only on user 独占: until-empty --i-own-the-gpu"
+  ],
+  "doc_board": "docs/plans/2026-08-06-h3-core-workflow-todoplan.md",
+  "waves": {
+    "H0": "SHIPPED",
+    "H1": "SHIPPED_doc",
+    "H2_H5": "OPEN_ops_discipline",
+    "H3_gpu": "OPEN_OPS_busy",
+    "H6": "SHIPPED_misleading_copy_fixed"
+  }
+}

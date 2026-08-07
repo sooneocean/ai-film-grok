@@ -1934,16 +1934,25 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
         sidechain["performance_duck_db"] = performance_bgm.get("duck_db")
     sc_frag = sidechain_filter_fragment(sidechain)
     filters_help = run(["ffmpeg", "-filters"], check=False).stdout
-    # Long multi-stem plates: dynamic_eq (sidechain+acrossover) can hang 30–60m+.
+    # I1.4 · default broadband duck (no acrossover) — multiband hang 30–60m+.
     # AIFILM_FORCE_SIMPLE_AMIX=1 → plain amix (no duck).
-    # AIFILM_FORCE_BROADBAND_DUCK=1 → sidechaincompress only (light duck, no acrossover).
+    # AIFILM_ALLOW_ACROSSOVER_MIX=1 → opt-in legacy sidechain+acrossover dynamic_eq.
+    # AIFILM_FORCE_BROADBAND_DUCK=1 → explicit broadband (same as default now).
     _env_on = lambda k: os.environ.get(k, "").strip().lower() in {"1", "true", "yes", "on"}
     if _env_on("AIFILM_FORCE_SIMPLE_AMIX"):
         filters_help = ""
         mix_spotting["force_simple_amix"] = True
-    elif _env_on("AIFILM_FORCE_BROADBAND_DUCK"):
+        mix_spotting["mix_path"] = "simple_amix"
+    elif _env_on("AIFILM_ALLOW_ACROSSOVER_MIX"):
+        mix_spotting["allow_acrossover_mix"] = True
+        mix_spotting["mix_path"] = "acrossover_multiband"
+    else:
+        # Default + FORCE_BROADBAND: strip acrossover so sidechaincompress-only path runs
         filters_help = (filters_help or "").replace("acrossover", "___disabled_acrossover___")
         mix_spotting["force_broadband_duck"] = True
+        mix_spotting["mix_path"] = "broadband_default"
+        if _env_on("AIFILM_FORCE_BROADBAND_DUCK"):
+            mix_spotting["force_broadband_duck_env"] = True
 
     try:
         from acoustic_policy import resolve_acoustic_space
@@ -2713,7 +2722,14 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
             cinematic_ok=None,
             final_complete=False,
             bgm_partial=bool((bgm_source_receipt or {}).get("partial")),
+            root=root,
         )
+        try:
+            from final.delivery_class import write_plate_boring_receipt
+
+            write_plate_boring_receipt(root)
+        except Exception:  # noqa: BLE001
+            pass
         try:
             from narrative.scale_fallback import (
                 flatten_spec_shots,

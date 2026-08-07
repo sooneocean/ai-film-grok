@@ -116,6 +116,95 @@ def demote_tier(tier: str | None) -> str:
     return order[max(0, i - 1)]
 
 
+class ScalePromoteBanError(ValueError):
+    """Blind promote blocked while scale-fallback promote_ban is active."""
+
+
+def scale_promote_skip() -> bool:
+    import os
+
+    return os.environ.get("AIFILM_SKIP_SCALE_PROMOTE_GATE", "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+
+
+def load_scale_fallback_receipt(root: Path | str) -> dict[str, Any] | None:
+    from util import read_json
+
+    path = Path(root).expanduser().resolve() / "receipts" / "scale-fallback.json"
+    data = read_json(path) if path.is_file() else None
+    return data if isinstance(data, dict) else None
+
+
+def promote_ban_active(receipt: dict[str, Any] | None) -> tuple[bool, list[str]]:
+    """True if root or nested decision has promote_ban."""
+    if not isinstance(receipt, dict):
+        return False, []
+    ban = bool(receipt.get("promote_ban"))
+    codes = list(receipt.get("codes") or [])
+    dec = receipt.get("decision") if isinstance(receipt.get("decision"), dict) else {}
+    if dec.get("promote_ban"):
+        ban = True
+        codes = list(dec.get("codes") or codes)
+    return ban, [str(c) for c in codes]
+
+
+def review_note_accepts_scale_fallback(review_note: str | None) -> bool:
+    note_l = str(review_note or "").lower()
+    return any(
+        tok in note_l
+        for tok in (
+            "soft-max",
+            "soft_max",
+            "model-limit",
+            "scale_fallback",
+            "scale-fallback",
+            "fallback accepted",
+        )
+    )
+
+
+def assert_scale_promote_allowed(
+    root: Path | str,
+    *,
+    review_note: str | None = None,
+    kind: str = "clip",
+) -> dict[str, Any]:
+    """I1.5 · fail-closed promote/register when scale-fallback promote_ban is set.
+
+    Escape: ``AIFILM_SKIP_SCALE_PROMOTE_GATE=1`` or review-note tokens (soft-max/…).
+    """
+    if scale_promote_skip():
+        return {
+            "ok": True,
+            "skipped": True,
+            "escape": "AIFILM_SKIP_SCALE_PROMOTE_GATE=1",
+            "kind": kind,
+        }
+    sf = load_scale_fallback_receipt(root)
+    ban, codes = promote_ban_active(sf)
+    if not ban:
+        return {"ok": True, "promote_ban": False, "kind": kind, "codes": codes}
+    if review_note_accepts_scale_fallback(review_note):
+        return {
+            "ok": True,
+            "promote_ban": True,
+            "human_accepted": True,
+            "kind": kind,
+            "codes": codes,
+        }
+    raise ScalePromoteBanError(
+        f"scale_fallback promote_ban active for {kind} "
+        f"(codes={codes}) — do not blind-approve collapsed bare; "
+        "re-gen at recommended_tier / soft-max, or pass review-note containing "
+        "'soft-max' / 'scale_fallback' after human accept. "
+        "Escape: AIFILM_SKIP_SCALE_PROMOTE_GATE=1"
+    )
+
+
 def decide_scale_fallback(
     *,
     target_tier: str = "bare",

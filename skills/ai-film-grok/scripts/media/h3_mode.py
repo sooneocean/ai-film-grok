@@ -266,6 +266,18 @@ def resolve_h3_mode_core(
                 alt_reasons=["retry_energy_if_static"],
                 confidence="medium",
             )
+        # Wave 4 · restricted L4/contact never silent T2V (genital detail risk)
+        if restricted or heat in {"act", "climax", "foreplay"}:
+            return _pack(
+                "i2v",
+                reasons=["insert_needs_detail_still", "ban_silent_t2v_on_meat_insert"],
+                confidence="hard",
+                extra={
+                    "blocked": True,
+                    "block_code": "INSERT_NEEDS_DETAIL_STILL",
+                    "restricted": True,
+                },
+            )
         return _pack("t2v", reasons=["insert_no_still_t2v"], confidence="medium")
 
     energy_hits: list[str] = []

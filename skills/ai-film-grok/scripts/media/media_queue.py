@@ -427,15 +427,24 @@ class MediaQueue:
         resolved_inputs = [path.expanduser().resolve() for path in inputs]
         if any(not path.is_file() for path in resolved_inputs):
             raise QueueError("every media input must be an existing file")
-        # Material fidelity: if a GenerationRequest receipt exists, pixel sha must match
+        # I2.4 Material fidelity: restricted shots require GenerationRequest; pixel sha must match
         if operation in {"image_to_video", "reference_to_video"} and resolved_inputs:
             try:
-                from generation_request import GenerationRequestError, assert_pixel_pack_current
+                from generation_request import (
+                    GenerationRequestError,
+                    assert_generation_request_for_i2v,
+                )
 
-                assert_pixel_pack_current(self.root, shot_id, inputs=resolved_inputs)
+                assert_generation_request_for_i2v(
+                    self.root,
+                    shot_id,
+                    inputs=resolved_inputs,
+                    build_if_missing=False,
+                )
             except GenerationRequestError as exc:
                 raise QueueError(str(exc)) from exc
-            except Exception as exc:  # noqa: BLE001 — optional fidelity; never silent
+            except Exception as exc:  # noqa: BLE001
+                # Non-restricted soft path: note partial; restricted already raised above
                 note_queue_partial(
                     self.root,
                     stage="generation_request_optional",
@@ -447,21 +456,53 @@ class MediaQueue:
                     ],
                 )
         if operation in {"image_to_video", "reference_to_video"}:
-            from anatomy_safety import requires_anatomy_safety
+            from anatomy_safety import AnatomySafetyError, assert_still_anatomy_for_i2v
 
-            if requires_anatomy_safety(self.root):
+            try:
+                assert_still_anatomy_for_i2v(
+                    self.root, shot_id, input_paths=list(resolved_inputs or [])
+                )
+            except AnatomySafetyError as exc:
+                raise QueueError(str(exc)) from exc
+            # Wave 3 · composition fill on first input (postage-stamp / fullbody)
+            if resolved_inputs:
+                try:
+                    from composition_fill_gate import assert_still_path_ready_for_i2v
+
+                    fill = assert_still_path_ready_for_i2v(
+                        resolved_inputs[0],
+                        mode="open",
+                        auto_remedy=True,
+                        shot_id=str(shot_id),
+                    )
+                    if not fill.get("ok") and not fill.get("skipped"):
+                        codes = ",".join(fill.get("codes") or ["TINY_SUBJECT"])
+                        raise QueueError(
+                            f"media-queue I2V blocked for {shot_id}: composition-fill "
+                            f"({codes}); subject ≥~75% height; escape "
+                            "AIFILM_SKIP_COMPOSITION_FILL=1"
+                        )
+                except QueueError:
+                    raise
+                except Exception as exc:  # noqa: BLE001
+                    note_queue_partial(
+                        self.root,
+                        stage="composition_fill_optional",
+                        error=str(exc),
+                        shot_id=str(shot_id),
+                        honest_limits=["composition_fill probe soft-failed"],
+                    )
+            # Extra byte-binding when film/shot requires attestation (multi-input r2v)
+            from anatomy_safety import shot_requires_anatomy_safety
+
+            if shot_requires_anatomy_safety(self.root, shot_id):
                 manifest = read_json(self.root / "manifest.json") or {}
                 stills = manifest.get("stills") if isinstance(manifest, dict) else {}
                 still = stills.get(shot_id) if isinstance(stills, dict) else None
-                if not isinstance(still, dict) or still.get("status") != "approved":
+                if not isinstance(still, dict):
                     raise QueueError(
                         "adult-max I2V requires an approved keyframe for this shot; "
                         "do not animate an unreviewed still"
-                    )
-                if still.get("anatomy_safe") is not True:
-                    raise QueueError(
-                        "adult-max I2V blocked: keyframe lacks anatomy_safe=true or was marked "
-                        "poisoned; repair the still and register it with --anatomy-safe first"
                     )
                 approved_sha = str(still.get("sha256") or "").strip()
                 if not approved_sha:

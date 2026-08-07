@@ -2,6 +2,7 @@
 
 | 主题 | 短卡 | 一句话 |
 |------|------|--------|
+| **H3 核心日课重打通** | [h3-core-workflow](2026-08-06-h3-core-workflow.md) | DOC 闭环；真烧 OPEN_OPS busy；canary 08-07 |
 | **多 agent 5090 禁 hog（机读）** | [multi-agent-gpu-no-hog](2026-08-06-multi-agent-gpu-no-hog.md) | until-empty `--execute` 须 `--i-own-the-gpu` |
 | 双片排水 / takes 认进度 | [dual-film-drain](2026-08-06-dual-film-drain-takes-progress.md) | 进度=takes 文件；pending 可假高 |
 | 卸装 + 尺度兜底 | [wardrobe](2026-08-06-wardrobe-no-redress-fullnude-fallback.md) | 不回穿→裸诱→模型极限勿硬上 |

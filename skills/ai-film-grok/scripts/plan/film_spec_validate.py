@@ -1176,6 +1176,14 @@ def validate_film_spec(
     except Exception as exc:  # noqa: BLE001
         spec["_edit_rhythm_errors"] = [str(exc)[:200]]
 
+    # Wave 2 · dialogue_audio_lane native|post_tts|silence on spoken shots
+    try:
+        from final.native_audio import apply_film_dialogue_audio_lanes
+
+        apply_film_dialogue_audio_lanes(spec)
+    except Exception as exc:  # noqa: BLE001
+        spec["_dialogue_audio_lanes_errors"] = [str(exc)[:200]]
+
     # Wave δ · 5-Track cinema mix defaults (DX/FX/BG/MX/SUB + -16 LUFS)
     try:
         from five_track import ensure_five_track_defaults
@@ -1626,6 +1634,36 @@ def validate_film_spec(
             "dramatic meaning gate failed (dramatic_meaning_strict): "
             + ",".join(meaning.get("codes") or ["SHOT_MEANING_EMPTY"])
         )
+
+    # I2.3 · speaker-frame hard on max dialogue_drama (write-spec fail-closed)
+    try:
+        from dialogue_speaker_frame_gate import (
+            lint_dialogue_speaker_frame,
+            speaker_frame_hard_enabled,
+        )
+
+        sf_rep = lint_dialogue_speaker_frame(spec)
+        sf_hard = speaker_frame_hard_enabled(spec)
+        bad_sf = list(sf_rep.get("violations") or []) + list(sf_rep.get("window_violations") or [])
+        spec["_speaker_frame"] = {
+            "ok": bool(sf_rep.get("ok")),
+            "hard": sf_hard,
+            "violation_count": len(bad_sf),
+            "codes": sorted(
+                {str(v.get("code")) for v in bad_sf if isinstance(v, dict) and v.get("code")}
+            ),
+        }
+        if sf_hard and bad_sf:
+            codes = sorted({str(v.get("code")) for v in bad_sf if v.get("code")})
+            raise FilmSpecError(
+                "speaker-frame gate failed (dialogue_drama max/adult): "
+                + ",".join(codes or ["SPEAKER_FRAME"])
+                + " — speaker must match picture subject; escape speaker_frame_strict:false"
+            )
+    except FilmSpecError:
+        raise
+    except Exception as exc:  # noqa: BLE001
+        spec["_speaker_frame"] = {"ok": True, "skipped": True, "error": str(exc)[:160]}
 
     # Shot-local audio is additive for legacy projects, strict for new timed plans.
     try:

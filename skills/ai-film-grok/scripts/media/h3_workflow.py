@@ -294,6 +294,16 @@ def _prompt_for_shot(
         )
     except MotionCoreError as exc:
         raise H3WorkflowError(str(exc)) from exc
+    # Wave 2 · dialogue shots must not ship "no speech" custom prompts
+    try:
+        from dialogue_speaker_frame_gate import assert_dialogue_prompt_allows_speech
+        from production_gates import ProductionGateError
+
+        assert_dialogue_prompt_allows_speech(prompt, work_shot)
+    except ProductionGateError as exc:
+        raise H3WorkflowError(str(exc)) from exc
+    except Exception:
+        pass
     return prompt
 
 
@@ -431,6 +441,39 @@ def plan_h3_shot(
         "combo_prompt_family": mode_res.get("combo_prompt_family"),
         "still_challenge_candidates": _still_challenge_candidates(base, shot_id),
     }
+    # Wave 3 · composition fill advisory on plan (run enforces hard)
+    if still is not None:
+        try:
+            from composition_fill_gate import assert_still_path_ready_for_i2v
+
+            fill = assert_still_path_ready_for_i2v(
+                still, mode="open", auto_remedy=False, shot_id=str(shot_id)
+            )
+            plan["composition_fill"] = {
+                "ok": fill.get("ok"),
+                "codes": fill.get("codes"),
+                "metrics": fill.get("metrics"),
+                "skipped": fill.get("skipped"),
+                "note": "run will auto-remedy then hard-block if still tiny",
+            }
+            if not fill.get("ok") and not fill.get("skipped"):
+                plan["ok"] = False
+                plan["block_reason"] = "composition_fill"
+        except Exception as exc:  # noqa: BLE001
+            plan["composition_fill"] = {"ok": None, "error": str(exc)[:160]}
+    # generation lane (setup/dialogue/meat/…) for agent routing
+    try:
+        from shot_lane import resolve_shot_lane
+
+        plan["generation_lane"] = resolve_shot_lane(
+            shot,
+            root=base,
+            intent=intent,
+            has_still=still is not None,
+            has_last=last_path is not None,
+        )
+    except Exception:
+        plan["generation_lane"] = None
     # Material fidelity: unified GenerationRequest receipt (StillSource + prompt + refs)
     try:
         from generation_request import build_generation_request
@@ -887,6 +930,74 @@ def run_h3_shot(
             f"H3 flf requires last frame for {shot_id} (--last-frame or stills/{shot_id}_end.png)"
         )
 
+    # I2.1 · anatomy attestation before restricted/adult I2V (same bar as media-queue)
+    if plan.get("requires_still"):
+        try:
+            from anatomy_safety import AnatomySafetyError, assert_still_anatomy_for_i2v
+
+            inputs = [plan["still_path"]] if plan.get("still_path") else None
+            assert_still_anatomy_for_i2v(base, shot_id, input_paths=inputs)
+        except AnatomySafetyError as exc:
+            raise H3WorkflowError(str(exc)) from exc
+        except Exception:  # noqa: BLE001 — module soft-miss never silently I2V poison
+            try:
+                from anatomy_safety import requires_anatomy_safety
+
+                if requires_anatomy_safety(base):
+                    raise H3WorkflowError(
+                        f"H3 I2V anatomy gate failed for {shot_id}; "
+                        "register-still --anatomy-safe after full-frame inspection"
+                    )
+            except H3WorkflowError:
+                raise
+            except Exception:
+                pass
+        # I2.4 · restricted shots need generation request receipt (auto-build if missing)
+        try:
+            from generation_request import GenerationRequestError, assert_generation_request_for_i2v
+
+            inputs = [Path(plan["still_path"])] if plan.get("still_path") else None
+            assert_generation_request_for_i2v(
+                base, shot_id, inputs=inputs, build_if_missing=True
+            )
+        except GenerationRequestError as exc:
+            raise H3WorkflowError(str(exc)) from exc
+        except Exception:
+            pass
+        # Wave 3 · composition fill before burn (EP02 postage-stamp / fullbody)
+        try:
+            from composition_fill_gate import assert_still_path_ready_for_i2v
+
+            fill = assert_still_path_ready_for_i2v(
+                plan["still_path"],
+                mode="open",
+                auto_remedy=True,
+                shot_id=str(shot_id),
+            )
+            plan["composition_fill"] = {
+                "ok": fill.get("ok"),
+                "codes": fill.get("codes"),
+                "metrics": fill.get("metrics"),
+                "remedied": bool((fill.get("remedy") or {}).get("remedied")),
+                "path": fill.get("path") or plan.get("still_path"),
+                "skipped": fill.get("skipped"),
+            }
+            if not fill.get("ok") and not fill.get("skipped"):
+                codes = ",".join(fill.get("codes") or ["TINY_SUBJECT"])
+                raise H3WorkflowError(
+                    f"H3 I2V blocked for {shot_id}: composition-fill failed ({codes}); "
+                    "subject height ≥~75% (CU/MS); run ensure_fill_frame or reseed still; "
+                    "escape AIFILM_SKIP_COMPOSITION_FILL=1"
+                )
+        except H3WorkflowError:
+            raise
+        except Exception as exc:  # noqa: BLE001 — never silently burn postage stamp
+            # Fail closed when gate import works but unexpected error on real path
+            if plan.get("still_path") and Path(str(plan["still_path"])).is_file():
+                raise H3WorkflowError(
+                    f"H3 I2V composition-fill gate error for {shot_id}: {exc}"
+                ) from exc
+
     # Variety door when registering candidates (bulk path) — skip via env escape.
     if register:
         from workflow_pack import WorkflowPackError, assert_variety_preflight
@@ -1265,8 +1376,14 @@ def list_h3_eligible_shots(
     for row in queue.get("shots") or []:
         if not include_challenge and not row.get("primary_h3"):
             continue
-        if not include_done and row.get("status") in {"done", "skip", "poison_blocked"}:
-            # primary pending/retry only when not include_done
+        if not include_done and row.get("status") in {
+            "done",
+            "skip",
+            "poison_blocked",
+            "anatomy_attestation_missing",
+        }:
+            # primary pending/retry only when not include_done;
+            # anatomy_attestation_missing has no command — drop from default list
             if row.get("status") != "retry":
                 if not row.get("command"):
                     continue

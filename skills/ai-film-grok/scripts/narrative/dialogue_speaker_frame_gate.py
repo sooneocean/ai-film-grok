@@ -217,6 +217,38 @@ def lint_dialogue_speaker_frame(
     }
 
 
+def speaker_frame_hard_enabled(spec: dict[str, Any]) -> bool:
+    """I2.3 · when speaker-frame violations are hard (fail-closed).
+
+    Hard when:
+    - speaker_frame_strict / dialogue_window_strict is True, or
+    - vo_mode=dialogue_drama AND heat max/hot/extreme OR adult_max_iron OR genre adult
+
+    Explicit escape: ``speaker_frame_strict: false`` (takes precedence unless
+    dialogue_window_strict is True).
+    """
+    if not isinstance(spec, dict):
+        return False
+    if spec.get("dialogue_window_strict") is True:
+        return True
+    if spec.get("speaker_frame_strict") is False:
+        return False
+    if spec.get("speaker_frame_strict") is True:
+        return True
+    vo = _norm(spec.get("vo_mode"))
+    if vo != "dialogue_drama":
+        return False
+    heat = _norm(spec.get("heat_scale"))
+    genre = _norm(spec.get("genre"))
+    if heat in {"max", "hot", "extreme"}:
+        return True
+    if spec.get("adult_max_iron") is True:
+        return True
+    if genre in {"adult", "erotic", "nsfw", "ecchi"}:
+        return True
+    return False
+
+
 def assert_dialogue_speaker_frame_contract(
     root: Path | str | None = None,
     *,
@@ -234,20 +266,8 @@ def assert_dialogue_speaker_frame_contract(
             raise ProductionGateError(f"speaker-frame gate: missing film-spec at {path}")
 
     report = lint_dialogue_speaker_frame(data)
-    vo = _norm(data.get("vo_mode"))
     if hard is None:
-        hard = (
-            data.get("dialogue_window_strict") is True
-            or data.get("speaker_frame_strict") is True
-            or (
-                vo == "dialogue_drama"
-                and data.get("speaker_frame_strict") is not False
-                and (
-                    _norm(data.get("heat_scale")) in {"max", "hot", "extreme"}
-                    or data.get("adult_max_iron") is True
-                )
-            )
-        )
+        hard = speaker_frame_hard_enabled(data)
 
     bad = list(report.get("violations") or []) + list(report.get("window_violations") or [])
     report["hard"] = bool(hard)
@@ -262,8 +282,259 @@ def assert_dialogue_speaker_frame_contract(
     return report
 
 
+# --- Wave 2 · dialogue still recipe (on_camera → speaker face/MCU, not fullbody meat) ---
+
+_WIDE_SIZES = frozenset(
+    {
+        "ws",
+        "wide",
+        "wideshot",
+        "wide_shot",
+        "full",
+        "fullbody",
+        "full_body",
+        "establishing",
+        "els",
+        "extreme_wide",
+        "long",
+        "long_shot",
+        "ls",
+    }
+)
+_CLOSE_OK = frozenset(
+    {
+        "cu",
+        "ecu",
+        "mcu",
+        "close",
+        "closeup",
+        "close_up",
+        "close-up",
+        "medium_close",
+        "medium_closeup",
+        "ms",
+        "medium",
+        "medium_shot",
+    }
+)
+
+
+def is_on_camera_dialogue_shot(shot: dict[str, Any] | None) -> bool:
+    if not isinstance(shot, dict):
+        return False
+    screen = _screen_mode(shot)
+    if screen not in _ON_CAMERA:
+        return False
+    if _spoken_cues(shot):
+        return True
+    return bool(
+        str(
+            shot.get("spoken_text")
+            or shot.get("dialogue")
+            or shot.get("dialogue_zh")
+            or ""
+        ).strip()
+    )
+
+
+def _shot_size_token(shot: dict[str, Any]) -> str:
+    dsl = shot.get("dsl") if isinstance(shot.get("dsl"), dict) else {}
+    cam = dsl.get("camera") if isinstance(dsl.get("camera"), dict) else {}
+    raw = (
+        shot.get("shot_size")
+        or dsl.get("shot_size")
+        or cam.get("shot_size")
+        or shot.get("framing")
+        or ""
+    )
+    return str(raw).strip().lower().replace(" ", "_").replace("-", "_")
+
+
+def lint_dialogue_still_recipe(shot: dict[str, Any] | None) -> dict[str, Any]:
+    """Field-level still recipe for on_camera dialogue (no pixels).
+
+    Hard codes (when speaker_frame hard):
+      SPEAKER_MISSING_FOR_STILL — no speaker on on_camera dialogue
+      DIALOGUE_STILL_WIDE_FRAME — WS/fullbody size on talking head
+    Soft:
+      DIALOGUE_STILL_SIZE_UNSPECIFIED — no shot_size (prefer MCU/CU)
+    """
+    issues: list[dict[str, Any]] = []
+    if not is_on_camera_dialogue_shot(shot):
+        return {
+            "schema_version": 1,
+            "kind": "dialogue-still-recipe",
+            "ok": True,
+            "applies": False,
+            "issues": [],
+        }
+    sh = shot if isinstance(shot, dict) else {}
+    sid = str(sh.get("id") or "")
+    speaker = _norm(sh.get("speaker") or sh.get("dialogue_speaker"))
+    if not speaker:
+        issues.append(
+            {
+                "shot_id": sid,
+                "code": "SPEAKER_MISSING_FOR_STILL",
+                "severity": "hard",
+                "msg": "on_camera dialogue still requires named speaker (face of speaker)",
+            }
+        )
+    size = _shot_size_token(sh)
+    if size in _WIDE_SIZES or "fullbody" in size or size.endswith("_ws"):
+        issues.append(
+            {
+                "shot_id": sid,
+                "code": "DIALOGUE_STILL_WIDE_FRAME",
+                "severity": "hard",
+                "msg": (
+                    f"on_camera dialogue still uses wide/fullbody size={size!r}; "
+                    "use face MCU/CU of speaker (禁全身办事 still 挂台词)"
+                ),
+            }
+        )
+    elif not size:
+        issues.append(
+            {
+                "shot_id": sid,
+                "code": "DIALOGUE_STILL_SIZE_UNSPECIFIED",
+                "severity": "soft",
+                "msg": "on_camera dialogue should set shot_size MCU/CU for still recipe",
+            }
+        )
+    elif size not in _CLOSE_OK and "close" not in size and size not in {"ms", "medium"}:
+        issues.append(
+            {
+                "shot_id": sid,
+                "code": "DIALOGUE_STILL_SIZE_RISKY",
+                "severity": "soft",
+                "msg": f"dialogue still size={size!r} — prefer MCU/CU speaker face",
+            }
+        )
+    hard_codes = [i for i in issues if i.get("severity") == "hard"]
+    return {
+        "schema_version": 1,
+        "kind": "dialogue-still-recipe",
+        "ok": not hard_codes,
+        "applies": True,
+        "shot_id": sid or None,
+        "speaker": speaker or None,
+        "shot_size": size or None,
+        "issues": issues,
+    }
+
+
+def assert_dialogue_still_for_register(
+    root: Path | str,
+    shot_id: str,
+    *,
+    hard: bool | None = None,
+) -> dict[str, Any]:
+    """Fail-closed still recipe for on_camera dialogue when speaker-frame hard."""
+    base = Path(root).expanduser().resolve()
+    spec = read_json(base / "film-spec.json") or {}
+    if not isinstance(spec, dict):
+        return {"ok": True, "skipped": True, "reason": "no_spec"}
+    shot = None
+    for sh in _iter_shots(spec):
+        if str(sh.get("id") or "") == str(shot_id):
+            shot = sh
+            break
+    if shot is None:
+        return {"ok": True, "skipped": True, "reason": "shot_not_in_spec"}
+    report = lint_dialogue_still_recipe(shot)
+    if hard is None:
+        hard = speaker_frame_hard_enabled(spec)
+    report["hard"] = bool(hard)
+    hard_issues = [
+        i for i in (report.get("issues") or []) if i.get("severity") == "hard"
+    ]
+    if hard and hard_issues:
+        codes = sorted({str(i.get("code")) for i in hard_issues})
+        raise ProductionGateError(
+            "dialogue still recipe failed for "
+            f"{shot_id}: {', '.join(codes)}; use speaker face MCU/CU still "
+            "(escape speaker_frame_strict:false)"
+        )
+    return report
+
+
+# --- Wave 2 · prompt must not ban speech when shot has spoken_text ---
+
+_NO_SPEECH_PATTERNS = (
+    "no speech",
+    "no talking",
+    "without speech",
+    "silent mouth",
+    "mouth closed no",
+    "do not speak",
+    "doesn't speak",
+    "does not speak",
+    "mute character",
+    "no dialogue",
+    "禁说话",
+    "不要开口",
+    "闭嘴不语",
+    "无对白",
+    "不说话",
+)
+
+
+def lint_dialogue_prompt_speech(
+    prompt: str,
+    shot: dict[str, Any] | None,
+) -> dict[str, Any]:
+    """If shot has spoken dialogue, custom/I2V prompt must not say no-speech."""
+    spoken = False
+    if isinstance(shot, dict):
+        spoken = is_on_camera_dialogue_shot(shot) or bool(
+            str(shot.get("spoken_text") or "").strip()
+        )
+        if not spoken:
+            for cue in shot.get("audio_cues") or []:
+                if isinstance(cue, dict) and str(
+                    cue.get("spoken_text") or cue.get("text") or ""
+                ).strip():
+                    spoken = True
+                    break
+    if not spoken:
+        return {"ok": True, "applies": False, "hits": []}
+    low = str(prompt or "").lower()
+    hits = [p for p in _NO_SPEECH_PATTERNS if p in low]
+    return {
+        "ok": not hits,
+        "applies": True,
+        "hits": hits,
+        "code": "DIALOGUE_PROMPT_NO_SPEECH" if hits else None,
+        "msg": (
+            f"dialogue shot prompt forbids speech ({hits}); remove no-speech lines "
+            "and keep Mandarin spoken delivery"
+            if hits
+            else None
+        ),
+    }
+
+
+def assert_dialogue_prompt_allows_speech(
+    prompt: str,
+    shot: dict[str, Any] | None,
+) -> dict[str, Any]:
+    rep = lint_dialogue_prompt_speech(prompt, shot)
+    if not rep.get("ok"):
+        raise ProductionGateError(
+            str(rep.get("msg") or "DIALOGUE_PROMPT_NO_SPEECH")
+        )
+    return rep
+
+
 __all__ = [
     "DIALOGUE_WINDOW_HEAT",
+    "assert_dialogue_prompt_allows_speech",
     "assert_dialogue_speaker_frame_contract",
+    "assert_dialogue_still_for_register",
+    "is_on_camera_dialogue_shot",
+    "lint_dialogue_prompt_speech",
     "lint_dialogue_speaker_frame",
+    "lint_dialogue_still_recipe",
+    "speaker_frame_hard_enabled",
 ]

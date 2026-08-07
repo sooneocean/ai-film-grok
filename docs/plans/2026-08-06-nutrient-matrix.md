@@ -2,8 +2,8 @@
 
 **Purpose:** 一眼看出「已吞吐可废文」vs「半吞吐补默认」vs「真 OPEN」。  
 **Authority:** hard-defaults + 代码 > memory > lesson。  
-**Probe:** plugin.json **2.40.48** · memory active **~42** · archive **~52**。  
-**执行板:** [CTO](2026-08-06-cto-optimization-todoplan.md) · **[铁律内化](2026-08-07-iron-internalization-todoplan.md)**（I0–I5）
+**Probe:** plugin.json **2.40.51** · memory active **~42** · archive **~52**。  
+**执行板:** [CTO](2026-08-06-cto-optimization-todoplan.md) · **[铁律内化](2026-08-07-iron-internalization-todoplan.md)**（**I0–I4 产品链 CLOSED**）
 
 ---
 
@@ -52,19 +52,19 @@
 |----|------|--------|----------|--------|
 | ~~H1~~ | plate≠master 口头 DONE | → **L4** | — | ✅ closeout + export 机读 |
 | ~~H2~~ | multi-seed shortlist 纪律 | → **L3+** | I1.1 | ✅ promote fail-closed；**全入口**仍 I1.1 |
-| H-material (H3) | restricted 缺 generation_request | L3 soft | **I2.4** | soft→hard |
-| ~~H4~~ | promote 硬冲 bare | → **L3+** | I1.5 | ✅ nested ban；压满入口 |
-| H-listen (H5) | aac≠可懂中文 | L2 人抽听 | deferred | ASR 后置；deliver 清单 |
-| H-dual (H6) | 双片 drain / 禁 pgrep 源码 | 纪律为主 | **I5.2** | 审计+测 |
-| **H-pixel-poison** | 毒镜无视觉分类；假 attestation | L3 人证 | **I2.1** | 缺 attestation fail-closed |
-| **H-endframe** | 末帧不回穿无自动闸 | L2 流程 | **I2.2** | register 抽帧 receipt 启发式 |
-| **H-variety-pixel** | 改 spec 不 re-I2V 可假绿 | L3 字段 | **I1.2** | 像素/邻差 hard |
-| **H-plate-boring** | 门绿≠好看；mix 假死 opt-in | L3 partial | **I1.3–I1.4** | closeout 禁 master + mix 默认不假死 |
-| **H-anti-hijack-all** | 非所有 multi-seed 入口强制 | L3 工具 | **I1.1** | 缺跑=不可 promote |
-| **H-speaker** | speaker-frame 默认 soft | L3 soft | **I2.3** | max+dialogue_drama → hard |
-| **H-scale-chain** | scale ban 未全封闭 promote | L3 | **I1.5** | 全 register 入口 |
-| **H-run-next-hog** | run-next 循环可软 hog | L3 until-empty only | **I5.1** | 提交预算 / busy 更严 |
-| **H-context-blind** | hard-defaults 不进 dispatch | L0 指针 | **I3** | routing + stages 瘦 |
+| ~~H-material~~ | restricted 缺 generation_request | → **L4 hard** | I2.4 | ✅ assert_generation_request_for_i2v |
+| ~~H4~~ | promote 硬冲 bare | → **L3+** | I1.5 residual | nested ban 已有 |
+| H-listen (H5) | aac≠可懂中文 | L2 人抽听 | deferred | ASR 后置 |
+| H-dual (H6) | 双片 drain | 纪律 | **I5** OPEN_OPS | — |
+| ~~H-pixel-poison~~ | 缺/毒 attestation | → **L4 人证** | I2.1 | ✅ |
+| ~~H-endframe~~ | 末帧不回穿 | → **L3 启发式** | I2.2 | ✅ endframe_wardrobe |
+| ~~H-variety-pixel~~ | 改 spec 假绿 | → **L4** | I1.2 | ✅ |
+| ~~H-plate-boring~~ | mean≪20 + mix 假死 | → **L4** | I1.3+I1.4 | ✅ plate + default broadband |
+| ~~H-anti-hijack-all~~ | multi-seed | → **L4** | I1.1 | ✅ |
+| ~~H-speaker~~ | speaker soft | → **L4** | I2.3 | ✅ |
+| H-scale-chain | scale ban 全入口 | L3+ residual | 触达 | — |
+| H-run-next-hog | 软 hog | ops | **I5** | OPEN_OPS |
+| ~~H-context-blind~~ | dispatch 盲 | → **L3** | I3 | ✅ stages 瘦 + routing |
 
 ---
 
@@ -74,12 +74,12 @@
 |----|-----|------|
 | CTO-1 | gates 静默 except → fail-closed | eng P0 |
 | CTO-2 | final/hotpath + plate≠master 永不回退 | eng P0 |
-| **I1*** | **假绿：anti-hijack 全入口 · variety 像素 · plate-boring · mix** | **铁律内化 P0** |
-| **I2*** | **人证 harden：毒镜 attestation · speaker hard · material hard** | **铁律内化 P0–P1** |
-| CTO-5 | 5090 drain 或 OPEN_OPS | ops P0 |
+| ~~I1*~~ | 假绿 anti-hijack/variety/plate/mix | **SHIPPED 2.40.51** |
+| ~~I2*~~ | 人证 anatomy/speaker/material/endframe | **SHIPPED 2.40.51** |
+| CTO-5 | 5090 drain 或 OPEN_OPS | ops P0 · I5 |
 | CTO-6 | 触达式 peel final/validate/preflight | structure P1 |
-| **I3** | stages 瘦 + context-routing 关键 issue | collab P1 |
-| **I4.1** | hard-defaults 契约常量测（防 doc/code 漂移） | eng P1 optional |
+| ~~I3~~ | stages 瘦 + routing | **SHIPPED** |
+| ~~I4.1~~ | hard-defaults 契约测 | **SHIPPED** |
 | CTO-12 | throughput-counters / provider 429 | deferred |
 | H-listen | aac 可懂中文 ASR | deferred |
 

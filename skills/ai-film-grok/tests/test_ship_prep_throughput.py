@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -71,6 +72,7 @@ class MeasureMeanTests(unittest.TestCase):
 
 class ShortlistPromoteTests(unittest.TestCase):
     def test_promote_writes_manifest_clip(self) -> None:
+        """Mean-rank promote with intentional anti-hijack skip (dummy bytes ≠ real frames)."""
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             _write(
@@ -101,7 +103,9 @@ class ShortlistPromoteTests(unittest.TestCase):
             strong.write_bytes(b"\x00" * 200)
             write_mean_sidecar(weak, 5.0)
             write_mean_sidecar(strong, 22.0)
-            rep = select_shortlist(root, write=True, promote=True, measure_missing=False)
+            # Dummy mp4 cannot extract frames → AH marks hijack; mean-rank path needs SKIP.
+            with mock.patch.dict(os.environ, {"AIFILM_SKIP_ANTI_HIJACK": "1"}, clear=False):
+                rep = select_shortlist(root, write=True, promote=True, measure_missing=False)
             self.assertTrue(rep.get("promoted"))
             man = json.loads((root / "manifest.json").read_text(encoding="utf-8"))
             self.assertEqual(Path(man["clips"]["s1"]["path"]).resolve(), strong.resolve())

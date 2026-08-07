@@ -17,7 +17,7 @@
 
 | 旧板 / 子板 | 角色 |
 |------|------|
-| **`docs/plans/2026-08-07-iron-internalization-todoplan.md`** | **铁律→代码内化子板（I0–I5）** · 支柱 A 假绿/人证；I0 账实已 ship |
+| **`docs/plans/2026-08-07-iron-internalization-todoplan.md`** | **铁律→代码内化子板** · **I0–I4 产品链 CLOSED 2.40.51**；I5 ops deferred |
 | `docs/plans/2026-08-06-nutrient-matrix.md` | L3/L4/L5 养分对账（I0 刷新） |
 | `docs/plans/2026-08-06-next-optimization-todoplan.md` | 近期 W0–N 执行板（多数 SHIPPED） |
 | `docs/plans/2026-08-06-optimization-todoplan.md` | 出片 A–G · A1–A5 SHIPPED |
@@ -245,7 +245,7 @@
 
 | ID | 主题 | 波次 | 优先级 |
 |----|------|------|--------|
-| 1 | gates 静默 except → fail-closed | A1 | **P0 · partial 2.40.42**（true_video / corrupt bible / graph soft / cinematic ensure note） |
+| 1 | gates 静默 except → fail-closed | A1 | **P0 · +2.40.56**（gate-auto + cinematic variety/five_track + preflight speaker/style probe） |
 | 2 | final/hotpath + plate≠master 永不回退 | A1/A2 | **P0** |
 | 3 | 双 checkout + 单一执行板 | G0 | **P0** |
 | 4 | 真片 ship-prep 人链 / 诚实 PARTIAL | A2 | **P0** |

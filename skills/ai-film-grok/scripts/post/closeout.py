@@ -75,13 +75,17 @@ def _final_record(root: Path) -> dict[str, Any] | None:
 
 
 def plate_delivery_honesty(root: Path | str) -> dict[str, Any]:
-    """S1.4 · detect OFFICIAL_FINAL_PLATE (not master) so closeout never pretends complete."""
+    """S1.4 · detect OFFICIAL_FINAL_PLATE (not master) so closeout never pretends complete.
+
+    I1.3: plate-boring meat mean also marks plate-only (no master).
+    """
     base = _root(root)
     plate_markers: list[str] = []
     for rel in (
         "receipts/official-final-report.json",
         "receipts/h3-ship-native.json",
         "receipts/delivery-class.json",
+        "receipts/plate-boring-mean.json",
     ):
         data = read_json(base / rel) or {}
         if not isinstance(data, dict):
@@ -103,10 +107,26 @@ def plate_delivery_honesty(root: Path | str) -> dict[str, Any]:
         ):
             if rel not in plate_markers:
                 plate_markers.append(rel)
-    is_plate = bool(plate_markers)
+        if data.get("boring") is True or "PLATE_BORING_MEAT_MEAN" in (
+            data.get("codes") or []
+        ):
+            if rel not in plate_markers:
+                plate_markers.append(rel)
+    boring = False
+    try:
+        from final.delivery_class import assess_plate_boring_meat_mean
+
+        br = assess_plate_boring_meat_mean(base)
+        boring = bool(br.get("boring"))
+        if boring and "receipts/i2v-high-motion-audit.json" not in plate_markers:
+            plate_markers.append("receipts/i2v-high-motion-audit.json#plate_boring")
+    except Exception:  # noqa: BLE001
+        pass
+    is_plate = bool(plate_markers) or boring
     return {
         "is_official_plate": is_plate,
         "markers": plate_markers,
+        "plate_boring": boring,
         "master_eligible": not is_plate,
         "note": (
             "OFFICIAL_FINAL_PLATE is not final_complete; need gate-auto green + review-final"

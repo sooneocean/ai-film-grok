@@ -270,7 +270,11 @@ def auto_i2v_motion_gate(root: Path, *, write: bool = True) -> dict[str, Any]:
 
 
 def auto_promote_single_takes(root: Path) -> dict[str, Any]:
-    """When a shot has exactly one take, promote it without human PK."""
+    """When a shot has exactly one take, promote it without human PK.
+
+    A1 · shortlist ok=false (e.g. multi-seed without anti-hijack) must not report
+    promote step as green.
+    """
     try:
         from workflow_pack import select_shortlist
 
@@ -280,12 +284,21 @@ def auto_promote_single_takes(root: Path) -> dict[str, Any]:
         for s in rep.get("shots") or []:
             if isinstance(s, dict) and int(s.get("take_count") or 0) >= 2:
                 multi += 1
+        shortlist_ok = bool(rep.get("ok", True))
+        promote_blocked = bool(rep.get("promote_blocked"))
         return {
-            "ok": True,
+            "ok": shortlist_ok and not promote_blocked,
             "promoted": len(rep.get("promoted") or []),
             "multi_take_shots": multi,
             "human_pk_still_required": multi > 0,
-            "detail": "single-take auto-promoted; multi-take needs human PK",
+            "promote_blocked": promote_blocked,
+            "codes": list(rep.get("codes") or []),
+            "detail": (
+                f"shortlist ok={shortlist_ok} blocked={promote_blocked} "
+                f"codes={rep.get('codes') or []}"
+                if not shortlist_ok or promote_blocked
+                else "single-take auto-promoted; multi-take needs human PK"
+            ),
         }
     except Exception as exc:  # noqa: BLE001
         return {"ok": False, "error": str(exc)[:200]}
@@ -487,19 +500,20 @@ def run_gate_auto(
     except Exception as exc:  # noqa: BLE001
         steps.append(_step("true_video", ok=False, detail=str(exc)[:200]))
 
-    # 5) variety (machine lint of film-spec)
+    # 5) variety (machine lint of film-spec) + I1.2 variety_pixel
     if run_variety:
         try:
-            from workflow_pack import variety_precheck
+            from workflow_pack import variety_pixel_bind, variety_precheck
 
             var = variety_precheck(base, write=write)
+            meat_n = int(var.get("meat_shot_count") or 0)
             # If no meat shots, variety often "ok" with empty matrix — fine
             steps.append(
                 _step(
                     "variety",
                     ok=bool(var.get("ok")),
-                    detail=f"issues={len(var.get('issues') or [])} meat={var.get('meat_shot_count')}",
-                    hard=bool(int(var.get("meat_shot_count") or 0) >= 2),
+                    detail=f"issues={len(var.get('issues') or [])} meat={meat_n}",
+                    hard=bool(meat_n >= 2),
                     next_cmd=(
                         None
                         if var.get("ok")
@@ -510,8 +524,35 @@ def run_gate_auto(
                     ],
                 )
             )
-        except Exception as exc:  # noqa: BLE001
-            steps.append(_step("variety", ok=True, hard=False, detail=f"skip: {exc}"[:160]))
+            vpx = variety_pixel_bind(base, write=write)
+            steps.append(
+                _step(
+                    "variety_pixel",
+                    ok=bool(vpx.get("ok") or vpx.get("skipped")),
+                    detail=(
+                        "skipped"
+                        if vpx.get("skipped")
+                        else f"issues={len(vpx.get('issues') or [])}"
+                    ),
+                    hard=bool(meat_n >= 2) and not bool(vpx.get("skipped")),
+                    next_cmd=vpx.get("next_cmd"),
+                    codes=[
+                        str(i.get("code"))
+                        for i in (vpx.get("issues") or [])
+                        if isinstance(i, dict)
+                    ],
+                )
+            )
+        except Exception as exc:  # noqa: BLE001 — A1: never silent-green variety
+            steps.append(
+                _step(
+                    "variety",
+                    ok=False,
+                    hard=True,
+                    detail=f"variety probe failed: {exc}"[:200],
+                    next_cmd=f'aifilm variety-precheck --root "{r}"',
+                )
+            )
 
     # 6) cinematic composite (uses fresh i2v receipts)
     if run_cinematic:

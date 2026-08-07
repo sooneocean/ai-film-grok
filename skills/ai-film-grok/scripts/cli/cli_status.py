@@ -747,7 +747,33 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     emit(report)
     return 0 if (report["strict_ok"] if getattr(args, "strict", False) else report["ok"]) else 1
 
+def cmd_iron_status(args: argparse.Namespace) -> int:
+    """List iron gates + which AIFILM_SKIP_* escapes are armed (I4.2)."""
+    from core.emit import emit
+    from gates.iron_status import iron_status_report
+
+    root = getattr(args, "root", None)
+    rep = iron_status_report(root if root else None)
+    emit(rep)
+    # exit 1 if any iron escape armed (ops hygiene)
+    if getattr(args, "strict", False) and int(rep.get("escape_count") or 0) > 0:
+        return 1
+    return 0
+
+
 def add_status_parsers(sub: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
+    iron = sub.add_parser(
+        "iron-status",
+        help="List IRON machine gates + armed AIFILM_SKIP_* escapes (read-only)",
+    )
+    iron.add_argument("--root", default=None, help="Optional film root for receipt snapshot")
+    iron.add_argument(
+        "--strict",
+        action="store_true",
+        help="Exit 1 if any AIFILM_SKIP_* iron escape is armed in env",
+    )
+    iron.set_defaults(func=cmd_iron_status, no_write=True)
+
     doctor = sub.add_parser(
         "doctor", help="Check tooling, locks, schema, backends, and security posture"
     )

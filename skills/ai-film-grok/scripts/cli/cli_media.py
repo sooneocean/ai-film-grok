@@ -737,6 +737,30 @@ def cmd_register_still(args: argparse.Namespace) -> int:
             + " — one continuous story frame only; never turnaround/expression boards. "
             "See references/lessons-2026-08-03-huangdao-rhythm-still-voice-silk.md"
         )
+    # P0 2026-08-07: I2V first-frame subject fill (EP02 postage-stamp accident)
+    composition_fill_rep: dict[str, Any] | None = None
+    if args.status == "approved":
+        try:
+            from composition_fill_gate import assert_i2v_firstframe_fill, ensure_fill_frame
+
+            composition_fill_rep = assert_i2v_firstframe_fill(source, mode="open")
+            if not composition_fill_rep.get("ok") and not composition_fill_rep.get("skipped"):
+                # one auto-remedy pass (letterbox strip / cover-crop) then re-gate
+                ensure_fill_frame(source, source, mode="open")
+                composition_fill_rep = assert_i2v_firstframe_fill(source, mode="open")
+            if not composition_fill_rep.get("ok") and not composition_fill_rep.get("skipped"):
+                raise FilmError(
+                    "Approved still failed I2V composition-fill gate: "
+                    + "; ".join(composition_fill_rep.get("errors") or composition_fill_rep.get("codes") or ["TINY_SUBJECT"])
+                    + " — subject must fill ≥~72% frame height (CU/MS); "
+                    "never raw fullbody cast master. "
+                    "See memory/2026-08-07-i2v-firstframe-fill-no-tiny-fullbody.md "
+                    "(escape AIFILM_SKIP_COMPOSITION_FILL=1)"
+                )
+        except FilmError:
+            raise
+        except Exception:
+            composition_fill_rep = None
     # P0 2026-07-29: one still must not be approved for multiple shots (byte-identical)
     if args.status == "approved":
         from still_uniqueness import StillUniquenessError, assert_still_is_unique
@@ -774,6 +798,16 @@ def cmd_register_still(args: argparse.Namespace) -> int:
             )
         except AnatomySafetyError as exc:
             raise FilmError(str(exc)) from exc
+        # Wave 2 · on_camera dialogue still = speaker face MCU (not wide meat body)
+        try:
+            from dialogue_speaker_frame_gate import assert_dialogue_still_for_register
+            from production_gates import ProductionGateError
+
+            assert_dialogue_still_for_register(root, str(args.shot_id))
+        except ProductionGateError as exc:
+            raise FilmError(str(exc)) from exc
+        except Exception:
+            pass
         if not identity_approved:
             raise FilmError(
                 "Approved stills require --identity-approved after comparing to cast master"
@@ -783,6 +817,15 @@ def cmd_register_still(args: argparse.Namespace) -> int:
                 "Approved stills require --review-note "
                 "(e.g. 'id-ok face/hair/outfit; medium matches style-v1')"
             )
+        # I1.5 · scale promote_ban on still approve (same as clip)
+        try:
+            from narrative.scale_fallback import ScalePromoteBanError, assert_scale_promote_allowed
+
+            assert_scale_promote_allowed(root, review_note=review_note, kind="still")
+        except ScalePromoteBanError as exc:
+            raise FilmError(str(exc)) from exc
+        except Exception:
+            pass
         # 卸装不回穿 still 源：undressed/bare 禁 sole-ref 全装 cast master
         heat_scale = str(spec.get("heat_scale") or "").strip().lower()
         if heat_scale == "max" and spec.get("adult_max_iron") is not False:
@@ -840,6 +883,13 @@ def cmd_register_still(args: argparse.Namespace) -> int:
     )
     record["geometry_qa"] = geo
     record["quality_gate"] = quality
+    if composition_fill_rep is not None:
+        record["composition_fill"] = {
+            "ok": composition_fill_rep.get("ok"),
+            "codes": composition_fill_rep.get("codes"),
+            "metrics": composition_fill_rep.get("metrics"),
+            "skipped": composition_fill_rep.get("skipped"),
+        }
     record["anatomy_safe"] = anatomy_safe if args.status == "approved" else None
     if style_job:
         record["style_reference_job"] = style_job
@@ -967,6 +1017,39 @@ def cmd_register_clip(args: argparse.Namespace) -> int:
             )
         except AnatomySafetyError as exc:
             raise FilmError(str(exc)) from exc
+        # I2.2 · endframe no-redress heuristic on undress meat
+        try:
+            from endframe_wardrobe import EndframeWardrobeError, assert_endframe_no_redress
+
+            clip_spec = read_json(root / "film-spec.json") if (root / "film-spec.json").is_file() else {}
+            if not isinstance(clip_spec, dict):
+                clip_spec = {}
+            heat_phase = None
+            wardrobe_state = None
+            for sc in clip_spec.get("scenes") or []:
+                if not isinstance(sc, dict):
+                    continue
+                for sh in sc.get("shots") or []:
+                    if isinstance(sh, dict) and str(sh.get("id") or "") == str(args.shot_id):
+                        heat_phase = sh.get("heat_phase")
+                        wardrobe_state = sh.get("wardrobe_state") or (
+                            (sh.get("dsl") or {}).get("wardrobe_state")
+                            if isinstance(sh.get("dsl"), dict)
+                            else None
+                        )
+                        break
+            assert_endframe_no_redress(
+                root,
+                str(args.shot_id),
+                source,
+                wardrobe_state=str(wardrobe_state) if wardrobe_state else None,
+                heat_phase=str(heat_phase) if heat_phase else None,
+                hard=True,
+            )
+        except EndframeWardrobeError as exc:
+            raise FilmError(str(exc)) from exc
+        except Exception:
+            pass
         if endpoint not in ALLOWED_VIDEO_ENDPOINTS:
             raise FilmError(
                 f"Approved clips require --source-endpoint in {sorted(ALLOWED_VIDEO_ENDPOINTS)}"
@@ -988,53 +1071,15 @@ def cmd_register_clip(args: argparse.Namespace) -> int:
             )
         if not review_note:
             raise FilmError("Approved clips require --review-note with the visual review result")
-        # AD C3 · scale_fallback promote ban: no blind approve of hard-on collapse
-        if os.environ.get("AIFILM_SKIP_SCALE_PROMOTE_GATE", "").strip().lower() not in {
-            "1",
-            "true",
-            "yes",
-            "on",
-        }:
-            try:
-                from util import read_json as soft_read_json
+        # I1.5 · scale_fallback promote ban (shared assert)
+        try:
+            from narrative.scale_fallback import ScalePromoteBanError, assert_scale_promote_allowed
 
-                sf_path = root / "receipts" / "scale-fallback.json"
-                sf = soft_read_json(sf_path) if sf_path.is_file() else None
-                # N1.2 · promote_ban on receipt root or nested decision
-                ban = False
-                ban_codes: list[Any] = []
-                if isinstance(sf, dict):
-                    ban = bool(sf.get("promote_ban"))
-                    ban_codes = list(sf.get("codes") or [])
-                    dec = sf.get("decision") if isinstance(sf.get("decision"), dict) else {}
-                    if dec.get("promote_ban"):
-                        ban = True
-                        ban_codes = list(dec.get("codes") or ban_codes)
-                if ban:
-                    note_l = review_note.lower()
-                    allow = any(
-                        tok in note_l
-                        for tok in (
-                            "soft-max",
-                            "soft_max",
-                            "model-limit",
-                            "scale_fallback",
-                            "scale-fallback",
-                            "fallback accepted",
-                        )
-                    )
-                    if not allow:
-                        raise FilmError(
-                            "scale_fallback promote_ban active "
-                            f"(codes={ban_codes}) — do not blind-approve collapsed bare; "
-                            "re-gen at recommended_tier / soft-max, or pass review-note containing "
-                            "'soft-max' / 'scale_fallback' after human accept. "
-                            "Escape: AIFILM_SKIP_SCALE_PROMOTE_GATE=1"
-                        )
-            except FilmError:
-                raise
-            except Exception:  # noqa: BLE001
-                pass
+            assert_scale_promote_allowed(root, review_note=review_note, kind="clip")
+        except ScalePromoteBanError as exc:
+            raise FilmError(str(exc)) from exc
+        except Exception:  # noqa: BLE001 — soft miss of helper only
+            pass
     manifest = load_manifest(root)
     style_job = None
     style = read_json(root / "style-bible.json") if (root / "style-bible.json").is_file() else {}

@@ -1,6 +1,7 @@
 # Memory · 2026-08-05 · h3_primary 无限主产线
 
-**定策**：[docs/plans/2026-08-05-h3-primary-capacity.md](../../../docs/plans/2026-08-05-h3-primary-capacity.md)  
+**定策（实现 SHIPPED）**：[docs/plans/archive/2026-08-05-h3-primary-capacity.md](../../../docs/plans/archive/2026-08-05-h3-primary-capacity.md)  
+**日课续板（ACTIVE）**：[docs/plans/2026-08-06-h3-core-workflow-todoplan.md](../../../docs/plans/2026-08-06-h3-core-workflow-todoplan.md) · [h3-core-workflow memory](2026-08-06-h3-core-workflow.md)  
 **矩阵**：[weapon-lane-matrix.md](../references/weapon-lane-matrix.md)
 
 ## 用户原话

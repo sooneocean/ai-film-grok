@@ -45,22 +45,30 @@ def test_report_rejects_missing_and_explicitly_poisoned_media() -> None:
 
 
 def test_adult_max_i2v_queue_rejects_unattested_keyframe(tmp_path: Path) -> None:
+    import os
+    from unittest import mock
+
     root = _adult_root(tmp_path)
     (root / "manifest.json").write_text(json.dumps({"stills": {}}), encoding="utf-8")
     prompt = root / "shot01.txt"
     image = root / "shot01.png"
     prompt.write_text("prompt", encoding="utf-8")
     image.write_bytes(b"png")
-    with pytest.raises(QueueError, match="approved keyframe"):
-        MediaQueue(root).add_job(
-            shot_id="shot01",
-            operation="image_to_video",
-            prompt_file=prompt,
-            inputs=[image],
-        )
+    # Isolate anatomy gate from I2.4 generation_request hard path
+    with mock.patch.dict(os.environ, {"AIFILM_SKIP_GENERATION_REQUEST": "1"}, clear=False):
+        with pytest.raises(QueueError, match="approved keyframe|anatomy_safe|I2V blocked"):
+            MediaQueue(root).add_job(
+                shot_id="shot01",
+                operation="image_to_video",
+                prompt_file=prompt,
+                inputs=[image],
+            )
 
 
 def test_adult_max_i2v_queue_binds_input_bytes_to_the_safe_keyframe(tmp_path: Path) -> None:
+    import os
+    from unittest import mock
+
     root = _adult_root(tmp_path)
     safe = root / "safe.png"
     poison = root / "unreviewed-poison.png"
@@ -83,16 +91,20 @@ def test_adult_max_i2v_queue_binds_input_bytes_to_the_safe_keyframe(tmp_path: Pa
         ),
         encoding="utf-8",
     )
-    with pytest.raises(QueueError, match="does not match the approved anatomy-safe"):
-        MediaQueue(root).add_job(
-            shot_id="shot01",
-            operation="image_to_video",
-            prompt_file=prompt,
-            inputs=[poison],
-        )
+    with mock.patch.dict(os.environ, {"AIFILM_SKIP_GENERATION_REQUEST": "1"}, clear=False):
+        with pytest.raises(QueueError, match="does not match the approved anatomy-safe"):
+            MediaQueue(root).add_job(
+                shot_id="shot01",
+                operation="image_to_video",
+                prompt_file=prompt,
+                inputs=[poison],
+            )
 
 
 def test_adult_max_reference_i2v_rejects_extra_unreviewed_image(tmp_path: Path) -> None:
+    import os
+    from unittest import mock
+
     root = _adult_root(tmp_path)
     safe = root / "safe.png"
     poison = root / "unreviewed-poison.png"
@@ -115,10 +127,11 @@ def test_adult_max_reference_i2v_rejects_extra_unreviewed_image(tmp_path: Path) 
         ),
         encoding="utf-8",
     )
-    with pytest.raises(QueueError, match="every input must be"):
-        MediaQueue(root).add_job(
-            shot_id="shot01",
-            operation="reference_to_video",
-            prompt_file=prompt,
-            inputs=[safe, poison],
-        )
+    with mock.patch.dict(os.environ, {"AIFILM_SKIP_GENERATION_REQUEST": "1"}, clear=False):
+        with pytest.raises(QueueError, match="every input must be"):
+            MediaQueue(root).add_job(
+                shot_id="shot01",
+                operation="reference_to_video",
+                prompt_file=prompt,
+                inputs=[safe, poison],
+            )

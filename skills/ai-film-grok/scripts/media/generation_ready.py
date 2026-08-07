@@ -58,6 +58,13 @@ def generation_ready_report(root: Path | str) -> dict[str, Any]:
         ssa = audit_film_still_sources(base)
     except Exception as exc:
         ssa = {"ok": True, "hard": [], "peak_missing": [], "error": str(exc)[:120]}
+    # P0 2026-08-07: keyframe subject-fill audit (postage-stamp / cast fullbody)
+    try:
+        from composition_fill_gate import audit_film_composition_fill
+
+        cfa = audit_film_composition_fill(base, auto_remedy=False, max_shots=80)
+    except Exception as exc:
+        cfa = {"ok": True, "hard": [], "checked": 0, "error": str(exc)[:120]}
     shots: list[dict[str, Any]] = []
     if isinstance(spec, dict):
         for scene in spec.get("scenes") or []:
@@ -86,9 +93,13 @@ def generation_ready_report(root: Path | str) -> dict[str, Any]:
         pass
     peak_missing = list(ssa.get("peak_missing") or [])
     hard = list(ssa.get("hard") or [])
+    fill_hard = list(cfa.get("hard") or [])
     blockers: list[str] = []
     if hard:
         blockers.extend(str(x) for x in hard[:5])
+    if fill_hard:
+        blockers.append(f"COMPOSITION_FILL:{len(fill_hard)}")
+        blockers.extend(str(x) for x in fill_hard[:3])
     if not style_locked and shots:
         blockers.append("STYLE_NOT_LOCKED")
 
@@ -96,6 +107,7 @@ def generation_ready_report(root: Path | str) -> dict[str, Any]:
     line_parts = [
         f"style={'lock' if style_locked else 'open'}",
         f"still_src={'ok' if ssa.get('ok') else 'hard'}",
+        f"fill={'ok' if cfa.get('ok') else f'hard{len(fill_hard)}'}",
         f"flf={flf_eligible}/{len(shots) or 0}",
         f"reg={'yes' if isinstance(reg, dict) and reg else 'no'}",
     ]
@@ -111,6 +123,11 @@ def generation_ready_report(root: Path | str) -> dict[str, Any]:
         hints.append("lock style-bible before bulk")
     if peak_missing:
         hints.append("peak wardrobe still missing — use state photo / Qwen edit primary")
+    if fill_hard:
+        hints.append(
+            "keyframe subject fill too small — ensure_fill_frame / CU reseed "
+            "(never raw fullbody cast master as I2V first frame)"
+        )
     if flf_missing_last and flf_eligible == 0 and shots:
         hints.append("no last frames yet — I2V default; produce _end.png for FLF")
     elif flf_missing_last:
@@ -125,9 +142,12 @@ def generation_ready_report(root: Path | str) -> dict[str, Any]:
     return {
         "schema_version": 1,
         "kind": "generation-ready",
-        "ok": bool(style_locked or not shots) and not peak_missing,
+        "ok": bool(style_locked or not shots) and not peak_missing and bool(cfa.get("ok", True)),
         "style_locked": style_locked,
         "still_source_ok": bool(ssa.get("ok")),
+        "composition_fill_ok": bool(cfa.get("ok", True)),
+        "composition_fill_hard": fill_hard[:12],
+        "composition_fill_checked": int(cfa.get("checked") or 0),
         "peak_missing": peak_missing[:12],
         "hard": hard[:8],
         "registry_present": bool(isinstance(reg, dict) and reg),

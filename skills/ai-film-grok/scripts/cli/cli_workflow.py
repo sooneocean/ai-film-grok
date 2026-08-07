@@ -105,6 +105,27 @@ def add_workflow_parsers(sub: argparse._SubParsersAction[argparse.ArgumentParser
     )
     ah.add_argument("--no-write", action="store_true")
 
+    # shot generation lane projection (read-only; no GPU)
+    sl = sub.add_parser(
+        "shot-lane",
+        help=(
+            "Project each shot to a generation lane "
+            "(setup/dialogue/meat/env/continue/poison_blocked…) + H3 mode + gates"
+        ),
+    )
+    sl.add_argument("--root", required=True)
+    sl.add_argument("--shot-id", default=None, help="Single shot id (default: all)")
+    sl.add_argument(
+        "--receipt",
+        default=None,
+        help="Optional path to write receipts/shot-lane.json (default when omitted: none)",
+    )
+    sl.add_argument(
+        "--write",
+        action="store_true",
+        help="Write receipts/shot-lane.json under film root",
+    )
+
     # gate-auto: machine verification ladder (no human pilot/PK/review)
     ga = sub.add_parser(
         "gate-auto",
@@ -416,6 +437,29 @@ def run_workflow_cmd(args: argparse.Namespace) -> int:
             )
             _emit(report)
             return 0 if report.get("ok") is not False else 2
+
+        if cmd == "shot-lane":
+            from pathlib import Path
+
+            from shot_lane import resolve_film_shot_lanes
+            from util import write_json
+
+            report = resolve_film_shot_lanes(
+                args.root,
+                shot_id=getattr(args, "shot_id", None),
+            )
+            if bool(getattr(args, "write", False)):
+                out = Path(args.root).expanduser().resolve() / "receipts" / "shot-lane.json"
+                out.parent.mkdir(parents=True, exist_ok=True)
+                write_json(out, report)
+                report["receipt"] = str(out)
+            elif getattr(args, "receipt", None):
+                out = Path(args.receipt).expanduser().resolve()
+                out.parent.mkdir(parents=True, exist_ok=True)
+                write_json(out, report)
+                report["receipt"] = str(out)
+            _emit(report)
+            return 0
 
         if cmd == "gate-auto":
             from gate_auto import run_gate_auto

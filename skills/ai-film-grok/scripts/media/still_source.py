@@ -390,13 +390,48 @@ def resolve_still_source(
 
 
 def assert_still_source_safe(entry: dict[str, Any], *, shot_id: str = "") -> dict[str, Any]:
-    """Fail-closed when peak wardrobe would use cast master or is blocked."""
+    """Fail-closed when peak wardrobe would use cast master or is blocked.
+
+    Also enforces I2V composition-fill on resolved pixel path (P0 2026-08-07 EP02):
+    cast fullbody masters and postage-stamp subjects cannot feed motion.
+    """
     if entry.get("blocked"):
         raise StillSourceError(
             f"still source blocked for {shot_id or '?'}: {entry.get('block_reason')}"
         )
     if not entry.get("ok") or not entry.get("path"):
         raise StillSourceError(f"still source missing for {shot_id or '?'}")
+    # Composition fill: refuse tiny fullbody / cast-sheet paths as I2V first frame
+    try:
+        from composition_fill_gate import assert_i2v_firstframe_fill, path_looks_like_cast_fullbody
+
+        p = Path(str(entry["path"]))
+        if p.is_file():
+            # Cast master under cast/ is never a playable first frame
+            if path_looks_like_cast_fullbody(p) and "keyframes/" not in str(p).replace(
+                "\\", "/"
+            ) and "stills/" not in str(p).replace("\\", "/"):
+                raise StillSourceError(
+                    f"still source for {shot_id or '?'} is cast/fullbody sheet path "
+                    f"({p.name}); cover-crop to keyframes/ as MS/CU first "
+                    "(EP02 composition-fill iron)"
+                )
+            fill = assert_i2v_firstframe_fill(p, mode="open")
+            entry["composition_fill"] = {
+                "ok": fill.get("ok"),
+                "codes": fill.get("codes"),
+                "metrics": fill.get("metrics"),
+            }
+            if not fill.get("ok") and not fill.get("skipped"):
+                codes = ",".join(fill.get("codes") or ["TINY"])
+                raise StillSourceError(
+                    f"still source for {shot_id or '?'} failed composition-fill "
+                    f"({codes}): subject must fill frame; see composition_fill_gate"
+                )
+    except StillSourceError:
+        raise
+    except Exception:
+        pass  # soft if gate import/deps missing
     return entry
 
 

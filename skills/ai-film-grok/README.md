@@ -14,7 +14,8 @@
 | Script-value debrief | 锁 story 前 L0–L4 呈现价值 + 人确认 | `plan debrief` |
 | Input Fidelity | 源句 / must_keep / 保护对白打分与 stamp | `fidelity status\|check\|apply` |
 | design-go | debrief+fidelity+variety 一页；不签 pilot | `design-go` |
-| hybrid_h3 + FLF | Grok 铺量；5090 H3 攻坚；有首尾帧 FLF 主轨 | `h3 plan\|run` · profile `hybrid_h3` |
+| **h3_primary（默认）** | 全片 5090 H3 主烧；Grok Video 仅 escape | `h3 run-next --max 5` · [h3-core-day](references/stages/h3-core-day.md) |
+| hybrid_h3 + FLF | 双轨：Grok soft 可铺量；H3 攻坚肉戏；有首尾帧 FLF | `h3 plan\|run` · profile `hybrid_h3` |
 | Fill-Idle | 空闲 P0→P2 挑战；PK shortlist；人 promote | `h3 next\|run-next\|cycle\|pk-*` |
 | still-challenge | FRW i2i 刷更好静帧再 I2V | `still-challenge` |
 

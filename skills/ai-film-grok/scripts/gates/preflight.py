@@ -1019,27 +1019,28 @@ def run_preflight(root: Path) -> dict[str, Any]:
                 else:
                     soft.append(sb_issue)
         except Exception as exc:
-            soft.append(
-                _issue(
-                    "soft",
-                    "style_bible_consistency_probe_error",
-                    f"style-bible consistency probe failed: {exc}"[:200],
-                    fix="check production_gates.style_bible_consistency_report",
-                )
+            _sb_heat = str(spec.get("heat_scale") or "").lower() in {"max", "hot", "extreme"}
+            _sb_sev = "hard" if _sb_heat else "soft"
+            _sb_iss = _issue(
+                _sb_sev,
+                "style_bible_consistency_probe_error",
+                f"style-bible consistency probe failed: {exc}"[:200],
+                fix="check production_gates.style_bible_consistency_report",
             )
+            if _sb_sev == "hard":
+                hard.append(_sb_iss)
+            else:
+                soft.append(_sb_iss)
 
-        # Speaker ↔ picture (on_camera): soft by default; hard on max dialogue_drama
+        # Speaker ↔ picture (on_camera): soft by default; hard on max dialogue_drama (I2.3)
         try:
-            from dialogue_speaker_frame_gate import lint_dialogue_speaker_frame
-
-            sf_hard = (
-                spec.get("speaker_frame_strict") is True
-                or spec.get("dialogue_window_strict") is True
-                or (
-                    str(spec.get("vo_mode") or "") == "dialogue_drama"
-                    and str(spec.get("heat_scale") or "").lower() in {"max", "hot", "extreme"}
-                )
+            from dialogue_speaker_frame_gate import (
+                lint_dialogue_speaker_frame,
+                lint_dialogue_still_recipe,
+                speaker_frame_hard_enabled,
             )
+
+            sf_hard = speaker_frame_hard_enabled(spec)
             sf_rep = lint_dialogue_speaker_frame(spec)
             bad_n = len(sf_rep.get("violations") or []) + len(sf_rep.get("window_violations") or [])
             if bad_n:
@@ -1058,22 +1059,110 @@ def run_preflight(root: Path) -> dict[str, Any]:
                     fix=(
                         "on_camera 台词镜 speaker 必须=画面主体(dsl.subject/cast)且与 "
                         "audio_cues.speaker 一致；同 beat 热窗内禁 speaker 翻转。"
-                        "逃生: speaker_frame_strict:false / dialogue_window_strict:false"
+                        "逃生: speaker_frame_strict:false"
                     ),
                 )
                 if sf_hard:
                     hard.append(sf_issue)
                 else:
                     soft.append(sf_issue)
+            # Wave 2 · dialogue still recipe (wide fullbody hanging lines)
+            for sc in spec.get("scenes") or []:
+                if not isinstance(sc, dict):
+                    continue
+                for sh in sc.get("shots") or []:
+                    if not isinstance(sh, dict):
+                        continue
+                    dr = lint_dialogue_still_recipe(sh)
+                    for iss in dr.get("issues") or []:
+                        sev = str(iss.get("severity") or "soft")
+                        if sev == "hard" and not sf_hard:
+                            sev = "soft"
+                        item = _issue(
+                            sev,
+                            str(iss.get("code") or "dialogue_still_recipe"),
+                            str(iss.get("msg") or iss.get("code")),
+                            fix="on_camera 台词镜 still=speaker 脸 MCU/CU；禁全身肉戏 still 挂 A 台词",
+                        )
+                        if sev == "hard":
+                            hard.append(item)
+                        else:
+                            soft.append(item)
         except Exception as exc:
-            soft.append(
-                _issue(
-                    "soft",
-                    "speaker_frame_probe_error",
-                    f"speaker-frame probe failed: {exc}"[:200],
-                    fix="check dialogue_speaker_frame_gate",
-                )
+            # A1 · when speaker-frame is hard mode, probe failure must hard-block
+            try:
+                from dialogue_speaker_frame_gate import speaker_frame_hard_enabled as _sfh
+
+                _sf_hard_err = _sfh(spec)
+            except Exception:
+                _sf_hard_err = False
+            _sev = "hard" if _sf_hard_err else "soft"
+            _iss = _issue(
+                _sev,
+                "speaker_frame_probe_error",
+                f"speaker-frame probe failed: {exc}"[:200],
+                fix="check dialogue_speaker_frame_gate",
             )
+            if _sev == "hard":
+                hard.append(_iss)
+            else:
+                soft.append(_iss)
+
+        # Wave 2 · dialogue_audio_lane required on spoken shots (native XOR post_tts)
+        try:
+            from dialogue_speaker_frame_gate import speaker_frame_hard_enabled
+            from final.native_audio import lint_film_dialogue_audio_lanes
+
+            lane_rep = lint_film_dialogue_audio_lanes(spec)
+            if not lane_rep.get("ok"):
+                miss = list(lane_rep.get("missing_lane_shots") or [])
+                inv = list(lane_rep.get("invalid_lane_shots") or [])
+                # invalid always hard; missing hard after write-spec once applied or explicit strict
+                applied = isinstance(spec.get("_dialogue_audio_lanes"), dict)
+                strict = spec.get("dialogue_audio_lane_strict") is True
+                lane_hard = bool(inv) or (
+                    bool(miss)
+                    and (
+                        strict
+                        or applied
+                        or speaker_frame_hard_enabled(spec)
+                    )
+                )
+                msg = (
+                    f"dialogue_audio_lane missing={miss[:8]} invalid={inv[:4]} "
+                    f"(checked={lane_rep.get('checked')})"
+                )
+                lane_issue = _issue(
+                    "hard" if lane_hard else "soft",
+                    str(lane_rep.get("code") or "DIALOGUE_AUDIO_LANE_MISSING"),
+                    msg,
+                    fix=(
+                        "每句对白镜写 dialogue_audio_lane=native|post_tts|silence；"
+                        "aifilm write-spec 会默认 native。禁原声+Edge 双轨。"
+                    ),
+                )
+                if lane_hard:
+                    hard.append(lane_issue)
+                else:
+                    soft.append(lane_issue)
+        except Exception as exc:
+            try:
+                from dialogue_speaker_frame_gate import speaker_frame_hard_enabled as _sfh2
+
+                _lane_hard_err = _sfh2(spec)
+            except Exception:
+                _lane_hard_err = False
+            _lane_sev = "hard" if _lane_hard_err else "soft"
+            _lane_iss = _issue(
+                _lane_sev,
+                "dialogue_audio_lane_probe_error",
+                f"dialogue_audio_lane probe failed: {exc}"[:200],
+                fix="check final.native_audio.lint_film_dialogue_audio_lanes",
+            )
+            if _lane_sev == "hard":
+                hard.append(_lane_iss)
+            else:
+                soft.append(_lane_iss)
 
         # Dramatic meaning stack (shot / motion / dialogue purpose / emotional_arc)
         try:

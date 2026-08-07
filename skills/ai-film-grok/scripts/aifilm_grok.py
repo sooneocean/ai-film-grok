@@ -429,6 +429,7 @@ from cli_status import (  # noqa: E402, F401
     _status_inventory,
     _status_remotion_probe,
     cmd_doctor,
+    cmd_iron_status,
     cmd_status,
 )
 from cli_write_spec import (  # noqa: E402, F401
@@ -840,8 +841,9 @@ def main(argv: list[str] | None = None) -> int:
                 reconcile_scene_sound(root, write=not bool(getattr(args, "no_write", False)))
         # Fast dispatch: simple one-command → one-handler (61 commands).
         # Inline branches below handle lazy imports / sub-actions.
-        _SIMPLE_DISPATCH: dict[str, argparse.Namespace] = {
+        _SIMPLE_DISPATCH: dict[str, Any] = {
             "doctor": cmd_doctor,
+            "iron-status": cmd_iron_status,
             "lock-runtime": cmd_lock_runtime,
             "review-shot": cmd_review_shot,
             "review-contract": cmd_review_contract,
@@ -967,6 +969,7 @@ def main(argv: list[str] | None = None) -> int:
             "variety-precheck": cmd_workflow,
             "select-shortlist": cmd_workflow,
             "anti-hijack": cmd_workflow,
+            "shot-lane": cmd_workflow,
             "ship-prep": cmd_workflow,
             "gpu-lease": cmd_workflow,
             "tunnel-probe": cmd_workflow,

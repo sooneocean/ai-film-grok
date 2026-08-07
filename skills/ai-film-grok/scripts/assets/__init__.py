@@ -4,6 +4,7 @@ from __future__ import annotations
 
 __all__ = [
     "anatomy_safety",
+    "endframe_wardrobe",
     "asset_registry",
     "clip_uniqueness",
     "continuity",

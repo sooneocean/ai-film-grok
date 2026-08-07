@@ -318,8 +318,45 @@ def pilot_pack(root: Path | str, *, shots: list[str] | None = None) -> dict[str,
             debrief_gate["design_go_blockers"] = dgo.get("blockers") or []
 
     # AD C1 · pilot 批片三看 (composition / wardrobe / poison) — checklist in receipt
+    # Wave 3 · machine prefill: composition_fill + generation_lane for pilot shots
+    lane_by_shot: dict[str, Any] = {}
+    fill_by_shot: dict[str, Any] = {}
+    try:
+        from composition_fill_gate import assert_keyframe_ready_for_h3
+        from shot_lane import resolve_shot_lane
+
+        for sid in picked:
+            sh = None
+            for scene in (spec.get("scenes") or []) if isinstance(spec, dict) else []:
+                if not isinstance(scene, dict):
+                    continue
+                for s in scene.get("shots") or []:
+                    if isinstance(s, dict) and str(s.get("id") or "") == str(sid):
+                        sh = s
+                        break
+            if isinstance(sh, dict):
+                try:
+                    lane_by_shot[str(sid)] = resolve_shot_lane(sh, root=base).get("lane")
+                except Exception:
+                    lane_by_shot[str(sid)] = None
+            try:
+                fr = assert_keyframe_ready_for_h3(
+                    base, str(sid), auto_remedy=False
+                )
+                fill_by_shot[str(sid)] = {
+                    "ok": fr.get("ok"),
+                    "codes": fr.get("codes"),
+                    "skipped": fr.get("skipped"),
+                }
+            except Exception:
+                fill_by_shot[str(sid)] = {"ok": None}
+    except Exception:
+        pass
+    fill_all_ok = bool(fill_by_shot) and all(
+        v.get("ok") is True or v.get("skipped") for v in fill_by_shot.values()
+    )
     three_look = {
-        "schema_version": 1,
+        "schema_version": 2,
         "kind": "pilot_three_look",
         "items": [
             {
@@ -328,6 +365,15 @@ def pilot_pack(root: Path | str, *, shots: list[str] | None = None) -> dict[str,
                 "required": True,
                 "checked": False,
                 "how": "aifilm anti-hijack / multi-seed shortlist composition column",
+            },
+            {
+                "id": "composition_fill",
+                "label": "I2V 首帧满幅：主体高度≥~75%（禁邮票全身定妆）",
+                "required": True,
+                "checked": fill_all_ok,
+                "machine_ok": fill_all_ok,
+                "per_shot": fill_by_shot,
+                "how": "composition_fill_gate / h3 plan composition_fill; escape AIFILM_SKIP_COMPOSITION_FILL=1",
             },
             {
                 "id": "wardrobe_rank",
@@ -343,8 +389,16 @@ def pilot_pack(root: Path | str, *, shots: list[str] | None = None) -> dict[str,
                 "checked": False,
                 "how": "anatomy_safe + poison gate on register",
             },
+            {
+                "id": "generation_lane",
+                "label": "镜类 lane 对（dialogue/meat/env/poison_blocked…）",
+                "required": False,
+                "checked": bool(lane_by_shot),
+                "per_shot": lane_by_shot,
+                "how": "aifilm shot-lane --root",
+            },
         ],
-        "note": "human must check before pilot approve phrase; machine lists discipline only",
+        "note": "human must check before pilot approve phrase; machine pre-fills fill+lane",
     }
 
     blockers: list[str] = []
@@ -465,7 +519,10 @@ def pilot_pack(root: Path | str, *, shots: list[str] | None = None) -> dict[str,
             "three_look_before_approve": True,
             "anti_hijack_on_shortlist": True,
             "debrief_before_media": True,
+            "composition_fill_before_h3": True,
         },
+        "generation_lanes": lane_by_shot,
+        "composition_fill": fill_by_shot,
     }
     path = base / RECEIPT_REL
     write_json(path, payload)

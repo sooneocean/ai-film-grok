@@ -48,8 +48,8 @@
         "required": true
       },
       {
-        "path": "references/comfy-weapon-armory.md",
-        "reason": "Live route verified 5090 still and edit weapons",
+        "path": "references/stages/h3-core-day.md",
+        "reason": "5090 H3 daily workflow (run-next max5 / GPU no-hog)",
         "required": false
       }
     ],
@@ -98,8 +98,8 @@
         "required": true
       },
       {
-        "path": "references/comfy-weapon-armory.md",
-        "reason": "Live route verified 5090 still and edit weapons",
+        "path": "references/stages/h3-core-day.md",
+        "reason": "5090 H3 daily workflow pointer",
         "required": false
       }
     ],
@@ -277,6 +277,34 @@
       {
         "path": "references/stages/post.md",
         "reason": "quality gate repair path",
+        "required": true
+      }
+    ],
+    "HEAT_WARDROBE_RE_DRESS": [
+      {
+        "path": "references/stages/visual.md",
+        "reason": "wardrobe no re-dress / endframe continuity",
+        "required": true
+      }
+    ],
+    "PLATE_BORING_MEAT_MEAN": [
+      {
+        "path": "references/stages/deliver.md",
+        "reason": "plate boring meat mean — re-I2V before master",
+        "required": true
+      }
+    ],
+    "SHORTLIST_PROMOTE_BLOCKED_MEAN_ONLY": [
+      {
+        "path": "references/stages/visual.md",
+        "reason": "multi-seed must run anti-hijack before promote",
+        "required": true
+      }
+    ],
+    "VARIETY_FIELD_ONLY_STALE": [
+      {
+        "path": "references/stages/visual.md",
+        "reason": "variety fields changed without re-I2V pixel evidence",
         "required": true
       }
     ]

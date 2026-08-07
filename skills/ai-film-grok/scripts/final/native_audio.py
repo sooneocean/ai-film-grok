@@ -112,6 +112,15 @@ def resolve_dialogue_audio_lane(
     Never returns a lane that would mix audible native dialogue with Edge TTS
     for the same spoken line (double-speak disaster).
     """
+    # Explicit field wins when already planned (Wave 2 honesty)
+    explicit = str(shot.get("dialogue_audio_lane") or "").strip().lower()
+    if explicit in {"native", "post_tts", "silence"}:
+        if explicit == "native" and _force_strip_native_policy(
+            shot, audio_policy=audio_policy
+        ):
+            return "post_tts" if has_spoken_text else "silence"
+        return explicit
+
     if non_vo_coverage and not has_spoken_text:
         return "silence"
 
@@ -134,6 +143,106 @@ def resolve_dialogue_audio_lane(
         return "post_tts"
 
     return "silence"
+
+
+def _shot_has_spoken_for_lane(shot: dict[str, Any]) -> bool:
+    if str(shot.get("spoken_text") or "").strip():
+        return True
+    for cue in shot.get("audio_cues") or []:
+        if not isinstance(cue, dict):
+            continue
+        if str(cue.get("spoken_text") or cue.get("text") or "").strip():
+            lt = str(cue.get("line_type") or "dialogue").strip().lower()
+            if lt not in {"sfx", "ambience", "music", "bed", "foley", "narration"}:
+                return True
+    sm = str(shot.get("screen_mode") or "").strip().lower()
+    return sm in {"on_camera", "off_camera", "on-camera", "off-camera"} and bool(
+        str(shot.get("dialogue") or shot.get("dialogue_zh") or "").strip()
+    )
+
+
+def plan_default_dialogue_audio_lane(shot: dict[str, Any], *, profile: str | None = None) -> str:
+    """Plan-time default when field missing: h3/native prefer_native for spoken."""
+    if not _shot_has_spoken_for_lane(shot):
+        return "silence"
+    explicit = str(shot.get("dialogue_audio_lane") or "").strip().lower()
+    if explicit in {"native", "post_tts", "silence"}:
+        return explicit
+    # Restricted / on_camera → native (H3/Grok); else still prefer native with TTS fallback at mix
+    sm = str(shot.get("screen_mode") or "").strip().lower()
+    if sm in {"on_camera", "on-camera", ""}:
+        return "native"
+    return "native"
+
+
+def apply_film_dialogue_audio_lanes(spec: dict[str, Any]) -> dict[str, Any]:
+    """Mutate shots: fill missing dialogue_audio_lane for spoken dialogue shots."""
+    if not isinstance(spec, dict):
+        return {"ok": False, "applied": 0}
+    applied = 0
+    missing_before = 0
+    for scene in spec.get("scenes") or []:
+        if not isinstance(scene, dict):
+            continue
+        for shot in scene.get("shots") or []:
+            if not isinstance(shot, dict):
+                continue
+            if not _shot_has_spoken_for_lane(shot):
+                continue
+            if not str(shot.get("dialogue_audio_lane") or "").strip():
+                missing_before += 1
+                shot["dialogue_audio_lane"] = plan_default_dialogue_audio_lane(shot)
+                applied += 1
+    if isinstance(spec.get("shots"), list):
+        for shot in spec["shots"]:
+            if not isinstance(shot, dict):
+                continue
+            if not _shot_has_spoken_for_lane(shot):
+                continue
+            if not str(shot.get("dialogue_audio_lane") or "").strip():
+                missing_before += 1
+                shot["dialogue_audio_lane"] = plan_default_dialogue_audio_lane(shot)
+                applied += 1
+    report = {
+        "ok": True,
+        "applied": applied,
+        "missing_before": missing_before,
+        "note": "dialogue_audio_lane ∈ native|post_tts|silence (XOR at final mix)",
+    }
+    spec["_dialogue_audio_lanes"] = report
+    return report
+
+
+def lint_film_dialogue_audio_lanes(spec: dict[str, Any]) -> dict[str, Any]:
+    """Spoken dialogue shots must declare dialogue_audio_lane (Wave 2 preflight)."""
+    missing: list[str] = []
+    invalid: list[str] = []
+    checked = 0
+    for scene in (spec.get("scenes") or []) if isinstance(spec, dict) else []:
+        if not isinstance(scene, dict):
+            continue
+        for shot in scene.get("shots") or []:
+            if not isinstance(shot, dict) or not _shot_has_spoken_for_lane(shot):
+                continue
+            checked += 1
+            sid = str(shot.get("id") or "?")
+            lane = str(shot.get("dialogue_audio_lane") or "").strip().lower()
+            if not lane:
+                missing.append(sid)
+            elif lane not in {"native", "post_tts", "silence"}:
+                invalid.append(f"{sid}:{lane}")
+    ok = not missing and not invalid
+    return {
+        "schema_version": 1,
+        "kind": "dialogue-audio-lane-lint",
+        "ok": ok,
+        "checked": checked,
+        "missing_lane_shots": missing,
+        "invalid_lane_shots": invalid,
+        "code": "DIALOGUE_AUDIO_LANE_MISSING" if missing else (
+            "DIALOGUE_AUDIO_LANE_INVALID" if invalid else None
+        ),
+    }
 
 
 def dialogue_lane_tts_mix_gain(lane: str) -> float:

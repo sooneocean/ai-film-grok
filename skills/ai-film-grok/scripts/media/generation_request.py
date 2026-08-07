@@ -368,3 +368,70 @@ def assert_pixel_pack_current(
         raise GenerationRequestError(
             "generation request pixel pack invalid: " + "; ".join(report.get("errors") or [])
         )
+
+
+def shot_requires_generation_request(root: Path | str, shot_id: str) -> bool:
+    """I2.4 · restricted / adult-max shots must have a GenerationRequest receipt."""
+    if generation_request_skip_strict():
+        return False
+    base = _root(root)
+    try:
+        from anatomy_safety import shot_requires_anatomy_safety
+
+        return bool(shot_requires_anatomy_safety(base, str(shot_id)))
+    except Exception:
+        # Fall back: film heat max / genre adult
+        spec = read_json(base / "film-spec.json") or {}
+        if not isinstance(spec, dict):
+            return False
+        if spec.get("adult_max_iron") is False:
+            return False
+        heat = str(spec.get("heat_scale") or "").strip().lower()
+        genre = str(spec.get("genre") or "").strip().lower()
+        return heat == "max" or genre in {"adult", "erotic", "nsfw", "ecchi"}
+
+
+def assert_generation_request_for_i2v(
+    root: Path | str,
+    shot_id: str,
+    *,
+    inputs: list[Path] | None = None,
+    build_if_missing: bool = False,
+) -> dict[str, Any]:
+    """I2.4 · restricted still→I2V: missing generation request is hard fail.
+
+    Escape: ``AIFILM_SKIP_GENERATION_REQUEST=1``.
+    When ``build_if_missing`` and shot requires, attempts ``build_generation_request(write=True)``.
+    """
+    if generation_request_skip_strict():
+        return {
+            "ok": True,
+            "skipped": True,
+            "escape": "AIFILM_SKIP_GENERATION_REQUEST",
+            "shot_id": str(shot_id),
+        }
+    base = _root(root)
+    sid = str(shot_id)
+    required = shot_requires_generation_request(base, sid)
+    req = load_generation_request(base, sid)
+    if req is None and build_if_missing and required:
+        try:
+            req = build_generation_request(base, sid, kind=KIND_I2V, write=True)
+        except Exception as exc:
+            raise GenerationRequestError(
+                f"restricted I2V for {sid} missing generation request and auto-build failed: {exc}"
+            ) from exc
+    if required and not isinstance(req, dict):
+        raise GenerationRequestError(
+            f"restricted/adult I2V for {sid} requires receipts/prompts/{sid}.request.json — "
+            f"run generation_request / h3 plan before queue; escape AIFILM_SKIP_GENERATION_REQUEST=1"
+        )
+    if isinstance(req, dict):
+        assert_pixel_pack_current(base, sid, inputs=inputs)
+    return {
+        "ok": True,
+        "required": required,
+        "shot_id": sid,
+        "has_receipt": isinstance(req, dict),
+        "receipt": str(request_receipt_path(base, sid)) if isinstance(req, dict) else None,
+    }

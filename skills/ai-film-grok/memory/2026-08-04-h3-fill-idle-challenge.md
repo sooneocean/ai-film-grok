@@ -1,6 +1,7 @@
-# Memory · 2026-08-04 · H3 Fill-Idle 挑战（Grok 主轴 + 本地 PK）
+# Memory · 2026-08-04 · H3 Fill-Idle 挑战（队列优先级）
 
-**运营矩阵**：[weapon-lane-matrix.md](../references/weapon-lane-matrix.md)（节 Fill-Idle）  
+**运营矩阵**：[weapon-lane-matrix.md](../references/weapon-lane-matrix.md)（节 Fill-Idle · **2026-08-06 语义澄清**）  
+**日课续板**：[h3-core-workflow](2026-08-06-h3-core-workflow.md) · [h3-core-day](../references/stages/h3-core-day.md)  
 **模式课**：[lessons-2026-08-04-h3-max-effect.md](../references/lessons-2026-08-04-h3-max-effect.md) · [h3-max-effect 短卡](2026-08-04-h3-max-effect.md)
 
 ## 用户原话
@@ -8,9 +9,9 @@
 > agree all · 推进全部 Wave αβγ
 
 ## 三句话
-1. **Grok 铺 soft**；**restricted 主轨 H3**；P0→P1→P2 填空（能烧就烧，禁抢 P0）。
+1. **默认 `h3_primary`**：P0=缺 clip 主烧 H3；P1=弱 take 补烧；**无「Grok 铺底」**。P2 挑战 Grok **仅 `hybrid_h3`**。
 2. **PK 复合分**（motion−身份罚）+ 人 promote；`h3 evidence` 记账。
-3. **5090**：dual 粘连 · 够动可停盲 R2V · 换模 free-memory · Grok take 打 `grok_*` 标。
+3. **5090**：平日 `run-next --max 5` · dual 粘连 · 够动停盲 R2V · 换模 free-memory。
 
 ## 补定策
 - P2=mean 最低优先；ship 允许 P2 未完；跨集胜率不自动。

@@ -1,6 +1,6 @@
 # h3_primary · 5090 无限主产线（2026-08-05）
 
-**Status:** Wave 0–1 **DONE in 2.39.14** · W3 until-empty still open  
+**Status:** Wave 0–1 **DONE in 2.39.14** · profile/code **SHIPPED** · **日课续板** → [2026-08-06-h3-core-workflow-todoplan.md](../2026-08-06-h3-core-workflow-todoplan.md)  
 **Strategy:** Local MiniMax H3 on 5090 is the **film-wide primary** generation path. Time is free; cloud quota is not.
 
 ## 定策三句

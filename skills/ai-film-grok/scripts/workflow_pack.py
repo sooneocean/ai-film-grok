@@ -26,10 +26,13 @@ MEAT_DURATION_FLOOR = 4.5
 GPU_LEASE_NAME = "gpu-lease.json"
 BULK_PREFLIGHT_NAME = "bulk-preflight.json"
 VARIETY_NAME = "variety-precheck.json"
+VARIETY_PIXEL_NAME = "variety-pixel.json"
 SELECT_SHORTLIST_NAME = "select-shortlist.json"
 LEASE_STALE_SEC = 45 * 60  # 45 min without heartbeat → expired
 DEFAULT_TUNNEL_PORT = 18188
 COMFY_WRONG_PORT = 8189
+# I1.2 · adjacent meat motion means closer than this → clone risk (re-I2V required)
+ADJACENT_MEAN_CLONE_EPS = 0.55
 
 
 class WorkflowPackError(RuntimeError):
@@ -406,13 +409,23 @@ def bulk_preflight(
             add(
                 "anatomy_stills",
                 bool(st.get("ok")),
+                hard=True,
                 poisoned=st.get("poisoned_shots"),
-                missing=st.get("missing_shots"),
+                missing=st.get("missing_attestation_shots") or st.get("missing_shots"),
             )
         else:
             add("anatomy_stills", True, required=False)
     except Exception as exc:  # noqa: BLE001
-        add("anatomy_stills", True, skipped=True, error=str(exc)[:120])
+        # I2.1: anatomy probe crash must not soft-pass bulk for adult-max films
+        try:
+            from anatomy_safety import requires_anatomy_safety as _req_an
+
+            if _req_an(root):
+                add("anatomy_stills", False, hard=True, error=str(exc)[:120])
+            else:
+                add("anatomy_stills", True, skipped=True, error=str(exc)[:120])
+        except Exception:
+            add("anatomy_stills", True, skipped=True, error=str(exc)[:120])
 
     # geometry sample: keyframes 9:16 when present
     geo_bad: list[str] = []
@@ -481,7 +494,8 @@ def bulk_preflight(
         note=progress.get("note"),
     )
 
-    # variety (design anti-boring) — hard door for bulk (P1 · 2026-08-04)
+    # variety (design anti-boring) — hard door for bulk (P1 · 2026-08-04 · Wave 4)
+    # Adult meat films: field floors (≥4 pose / ≥2 face CU / ≥2 L4) must pass before queue.
     skip_variety = os.environ.get("AIFILM_SKIP_VARIETY_PREFLIGHT", "").strip().lower() in {
         "1",
         "true",
@@ -493,14 +507,27 @@ def bulk_preflight(
     else:
         try:
             var_report = variety_precheck(root, write=True)
+            meat_n = int(var_report.get("meat_shot_count") or 0)
+            # Wave 4 · when meat window large enough, variety is hard (already ok flag)
+            var_ok = bool(var_report.get("ok"))
             add(
                 "variety",
-                bool(var_report.get("ok")),
+                var_ok,
                 issue_count=len(var_report.get("issues") or []),
                 issues=[i.get("code") for i in (var_report.get("issues") or [])[:8]],
+                meat_shot_count=meat_n,
+                unique_pose_count=var_report.get("unique_pose_count"),
+                face_cu_count=var_report.get("face_cu_count"),
+                l4_insert_count=var_report.get("l4_insert_count"),
+                hard=True if meat_n >= 4 else bool(not var_ok),
+                next=(
+                    None
+                    if var_ok
+                    else f'aifilm variety-precheck --root "{root}"  # fix poses/CU/L4 then bulk'
+                ),
             )
         except Exception as exc:  # noqa: BLE001
-            add("variety", False, error=str(exc)[:240])
+            add("variety", False, error=str(exc)[:240], hard=True)
 
     # Q4.1 duration target honesty (planned + optional media sum vs target)
     # Soft by default; hard when DURATION_*_HARD (planned or media gap >20%).
@@ -863,6 +890,201 @@ def variety_precheck(root: Path | str, *, write: bool = True) -> dict[str, Any]:
         (root / "receipts" / "variety-matrix.md").write_text(
             out["matrix_md"] + "\n", encoding="utf-8"
         )
+    return out
+
+
+def _variety_field_fingerprint(meat: list[dict[str, Any]]) -> str:
+    """Stable hash of design fields that claim variety (not pixel motion)."""
+    import hashlib
+
+    parts: list[str] = []
+    for s in meat:
+        parts.append(
+            "|".join(
+                [
+                    str(s.get("id") or ""),
+                    _sex_pose(s),
+                    _shot_size(s),
+                    _camera_move(s),
+                    _motion_primary(s),
+                    _heat_phase(s),
+                ]
+            )
+        )
+    raw = "\n".join(parts)
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:16]
+
+
+def _resolve_meat_clip_path(root: Path, shot_id: str, man: dict[str, Any]) -> Path | None:
+    clips = man.get("clips") if isinstance(man.get("clips"), dict) else {}
+    entry = clips.get(shot_id) if isinstance(clips, dict) else None
+    if isinstance(entry, dict):
+        raw = str(entry.get("path") or "").strip()
+        if raw:
+            p = Path(raw)
+            if not p.is_absolute():
+                p = root / p
+            if p.is_file() and p.stat().st_size > 0:
+                return p
+    takes_dir = root / "takes" / shot_id
+    if takes_dir.is_dir():
+        vids = sorted(
+            (
+                p
+                for p in takes_dir.rglob("*")
+                if p.is_file() and p.suffix.lower() in {".mp4", ".webm", ".mov"}
+            ),
+            key=lambda x: x.stat().st_mtime,
+            reverse=True,
+        )
+        if vids:
+            return vids[0]
+    return None
+
+
+def variety_pixel_bind(root: Path | str, *, write: bool = True) -> dict[str, Any]:
+    """I1.2 · field variety green ≠ pixel green; require re-I2V evidence for meat.
+
+    Hard issues when:
+    - meat design fields changed but clip/mean fingerprint unchanged (field-only fake green)
+    - adjacent meat means nearly identical (clone / still-chain risk)
+    - meat shots have no clip/mean once any meat media exists (partial plate)
+
+    Escape: ``AIFILM_SKIP_VARIETY_PIXEL=1`` or ``AIFILM_SKIP_VARIETY_PREFLIGHT=1``.
+    """
+    if os.environ.get("AIFILM_SKIP_VARIETY_PIXEL", "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    } or os.environ.get("AIFILM_SKIP_VARIETY_PREFLIGHT", "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }:
+        return {
+            "schema_version": 1,
+            "kind": "variety-pixel",
+            "ok": True,
+            "skipped": True,
+            "escape": "AIFILM_SKIP_VARIETY_PIXEL or AIFILM_SKIP_VARIETY_PREFLIGHT",
+        }
+    root_p = _root(root)
+    spec = read_json(root_p / "film-spec.json") or {}
+    if not spec:
+        return {
+            "schema_version": 1,
+            "kind": "variety-pixel",
+            "ok": False,
+            "issues": [{"code": "NO_FILM_SPEC", "message": "film-spec.json missing"}],
+        }
+    meat = [s for s in _shots_from_spec(spec) if _heat_phase(s) in {"act", "climax", "foreplay"}]
+    man = read_json(root_p / "manifest.json") or {}
+    if not isinstance(man, dict):
+        man = {}
+    field_fp = _variety_field_fingerprint(meat)
+    pixel_parts: list[str] = []
+    means: list[tuple[str, float | None]] = []
+    missing_clip: list[str] = []
+    missing_mean: list[str] = []
+    any_media = False
+    for s in meat:
+        sid = str(s.get("id") or "")
+        if not sid:
+            continue
+        path = _resolve_meat_clip_path(root_p, sid, man)
+        mean: float | None = None
+        size = 0
+        if path is not None:
+            any_media = True
+            size = path.stat().st_size
+            mean = _read_motion_mean(root_p, sid, path)
+            if mean is None:
+                missing_mean.append(sid)
+        else:
+            missing_clip.append(sid)
+        means.append((sid, mean))
+        pixel_parts.append(f"{sid}:{size}:{mean if mean is not None else 'na'}")
+    import hashlib
+
+    pixel_fp = hashlib.sha256("\n".join(pixel_parts).encode("utf-8")).hexdigest()[:16]
+    prev = read_json(root_p / "receipts" / VARIETY_PIXEL_NAME) or {}
+    issues: list[dict[str, Any]] = []
+    if (
+        isinstance(prev, dict)
+        and prev.get("field_fp")
+        and prev.get("pixel_fp")
+        and str(prev.get("field_fp")) != field_fp
+        and str(prev.get("pixel_fp")) == pixel_fp
+        and any_media
+    ):
+        issues.append(
+            {
+                "code": "VARIETY_FIELD_ONLY_STALE",
+                "message": (
+                    "meat variety fields changed but clip/mean fingerprint unchanged — "
+                    "re-I2V / promote new takes before ship-prep"
+                ),
+            }
+        )
+    # Adjacent mean clones (pixel sameness after field variety claims difference)
+    for (a_id, a_m), (b_id, b_m) in zip(means, means[1:], strict=False):
+        if a_m is None or b_m is None:
+            continue
+        if abs(float(a_m) - float(b_m)) + 1e-9 < ADJACENT_MEAN_CLONE_EPS:
+            issues.append(
+                {
+                    "code": "ADJACENT_MEAN_CLONE",
+                    "message": (
+                        f"{a_id}→{b_id} mean Δ<{ADJACENT_MEAN_CLONE_EPS} "
+                        f"({a_m:.2f}≈{b_m:.2f}) — re-I2V for visual difference"
+                    ),
+                }
+            )
+    # Once any meat media exists, incomplete meat set is a hard ship risk
+    if any_media and len(meat) >= 2:
+        for sid in missing_clip[:12]:
+            issues.append(
+                {
+                    "code": "MEAT_CLIP_MISSING",
+                    "message": f"{sid}: variety fields present but no clip/take for meat",
+                }
+            )
+        for sid in missing_mean[:12]:
+            issues.append(
+                {
+                    "code": "MEAT_MEAN_MISSING",
+                    "message": f"{sid}: clip present but mean not measured — run i2v-motion-gate",
+                }
+            )
+    ok = not issues
+    out = {
+        "schema_version": 1,
+        "kind": "variety-pixel",
+        "at": utc_now(),
+        "root": str(root_p),
+        "ok": ok,
+        "field_fp": field_fp,
+        "pixel_fp": pixel_fp,
+        "meat_shot_count": len(meat),
+        "any_media": any_media,
+        "missing_clip": missing_clip,
+        "missing_mean": missing_mean,
+        "adjacent_mean_eps": ADJACENT_MEAN_CLONE_EPS,
+        "issues": issues,
+        "next_cmd": (
+            None
+            if ok
+            else (
+                f'aifilm h3 run-next --root "{root_p}" --max 5  # re-I2V meat; '
+                f'then measure means + select-shortlist --promote'
+            )
+        ),
+        "note": "field variety alone is not ship-ready; pixel bind requires re-I2V evidence",
+    }
+    if write:
+        write_json(root_p / "receipts" / VARIETY_PIXEL_NAME, out)
     return out
 
 
@@ -1266,16 +1488,31 @@ def select_shortlist(
                 }
             )
 
-    # AD C2 / N1.3 · multi-seed: anti-hijack before mean; fail-closed promote when gate missing
+    # AD C2 / N1.3 / I1.1 · multi-seed: anti-hijack before mean; fail-closed when gate missing
     multi_take_rows = [r for r in rows if int(r.get("take_count") or 0) >= 2]
     ah_skip_intentional = False
+    gate_rep: dict[str, Any] = {}
     try:
         import composition_anti_hijack as _ah_env
 
         ah_skip_intentional = bool(_ah_env._env_skip())
+        gate_rep = _ah_env.multi_seed_anti_hijack_gate(
+            multi_take=bool(multi_take_rows),
+            anti_hijack_enabled=anti_hijack_on,
+            promote=bool(promote),
+        )
     except Exception:  # noqa: BLE001
         ah_skip_intentional = False
-    mean_only_risk = bool(multi_take_rows) and not anti_hijack_on
+        gate_rep = {
+            "ok": not bool(multi_take_rows),
+            "promote_blocked": bool(promote and multi_take_rows),
+            "codes": (
+                ["SHORTLIST_MEAN_ONLY_NO_ANTI_HIJACK", "SHORTLIST_PROMOTE_BLOCKED_MEAN_ONLY"]
+                if multi_take_rows and promote
+                else (["SHORTLIST_MEAN_ONLY_NO_ANTI_HIJACK"] if multi_take_rows else [])
+            ),
+        }
+    mean_only_risk = bool(multi_take_rows) and not anti_hijack_on and not ah_skip_intentional
     hijack_preferred = [
         r
         for r in rows
@@ -1286,19 +1523,21 @@ def select_shortlist(
             if isinstance(c, dict)
         )
     ]
-    codes: list[str] = []
-    if mean_only_risk:
+    codes: list[str] = list(gate_rep.get("codes") or [])
+    if mean_only_risk and "SHORTLIST_MEAN_ONLY_NO_ANTI_HIJACK" not in codes:
         codes.append("SHORTLIST_MEAN_ONLY_NO_ANTI_HIJACK")
     if hijack_preferred:
         codes.append("SHORTLIST_HIJACK_PREFERRED_NO_CLEAN_ALT")
-    # N1.3 · --promote must not write mean-only multi-seed (escape = intentional SKIP env)
-    promote_blocked = False
+    # N1.3 / I1.1 · multi-seed without anti-hijack is not ok; promote must not write mean-only
+    promote_blocked = bool(gate_rep.get("promote_blocked"))
     if promote and hijack_preferred:
         promote_blocked = True
-        codes.append("SHORTLIST_PROMOTE_BLOCKED_HIJACK")
-    if promote and mean_only_risk and not ah_skip_intentional:
+        if "SHORTLIST_PROMOTE_BLOCKED_HIJACK" not in codes:
+            codes.append("SHORTLIST_PROMOTE_BLOCKED_HIJACK")
+    if promote and mean_only_risk:
         promote_blocked = True
-        codes.append("SHORTLIST_PROMOTE_BLOCKED_MEAN_ONLY")
+        if "SHORTLIST_PROMOTE_BLOCKED_MEAN_ONLY" not in codes:
+            codes.append("SHORTLIST_PROMOTE_BLOCKED_MEAN_ONLY")
 
     did_promote = False
     if promote and promoted and not promote_blocked:
@@ -1308,9 +1547,14 @@ def select_shortlist(
     elif promote and promote_blocked:
         promoted = []
 
-    shortlist_ok = not promote_blocked
+    # I1.1: multi-seed without anti-hijack → shortlist not ok (even advisory), unless SKIP
+    shortlist_ok = (not promote_blocked) and bool(gate_rep.get("ok", True)) and not (
+        mean_only_risk and not ah_skip_intentional
+    )
+    if mean_only_risk and not ah_skip_intentional:
+        shortlist_ok = False
     next_cmd: str | None
-    if promote_blocked:
+    if promote_blocked or mean_only_risk:
         next_cmd = (
             f'unset AIFILM_SKIP_ANTI_HIJACK; aifilm anti-hijack --root "{root}"; '
             f'aifilm select-shortlist --root "{root}" --promote'
@@ -1466,6 +1710,22 @@ def ship_prep(
                 "hard": True,
             }
         )
+        # I1.2 · field green ≠ pixel green
+        vpx = variety_pixel_bind(root, write=write)
+        steps.append(
+            {
+                "id": "variety_pixel",
+                "ok": bool(vpx.get("ok") or vpx.get("skipped")),
+                "detail": (
+                    "skipped"
+                    if vpx.get("skipped")
+                    else ("ok" if vpx.get("ok") else f"issues={len(vpx.get('issues') or [])}")
+                ),
+                "next_cmd": vpx.get("next_cmd"),
+                "hard": True,
+                "codes": [str(i.get("code") or "") for i in (vpx.get("issues") or []) if isinstance(i, dict)],
+            }
+        )
 
     # 2.38.2 · human-safe: never mean-promote multi-take before PK (unless force)
     force_promote = os.environ.get("AIFILM_SHIP_PROMOTE_FORCE", "").strip().lower() in {
@@ -1496,21 +1756,29 @@ def ship_prep(
         promote_deferred = True
 
     sel = select_shortlist(root, write=write, promote=promote_effective, measure_missing=measure)
+    sel_ok = bool(sel.get("ok", True))
     steps.append(
         {
             "id": "select_shortlist",
-            "ok": True,
+            "ok": sel_ok,
+            "hard": not sel_ok,
             "detail": (
                 f"shots={len(sel.get('shots') or [])} promoted={len(sel.get('promoted') or [])}"
                 + ("; multi-take → promote deferred for human PK" if promote_deferred else "")
+                + (f"; codes={','.join(sel.get('codes') or [])}" if not sel_ok else "")
             ),
             "next_cmd": (
-                f'aifilm select-shortlist --root "{root}" --promote  # after human PK'
-                if promote_deferred
-                else None
+                sel.get("next_cmd")
+                if not sel_ok
+                else (
+                    f'aifilm select-shortlist --root "{root}" --promote  # after human PK'
+                    if promote_deferred
+                    else None
+                )
             ),
             "promoted": sel.get("promoted") or [],
             "promote_deferred_human_pk": promote_deferred,
+            "codes": list(sel.get("codes") or []),
         }
     )
 

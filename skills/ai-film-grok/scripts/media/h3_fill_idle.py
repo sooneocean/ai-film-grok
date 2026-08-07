@@ -559,7 +559,13 @@ def classify_primary_h3_shot(
 
 
 def _poison_blocked(root: Path, shot_id: str) -> bool:
-    """Soft check: poison receipts or rejected stills skip the queue."""
+    """Poison / anatomy_safe=false stills skip the Fill-Idle queue (align shot_lane)."""
+    try:
+        from shot_lane import is_poison_blocked
+
+        return bool(is_poison_blocked(root, shot_id))
+    except Exception:
+        pass
     man = read_json(root / "manifest.json") or {}
     stills = man.get("stills") if isinstance(man, dict) else {}
     still = stills.get(shot_id) if isinstance(stills, dict) else None
@@ -568,6 +574,9 @@ def _poison_blocked(root: Path, shot_id: str) -> bool:
         if status in {"poison", "rejected", "blocked"}:
             return True
         if still.get("poison") is True or still.get("anatomy_poison") is True:
+            return True
+        # I2.1 · explicit poison attestation must not enter queue
+        if still.get("anatomy_safe") is False:
             return True
     poison_dir = root / "receipts" / "poison"
     if poison_dir.is_dir():
@@ -740,11 +749,43 @@ def classify_fill_idle_shot(
     if alt_mode and last_path and str(alt_mode) in {"flf", "r2v"}:
         alt_cli = f' --last-frame "{last_path}"'
 
+    # Generation-type lane (setup/dialogue/meat/poison…) — distinct from fill-idle queue lane
+    generation_lane: str | None = None
+    generation_lane_blocked: list[str] = []
+    try:
+        from shot_lane import resolve_shot_lane
+
+        gl = resolve_shot_lane(
+            shot,
+            root=base,
+            intent=intent,
+            has_still=bool(has_still),
+            has_last=bool(has_last),
+        )
+        generation_lane = str(gl.get("lane") or "") or None
+        generation_lane_blocked = list(gl.get("blocked_by") or [])
+        # Missing anatomy attestation: keep row visible on primary list but no run command
+        if (
+            not poison
+            and generation_lane != "poison_blocked"
+            and "ANATOMY_STILL_NOT_SAFE" in generation_lane_blocked
+            and status not in {"done", "skip", "poison_blocked"}
+            and mode in {"i2v", "flf", "r2v"}
+        ):
+            status = "anatomy_attestation_missing"
+            reasons.append("anatomy_still_not_safe")
+            cmd = None
+            # stay primary_h3 / P0 so h3 list still surfaces the blocker
+    except Exception:
+        pass
+
     return {
         "shot_id": sid,
         "priority": priority,
         "priority_rank": PRIORITY_RANK.get(priority, 99),
         "lane": lane,
+        "generation_lane": generation_lane,
+        "generation_lane_blocked": generation_lane_blocked,
         "status": status,
         "primary_h3": primary,
         "reasons": reasons,
@@ -1616,7 +1657,11 @@ def pk_compare(
     measure_missing: bool = False,
     write_dailies: bool = True,
 ) -> dict[str, Any]:
-    """Multi-take machine recommendation only — never writes preferred/promote."""
+    """Multi-take machine recommendation only — never writes preferred/promote.
+
+    I1.1: multi-seed without anti-hijack (and no intentional SKIP) → ok=false;
+    recommended takes are marked not_promotable so agents cannot blind-follow mean.
+    """
     base = _root(root)
     spec = _load_spec(base)
     shot_ids: list[str]
@@ -1636,6 +1681,19 @@ def pk_compare(
         if isinstance(clips, dict):
             found.update(str(k) for k in clips)
         shot_ids = sorted(found)
+
+    # I1.1 · composition anti-hijack availability for multi-seed PK
+    ah_enabled = True
+    ah_skip = False
+    try:
+        import composition_anti_hijack as _ah_mod
+
+        ah_skip = bool(_ah_mod._env_skip())
+        if ah_skip:
+            ah_enabled = False
+    except Exception:  # noqa: BLE001
+        ah_enabled = False
+        ah_skip = False
 
     shot_map = {str(s.get("id")): s for s in _iter_shots(spec)}
     rows: list[dict[str, Any]] = []
@@ -1690,6 +1748,26 @@ def pk_compare(
                 caution.append("recommended_downgraded_identity")
                 recommended = alt
                 caution = list(recommended.get("pk_caution") or []) + ["identity_prefer_safer_take"]
+        # never recommend pure hijack when a clean alt exists
+        _ah_rec = recommended.get("pk_anti_hijack") if isinstance(recommended.get("pk_anti_hijack"), dict) else {}
+        if _ah_rec.get("hijack") or "composition_hijack" in caution:
+            clean = next(
+                (
+                    c
+                    for c in scored
+                    if "composition_hijack" not in (c.get("pk_caution") or [])
+                    and not (c.get("pk_anti_hijack") or {}).get("hijack")
+                ),
+                None,
+            )
+            if clean is not None and clean is not recommended:
+                caution.append("recommended_downgraded_hijack")
+                recommended = clean
+                caution = list(recommended.get("pk_caution") or []) + ["composition_prefer_clean_take"]
+        multi = len(scored) >= 2
+        not_promotable = bool(multi and not ah_enabled and not ah_skip)
+        if not_promotable:
+            caution.append("anti_hijack_required_before_promote")
         rows.append(
             {
                 "shot_id": sid,
@@ -1700,10 +1778,15 @@ def pk_compare(
                 "floor": floor,
                 "caution": caution,
                 "human_required": True,
+                "not_promotable": not_promotable,
                 "pk_policy": "composite_motion_minus_identity_v1",
                 "note": (
-                    "advisory only — do not auto-promote; "
-                    "run select-shortlist --promote after human OK"
+                    "BLOCKED: multi-seed without anti-hijack — run aifilm anti-hijack first"
+                    if not_promotable
+                    else (
+                        "advisory only — do not auto-promote; "
+                        "run select-shortlist --promote after human OK"
+                    )
                 ),
             }
         )
@@ -1731,21 +1814,38 @@ def pk_compare(
             dailies_path.write_text(dailies_md, encoding="utf-8")
         except OSError:
             pass
+    multi_rows = [r for r in rows if int(r.get("take_count") or 0) >= 2]
+    blocked = any(bool(r.get("not_promotable")) for r in multi_rows)
+    codes: list[str] = []
+    if multi_rows and not ah_enabled and not ah_skip:
+        codes.append("PK_MULTI_SEED_NO_ANTI_HIJACK")
+    if multi_rows and ah_skip:
+        codes.append("PK_MEAN_ONLY_SKIP_INTENTIONAL")
+    pk_ok = not blocked
     return {
         "schema_version": 1,
         "kind": "ai-film-h3-pk-compare",
-        "ok": True,
+        "ok": pk_ok,
         "at": utc_now(),
         "root": str(base),
         "count": len(rows),
         "shots": rows,
         "policy": "machine_suggest_human_promote",
+        "anti_hijack_enabled": ah_enabled,
+        "anti_hijack_skip_intentional": ah_skip,
+        "multi_take_count": len(multi_rows),
+        "not_promotable": blocked,
+        "codes": codes,
         "dailies_md": dailies_md,
         "dailies_path": str(dailies_path) if write_dailies and rows else None,
         "next_cmd": (
-            f'aifilm select-shortlist --root "{base}" --promote  # review then promote'
-            if rows
-            else None
+            f'aifilm anti-hijack --root "{base}"; aifilm h3 pk-compare --root "{base}"'
+            if blocked
+            else (
+                f'aifilm select-shortlist --root "{base}" --promote  # review then promote'
+                if rows
+                else None
+            )
         ),
     }
 

@@ -716,17 +716,27 @@ def default_cut_on_for_shot(shot: dict[str, Any] | None) -> str | None:
     heat = str(shot.get("heat_phase") or "").strip().lower()
     if heat in {"act", "climax"}:
         return "mid_motion"
+    # Wave 2 · spoken dialogue → mid_motion so visual_fit resolves to vo (not PPT slot)
+    if shot_has_spoken_dialogue(shot):
+        return "mid_motion"
     return None
 
 
 def apply_shot_edit_rhythm_defaults(shot: dict[str, Any]) -> dict[str, Any]:
-    """Fill missing dsl.cut_on for drive shots (mutates shot). Returns notes."""
+    """Fill missing dsl.cut_on for drive/dialogue shots (mutates shot). Returns notes."""
     notes: dict[str, Any] = {"cut_on_applied": False}
     if not isinstance(shot, dict):
         return notes
     dsl = shot.get("dsl") if isinstance(shot.get("dsl"), dict) else None
     if dsl is None:
-        return notes
+        # Create dsl so dialogue cut_on can land (Wave 2)
+        if shot_has_spoken_dialogue(shot) or str(
+            shot.get("dramatic_function") or ""
+        ).strip().lower() in DRIVE_CUT_FUNCTIONS:
+            dsl = {}
+            shot["dsl"] = dsl
+        else:
+            return notes
     suggested = default_cut_on_for_shot(shot)
     existing = str(dsl.get("cut_on") or "").strip()
     if not existing and suggested:
@@ -734,6 +744,10 @@ def apply_shot_edit_rhythm_defaults(shot: dict[str, Any]) -> dict[str, Any]:
         shot["dsl"] = dsl
         notes["cut_on_applied"] = True
         notes["cut_on"] = suggested
+    # Dialogue: prefer visual_fit=vo when unset
+    if shot_has_spoken_dialogue(shot) and not str(shot.get("visual_fit") or "").strip():
+        shot["visual_fit"] = "vo"
+        notes["visual_fit"] = "vo"
     return notes
 
 

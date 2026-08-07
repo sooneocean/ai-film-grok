@@ -31,6 +31,7 @@ from i2v_motion_gate import (  # noqa: E402
     MEAN_MEAT_TARGET,
     MEAN_NORMAL_FLOOR,
 )
+from final.delivery_class import PLATE_BORING_MEAT_FLOOR  # noqa: E402
 from media_qa import (  # noqa: E402
     STILL_ASPECT_9_16_MAX,
     STILL_ASPECT_9_16_MIN,
@@ -46,6 +47,20 @@ def _shot(sid: str, phase: str, dur: float = 6.0) -> dict[str, object]:
 
 class HardDefaultsContractTests(unittest.TestCase):
     """Lock the hard-defaults.md contract values to the code."""
+
+    # --- I4.1 iron floors aligned ---
+    def test_plate_boring_floor_matches_meat_mean(self) -> None:
+        self.assertEqual(PLATE_BORING_MEAT_FLOOR, MEAN_MEAT_FLOOR)
+        self.assertEqual(MEAN_MEAT_FLOOR, 20.0)
+        self.assertEqual(MEAN_NORMAL_FLOOR, 18.0)
+
+    def test_anti_hijack_skip_env_name(self) -> None:
+        from composition_anti_hijack import multi_seed_anti_hijack_gate
+
+        g = multi_seed_anti_hijack_gate(
+            multi_take=True, anti_hijack_enabled=True, promote=False
+        )
+        self.assertTrue(g.get("ok"))
 
     # --- §叙事与规划: 性爱片段时长硬底 (adult max IRON 2026-07-24 · 50%) ---
     def test_sex_duration_floor_is_50_percent(self) -> None:

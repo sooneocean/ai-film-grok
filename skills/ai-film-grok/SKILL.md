@@ -59,7 +59,7 @@ AIFILM="$SKILL_DIR/scripts/aifilm"
 
 ## 阶段
 
-[agent](references/stages/agent.md)→[visual](references/stages/visual.md)→[voice](references/stages/voice.md)→[post](references/stages/post.md)→[deliver](references/stages/deliver.md) · [approval](references/stages/approval.md) · [INDEX](references/INDEX.md)
+[agent](references/stages/agent.md)→[visual](references/stages/visual.md)→[voice](references/stages/voice.md)→[post](references/stages/post.md)→[deliver](references/stages/deliver.md) · [approval](references/stages/approval.md) · **[H3 日课](references/stages/h3-core-day.md)** · [INDEX](references/INDEX.md)
 
 ## 命令
 
