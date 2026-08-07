@@ -47,6 +47,12 @@
 | C MIGRATE | **safe queue emptied** |
 | D PEEL | bug-driven only on remaining thick bodies (`workflow_pack`, `render_final`, …) |
 
+## Orchestrator relief (2026-08-07)
+
+Structure debt owner for mega-functions (`render_final` / `validate_film_spec` / `run_preflight` / export writers):  
+**[docs/plans/2026-08-07-monolith-orchestrator-relief-todoplan.md](../plans/2026-08-07-monolith-orchestrator-relief-todoplan.md)**  
+(heat facade + package migrate remain DONE; do not re-open C MIGRATE vanity moves.)
+
 ## Iron
 
 Public `aifilm` subcommand strings · hard-compat shims · dual-checkout discipline · no vanity LOC sprint.

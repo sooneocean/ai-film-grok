@@ -326,6 +326,7 @@ flowchart TD
 - `skills/ai-film-grok/tests/test_media_queue.py`
 - `skills/ai-film-grok/tests/test_media_queue_inventory.py`
 - `skills/ai-film-grok/tests/test_media_routing.py`
+- `skills/ai-film-grok/tests/test_mega_fn_budget.py`
 - `skills/ai-film-grok/tests/test_merge_edls.py`
 - `skills/ai-film-grok/tests/test_metabolism_terminal_residual.py`
 - `skills/ai-film-grok/tests/test_micro_motion.py`

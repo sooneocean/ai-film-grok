@@ -1,9 +1,9 @@
 # 巨石舒缓 Todo Plan（2026-08-06 · 诊断 + 执行队列）
 
-**Status:** ACTIVE · **M0–M4 SHIPPED (2.40.12)** · M5 deferred  
-**Plugin:** **2.40.12** · checkout `plugins/ai-film-grok`  
+**Status:** **SUPERSEDED for structure** → [2026-08-07-monolith-orchestrator-relief-todoplan.md](2026-08-07-monolith-orchestrator-relief-todoplan.md) · **M0–M4 SHIPPED (2.40.12)** · M5 并入 08-07 Wave 6  
+**Plugin:** **2.40.12**（历史）· checkout `plugins/ai-film-grok`  
 **结构主档（历史 wave）：** [residual-monolith-w4-todo](2026-08-05-residual-monolith-w4-todo.md)  
-**综合执行板：** [next-optimization-todoplan](2026-08-06-next-optimization-todoplan.md) Wave 3  
+**综合执行板（历史）：** [next-optimization-todoplan](2026-08-06-next-optimization-todoplan.md) Wave 3  
 **Tracker：** [project-module-refactor](2026-08-05-project-module-refactor.md)
 
 ---

@@ -1,11 +1,11 @@
 # Residual 大石 / 大型模组拆分 Todo Plan — post-W4 (2026-08-05)
 
-**Status:** ACTIVE · pure-helper peels **SHIPPED** (R1/R1b/R1c + R3a) · residual = orchestrator / heat packs / export harness only  
-**Diagnosis + M-queue (2026-08-06):** [2026-08-06-monolith-relief-todoplan.md](2026-08-06-monolith-relief-todoplan.md) · M0 SHIPPED  
-**Kind:** structure plan (docs + ordered implementer queue; not a vanity LOC sprint)  
+**Status:** **SUPERSEDED for structure** → [2026-08-07-monolith-orchestrator-relief-todoplan.md](2026-08-07-monolith-orchestrator-relief-todoplan.md) · pure-helper peels **SHIPPED** (R1/R1b/R1c + R3a) · heat facade **SHIPPED** · residual orchestrator 由 08-07 Wave 1–4 接管  
+**Diagnosis + M-queue (2026-08-06):** [2026-08-06-monolith-relief-todoplan.md](2026-08-06-monolith-relief-todoplan.md) · M0–M4 SHIPPED  
+**Kind:** structure plan history (docs + ordered implementer queue; not a vanity LOC sprint)  
 **Owner tracker:** [2026-08-05-project-module-refactor.md](2026-08-05-project-module-refactor.md)  
 **Strategy pointer:** [2026-08-05-strategy-director-engineer-upgrade.md](2026-08-05-strategy-director-engineer-upgrade.md) · R-struct  
-**Baseline date:** 2026-08-05 worktree (plugin **2.39.51**) · LOC freeze `2026-08-05T03:49:08Z` · evidence commit `ef9c4c70` (W4 packages) · **LOC refresh 2.40.10**
+**Baseline date:** 2026-08-05 worktree (plugin **2.39.51**) · LOC freeze `2026-08-05T03:49:08Z` · evidence commit `ef9c4c70` (W4 packages) · **LOC refresh 2.40.10** · **orchestrator probe 2026-08-07**
 
 > **一句话：** W0–W3（hub ≤2500 · `core/*` · package dirs）+ **W4 包边界**（`post/render_final` · `narrative/edit_policy_heat` + top-level shims）+ W5 docs **已 ship**；本档只排 **仍 4k 的内部叶拆** 与 next-tier 领域巨石——按 **出片风险 × 改动频率**，禁止「全员 <1500 行」冲刺，禁止把「搬进包」误报成「内部 peel DONE」。
 
