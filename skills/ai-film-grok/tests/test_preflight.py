@@ -159,6 +159,9 @@ class PreflightTests(unittest.TestCase):
                     "title": "日常",
                     "vo_mode": "storyteller",
                     "tts_backend": "auto",
+                    # This case asserts pilot/TTS softs only; meaning is fail-closed by
+                    # default — opt out so empty aesthetic fixture does not hard-block.
+                    "dramatic_meaning_strict": False,
                     "director_intent": {
                         "logline": "普通日常故事的完整一句话。",
                         "tone": "日常",
@@ -174,8 +177,13 @@ class PreflightTests(unittest.TestCase):
                                     "duration_sec": 6,
                                     "dsl": {
                                         "subject": "a",
-                                        "action": "b",
-                                        "motion": "slow push-in, soft blink, idle not speaking",
+                                        "action": "pulls curtain and steps into night light",
+                                        "motion": (
+                                            "hand pulls curtain aside, steps into window light, "
+                                            "idle not speaking"
+                                        ),
+                                        "visible_change": "from dark room into street-lit frame",
+                                        "story_beat": "she opens the night window",
                                     },
                                 }
                             ]
@@ -185,7 +193,16 @@ class PreflightTests(unittest.TestCase):
             )
             report = run_preflight(root)
             soft_codes = {i["code"] for i in report["soft"]}
-            self.assertTrue(report["hard_ok"])
+            hard_codes = {i["code"] for i in report["hard"]}
+            self.assertNotIn(
+                "dramatic_meaning",
+                hard_codes,
+                msg=f"meaning must stay soft when strict=false; hard={hard_codes}",
+            )
+            self.assertTrue(
+                report["hard_ok"],
+                msg=f"expected soft-only pilot/tts; hard={list(report.get('hard') or [])}",
+            )
             self.assertIn("pilot_not_user_approved", soft_codes)
             self.assertIn("tts_external_risk", soft_codes)
 
