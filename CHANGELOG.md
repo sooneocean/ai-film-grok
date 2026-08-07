@@ -1,6 +1,16 @@
 # Changelog
 
-## [2.41.27] - 2026-08-07
+## [2.41.28] - 2026-08-07
+
+### Added (director-center · Phase A–C)
+- **`aifilm director-center open|status|stop|wait`**: loopback 指挥中心 + 等人审。
+- **`GET /api/live` · `/api/events` · `/api/takes` · `POST /api/takes/review`**: 人审收件箱、活动流、多 take 选片（双网关）。
+- **console**: 指挥中心 KPI/收件箱/活动流 + **选 Take** tab（并排 Select/Reject，anti-hijack 提示）。
+- **`aifilm takes select|reject`**: CLI 与 Web 同学 take_registry。
+- **dispatch** `console_url` / `console_hint` 连动。
+- **Tests:** `test_director_center.py`。
+
+[2.41.27] - 2026-08-07
 
 ### Added (edit director · full desk)
 - **`aifilm edit-director`**: draft / normalize / status / set / apply / run / audit / snapshot / cuts / activate.

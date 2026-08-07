@@ -56,6 +56,10 @@ def test_fastapi_covers_review_parity_apis():
         ("GET", "/api/gates"),
         ("GET", "/api/assets"),
         ("GET", "/api/console-state"),
+        ("GET", "/api/live"),
+        ("GET", "/api/events"),
+        ("GET", "/api/takes"),
+        ("POST", "/api/takes/review"),
         ("POST", "/api/select"),
         ("GET", "/api/onboarding"),
     }

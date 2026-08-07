@@ -284,6 +284,43 @@ def make_handler(root: Path, token: str):
                 except Exception as exc:  # noqa: BLE001
                     self._json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
                 return
+            if parsed.path == "/api/live":
+                try:
+                    from console_projection import project_director_live
+
+                    self._json(200, project_director_live(film_root, include_token=False))
+                except Exception as exc:  # noqa: BLE001
+                    self._json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
+                return
+            if parsed.path == "/api/events":
+                try:
+                    from console_projection import project_events_tail
+
+                    qs = parse_qs(parsed.query)
+                    since = (qs.get("since") or [None])[0]
+                    try:
+                        limit = int((qs.get("limit") or ["40"])[0])
+                    except ValueError:
+                        limit = 40
+                    self._json(200, project_events_tail(film_root, since=since, limit=limit))
+                except Exception as exc:  # noqa: BLE001
+                    self._json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
+                return
+            if parsed.path == "/api/takes":
+                try:
+                    from web import takes_api
+                    from web_core import WebConsoleError
+
+                    shot = (parse_qs(parsed.query).get("shot") or [None])[0]
+                    if shot:
+                        self._json(200, takes_api.get_takes(film_root, shot))
+                    else:
+                        self._json(200, takes_api.list_take_shots(film_root))
+                except WebConsoleError as exc:
+                    self._json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+                except Exception as exc:  # noqa: BLE001
+                    self._json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
+                return
             if parsed.path == "/api/onboarding":
                 try:
                     import onboarding
@@ -496,6 +533,21 @@ def make_handler(root: Path, token: str):
                         {"ok": True, "active_film_id": summary["id"], "summary": summary},
                     )
                     return
+                elif self.path == "/api/takes/review":
+                    from web import takes_api
+
+                    report = takes_api.review_take(
+                        film_root,
+                        shot_id=str(body.get("shot_id") or ""),
+                        take_id=body.get("take_id"),
+                        director_status=body.get("director_status"),
+                        performance=body.get("performance"),
+                        continuity=body.get("continuity"),
+                        camera=body.get("camera"),
+                        artifacts=body.get("artifacts"),
+                        note=body.get("note"),
+                        expected_revision=body.get("expected_revision"),
+                    )
                 elif self.path == "/api/stop":
                     report = {"ok": True, "stopping": True}
                     threading.Thread(target=self.server.shutdown, daemon=True).start()

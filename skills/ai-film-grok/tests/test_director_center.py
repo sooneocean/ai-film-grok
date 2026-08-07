@@ -1,0 +1,211 @@
+"""Director command center + takes API (Phase A–C)."""
+
+from __future__ import annotations
+
+import json
+import sys
+from pathlib import Path
+
+import pytest
+
+pytestmark = pytest.mark.console
+
+HERE = Path(__file__).resolve().parent
+SKILL_SCRIPTS = HERE.parent / "scripts"
+if str(SKILL_SCRIPTS) not in sys.path:
+    sys.path.insert(0, str(SKILL_SCRIPTS))
+
+from console_projection import (  # noqa: E402
+    attach_console_url_to_dispatch,
+    project_director_live,
+    project_events_tail,
+    session_meta,
+)
+from web.director_center import DirectorCenterError, _find_stage_item, wait_for_approval  # noqa: E402
+from web.takes_api import get_takes, list_take_shots, review_take  # noqa: E402
+
+
+def test_live_empty_film(tmp_path):
+    (tmp_path / "receipts").mkdir()
+    live = project_director_live(tmp_path)
+    assert live["kind"] == "director-center-live"
+    assert live["human_inbox"] == []
+    assert live["session"]["active"] is False
+
+
+def test_live_inbox_stage(tmp_path, monkeypatch):
+    (tmp_path / "receipts").mkdir()
+
+    def fake_queue(_root):
+        return {
+            "items": [
+                {
+                    "id": "pilot",
+                    "title": "Pilot",
+                    "state": "pending_review",
+                    "media": [],
+                    "cloud_candidates": [],
+                }
+            ]
+        }
+
+    monkeypatch.setattr("review_control.review_queue", fake_queue)
+    live = project_director_live(tmp_path)
+    assert live["inbox_count"] >= 1
+    assert any(i["id"] == "pilot" for i in live["human_inbox"])
+
+
+def test_events_tail(tmp_path):
+    receipts = tmp_path / "receipts"
+    receipts.mkdir()
+    (receipts / "pipeline-events.jsonl").write_text(
+        json.dumps(
+            {
+                "event_id": "e1",
+                "stage": "h3",
+                "phase": "registered",
+                "shot_id": "s01",
+                "occurred_at": "2026-08-07T10:00:00+00:00",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    tail = project_events_tail(tmp_path)
+    assert tail["available"] is True
+    assert len(tail["events"]) == 1
+
+
+def test_session_and_console_url(tmp_path):
+    receipts = tmp_path / "receipts"
+    receipts.mkdir()
+    (receipts / "review-ui-session.json").write_text(
+        json.dumps(
+            {
+                "pid": None,
+                "port": 5555,
+                "token": "tok",
+                "root": str(tmp_path.resolve()),
+            }
+        ),
+        encoding="utf-8",
+    )
+    assert session_meta(tmp_path)["active"] is True
+    packet = attach_console_url_to_dispatch(tmp_path, {"ok": True})
+    assert "5555" in (packet.get("console_url") or "")
+
+
+def test_wait_ok_and_timeout(tmp_path, monkeypatch):
+    (tmp_path / "receipts").mkdir()
+
+    def ok(_r):
+        return {"items": [{"id": "pilot", "state": "approved", "approval_id": "a"}]}
+
+    monkeypatch.setattr("review_control.review_queue", ok)
+    assert wait_for_approval(tmp_path, stage="pilot", timeout_sec=1, poll_sec=0.2)["ok"]
+
+    def pending(_r):
+        return {"items": [{"id": "pilot", "state": "pending_review"}]}
+
+    monkeypatch.setattr("review_control.review_queue", pending)
+    assert wait_for_approval(tmp_path, stage="pilot", timeout_sec=0.4, poll_sec=0.2)["ok"] is False
+
+
+def test_find_stage_item():
+    items = [{"id": "pilot"}, {"id": "director:pilot_approval"}]
+    assert _find_stage_item(items, "pilot")["id"] == "pilot"
+
+
+def test_wait_empty_stage(tmp_path):
+    with pytest.raises(DirectorCenterError):
+        wait_for_approval(tmp_path, stage="")
+
+
+def _write_manifest_two_takes(root: Path) -> None:
+    (root / "clips").mkdir(exist_ok=True)
+    p1 = root / "clips" / "a.mp4"
+    p2 = root / "clips" / "b.mp4"
+    p1.write_bytes(b"fakea")
+    p2.write_bytes(b"fakeb")
+    manifest = {
+        "schema_version": 2,
+        "clips": {
+            "s01": {
+                "shot_id": "s01",
+                "take_id": "s01--aaaaaaaaaaaa",
+                "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "path": str(p1),
+                "active": True,
+                "state": "active",
+            }
+        },
+        "take_history": {
+            "s01": [
+                {
+                    "shot_id": "s01",
+                    "take_id": "s01--bbbbbbbbbbbb",
+                    "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                    "path": str(p2),
+                    "active": False,
+                    "state": "superseded",
+                }
+            ]
+        },
+    }
+    (root / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+
+
+def test_takes_list_and_select(tmp_path):
+    (tmp_path / "receipts").mkdir()
+    _write_manifest_two_takes(tmp_path)
+    idx = list_take_shots(tmp_path)
+    assert idx["shot_count"] == 1
+    assert idx["multi_take_count"] == 1
+    cmp = get_takes(tmp_path, "s01")
+    assert cmp["candidate_count"] == 2
+    report = review_take(
+        tmp_path,
+        shot_id="s01",
+        take_id="s01--bbbbbbbbbbbb",
+        director_status="selected",
+        note="pick b",
+    )
+    assert report["ok"] is True
+    assert report["result"]["director_status"] == "selected"
+    cmp2 = get_takes(tmp_path, "s01")
+    active = [c for c in cmp2["candidates"] if c.get("active")]
+    assert active and active[0]["take_id"] == "s01--bbbbbbbbbbbb"
+
+
+def test_console_state_director_live(tmp_path):
+    from asset_picker import console_state
+
+    (tmp_path / "receipts").mkdir()
+    state = console_state(tmp_path)
+    assert state["director_live"]["kind"] == "director-center-live"
+
+
+@pytest.mark.skipif(
+    not __import__("importlib").util.find_spec("fastapi"),
+    reason="fastapi not installed",
+)
+def test_api_live_and_takes(tmp_path):
+    from fastapi.testclient import TestClient
+    from web_api import create_app
+
+    (tmp_path / "receipts").mkdir()
+    _write_manifest_two_takes(tmp_path)
+    app = create_app(tmp_path, token="t", port=8765)
+    client = TestClient(app)
+    h = {"X-Review-Token": "t"}
+    assert client.get("/api/live", headers=h).json()["kind"] == "director-center-live"
+    assert client.get("/api/events", headers=h).json()["kind"] == "pipeline-events-tail"
+    assert client.get("/api/takes", headers=h).json()["kind"] == "takes-index"
+    assert client.get("/api/takes?shot=s01", headers=h).json()["candidate_count"] == 2
+    r = client.post(
+        "/api/takes/review",
+        headers={**h, "Origin": "http://127.0.0.1:8765"},
+        json={"shot_id": "s01", "take_id": "s01--bbbbbbbbbbbb", "director_status": "selected"},
+    )
+    assert r.status_code == 200
+    assert r.json()["ok"] is True

@@ -10,6 +10,24 @@
 声线 / 镜头候选 / 场景 / 道具）、推进起步向导，并把选择以**单一真相**方式落回流水线既有
 文件。浏览器是薄前端，**绝不发明生产状态**。
 
+### 1.1 导演指挥中心（Phase A–C）
+
+```bash
+aifilm director-center open --root <film>
+aifilm director-center wait --root <film> --stage pilot
+aifilm takes compare --root <film> --shot-id s01
+aifilm takes select --root <film> --shot-id s01 --take-id <id>
+```
+
+| API | 作用 |
+|-----|------|
+| `GET /api/live` | 人审收件箱 · queue · activity |
+| `GET /api/events` | pipeline-events 尾 |
+| `GET /api/takes` · `?shot=` | 多 take 索引 / 对比 |
+| `POST /api/takes/review` | Select/Reject take |
+
+放行写 ledger/manifest；Web 不执行 H3/final。
+
 ## 2. 架构
 
 ```

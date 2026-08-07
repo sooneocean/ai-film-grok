@@ -281,6 +281,55 @@ def create_app(root: str | Path, token: str, port: int) -> FastAPI:
 
         return asset_picker.console_state(base)
 
+    @app.get("/api/live", dependencies=[Depends(require_auth)])
+    def api_live() -> dict[str, Any]:
+        from console_projection import project_director_live
+
+        return project_director_live(base, include_token=False)
+
+    @app.get("/api/events", dependencies=[Depends(require_auth)])
+    def api_events(since: str | None = None, limit: int = 40) -> dict[str, Any]:
+        from console_projection import project_events_tail
+
+        return project_events_tail(base, since=since, limit=limit)
+
+    @app.get("/api/takes", dependencies=[Depends(require_auth)])
+    def api_takes(shot: str | None = None) -> dict[str, Any]:
+        from web import takes_api
+
+        try:
+            if shot:
+                return takes_api.get_takes(base, shot)
+            return takes_api.list_take_shots(base)
+        except WebConsoleError as exc:
+            raise _http_error(400, str(exc)) from exc
+
+    @app.post("/api/takes/review", dependencies=[Depends(require_auth), Depends(require_loopback)])
+    async def api_takes_review(request: Request) -> dict[str, Any]:
+        from web import takes_api
+
+        payload = await _read_json_body(request)
+        try:
+            return takes_api.review_take(
+                base,
+                shot_id=str(payload.get("shot_id") or ""),
+                take_id=payload.get("take_id"),
+                director_status=payload.get("director_status"),
+                performance=payload.get("performance"),
+                continuity=payload.get("continuity"),
+                camera=payload.get("camera"),
+                artifacts=payload.get("artifacts"),
+                note=payload.get("note"),
+                expected_revision=payload.get("expected_revision"),
+            )
+        except WebConsoleConflict as exc:
+            raise _http_error(409, str(exc)) from exc
+        except WebConsoleForbidden as exc:
+            raise _http_error(403, str(exc)) from exc
+        except WebConsoleError as exc:
+            raise _http_error(400, str(exc)) from exc
+
+
     # ---- workspace file (read-only: auth only; path-escape safe) ----
     @app.get("/api/file", dependencies=[Depends(require_auth)])
     def api_file(path: str = "", request: Request = None) -> Response:  # noqa: ARG001

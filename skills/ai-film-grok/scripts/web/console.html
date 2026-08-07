@@ -216,6 +216,7 @@
   .hero-strip p { margin: .25rem 0 0; color: var(--muted); font-size: .9rem; }
   .pill { display: inline-flex; align-items: center; gap: .45rem; padding: .35rem .8rem; border-radius: 999px; font-size: .82rem; font-weight: 600; border: 1px solid var(--panel-brd); white-space: nowrap; }
   .pill .dot { width: 9px; height: 9px; }
+  .pill.warn { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 40%, transparent); background: color-mix(in srgb, var(--warn) 12%, transparent); }
   .pill.ok { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 40%, transparent); background: color-mix(in srgb, var(--ok) 12%, transparent); }
   .pill.fail { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 40%, transparent); background: color-mix(in srgb, var(--danger) 12%, transparent); }
   .kpi-bento { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px,1fr)); gap: .9rem; margin-bottom: 1.2rem; }
@@ -301,6 +302,7 @@
     <button class="tab magnetic" role="tab" data-tab="overview" aria-controls="dashboard" aria-selected="true">工作台</button>
     <button class="tab magnetic" role="tab" data-tab="studio" aria-controls="studio" aria-selected="false" id="tab-studio" style="display:none">总控台</button>
     <button class="tab magnetic" role="tab" data-tab="assets" aria-controls="assets" aria-selected="false">选素材</button>
+    <button class="tab magnetic" role="tab" data-tab="dailies" aria-controls="dailies" aria-selected="false">选 Take</button>
     <button class="tab magnetic" role="tab" data-tab="review" aria-controls="review" aria-selected="false">验片</button>
     <button class="tab magnetic" role="tab" data-tab="gates" aria-controls="gates" aria-selected="false">门禁</button>
     <button class="tab magnetic" role="tab" data-tab="onboarding" aria-controls="onboarding" aria-selected="false">起步</button>
@@ -322,6 +324,15 @@
     </div>
 
     <div id="dash-kpi" class="kpi-bento"></div>
+
+    <div class="panel" id="dash-inbox-panel">
+      <h3 class="section-h">人审收件箱 <span id="dash-inbox-count" class="muted" style="font-weight:400;font-size:.85rem"></span></h3>
+      <p class="muted" style="font-size:.82rem;margin:.2rem 0 .9rem">待审阶段 / 多 take 抽检。CLI：<code>aifilm director-center wait --stage …</code> · <code>aifilm takes select …</code></p>
+      <ul id="dash-inbox" class="recent" aria-live="polite"></ul>
+      <h3 class="section-h" style="margin-top:1rem">生成活动流</h3>
+      <ul id="dash-activity" class="recent muted"></ul>
+    </div>
+
 
     <div class="two-col">
       <div class="panel">
@@ -406,6 +417,18 @@
       </div>
       <div id="assets-grid" class="grid" aria-live="polite"></div>
       <button class="ghost-btn more-btn hidden" id="more">显示更多…</button>
+    </div>
+  </section>
+
+  <section id="dailies" class="tabpane hidden" role="tabpanel" aria-labelledby="tab-dailies">
+    <div class="panel">
+      <h3 style="margin-top:0">选 Take · Dailies <span class="muted" style="font-weight:400;font-size:.8rem">多 take 并排 · 人眼挑选 · 禁只比 mean</span></h3>
+      <p class="muted" id="dailies-hint" style="font-size:.82rem">禁止只比 mean/音量/white0 自动选片；目视构图与主体后再 Select。</p>
+      <div class="cmd-row" style="margin-bottom:.8rem">
+        <button class="cmd-btn magnetic" id="dailies-refresh">刷新镜头列表</button>
+      </div>
+      <div id="dailies-shots" class="lanes" aria-live="polite"></div>
+      <div id="dailies-compare" class="grid" style="margin-top:1rem"></div>
     </div>
   </section>
 
@@ -556,7 +579,8 @@ function activateTab(b){
   if (b.dataset.tab === 'overview') loadDashboard();
   if (b.dataset.tab === 'review') ensureReviewFrame();
   if (b.dataset.tab === 'onboarding') loadOnboarding();   // T1: 起步 tab 必须加载状态，否则"点画面不会动"
-  if (b.dataset.tab === 'studio') loadStudio();           // 导演总控台：多片统览 + 切换
+  if (b.dataset.tab === 'studio') loadStudio();
+  if (b.dataset.tab === 'dailies') loadDailies();           // 导演总控台：多片统览 + 切换
 }
 tabButtons.forEach((b, i) => {
   b.onclick = () => activateTab(b);
@@ -921,9 +945,10 @@ document.getElementById('refresh-gates').onclick = loadGates;
 // ---- dashboard (macro workbench) ----
 async function loadDashboard(){
   try {
-    const [s, g, bgm, character, voice, shot, scene, prop] = await Promise.all([
+    const [s, g, live, bgm, character, voice, shot, scene, prop] = await Promise.all([
       api('/api/console-state'),
       api('/api/gates'),
+      api('/api/live').catch(() => null),
       api('/api/assets?kind=bgm'),
       api('/api/assets?kind=character'),
       api('/api/assets?kind=voice'),
@@ -934,63 +959,90 @@ async function loadDashboard(){
     renderDashboard(s, g, {
       bgm: bgm.items || [], character: character.items || [], voice: voice.items || [],
       shot: shot.items || [], scene: scene.items || [], prop: prop.items || []
-    });
+    }, live || s.director_live || null);
   } catch (e) { toast('载入工作台失败：' + e.message, true); }
 }
-function renderDashboard(s, g, libs){
+function renderDashboard(s, g, libs, live){
   const counts = s.selection_counts || {};
-  const total = s.selection_total || 0;
-  const ob = s.onboarding || {};
-
-  // gate health pill
+  const L = live || {};
+  const Q = L.queue || {};
+  const D = L.dispatch || s.dispatch_projection || {};
+  const inbox = Array.isArray(L.human_inbox) ? L.human_inbox : [];
+  const activity = Array.isArray(L.activity) ? L.activity : [];
   const pill = document.getElementById('dash-gate-pill');
-  if (g.blocking){ pill.className = 'pill fail'; pill.innerHTML = '<span class="dot s-fail"></span><span>硬门禁阻断</span>'; }
-  else { pill.className = 'pill ok'; pill.innerHTML = '<span class="dot s-pass"></span><span>硬门禁通过</span>'; }
-
-  // KPI bento
+  if (pill){
+    if (g.blocking){ pill.className = 'pill fail'; pill.innerHTML = '<span class="dot s-fail"></span><span>硬门禁阻断</span>'; }
+    else if (inbox.length){ pill.className = 'pill warn'; pill.innerHTML = '<span class="dot s-warn"></span><span>待审 ' + inbox.length + '</span>'; }
+    else { pill.className = 'pill ok'; pill.innerHTML = '<span class="dot s-pass"></span><span>硬门禁通过</span>'; }
+  }
   const kpis = [
-    { cls: 'accent', num: total, lbl: '总选择数',
-      sub: Object.keys(counts).length ? Object.entries(counts).map(([k,v]) => `${KIND_LABEL[k]||k} ${v}`).join(' · ') : '暂无选择' },
-    { cls: 'ok', num: s.approved_clips || 0, lbl: '已批准 clips', sub: '已写入 manifest.json' },
-    { cls: g.blocking ? 'danger' : 'ok', num: g.blocking ? '阻断' : '通过', lbl: '硬门禁', sub: `${g.gates.length} 项检测` },
-    { cls: ob.completed ? 'ok' : '', num: `${ob.done||0}/${ob.total||0}`, lbl: '起步进度', sub: ob.completed ? '已完成' : (ob.total ? '进行中' : '未开始') },
+    { cls: inbox.length ? 'danger' : 'accent', num: inbox.length, lbl: '待审人审', sub: D.next_id ? ('next: ' + D.next_id) : (D.stage_public || '无 dispatch') },
+    { cls: Q.running ? 'accent' : '', num: Q.running || 0, lbl: '生成中', sub: 'pending ' + (Q.pending||0) + ' · takes ' + (Q.takes_count??'—') },
+    { cls: 'ok', num: s.approved_clips || 0, lbl: '已批准 clips', sub: '多 take ' + (Q.multi_take_shots||0) },
+    { cls: g.blocking ? 'danger' : 'ok', num: g.blocking ? '阻断' : '通过', lbl: '硬门禁', sub: `${(g.gates||[]).length} 项检测` },
   ];
-  document.getElementById('dash-kpi').innerHTML = kpis.map(k =>
+  const kpiEl = document.getElementById('dash-kpi');
+  if (kpiEl) kpiEl.innerHTML = kpis.map(k =>
     `<div class="kpi ${k.cls}"><div class="k-num">${k.num}</div><div class="k-lbl">${esc(k.lbl)}</div><div class="k-sub">${esc(k.sub)}</div></div>`
   ).join('');
-
-  // material lanes (selected / library total)
+  const inboxEl = document.getElementById('dash-inbox');
+  const inboxCount = document.getElementById('dash-inbox-count');
+  if (inboxCount) inboxCount.textContent = inbox.length ? `· ${inbox.length} 项` : '· 空';
+  if (inboxEl){
+    inboxEl.innerHTML = inbox.length
+      ? inbox.map(it => `<li style="cursor:pointer" data-inbox-kind="${esc(it.kind||'stage')}" data-inbox-id="${esc(it.id)}" data-shot="${esc(it.shot_id||'')}">`
+          + `<span class="r-kind">${esc(it.state)}</span>`
+          + `<span><b>${esc(it.title||it.id)}</b></span>`
+          + `<span class="r-time">${it.candidates? (it.candidates+' 候选'):''}</span></li>`).join('')
+      : '<li class="muted">暂无待审。</li>';
+    inboxEl.querySelectorAll('[data-inbox-id]').forEach(node => {
+      node.onclick = () => {
+        if (node.dataset.inboxKind === 'take_pick') {
+          const tab = tabButtons.find(b => b.dataset.tab === 'dailies');
+          if (tab) { tab.click(); if (node.dataset.shot) openDailiesShot(node.dataset.shot); }
+        } else {
+          const tab = tabButtons.find(b => b.dataset.tab === 'review');
+          if (tab) tab.click();
+        }
+      };
+    });
+  }
+  const actEl = document.getElementById('dash-activity');
+  if (actEl){
+    const rows = activity.slice().reverse();
+    actEl.innerHTML = rows.length
+      ? rows.map(e => `<li><span class="r-kind">${esc(e.phase||'')}</span><span>${esc(e.stage||'')}${e.shot_id?(' · '+e.shot_id):''}</span><span class="r-time">${esc(String(e.at||'').slice(0,16).replace('T',' '))}</span></li>`).join('')
+      : '<li class="muted">尚无 pipeline-events。</li>';
+  }
+  // preserve lanes/recent/gates if elements exist — call partial legacy
   const kinds = ['bgm','character','voice','shot','scene','prop'];
-  document.getElementById('dash-lanes').innerHTML = kinds.map(k => {
-    const sel = counts[k] || 0;
-    const tot = (libs[k] || []).length;
-    const pct = tot ? Math.min(100, Math.round(sel / tot * 100)) : 0;
-    return `<div class="lane"><div class="l-top"><span class="l-name">${KIND_LABEL[k]||k}</span>`
-      + `<span class="l-val">${sel} / ${tot}</span></div>`
-      + `<div class="l-bar"><div class="l-fill" style="width:${pct}%"></div></div></div>`;
-  }).join('');
-
-  // recent activity
+  const lanes = document.getElementById('dash-lanes');
+  if (lanes){
+    lanes.innerHTML = kinds.map(k => {
+      const sel = counts[k] || 0;
+      const tot = (libs[k] || []).length;
+      const pct = tot ? Math.min(100, Math.round(sel / tot * 100)) : 0;
+      return `<div class="lane"><div class="l-top"><span class="l-name">${KIND_LABEL[k]||k}</span><span class="l-val">${sel} / ${tot}</span></div><div class="l-bar"><div class="l-fill" style="width:${pct}%"></div></div></div>`;
+    }).join('');
+  }
   const recent = (s.recent_selections || []).slice().reverse();
-  document.getElementById('dash-recent').innerHTML = recent.length
-    ? recent.map(r => `<li><span class="r-kind">${esc(KIND_LABEL[r.kind]||r.kind)}</span>`
-        + `<span>${esc(r.asset_id)}</span>`
-        + `<span class="r-time">${esc((r.recorded_at||'').slice(0,16).replace('T',' '))}</span></li>`).join('')
-    : '<li class="muted">暂无选择记录。</li>';
-
-  // gate health list
-  document.getElementById('dash-gates').innerHTML = g.gates.map(x =>
-    `<div class="gate"><span class="dot s-${esc(x.status)}"></span>`
-      + `<div><div class="name">${esc(x.name)} ${x.required ? '· 硬' : ''}</div>`
-      + `<div class="detail">${esc(x.detail)}</div></div></div>`
-  ).join('');
-
-  // next-step guidance (CTO plan T3): tell the user exactly what to do next
+  const recEl = document.getElementById('dash-recent');
+  if (recEl){
+    recEl.innerHTML = recent.length
+      ? recent.map(r => `<li><span class="r-kind">${esc(KIND_LABEL[r.kind]||r.kind)}</span><span>${esc(r.asset_id)}</span><span class="r-time">${esc((r.recorded_at||'').slice(0,16).replace('T',' '))}</span></li>`).join('')
+      : '<li class="muted">暂无选择记录。</li>';
+  }
+  const gatesEl = document.getElementById('dash-gates');
+  if (gatesEl && g.gates){
+    gatesEl.innerHTML = g.gates.map(x =>
+      `<div class="gate"><span class="dot s-${esc(x.status)}"></span><div><div class="name">${esc(x.name)} ${x.required ? '· 硬' : ''}</div><div class="detail">${esc(x.detail)}</div></div></div>`
+    ).join('');
+  }
   const next = document.getElementById('dash-next');
   if (next){
-    if (ob.completed) next.textContent = '起步已完成 —— 点「启动流水线」直接开跑。';
-    else if (g.blocking) next.textContent = '硬门禁阻断中 —— 先解决门禁再启动。';
-    else next.textContent = '还没起步？点「开始 / 继续起步」贴故事让 AI 拆解，确认后一键启动。';
+    if (inbox.length) next.textContent = `有 ${inbox.length} 项待人审 —— 验片放行或选 Take。`;
+    else if (D.next_cmd) next.textContent = '下一步（终端）：' + D.next_cmd;
+    else next.textContent = '工作台就绪。';
   }
 }
 
@@ -1519,6 +1571,58 @@ loadDashboard();
 loadAssets('bgm');
 startSync();
 bootStudio();   // reveal 总控台 tab in studio mode; default landing there
+
+// ===== Dailies / multi-take pick (Phase C) =====
+let dailiesShot = null;
+async function loadDailies(){
+  try {
+    const idx = await api('/api/takes');
+    const hint = document.getElementById('dailies-hint');
+    if (hint && idx.anti_hijack_hint) hint.textContent = idx.anti_hijack_hint;
+    const box = document.getElementById('dailies-shots');
+    const shots = idx.shots || [];
+    box.innerHTML = shots.length
+      ? shots.map(s => `<div class="lane" style="cursor:pointer" data-shot="${esc(s.shot_id)}"><div class="l-top"><span class="l-name">${esc(s.shot_id)}</span><span class="l-val">${s.candidate_count} takes${s.needs_pick?' · 待选':''}</span></div></div>`).join('')
+      : '<p class="muted">尚无 takes。生成并 register 后会出现在此。</p>';
+    box.querySelectorAll('[data-shot]').forEach(n => n.onclick = () => openDailiesShot(n.dataset.shot));
+    if (dailiesShot) openDailiesShot(dailiesShot);
+    else if (shots.find(s => s.needs_pick)) openDailiesShot(shots.find(s => s.needs_pick).shot_id);
+  } catch (e) { toast('载入 takes 失败：' + e.message, true); }
+}
+async function openDailiesShot(shotId){
+  dailiesShot = shotId;
+  try {
+    const cmp = await api('/api/takes?shot=' + encodeURIComponent(shotId));
+    const el = document.getElementById('dailies-compare');
+    const cands = cmp.candidates || [];
+    el.innerHTML = cands.length ? cands.map(c => {
+      const media = c.path ? (/\.(mp4|mov|webm|m4v)$/i.test(c.path)
+        ? `<video class="media" controls preload="metadata" src="/media/${c.path.split('/').map(encodeURIComponent).join('/')}" style="max-width:100%;max-height:220px"></video>`
+        : `<img class="media" src="/media/${c.path.split('/').map(encodeURIComponent).join('/')}" style="max-width:100%;max-height:220px" alt="">`)
+        : '<p class="muted">无媒体路径</p>';
+      return `<article class="card"><div class="meta"><b>${esc(c.take_id||'?')}</b> ${c.active?'· active':''} · ${esc(c.director_status||c.state||'')}</div>
+        ${media}
+        <div class="meta">mean=${c.mean_volume??'—'} · score=${c.score_total??'—'}</div>
+        <div class="card-actions">
+          <button class="pick" data-take-act="selected" data-tid="${esc(c.take_id)}">Select</button>
+          <button class="ghost-btn" data-take-act="rejected" data-tid="${esc(c.take_id)}">Reject</button>
+        </div></article>`;
+    }).join('') : '<p class="muted">该镜无候选。</p>';
+    el.querySelectorAll('[data-take-act]').forEach(btn => {
+      btn.onclick = async () => {
+        try {
+          await api('/api/takes/review', {method:'POST', headers:{'Content-Type':'application/json', Origin: location.origin}, body: JSON.stringify({
+            shot_id: shotId, take_id: btn.dataset.tid, director_status: btn.dataset.takeAct, note: 'console dailies'
+          })});
+          toast((btn.dataset.takeAct==='selected'?'已选 take ':'已拒 take ') + btn.dataset.tid);
+          openDailiesShot(shotId); loadDailies();
+        } catch (e) { toast(e.message, true); }
+      };
+    });
+  } catch (e) { toast(e.message, true); }
+}
+document.getElementById('dailies-refresh') && (document.getElementById('dailies-refresh').onclick = loadDailies);
+
 </script>
 </body>
 </html>

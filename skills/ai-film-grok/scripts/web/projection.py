@@ -151,4 +151,19 @@ def enrich_console_state(root: Path | str, state: dict[str, Any]) -> dict[str, A
     state = dict(state)
     state["dispatch_projection"] = project_dispatch_for_console(base)
     state["queue_snapshot"] = project_queue_snapshot(base)
+    try:
+        from web.director_live_ext import project_director_live
+        state["director_live"] = project_director_live(base)
+    except Exception:
+        state["director_live"] = {"kind": "director-center-live", "available": False}
     return state
+
+
+# Re-export director-live API (implementation in director_live_ext)
+from web.director_live_ext import (  # noqa: E402
+    attach_console_url_to_dispatch,
+    project_director_live,
+    project_events_tail,
+    project_human_inbox,
+    session_meta,
+)

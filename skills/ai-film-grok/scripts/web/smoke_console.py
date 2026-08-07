@@ -405,6 +405,10 @@ def main() -> int:
             and "function cmdGo" in text
             and "function cmdAdvance" in text,
         )
+        check(
+            "served console: director inbox + dailies",
+            'id="dash-inbox"' in text and "/api/live" in text and 'data-tab="dailies"' in text and "function loadDailies" in text,
+        )
         # 11c) Onboarding tab actually wires its loader (CTO plan T1): the tab
         #      switch must invoke loadOnboarding() so the "起步" screen is alive.
         check(

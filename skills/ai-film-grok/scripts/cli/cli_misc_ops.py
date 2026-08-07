@@ -1026,6 +1026,19 @@ def cmd_review_ui(args: argparse.Namespace) -> int:
     return code
 
 
+def cmd_director_center(args: argparse.Namespace) -> int:
+    """Open / status / stop / wait for the AI director command center."""
+    from core.emit import emit
+    from web.director_center import DirectorCenterError, run_director_center
+
+    try:
+        report, code = run_director_center(args)
+    except (OSError, ValueError, DirectorCenterError) as exc:
+        raise FilmError(str(exc)) from exc
+    emit(report)
+    return code
+
+
 def cmd_interactive(args: argparse.Namespace) -> int:
     from cli_interactive import run_interactive
     from core.constants import MANIFEST_NAME  # noqa: F401

@@ -117,6 +117,17 @@ def add_quality_ops_parsers(sub: argparse._SubParsersAction[argparse.ArgumentPar
         ),
     )
 
+    takes_select = takes_sub.add_parser("select", help="Select a take as active (director_status=selected)")
+    takes_select.add_argument("--root", required=True)
+    takes_select.add_argument("--shot-id", required=True)
+    takes_select.add_argument("--take-id", required=True)
+    takes_select.add_argument("--note", default="")
+    takes_reject = takes_sub.add_parser("reject", help="Reject a take (director_status=rejected)")
+    takes_reject.add_argument("--root", required=True)
+    takes_reject.add_argument("--shot-id", required=True)
+    takes_reject.add_argument("--take-id", default=None)
+    takes_reject.add_argument("--note", default="")
+
     benchmark_p = sub.add_parser(
         "benchmark", help="Run a no-spend premium vertical benchmark contract"
     )
@@ -458,6 +469,38 @@ def cmd_takes(args: argparse.Namespace) -> int:
             raise FilmError(str(exc)) from exc
         save_manifest(root, manifest)
         report["root"] = str(root)
+        emit(report)
+        return 0 if report.get("ok") else 1
+    if action in {"select", "reject"}:
+        manifest = load_manifest(root)
+        status = "selected" if action == "select" else "rejected"
+        try:
+            report = set_take_review(
+                manifest,
+                str(args.shot_id),
+                take_id=getattr(args, "take_id", None),
+                director_status=status,
+            )
+        except ValueError as exc:
+            from util.errors import FilmError
+
+            raise FilmError(str(exc)) from exc
+        save_manifest(root, manifest)
+        try:
+            from pipeline_events import append_event
+
+            append_event(
+                root,
+                stage=f"take:{args.shot_id}",
+                phase="completed" if action == "select" else "human_time",
+                shot_id=str(args.shot_id),
+                note=status,
+                actor="cli-takes",
+            )
+        except Exception:
+            pass
+        report["root"] = str(root)
+        report["action"] = action
         emit(report)
         return 0 if report.get("ok") else 1
     from util.errors import FilmError
