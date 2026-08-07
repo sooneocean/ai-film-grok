@@ -17,7 +17,7 @@ SKILL := $(ROOT)/skills/ai-film-grok
 AIFILM := $(SKILL)/scripts/aifilm
 RUNTIME_PYTHON := $(SKILL)/scripts/runtime-python
 
-.PHONY: help setup dev test test-fast test-hotpath check-all review clean validate doctor coverage audit audit-full lessons-audit release-check release-light update inspect version sync-docs sync install-hooks lock-runtime type
+.PHONY: help setup dev test test-fast test-hotpath check-all review clean validate doctor coverage audit audit-full lessons-audit release-check release-light update inspect version sync-docs sync install-hooks lock-runtime type smoke-console
 
 help:
 	@echo "ai-film-grok make targets"
@@ -30,6 +30,7 @@ help:
 	@echo "  release-light   docs + doctor core (CI is the real gate)"
 	@echo "  release-check   package + full test suite"
 	@echo "  lock-runtime    refresh runtime-lock.json fingerprints"
+	@echo "  smoke-console   live localhost console regression (real aifilm serve + HTTP)"
 	@echo "  sync-docs       regenerate README/GRAPH version pointers"
 	@echo "  type            P5-1 mypy incremental typing gate (scoped)"
 	@echo "  install-hooks   core.hooksPath=.githooks"
@@ -93,6 +94,13 @@ release-light:
 
 lock-runtime:
 	@"$(AIFILM)" lock-runtime
+
+# Live localhost console regression: starts the real `aifilm review-ui serve`
+# on a loopback socket and drives the full flow end-to-end (gates, assets,
+# hash-bound select 200/409, blocking gate 403, cross-origin 403, bad token 401,
+# media-lib path-escape 404). Local one-click gate; mirrors the CI `console` job.
+smoke-console:
+	@"$(SKILL)/scripts/smoke_console.py"
 
 update:
 	grok plugin update ai-film-grok

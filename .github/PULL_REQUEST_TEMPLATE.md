@@ -10,6 +10,7 @@
 
 ## 控制台改动自查（涉及控制台文件时必填）
 - [ ] 本地跑过 `pytest -m console`（双网关安全契约：token / 跨域 / 冲突 409 / 门禁 403 / 越界 404）
+- [ ] CI `console` 门禁绿（`.github/workflows/ci.yml` 的 `console` job 通过；或本地 `make smoke-console` 全绿，等价于端到端冒烟）
 - [ ] `make doctor` 绿（`failed_checks: []`）
 - [ ] `ruff` 干净（改动文件）
 - [ ] 若改了 `asset_picker.select_asset`：确认 shot 仍只写 `manifest.json` 的 `clips`，角色/声线/BGM 不发明进 manifest

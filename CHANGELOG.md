@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.40.72] - 2026-08-07
+
+### Added (web review console · local live smoke + PR gate)
+- **`scripts/smoke_console.py`:** repo-relative live smoke harness that spawns the real `aifilm review-ui serve` on a loopback socket and drives the full console flow end-to-end (console page, gates panel, asset listing + bad-kind 400, console-state + recent_selections, onboarding, hash-bound select 200/409, blocking gate 403, cross-origin 403, bad token 401, media-lib path-escape 404). Stdlib-only driver; exits non-zero on first failure.
+- **`make smoke-console`:** one-click local regression target mirroring the CI `console` job.
+- **PR template:** added a "console 门禁须绿" checkbox (CI `console` job / `make smoke-console`) under 控制台改动自查.
+
 ## [2.40.71] - 2026-08-07
 
 ### Added (delivery honesty-rail R4 I5 ops · named contracts)
