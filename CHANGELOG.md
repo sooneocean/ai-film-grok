@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.41.33] - 2026-08-07
+
+### Added (edit-director · Round 4 closeout)
+- **trims → plate**: apply writes `in_point_sec`/`out_point_sec` on film-spec (render_final fit path); receipt `edit-director-trims.json`.
+- **gate-auto**: step `edit_director` (hard on post-route mismatch; auto-draft when missing).
+- **`edit-director verify`**: status+checklist+post-doctor+trims (no media).
+- **post-doctor**: TRIM_UNBOUND/BOUND soft codes.
+- **Tests:** 20 cases.
+
 ## [2.41.32] - 2026-08-07
 
 ### Added (director-center · Phase E)
