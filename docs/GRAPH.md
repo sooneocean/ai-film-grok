@@ -548,6 +548,7 @@ flowchart TD
 - `skills/ai-film-grok/tests/test_web_api.py`
 - `skills/ai-film-grok/tests/test_web_console.py`
 - `skills/ai-film-grok/tests/test_web_routes.py`
+- `skills/ai-film-grok/tests/test_web_studio.py`
 - `skills/ai-film-grok/tests/test_workflow_p0_gates.py`
 - `skills/ai-film-grok/tests/test_workflow_pack.py`
 - `skills/ai-film-grok/tests/test_workflow_spine.py`
