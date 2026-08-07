@@ -1,5 +1,12 @@
 # Post 阶段卡
 
+
+## 转场刀口（T8 快卡）
+
+1. **continue 缝 = 硬切**（match-cut / concat；禁 dissolve 盖接戏）。  
+2. **soft 缝须轮转**（同 style 连粥 hard；`transition_policy` / ops 同一真相）。  
+3. **有 final → 缝抽帧 audit**（`transition_frame_audit` receipt；红码进 PARTIAL）。
+
 字幕双路径：正式 master=HF（plate `subs=off`）；ship/门红=**PIL 硬烧**中文。  
 铁律：[hard-defaults](../hard-defaults.md) · final 诚实：[suse memory](../../memory/2026-08-06-suse-ep01-official-final-iron.md)
 

@@ -772,6 +772,124 @@ def cmd_doctor(args: argparse.Namespace) -> int:
             if "security_posture" in report and isinstance(report["security_posture"], dict):
                 report["security_posture"]["warnings"] = environment_warnings
 
+    # F5 · face-identity doctor probe when film --root given
+    film_root_face = getattr(args, "root", None) or (
+        getattr(args, "art_root", None) if getattr(args, "art_check", False) else None
+    )
+    if film_root_face and str(film_root_face).strip() not in {"", "."}:
+        try:
+            fr_face = Path(str(film_root_face)).expanduser().resolve()
+        except Exception:  # noqa: BLE001
+            fr_face = None
+        if fr_face is not None and (fr_face / "film-spec.json").is_file():
+            face_probe: dict[str, Any] = {
+                "kind": "face-identity-doctor",
+                "ok": True,
+                "root": str(fr_face),
+                "advisory": False,
+            }
+            try:
+                from util import read_json as _rj_face
+
+                try:
+                    from assets.face_identity import load_receipt as _load_fi
+                except ImportError:  # pragma: no cover
+                    from face_identity import load_receipt as _load_fi  # type: ignore
+
+                spec_f = _rj_face(fr_face / "film-spec.json") or {}
+                receipt = _load_fi(fr_face)
+                enrolled = (
+                    receipt.get("enrolled")
+                    if isinstance(receipt.get("enrolled"), dict)
+                    else {}
+                )
+                # Lead cast ids: style-bible characters + film-spec cast_voices / cast
+                lead_ids: list[str] = []
+                bible = _rj_face(fr_face / "style-bible.json") or {}
+                chars = bible.get("characters") if isinstance(bible, dict) else None
+                if isinstance(chars, list):
+                    for c in chars:
+                        if not isinstance(c, dict):
+                            continue
+                        cid = str(c.get("id") or c.get("character_id") or "").strip()
+                        if cid and (c.get("is_lead") or c.get("role") in {"lead", "hero", "主角"}):
+                            lead_ids.append(cid)
+                    if not lead_ids:
+                        for c in chars[:1]:
+                            if isinstance(c, dict):
+                                cid = str(c.get("id") or "").strip()
+                                if cid:
+                                    lead_ids.append(cid)
+                if not lead_ids and isinstance(spec_f, dict):
+                    cv = spec_f.get("cast_voices")
+                    if isinstance(cv, dict) and cv:
+                        lead_ids = [str(k) for k in list(cv.keys())[:1]]
+                missing = [cid for cid in lead_ids if cid not in enrolled]
+                verified_false: list[str] = []
+                for cid, ent in enrolled.items():
+                    if not isinstance(ent, dict):
+                        continue
+                    if ent.get("verified") is False:
+                        verified_false.append(str(cid))
+                face_probe["lead_ids"] = lead_ids
+                face_probe["enrolled"] = list(enrolled.keys())
+                face_probe["missing_enroll"] = missing
+                face_probe["verified_false"] = verified_false
+                if missing:
+                    face_probe["ok"] = False
+                    face_probe["codes"] = ["FACE_IDENTITY_ENROLL_GAP"]
+                    face_probe["next_cmd"] = (
+                        f'aifilm face-identity enroll-bible --root "{fr_face}"'
+                    )
+                    environment_warnings.append(
+                        f"face-identity: lead cast not enrolled: {missing}; "
+                        f'{face_probe["next_cmd"]}'
+                    )
+                elif verified_false:
+                    face_probe["ok"] = False
+                    face_probe["codes"] = ["FACE_IDENTITY_VERIFIED_FALSE"]
+                    face_probe["next_cmd"] = (
+                        f'aifilm face-identity audit --root "{fr_face}"'
+                    )
+                    environment_warnings.append(
+                        f"face-identity: verified=false for {verified_false}; "
+                        f'{face_probe["next_cmd"]}'
+                    )
+                else:
+                    face_probe["codes"] = []
+                    face_probe["next_cmd"] = None
+                    if not lead_ids and not enrolled:
+                        face_probe["ok"] = False
+                        face_probe["codes"] = ["FACE_IDENTITY_NO_CAST"]
+                        face_probe["next_cmd"] = (
+                            f'aifilm face-identity enroll-bible --root "{fr_face}"'
+                        )
+                        environment_warnings.append(
+                            "face-identity: no cast enrolled and no lead ids found"
+                        )
+            except Exception as exc:  # noqa: BLE001
+                face_probe = {
+                    "kind": "face-identity-doctor",
+                    "ok": False,
+                    "hard": True,
+                    "codes": ["FACE_IDENTITY_DOCTOR_PROBE_FAILED"],
+                    "error": str(exc)[:200],
+                    "next_cmd": f'aifilm face-identity status --root "{fr_face}"',
+                }
+                environment_warnings.append(
+                    f"face-identity doctor probe failed: {exc}"[:200]
+                )
+            report["face_identity"] = face_probe
+            if "security_posture" in report and isinstance(report["security_posture"], dict):
+                report["security_posture"]["warnings"] = environment_warnings
+            # When --root film given: face gap fails doctor (F5 red)
+            if face_probe.get("ok") is False:
+                report["ok"] = False
+                report["error"] = (
+                    report.get("error")
+                    or f"face-identity: {face_probe.get('codes')} — {face_probe.get('next_cmd')}"
+                )
+
     emit(report)
     return 0 if (report["strict_ok"] if getattr(args, "strict", False) else report["ok"]) else 1
 
@@ -821,7 +939,7 @@ def add_status_parsers(sub: argparse._SubParsersAction[argparse.ArgumentParser])
     doctor.add_argument(
         "--root",
         default=None,
-        help="Optional film root: soft plate≠master advisory (OFFICIAL_FINAL_PLATE vs final_complete)",
+        help="Optional film root: plate≠master advisory + F5 face-identity enroll/verified probe",
     )
     doctor.add_argument(
         "--checkout-drift",

@@ -140,8 +140,18 @@ def audit_film_still_provenance(root: Path | str) -> dict[str, Any]:
         from util import read_json
 
         manifest = read_json(base / "film-manifest.json") or {}
-    except Exception:
-        manifest = {}
+    except Exception as exc:  # noqa: BLE001 — fail-closed, not silent empty
+        return {
+            "kind": "still-provenance-audit",
+            "ok": False,
+            "checked": 0,
+            "codes": ["STILL_PROVENANCE_MANIFEST_READ_FAILED"],
+            "issues": [{"message": str(exc)[:200]}],
+            "escape": "AIFILM_SKIP_STILL_PROVENANCE=1",
+            "at": utc_now(),
+            "root": str(base),
+            "error": str(exc)[:200],
+        }
     stills = manifest.get("stills") if isinstance(manifest.get("stills"), dict) else {}
     issues: list[dict[str, Any]] = []
     codes: list[str] = []

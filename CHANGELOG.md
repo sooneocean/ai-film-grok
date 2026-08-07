@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.41.3] - 2026-08-07
+
+### Changed (ROI next: gates fail-closed + doctor F5 + heat smoke)
+- **Gates:** still face-lock resolve errors fail-closed (`STILL_SOURCE_RESOLVE_FAILED`); still provenance manifest read fail-closed (no silent empty).
+- **Doctor F5:** `aifilm doctor --root` probes face-identity enroll / verified=false with `next_cmd`; red when gap.
+- **Stages T8:** `stages/post.md` transition knife-edge three-liner.
+- **Smoke:** plot-driven heat canary `artifacts/2026-08-07-heat-plot-driven-smoke.json` (tmp film root).
+- **Tests:** `test_roi_gates_face_doctor.py`.
+
 ## [2.41.2] - 2026-08-07
 
 ### Added (Film Production OS · W5–W6 closeout)

@@ -1,0 +1,11 @@
+{
+  "ok": true,
+  "smoke": "plot_driven_not_max",
+  "tmp_root": "/var/folders/r1/qcf057v96lb7nrsdr2yk9dtc0000gn/T/heat-smoke-kcv0s1a5",
+  "heat_scale": "hot",
+  "heat_pinned_by": "plot_driven",
+  "explicit_max": false,
+  "heat_check_ok": true,
+  "hard_relevant_codes": [],
+  "challenge_max_scale": null
+}

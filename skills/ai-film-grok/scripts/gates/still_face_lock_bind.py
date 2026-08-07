@@ -274,8 +274,18 @@ def audit_film_still_face_lock_bind(
         sid = str(sh["id"])
         try:
             entry = resolve_still_source(base, sid, shot=sh, kind="i2v")
-        except Exception as exc:  # noqa: BLE001
-            rows.append({"shot_id": sid, "ok": True, "skip": str(exc)[:80]})
+        except Exception as exc:  # noqa: BLE001 — fail-closed: resolve error ≠ pass
+            rows.append(
+                {
+                    "shot_id": sid,
+                    "ok": False,
+                    "codes": ["STILL_SOURCE_RESOLVE_FAILED"],
+                    "error": str(exc)[:120],
+                }
+            )
+            hard.append(f"{sid}:STILL_SOURCE_RESOLVE_FAILED")
+            if "STILL_SOURCE_RESOLVE_FAILED" not in all_codes:
+                all_codes.append("STILL_SOURCE_RESOLVE_FAILED")
             continue
         if not entry.get("path"):
             continue
@@ -320,8 +330,12 @@ def audit_film_still_face_lock_bind(
     try:
         ssa = audit_film_still_sources(base)
         out["still_source_audit_ok"] = bool(ssa.get("ok"))
-    except Exception:
-        pass
+    except Exception as exc:  # noqa: BLE001 — fail-closed audit signal
+        out["still_source_audit_ok"] = False
+        out["still_source_audit_error"] = str(exc)[:160]
+        if out.get("ok") is True:
+            # do not flip whole gate hard solely on nested audit probe; record only
+            out.setdefault("codes", []).append("STILL_SOURCE_AUDIT_PROBE_FAILED")
     if write_receipt:
         write_json(base / RECEIPT_REL, out)
         out["path"] = str(base / RECEIPT_REL)
