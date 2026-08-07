@@ -2,6 +2,12 @@
 
 ## [2.40.91] - 2026-08-07
 
+### Changed (H3 official prompt · densify P2.5 + receipt P3)
+- **Base densify:** `_densify_base_action_tail` (half-second pose/fabric life on I2VA path).
+- **Ref2VA densify:** `detailed_description` toward GUIDE 350–500 words; `official_prompt_word_count`.
+- **Receipt:** `run_h3_shot` writes `*.h3.meta.json` (+ `*.h3.official.txt` when official structure).
+- **Tests:** densify word-band + base half-second golden.
+
 ### Fixed / Changed (C6.5 mypy dual-module unblock + core seed)
 - **style_lock dual-module:** import real packages (`from assets import style_lock|face_identity`) in `core/gates` + `cli_media` (no `from scripts import …` / top-level shim).
 - **mypy config:** `follow_imports=silent`; exclude top-level hard-compat shims `style_lock.py` / `face_identity.py` (package impls under `assets/` remain typed when listed).
