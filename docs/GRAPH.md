@@ -261,6 +261,7 @@ flowchart TD
 - `skills/ai-film-grok/tests/test_h3_fill_idle_ops_safe.py`
 - `skills/ai-film-grok/tests/test_h3_flf_media_pack.py`
 - `skills/ai-film-grok/tests/test_h3_mode.py`
+- `skills/ai-film-grok/tests/test_h3_official_prompt.py`
 - `skills/ai-film-grok/tests/test_h3_primary.py`
 - `skills/ai-film-grok/tests/test_h3_timeline_prompt.py`
 - `skills/ai-film-grok/tests/test_h3_until_empty.py`
