@@ -21,6 +21,16 @@ def test_native_light_filter_has_no_agate_or_dual_arnndn() -> None:
     assert FILM_NATIVE_STABLE_BASENAME.startswith("film_native_stable")
 
 
+def test_h3_ship_native_receipt_carries_light_filter() -> None:
+    """ship-native report must advertise light filter + stable basename."""
+    from media.h3_ship_native import NATIVE_LIGHT_AF_FILTER as ship_f
+    from media.h3_ship_native import FILM_NATIVE_STABLE_BASENAME as ship_bn
+
+    assert ship_f == NATIVE_LIGHT_AF_FILTER
+    assert "agate" not in ship_f
+    assert ship_bn == FILM_NATIVE_STABLE_BASENAME
+
+
 def test_prefer_native_lane_when_stem_present() -> None:
     shot = {"id": "s1", "audio_policy": "prefer_native"}
     lane = resolve_dialogue_audio_lane(

@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.41.13] - 2026-08-07
+
+### Changed (H3 native chain close-the-loop)
+- **h3 ship-native:** default out `film_native_stable.mp4`; receipt carries `NATIVE_LIGHT_AF_FILTER` + forbid agate/arnndn; legacy `film_native_h3.mp4` alias.
+- **closeout:** accepts stable + legacy native plate paths.
+- **music_director:** light numpy path documents FFmpeg counterpart constant.
+- Tests: ship-native receipt + native light filter.
+
 ## [2.41.12] - 2026-08-07
 
 ### Changed (monolith orchestrator relief · W1.6 picture)

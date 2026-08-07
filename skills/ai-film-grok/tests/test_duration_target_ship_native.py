@@ -242,6 +242,10 @@ class TestShipNativeDry(unittest.TestCase):
             self.assertEqual(rep["delivery_class"], "OFFICIAL_FINAL_PLATE")
             self.assertFalse(rep.get("master_lock"))
             self.assertEqual(rep["clip_count"], 2)
+            # P0 light-process IRON advertised on receipt
+            self.assertIn("highpass", rep.get("native_light_af_filter") or "")
+            self.assertNotIn("agate", rep.get("native_light_af_filter") or "")
+            self.assertTrue(str(rep.get("out") or "").endswith("film_native_stable.mp4"))
             # planned 10s vs 30s → hard shortfall flagged in duration_target subreport
             dt = rep.get("duration_target") or {}
             self.assertIn("DURATION_TARGET_SHORT_HARD", dt.get("codes") or [])

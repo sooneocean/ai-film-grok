@@ -69,7 +69,8 @@ def _final_record(root: Path) -> dict[str, Any] | None:
         "out/final.mp4",
         "out/plate.mp4",
         "out/final-plate.mp4",
-        "out/film_native_h3.mp4",
+        "out/film_native_stable.mp4",
+        "out/film_native_h3.mp4",  # legacy alias of ship-native plate
     ):
         if (root / rel).is_file():
             return {"path": str(root / rel), "source": "filesystem"}

@@ -574,6 +574,11 @@ def load_audio_samples(
 def apply_light_process_samples(samples: np.ndarray, sr: int) -> np.ndarray:
     """Mild H3-native-aligned cleanup without agate / dual arnndn.
 
+    FFmpeg counterpart (re-encode / ship post-process) is
+    ``final.native_audio.NATIVE_LIGHT_AF_FILTER``
+    (hp+afftdn+adeclick+loudnorm). This numpy path is a lightweight
+    in-memory preview only — do not invent a harder gate here.
+
     - DC remove
     - simple 1-pole highpass ~80Hz
     - soft clip guard (does not replace peak_fix)

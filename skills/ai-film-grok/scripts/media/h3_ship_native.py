@@ -19,6 +19,19 @@ from typing import Any
 
 from util import read_json, utc_now, write_json
 
+try:
+    from final.native_audio import (
+        FILM_NATIVE_STABLE_BASENAME,
+        FILM_NATIVE_SPEECH_BROKEN_BASENAME,
+        NATIVE_LIGHT_AF_FILTER,
+    )
+except ImportError:  # pragma: no cover — flat scripts path
+    from native_audio import (  # type: ignore
+        FILM_NATIVE_STABLE_BASENAME,
+        FILM_NATIVE_SPEECH_BROKEN_BASENAME,
+        NATIVE_LIGHT_AF_FILTER,
+    )
+
 
 class H3ShipNativeError(FilmError):
     pass
@@ -339,8 +352,9 @@ def ship_native(
 
     dur_rep = check_duration_vs_target(root_p, spec, parts)
 
+    # P0 deliverable name: film_native_stable (hard-defaults · 禁 film_watchable 冒充)
     out = Path(out_path).expanduser().resolve() if out_path else (
-        root_p / "out" / "film_native_h3.mp4"
+        root_p / "out" / FILM_NATIVE_STABLE_BASENAME
     )
     wants_stage2 = bool(
         (caption and str(caption).strip().lower() not in {"", "none", "off", "0"})
@@ -401,6 +415,18 @@ def ship_native(
         "audio_sample": audio_audit.get("rows"),
         "native_audio_audit": audio_audit,
         "mandarin_intelligibility": mandarin_soft,
+        # H3 原声轻处理 IRON — concat keeps aac; optional re-encode uses this filter only
+        "native_light_af_filter": NATIVE_LIGHT_AF_FILTER,
+        "native_light_policy": {
+            "default": "light",
+            "forbid_default": ["agate", "arnndn", "dual_arnndn"],
+            "stable_basename": FILM_NATIVE_STABLE_BASENAME,
+            "broken_basename": FILM_NATIVE_SPEECH_BROKEN_BASENAME,
+            "note": (
+                "concat path uses -c copy (no reprocess). Optional post-concat light "
+                "cleanup must use native_light_af_filter; never agate/dual-arnndn by default."
+            ),
+        },
         "out": str(out),
         "duration_target": dur_rep,
         "stage2": stage2,
@@ -410,6 +436,8 @@ def ship_native(
             "not master_lock; formal master = gate-auto green + review-final",
             f"stage-2 captions/BGM: {stage2_cmd}",
             "S1.3 mandarin checklist soft in receipts (not ASR hard)",
+            f"light filter (if re-encode): {NATIVE_LIGHT_AF_FILTER}",
+            "forbid default agate / dual arnndn on native dialogue (P0 2026-08-07)",
         ],
         "next": list(
             dict.fromkeys(
@@ -459,6 +487,16 @@ def ship_native(
     _hard_concat(parts, out)
     if not out.is_file() or out.stat().st_size <= 0:
         raise H3ShipNativeError(f"output missing after concat: {out}")
+
+    # Legacy closeout path alias (film_native_h3) — same plate, not a second master
+    try:
+        legacy = root_p / "out" / "film_native_h3.mp4"
+        if out.resolve() != legacy.resolve():
+            legacy.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(out, legacy)
+            report["legacy_alias"] = str(legacy)
+    except OSError as exc:
+        report.setdefault("honest_limits", []).append(f"legacy_alias_failed:{exc}")
 
     # optional copy to film_final only if user asks via env (never silent)
     if os.environ.get("AIFILM_H3_SHIP_AS_FILM_FINAL", "").strip() in {"1", "true", "yes"}:
