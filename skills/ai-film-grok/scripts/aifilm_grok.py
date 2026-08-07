@@ -414,6 +414,7 @@ from cli_quality_ops import (  # noqa: E402
     cmd_quality,
     cmd_quality_closure,
     cmd_quality_status,
+    cmd_takes,
 )
 from cli_review_ops import (  # noqa: E402
     cmd_external_review,
@@ -923,6 +924,7 @@ def main(argv: list[str] | None = None) -> int:
             "preflight": cmd_preflight,
             "cinematic-audit": cmd_cinematic_audit,
             "quality": cmd_quality,
+            "takes": cmd_takes,
             "heat": cmd_heat,
             "state-index": cmd_state_index,
             "pilot": cmd_pilot,

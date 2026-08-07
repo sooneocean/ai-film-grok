@@ -84,6 +84,39 @@ def add_quality_ops_parsers(sub: argparse._SubParsersAction[argparse.ArgumentPar
     quality.add_argument("--root", required=True)
     quality.add_argument("--shot-id", default=None)
 
+    takes_p = sub.add_parser(
+        "takes",
+        help="Take compare / director review (Film Production OS W5)",
+    )
+    takes_sub = takes_p.add_subparsers(dest="takes_action", required=True)
+    takes_compare = takes_sub.add_parser("compare", help="Compare takes for one shot")
+    takes_compare.add_argument("--root", required=True)
+    takes_compare.add_argument("--shot-id", required=True)
+    takes_review = takes_sub.add_parser(
+        "review",
+        help="Attach director_review scores / director_status (never overwrite media)",
+    )
+    takes_review.add_argument("--root", required=True)
+    takes_review.add_argument("--shot-id", required=True)
+    takes_review.add_argument("--take-id", default=None)
+    takes_review.add_argument("--performance", type=int, default=None)
+    takes_review.add_argument("--continuity", type=int, default=None)
+    takes_review.add_argument("--camera", type=int, default=None)
+    takes_review.add_argument("--artifacts", type=int, default=None)
+    takes_review.add_argument(
+        "--director-status",
+        default=None,
+        choices=(
+            "generated",
+            "candidate",
+            "selected",
+            "approved",
+            "rejected",
+            "archived",
+            "active",
+        ),
+    )
+
     benchmark_p = sub.add_parser(
         "benchmark", help="Run a no-spend premium vertical benchmark contract"
     )
@@ -389,6 +422,47 @@ def cmd_quality(args: argparse.Namespace) -> int:
         report["take_comparison"] = compare_takes(manifest, str(args.shot_id))
     emit(report)
     return 0 if report["ok"] else 2
+
+
+def cmd_takes(args: argparse.Namespace) -> int:
+    """Take compare / director review (Film Production OS W5)."""
+    from core.emit import emit
+    from core.film_io import load_manifest, save_manifest
+    from take_registry import compare_takes, set_take_review
+
+    root = Path(args.root).expanduser().resolve()
+    action = str(getattr(args, "takes_action", "") or "")
+    if action == "compare":
+        manifest = load_manifest(root)
+        report = compare_takes(manifest, str(args.shot_id))
+        report["ok"] = True
+        report["root"] = str(root)
+        emit(report)
+        return 0
+    if action == "review":
+        manifest = load_manifest(root)
+        try:
+            report = set_take_review(
+                manifest,
+                str(args.shot_id),
+                take_id=getattr(args, "take_id", None),
+                performance=getattr(args, "performance", None),
+                continuity=getattr(args, "continuity", None),
+                camera=getattr(args, "camera", None),
+                artifacts=getattr(args, "artifacts", None),
+                director_status=getattr(args, "director_status", None),
+            )
+        except ValueError as exc:
+            from util.errors import FilmError
+
+            raise FilmError(str(exc)) from exc
+        save_manifest(root, manifest)
+        report["root"] = str(root)
+        emit(report)
+        return 0 if report.get("ok") else 1
+    from util.errors import FilmError
+
+    raise FilmError(f"unknown takes action {action!r}")
 
 
 def cmd_benchmark(args: argparse.Namespace) -> int:
