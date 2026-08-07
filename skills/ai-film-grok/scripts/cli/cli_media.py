@@ -794,7 +794,12 @@ def cmd_register_still(args: argparse.Namespace) -> int:
 
         try:
             require_anatomy_safe(
-                root=root, anatomy_safe=anatomy_safe, kind="still", shot_id=str(args.shot_id)
+                root=root,
+                anatomy_safe=anatomy_safe,
+                kind="still",
+                shot_id=str(args.shot_id),
+                still_path=source,
+                review_note=review_note or None,
             )
         except AnatomySafetyError as exc:
             raise FilmError(str(exc)) from exc
@@ -1013,7 +1018,12 @@ def cmd_register_clip(args: argparse.Namespace) -> int:
 
         try:
             require_anatomy_safe(
-                root=root, anatomy_safe=anatomy_safe, kind="clip", shot_id=str(args.shot_id)
+                root=root,
+                anatomy_safe=anatomy_safe,
+                kind="clip",
+                shot_id=str(args.shot_id),
+                still_path=source,
+                review_note=str(getattr(args, "review_note", "") or "").strip() or None,
             )
         except AnatomySafetyError as exc:
             raise FilmError(str(exc)) from exc

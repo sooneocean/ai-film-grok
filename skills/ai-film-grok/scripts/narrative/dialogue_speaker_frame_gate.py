@@ -279,6 +279,22 @@ def assert_dialogue_speaker_frame_contract(
             + f" ({len(bad)} issue(s)); fix speaker/subject alignment or set "
             "speaker_frame_strict:false / dialogue_window_strict:false"
         )
+    # Honesty-rail R2: record pass/fail provenance when film root known
+    if root is not None and not bad:
+        try:
+            from core.attestation_audit import write_attestation
+
+            write_attestation(
+                root,
+                kind="speaker_frame",
+                shot_id="_film",
+                still_path=str(Path(root).expanduser().resolve() / "film-spec.json"),
+                anatomy_safe=None,
+                note=f"speaker_frame ok hard={bool(hard)} shots={report.get('shot_count')}",
+                source="assert_dialogue_speaker_frame_contract",
+            )
+        except Exception:
+            pass
     return report
 
 

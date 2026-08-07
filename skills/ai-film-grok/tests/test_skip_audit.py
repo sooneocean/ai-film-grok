@@ -1,0 +1,108 @@
+"""Honesty-rail R1 · skip_audit contract scenarios."""
+
+from __future__ import annotations
+
+import json
+import os
+import sys
+import tempfile
+import unittest
+from pathlib import Path
+
+SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
+sys.path.insert(0, str(SCRIPTS))
+
+
+class TestSkipAudit(unittest.TestCase):
+    def tearDown(self) -> None:
+        for k in list(os.environ):
+            if k.startswith("AIFILM_SKIP"):
+                os.environ.pop(k, None)
+
+    def test_skip_flag_first_write_usage(self) -> None:
+        from core.skip_audit import skip_flag, load_skip_usage
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            os.environ["AIFILM_SKIP_GATE_AUTO"] = "1"
+            self.assertTrue(skip_flag("AIFILM_SKIP_GATE_AUTO", film_root=root))
+            usage = root / "receipts" / "skip-usage.json"
+            self.assertTrue(usage.is_file())
+            data = json.loads(usage.read_text(encoding="utf-8"))
+            names = {e.get("name") for e in (data.get("entries") or [])}
+            self.assertIn("AIFILM_SKIP_GATE_AUTO", names)
+            self.assertEqual(len(load_skip_usage(root).get("entries") or []), 1)
+
+    def test_idempotent_same_env_read(self) -> None:
+        from core.skip_audit import skip_flag, load_skip_usage
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            os.environ["AIFILM_SKIP_CINEMATIC_GATE"] = "1"
+            skip_flag("AIFILM_SKIP_CINEMATIC_GATE", film_root=root)
+            skip_flag("AIFILM_SKIP_CINEMATIC_GATE", film_root=root)
+            self.assertEqual(len(load_skip_usage(root).get("entries") or []), 1)
+
+    def test_iron_unreasoned_partial(self) -> None:
+        from core.skip_audit import record_skip_usage, verify_skip_usage
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            record_skip_usage(root, "AIFILM_SKIP_HEAT_FINAL_GATE", origin="env")
+            ver = verify_skip_usage(root, sync_env=False)
+            self.assertFalse(ver.get("ok"))
+            self.assertEqual(ver.get("classification"), "PARTIAL")
+            self.assertIn("AIFILM_SKIP_HEAT_FINAL_GATE", ver.get("skips_used") or [])
+
+    def test_iron_with_reason_documented(self) -> None:
+        from core.skip_audit import record_skip_usage, verify_skip_usage
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            record_skip_usage(
+                root,
+                "AIFILM_SKIP_HEAT_FINAL_GATE",
+                origin="env",
+                reason="canary only",
+            )
+            ver = verify_skip_usage(root, sync_env=False)
+            self.assertTrue(ver.get("ok"))
+            self.assertEqual(ver.get("classification"), "SKIP_DOCUMENTED")
+
+    def test_clean_no_skips(self) -> None:
+        from core.skip_audit import verify_skip_usage
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            ver = verify_skip_usage(root, sync_env=False)
+            self.assertTrue(ver.get("ok"))
+            self.assertEqual(ver.get("skips_used"), [])
+            self.assertEqual(ver.get("classification"), "CLEAN")
+
+    def test_sync_env_catches_legacy_direct_read(self) -> None:
+        from core.skip_audit import verify_skip_usage
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            os.environ["AIFILM_SKIP_I2V_MOTION_GATE"] = "1"
+            # never called skip_flag — closeout sync should still ledger
+            ver = verify_skip_usage(root, sync_env=True)
+            self.assertIn("AIFILM_SKIP_I2V_MOTION_GATE", ver.get("skips_used") or [])
+            self.assertFalse(ver.get("ok"))  # iron, no reason
+
+    def test_attach_skips_to_official_report(self) -> None:
+        from core.skip_audit import record_skip_usage, attach_skips_to_report
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            record_skip_usage(root, "AIFILM_SKIP_PILOT_GATE", reason="test")
+            rep = attach_skips_to_report(
+                {"status": "TECHNICAL_FINAL", "partial": False, "honest_limits": []},
+                root,
+            )
+            self.assertIn("AIFILM_SKIP_PILOT_GATE", rep.get("skips_used") or [])
+            self.assertEqual(rep["skip_audit"]["classification"], "SKIP_DOCUMENTED")
+
+
+if __name__ == "__main__":
+    unittest.main()

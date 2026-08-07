@@ -2489,26 +2489,56 @@ def queue_progress_honest(root: Path | str) -> dict[str, Any]:
 
 
 def local_comfy_client_status() -> dict[str, Any]:
-    """Best-effort: count local comfy_video.py processes (macOS/ps)."""
+    """Best-effort: count local comfy_video.py processes (macOS/Linux ps).
+
+    Honesty-rail R4.2: **never** ``pgrep -f`` / wide source match (self-kill hazard
+    when argv embeds script paths). Uses ``ps`` + token filter + skip self PID.
+    """
     try:
+        import os
         import subprocess
 
+        me = str(os.getpid())
         proc = subprocess.run(
-            ["pgrep", "-fl", "comfy_video.py"],
+            ["ps", "-ax", "-o", "pid=,command="],
             capture_output=True,
             text=True,
             timeout=3,
             check=False,
         )
-        lines = [ln for ln in (proc.stdout or "").splitlines() if ln.strip()]
-        # Filter generate-ish lines if possible
+        if proc.returncode not in (0, 1):
+            return {
+                "ok": True,
+                "count": None,
+                "skipped": True,
+                "error": f"ps exit {proc.returncode}",
+            }
+        lines: list[str] = []
+        for raw in (proc.stdout or "").splitlines():
+            ln = raw.strip()
+            if not ln:
+                continue
+            parts = ln.split(None, 1)
+            if len(parts) < 2:
+                continue
+            pid, cmd = parts[0], parts[1]
+            if pid == me:
+                continue
+            # basename / path token only — not editor buffers that merely mention it
+            if "comfy_video.py" not in cmd:
+                continue
+            low = cmd.lower()
+            if any(x in low for x in ("pgrep", "grep comfy", " rg ", "ripgrep")):
+                continue
+            lines.append(ln)
         count = len(lines)
         ok = count <= 1
         return {
             "ok": ok,
             "count": count,
             "lines": lines[:5],
-            "note": "at most one local comfy_video.py client (16GB Mac OOM risk)",
+            "note": "at most one local comfy_video.py client (16GB Mac OOM risk); ps not pgrep -f",
+            "method": "ps_token",
         }
     except Exception as exc:  # noqa: BLE001
         return {"ok": True, "count": None, "skipped": True, "error": str(exc)[:120]}

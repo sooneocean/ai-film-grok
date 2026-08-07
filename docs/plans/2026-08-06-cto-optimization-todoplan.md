@@ -18,7 +18,7 @@
 | 旧板 / 子板 | 角色 |
 |------|------|
 | **`docs/plans/2026-08-07-iron-internalization-todoplan.md`** | **铁律→代码内化子板** · **I0–I4 产品链 CLOSED 2.40.51**；I5 ops deferred |
-| **`docs/plans/2026-08-07-delivery-honesty-rail-todoplan.md`** | **出片诚实审计轨** · Active 2.40.67 R0+R1 partial (`skip_audit`) |
+| **`docs/plans/2026-08-07-delivery-honesty-rail-todoplan.md`** | **出片诚实审计轨** · Active 2.40.68 R0–R3 SHIPPED (`skip_audit`+attestation+checkout_drift)；R4 I5 residual |
 | `docs/plans/2026-08-06-nutrient-matrix.md` | L3/L4/L5 养分对账（I0 刷新） |
 | `docs/plans/2026-08-06-next-optimization-todoplan.md` | 近期 W0–N 执行板（多数 SHIPPED） |
 | `docs/plans/2026-08-06-optimization-todoplan.md` | 出片 A–G · A1–A5 SHIPPED |

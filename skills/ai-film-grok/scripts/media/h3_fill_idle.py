@@ -2012,6 +2012,30 @@ def gpu_no_hog_decision(
     }
 
 
+def attach_open_ops_status(report: dict[str, Any]) -> dict[str, Any]:
+    """Honesty-rail R4.3: machine-classify drain end as queue_empty or OPEN_OPS.
+
+    Callers write the same payload to ``receipts/fill-idle-until-empty.json``.
+    True GPU absence / exclusive refuse is OPEN_OPS, not an engineering crash.
+    """
+    if not isinstance(report, dict):
+        return report
+    stop = str(report.get("stop_reason") or report.get("skipped_reason") or "").strip()
+    if stop in {"queue_empty", "queue_empty_after_runs"}:
+        report["open_ops_status"] = "queue_empty"
+        report["open_ops_reason"] = None
+    elif not stop:
+        report["open_ops_status"] = "OPEN_OPS"
+        report["open_ops_reason"] = "unknown"
+    else:
+        report["open_ops_status"] = "OPEN_OPS"
+        report["open_ops_reason"] = stop
+    # ensure open_ops list present for consumers
+    if not isinstance(report.get("open_ops"), list):
+        report["open_ops"] = list(report.get("open_ops") or [])
+    return report
+
+
 def gpu_no_hog_report(
     *,
     queue_busy: bool,
@@ -2204,33 +2228,35 @@ def fill_idle_until_empty(
                 "pending_after": plan_before.get("pending_jobs"),
                 "gpu_lease": foreign,
             }
-            return {
-                "schema_version": 1,
-                "kind": "ai-film-fill-idle-until-empty",
-                "ok": False,
-                "partial": True,
-                "root": str(base),
-                "execute": True,
-                "until_empty": True,
-                "i_own_the_gpu": bool(own),
-                "stop_reason": "lease_held_foreign",
-                "halt_reason_code": halt_code,
-                "halt_reason_group": halt_group,
-                "skipped_reason": "lease_held_foreign",
-                "gpu_lease": foreign,
-                "open_ops": [open_op],
-                "cycles_run": 0,
-                "jobs_ran_total": 0,
-                "takes_count_before": takes_before,
-                "takes_count_after": takes_before,
-                "takes_count_delta": 0,
-                "pending_reason_breakdown": pending_breakdown_before,
-                "cycles": [],
-                "next_cmd": (
-                    f'aifilm gpu-lease status --root "{base}" && '
-                    f'aifilm gpu-lease acquire --root "{base}"  # or release foreign owner'
-                ),
-            }
+            return attach_open_ops_status(
+                {
+                    "schema_version": 1,
+                    "kind": "ai-film-fill-idle-until-empty",
+                    "ok": False,
+                    "partial": True,
+                    "root": str(base),
+                    "execute": True,
+                    "until_empty": True,
+                    "i_own_the_gpu": bool(own),
+                    "stop_reason": "lease_held_foreign",
+                    "halt_reason_code": halt_code,
+                    "halt_reason_group": halt_group,
+                    "skipped_reason": "lease_held_foreign",
+                    "gpu_lease": foreign,
+                    "open_ops": [open_op],
+                    "cycles_run": 0,
+                    "jobs_ran_total": 0,
+                    "takes_count_before": takes_before,
+                    "takes_count_after": takes_before,
+                    "takes_count_delta": 0,
+                    "pending_reason_breakdown": pending_breakdown_before,
+                    "cycles": [],
+                    "next_cmd": (
+                        f'aifilm gpu-lease status --root "{base}" && '
+                        f'aifilm gpu-lease acquire --root "{base}"  # or release foreign owner'
+                    ),
+                }
+            )
     if bool(execute) and not own:
         plan_before = capacity_plan(base, include_challenge=include_challenge)
         halt_code = "RUN_EXCLUSIVE_GPU_REQUIRED"
@@ -2264,62 +2290,64 @@ def fill_idle_until_empty(
             "pending_after": plan_before.get("pending_jobs"),
             "decision_tree": decision_trace,
         }
-        report = {
-            "schema_version": 1,
-            "kind": "ai-film-fill-idle-until-empty",
-            "ok": False,
-            "root": str(base),
-            "execute": True,
-            "until_empty": True,
-            "i_own_the_gpu": False,
-            "stop_reason": "exclusive_gpu_required",
-            "halt_reason_code": halt_code,
-            "halt_reason_group": halt_group,
-            "skipped_reason": "exclusive_gpu_required",
-            "decision_tree": decision_trace,
-            "open_ops": [open_op],
-            "cycles_run": 0,
-            "jobs_ran_total": 0,
-            "takes_count_before": takes_before,
-            "takes_count_after": takes_before,
-            "takes_count_delta": 0,
-            "pending_reason_breakdown": pending_breakdown_before,
-            "cycles": [
-                {
-                    "cycle": 1,
-                    "jobs_ran": 0,
-                    "skipped_reason": "exclusive_gpu_required",
-                    "halt_reason_code": halt_code,
-                    "halt_reason_group": halt_group,
-                    "decision_tree": decision_trace,
-                    "ok": False,
-                    "pending_after": plan_before.get("pending_jobs"),
-                    "next_after": None,
-                    "open_ops": [open_op],
-                }
-            ],
-            "plan_before": {
-                "pending_jobs": plan_before.get("pending_jobs"),
-                "eta_minutes_total": plan_before.get("eta_minutes_total"),
-                "p0_jobs": plan_before.get("p0_jobs"),
-            },
-            "honest_limits": [
-                "until-empty --execute requires --i-own-the-gpu or AIFILM_I_OWN_THE_GPU=1 "
-                "(multi-agent 5090: no default drain hog)"
-            ],
-            "human_next": [
-                f'aifilm h3 run-next --root "{base}" --execute --max 5',
-                f'aifilm h3 cycle --root "{base}" --execute --max 5',
-                (
-                    f'aifilm h3 cycle --root "{base}" --until-empty --execute '
-                    f"--i-own-the-gpu  # only when user named exclusive / overnight own"
+        report = attach_open_ops_status(
+            {
+                "schema_version": 1,
+                "kind": "ai-film-fill-idle-until-empty",
+                "ok": False,
+                "root": str(base),
+                "execute": True,
+                "until_empty": True,
+                "i_own_the_gpu": False,
+                "stop_reason": "exclusive_gpu_required",
+                "halt_reason_code": halt_code,
+                "halt_reason_group": halt_group,
+                "skipped_reason": "exclusive_gpu_required",
+                "decision_tree": decision_trace,
+                "open_ops": [open_op],
+                "cycles_run": 0,
+                "jobs_ran_total": 0,
+                "takes_count_before": takes_before,
+                "takes_count_after": takes_before,
+                "takes_count_delta": 0,
+                "pending_reason_breakdown": pending_breakdown_before,
+                "cycles": [
+                    {
+                        "cycle": 1,
+                        "jobs_ran": 0,
+                        "skipped_reason": "exclusive_gpu_required",
+                        "halt_reason_code": halt_code,
+                        "halt_reason_group": halt_group,
+                        "decision_tree": decision_trace,
+                        "ok": False,
+                        "pending_after": plan_before.get("pending_jobs"),
+                        "next_after": None,
+                        "open_ops": [open_op],
+                    }
+                ],
+                "plan_before": {
+                    "pending_jobs": plan_before.get("pending_jobs"),
+                    "eta_minutes_total": plan_before.get("eta_minutes_total"),
+                    "p0_jobs": plan_before.get("p0_jobs"),
+                },
+                "honest_limits": [
+                    "until-empty --execute requires --i-own-the-gpu or AIFILM_I_OWN_THE_GPU=1 "
+                    "(multi-agent 5090: no default drain hog)"
+                ],
+                "human_next": [
+                    f'aifilm h3 run-next --root "{base}" --execute --max 5',
+                    f'aifilm h3 cycle --root "{base}" --execute --max 5',
+                    (
+                        f'aifilm h3 cycle --root "{base}" --until-empty --execute '
+                        f"--i-own-the-gpu  # only when user named exclusive / overnight own"
+                    ),
+                ],
+                "note": (
+                    "refused: free-first does not cancel foreign but until-empty still "
+                    "fills every idle slot — default multi-agent must not hog 5090"
                 ),
-            ],
-            "note": (
-                "refused: free-first does not cancel foreign but until-empty still "
-                "fills every idle slot — default multi-agent must not hog 5090"
-            ),
-        }
+            }
+        )
         try:
             from util import write_json
 
@@ -2506,6 +2534,14 @@ def fill_idle_until_empty(
             "progress = takes_count_delta (not pending alone)"
         ),
     }
+    # Collect open_ops from cycle rows when top-level empty
+    if not report.get("open_ops"):
+        ops: list[dict[str, Any]] = []
+        for c in cycles:
+            if isinstance(c, dict) and isinstance(c.get("open_ops"), list):
+                ops.extend(x for x in c["open_ops"] if isinstance(x, dict))
+        report["open_ops"] = ops
+    attach_open_ops_status(report)
     try:
         from util import write_json
 

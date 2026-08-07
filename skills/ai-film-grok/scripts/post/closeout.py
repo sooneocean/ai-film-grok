@@ -823,7 +823,7 @@ def closeout_status(root: Path | str) -> dict[str, Any]:
     try:
         from core.skip_audit import verify_skip_usage
 
-        skip_audit = verify_skip_usage(base)
+        skip_audit = verify_skip_usage(base, sync_env=True)
     except Exception as exc:  # noqa: BLE001
         skip_audit = {
             "ok": False,
@@ -849,11 +849,45 @@ def closeout_status(root: Path | str) -> dict[str, Any]:
         }
     )
 
+    # Honesty-rail R2 · human attestation provenance (advisory)
+    attestation_audit: dict[str, Any] = {
+        "ok": True,
+        "advisory": True,
+        "count": 0,
+        "pending_count": 0,
+    }
+    try:
+        from core.attestation_audit import verify_attestation_ledger
+
+        attestation_audit = verify_attestation_ledger(base)
+    except Exception as exc:  # noqa: BLE001
+        attestation_audit = {
+            "ok": True,
+            "advisory": True,
+            "error": str(exc)[:160],
+            "count": 0,
+            "pending_count": 0,
+        }
+    steps.append(
+        {
+            "id": "attestation_audit",
+            "ok": True,  # advisory only — never hard-block ship
+            "advisory": True,
+            "detail": (
+                f"attestations={attestation_audit.get('count', 0)} "
+                f"pending={attestation_audit.get('pending_count', 0)}"
+            ),
+            "pending_human_review": attestation_audit.get("pending_human_review") or [],
+            "next_cmd": None,
+        }
+    )
+
     soft_ids = {
         "desktop_exported",
         "input_fidelity",
         "duration_honesty",
         "official_final_readback",
+        "attestation_audit",
     }
     if not film_core_hard:
         soft_ids.add("film_core")
@@ -895,6 +929,7 @@ def closeout_status(root: Path | str) -> dict[str, Any]:
         "official_final_readback": official_final_readback,
         "skip_audit": skip_audit,
         "skips_used": skip_audit.get("skips_used") or [],
+        "attestation_audit": attestation_audit,
         "final": final_rec,
         "heat": {
             "active": heat.get("active"),

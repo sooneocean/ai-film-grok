@@ -693,6 +693,34 @@ def cmd_doctor(args: argparse.Namespace) -> int:
                 art_report["checks"][str(film_root)] = {"ok": False, "error": str(exc)[:200]}
         report["art_check"] = art_report
 
+    # Honesty-rail R3 · dual-checkout drift probe (always recorded; warn only on HEAD mismatch)
+    try:
+        from core.checkout_drift import check_checkout_drift
+
+        drift = check_checkout_drift()
+        report["checkout_drift"] = drift
+        # HEAD mismatch → environment warning (strict may surface). Dirty-only stays silent.
+        # Explicit --checkout-drift also surfaces dirty as soft warning text in report only.
+        if drift.get("warn"):
+            environment_warnings.append(
+                f"checkout drift: {drift.get('note')}; "
+                "sync via git only — never hand-copy between plugins and dev trees"
+            )
+        elif getattr(args, "checkout_drift", False) and drift.get("status") in {
+            "drift",
+            "dirty",
+        }:
+            # opt-in visibility without failing default doctor when only dirty
+            report["checkout_drift_verbose"] = True
+    except Exception as drift_exc:  # noqa: BLE001
+        report["checkout_drift"] = {
+            "ok": True,
+            "status": "error",
+            "advisory": True,
+            "warn": False,
+            "error": str(drift_exc)[:200],
+        }
+
     # N1.4 · optional film-root plate≠master soft advisory (never hard-fails core doctor)
     film_root_arg = getattr(args, "root", None) or getattr(args, "art_root", None)
     if film_root_arg and str(film_root_arg).strip() not in {"", "."}:
@@ -794,6 +822,11 @@ def add_status_parsers(sub: argparse._SubParsersAction[argparse.ArgumentParser])
         "--root",
         default=None,
         help="Optional film root: soft plate≠master advisory (OFFICIAL_FINAL_PLATE vs final_complete)",
+    )
+    doctor.add_argument(
+        "--checkout-drift",
+        action="store_true",
+        help="Honesty-rail R3: compare plugin vs dev git checkout (soft advisory; never hand-copy)",
     )
 
     st = sub.add_parser("status", help="Gate status")

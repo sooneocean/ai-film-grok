@@ -41,12 +41,23 @@ def assess_plate_boring_meat_mean(root: Path | str | None = None) -> dict[str, A
     Escape: ``AIFILM_SKIP_PLATE_BORING=1``.
     Missing audit → not boring (skipped; motion gate still separate).
     """
-    if os.environ.get("AIFILM_SKIP_PLATE_BORING", "").strip().lower() in {
-        "1",
-        "true",
-        "yes",
-        "on",
-    }:
+    try:
+        from core.skip_audit import skip_flag
+
+        _plate_skip = skip_flag(
+            "AIFILM_SKIP_PLATE_BORING",
+            origin="env",
+            film_root=root,
+            call_site="assess_plate_boring_meat_mean",
+        )
+    except Exception:
+        _plate_skip = os.environ.get("AIFILM_SKIP_PLATE_BORING", "").strip().lower() in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        }
+    if _plate_skip:
         return {
             "kind": "plate-boring-mean",
             "ok": True,
@@ -248,18 +259,28 @@ def classify_official_final(
 
 
 def write_official_final_report(root: Path | str, payload: dict[str, Any]) -> Path:
-    """Write receipts/official-final-report.json."""
+    """Write receipts/official-final-report.json.
+
+    Honesty-rail R1: attach ``skips_used`` / skip_audit from runtime ledger.
+    """
     root_p = Path(root).expanduser().resolve()
+    body = dict(payload or {})
+    try:
+        from core.skip_audit import attach_skips_to_report
+
+        body = attach_skips_to_report(body, root_p)
+    except Exception:
+        body.setdefault("skips_used", [])
     out = root_p / "receipts" / "official-final-report.json"
     out.parent.mkdir(parents=True, exist_ok=True)
     try:
         from util import write_json
 
-        write_json(out, payload)
+        write_json(out, body)
     except ImportError:  # pragma: no cover
         import json
 
-        out.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        out.write_text(json.dumps(body, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     return out
 
 

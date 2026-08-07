@@ -166,8 +166,49 @@ def skip_flag(
     return True
 
 
-def verify_skip_usage(root: Path | str | None) -> dict[str, Any]:
-    """Closeout helper: IRON skips without reason → not certifiable."""
+def sync_armed_env_skips(
+    root: Path | str | None,
+    *,
+    reason: str | None = None,
+    call_site: str = "sync_armed_env_skips",
+) -> dict[str, Any]:
+    """Scan process env for armed AIFILM_SKIP_* and ledger them (closeout pre-pass).
+
+    Catches escapes that never went through ``skip_flag`` (legacy direct os.environ reads).
+    """
+    if root is None:
+        return load_skip_usage(root)
+    ledger = load_skip_usage(root)
+    reason_eff = reason or os.environ.get("AIFILM_SKIP_REASON")
+    # Prefer known IRON set + any AIFILM_SKIP_* currently in env
+    candidates: set[str] = set(IRON_SKIP_FLAGS)
+    for key in os.environ:
+        if key.upper().startswith("AIFILM_SKIP_") and key.upper() != "AIFILM_SKIP_REASON":
+            candidates.add(key.upper() if key.startswith("AIFILM_") else key)
+    for name in sorted(candidates):
+        if _env_truthy(name):
+            record_skip_usage(
+                root,
+                name,
+                origin="env",
+                reason=reason_eff,
+                call_site=call_site,
+            )
+    return load_skip_usage(root)
+
+
+def verify_skip_usage(
+    root: Path | str | None,
+    *,
+    sync_env: bool = True,
+) -> dict[str, Any]:
+    """Closeout helper: IRON skips without reason → not certifiable.
+
+    When ``sync_env`` is True (default), first ledger any armed env escapes so
+    legacy direct ``os.environ`` readers still appear in the report.
+    """
+    if sync_env and root is not None:
+        sync_armed_env_skips(root)
     ledger = load_skip_usage(root)
     entries = list(ledger.get("entries") or [])
     iron_unreasoned: list[dict[str, Any]] = []
@@ -177,11 +218,12 @@ def verify_skip_usage(root: Path | str | None) -> dict[str, Any]:
         if not str(e.get("reason") or "").strip():
             iron_unreasoned.append(e)
     ok = not iron_unreasoned
+    skips_used = [e.get("name") for e in entries if e.get("name")]
     return {
         "ok": ok,
         "kind": "skip-usage-verify",
         "entries": entries,
-        "skips_used": [e.get("name") for e in entries if e.get("name")],
+        "skips_used": skips_used,
         "iron_unreasoned": [
             {"name": e.get("name"), "origin": e.get("origin")} for e in iron_unreasoned
         ],
@@ -193,3 +235,28 @@ def verify_skip_usage(root: Path | str | None) -> dict[str, Any]:
             else "set AIFILM_SKIP_REASON='why this IRON escape' before re-final/closeout"
         ),
     }
+
+
+def attach_skips_to_report(
+    report: dict[str, Any],
+    root: Path | str | None,
+) -> dict[str, Any]:
+    """Mutate/return official-final-style report with skips_used fields."""
+    ver = verify_skip_usage(root, sync_env=True)
+    report = dict(report or {})
+    report["skips_used"] = list(ver.get("skips_used") or [])
+    report["skip_audit"] = {
+        "ok": ver.get("ok"),
+        "classification": ver.get("classification"),
+        "iron_unreasoned": ver.get("iron_unreasoned") or [],
+        "partial": ver.get("partial"),
+    }
+    if ver.get("partial"):
+        report["partial"] = True
+        limits = list(report.get("honest_limits") or [])
+        if "iron_skip_unreasoned" not in limits:
+            limits.append("iron_skip_unreasoned")
+        report["honest_limits"] = limits
+        if str(report.get("status") or "") == "TECHNICAL_FINAL":
+            report["status"] = "OFFICIAL_FINAL_PLATE"
+    return report

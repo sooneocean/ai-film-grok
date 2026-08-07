@@ -25,13 +25,24 @@ _RESTRICTED_WARDROBE = frozenset({"undressed", "bare", "partial", "nude", "naked
 _RESTRICTED_HEAT = frozenset({"act", "climax", "foreplay"})
 
 
-def _env_skip() -> bool:
-    return os.environ.get("AIFILM_SKIP_ANATOMY_SAFETY", "").strip().lower() in {
-        "1",
-        "true",
-        "yes",
-        "on",
-    }
+def _env_skip(root: Path | str | None = None) -> bool:
+    """Honesty-rail: prefer central skip_flag so escapes land in skip-usage ledger."""
+    try:
+        from core.skip_audit import skip_flag
+
+        return skip_flag(
+            "AIFILM_SKIP_ANATOMY_SAFETY",
+            origin="env",
+            film_root=root,
+            call_site="anatomy_safety._env_skip",
+        )
+    except Exception:
+        return os.environ.get("AIFILM_SKIP_ANATOMY_SAFETY", "").strip().lower() in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        }
 
 
 def _load_spec(root: Path) -> dict[str, Any]:
@@ -45,7 +56,7 @@ def requires_anatomy_safety(root: Path) -> bool:
     True when heat_scale=max (adult_max_iron not false) **or** genre=adult
     (same iron exit). Escape env forces False.
     """
-    if _env_skip():
+    if _env_skip(root):
         return False
     spec = _load_spec(root)
     if spec.get("adult_max_iron") is False:
@@ -97,7 +108,7 @@ def shot_requires_anatomy_safety(
     shot: dict[str, Any] | None = None,
 ) -> bool:
     """Film-level adult max **or** this shot is restricted meat/undress."""
-    if _env_skip():
+    if _env_skip(root):
         return False
     if requires_anatomy_safety(root):
         return True
@@ -109,12 +120,43 @@ def shot_requires_anatomy_safety(
     return shot_is_restricted(sh)
 
 
-def require_anatomy_safe(*, root: Path, anatomy_safe: bool, kind: str, shot_id: str) -> None:
-    """Require an explicit human attestation before approving adult-max media."""
-    if _env_skip():
+def require_anatomy_safe(
+    *,
+    root: Path,
+    anatomy_safe: bool,
+    kind: str,
+    shot_id: str,
+    still_path: str | Path | None = None,
+    reviewer: str | None = None,
+    agent_session: str | None = None,
+    review_note: str | None = None,
+) -> None:
+    """Require an explicit human attestation before approving adult-max media.
+
+    When anatomy_safe=True, write provenance to receipts/attestation-ledger.json
+    (honesty-rail R2). Missing reviewer/session → pending_human_review, never fake source.
+    """
+    if _env_skip(root):
         return
     # film-level or this shot restricted
     if not shot_requires_anatomy_safety(root, shot_id) or anatomy_safe:
+        if anatomy_safe:
+            try:
+                from core.attestation_audit import write_attestation
+
+                write_attestation(
+                    root,
+                    kind=f"anatomy_{kind}",
+                    shot_id=str(shot_id),
+                    still_path=still_path,
+                    reviewer=reviewer,
+                    agent_session=agent_session,
+                    anatomy_safe=True,
+                    note=review_note,
+                    source="require_anatomy_safe",
+                )
+            except Exception:
+                pass
         return
     raise AnatomySafetyError(
         f"adult-max/restricted approved {kind} for {shot_id} requires --anatomy-safe after "
@@ -172,7 +214,7 @@ def assert_still_anatomy_for_i2v(
     """
     base = Path(root).expanduser().resolve()
     sid = str(shot_id)
-    if _env_skip():
+    if _env_skip(base):
         return {
             "ok": True,
             "skipped": True,
@@ -224,13 +266,39 @@ def assert_still_anatomy_for_i2v(
                     "anatomy-safe keyframe bytes for this shot"
                 )
 
-    return {
+    # R2: surface provenance status (pending if register lacked reviewer/session)
+    provenance: dict[str, Any] | None = None
+    try:
+        from core.attestation_audit import find_attestation, provenance_fields
+
+        entry = find_attestation(base, kind="anatomy_still", shot_id=sid)
+        if entry is None:
+            entry = find_attestation(base, kind="anatomy_clip", shot_id=sid)
+        if entry is not None:
+            provenance = {
+                **provenance_fields(entry),
+                "pending_human_review": bool(entry.get("pending_human_review")),
+                "provenance_complete": bool(entry.get("provenance_complete")),
+            }
+        else:
+            provenance = {
+                "pending_human_review": True,
+                "provenance_complete": False,
+                "note": "anatomy_safe=true without attestation ledger row",
+            }
+    except Exception:
+        provenance = None
+
+    out: dict[str, Any] = {
         "ok": True,
         "required": True,
         "shot_id": sid,
         "anatomy_safe": True,
         "still_status": still.get("status"),
     }
+    if provenance is not None:
+        out["attestation"] = provenance
+    return out
 
 
 __all__ = [

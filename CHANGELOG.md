@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.40.69] - 2026-08-07
+
+### Added (delivery honesty-rail R1 complete + R2 + R3)
+- **R1 SKIP audit complete:** `sync_armed_env_skips` closeout pre-pass; `attach_skips_to_report` → `official-final-report.skips_used`; plate-boring + anatomy escape via `skip_flag`.
+- **R2 attestation provenance:** `core/attestation_audit.py` ledger `receipts/attestation-ledger.json`; `require_anatomy_safe` / register-still·clip write provenance; missing reviewer/session → `pending_human_review`; closeout advisory step.
+- **R3 checkout drift:** `core/checkout_drift.py`; `aifilm doctor` always records `checkout_drift` (HEAD mismatch → environment warning; dirty-only silent); `--checkout-drift` opt-in verbose.
+- **Law:** hard-defaults row + memory `2026-08-07-delivery-honesty-rail.md`.
+- **Tests:** `test_skip_audit` · `test_attestation_provenance` · `test_checkout_drift`.
+
 ## [2.40.68] - 2026-08-07
 
 ### Added (CI · web review console permanent gate)

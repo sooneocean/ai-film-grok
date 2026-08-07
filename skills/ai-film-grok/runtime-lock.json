@@ -150,7 +150,7 @@
     },
     {
       "path": "scripts/assets/anatomy_safety.py",
-      "sha256": "113abb4b11c6f65cd5202dd39bfa3e08b8918bb9829099abd72d51f3f96f4de4"
+      "sha256": "b9a0a39d6c7d7ace76545f5d5e92f9a8b3fc36c492e58bd8aefb6ad3ec5617cd"
     },
     {
       "path": "scripts/assets/asset_registry.py",
@@ -634,7 +634,7 @@
     },
     {
       "path": "scripts/cli/cli_media.py",
-      "sha256": "b52e388f166fc920efbf01f7ec143dbc03758568bda4435fa751798dcfaf1651"
+      "sha256": "c208686c8d2f9da45c06280ad4cbc57fd9f67121985fa30e1b721ef3a7a47e8e"
     },
     {
       "path": "scripts/cli/cli_misc_ops.py",
@@ -722,7 +722,7 @@
     },
     {
       "path": "scripts/cli/cli_status.py",
-      "sha256": "6bf4007f8afa58886aeace81749e5301f05c27aae0970436bfc1a9ce19590b03"
+      "sha256": "faf8700bffb9ab528a5b5e183b6801bd559a5a1ce2f5182b8d6ec8478914f9b9"
     },
     {
       "path": "scripts/cli/cli_still_challenge.py",
@@ -1009,6 +1009,14 @@
       "sha256": "4849ee5b1e8800102bc267576dfc81540d77d8f0ffd26e204bd4e6642dd8f516"
     },
     {
+      "path": "scripts/core/attestation_audit.py",
+      "sha256": "4b101cd43f561741d6c020c9ae235de5c98494aadd1c784c2cc7d38ad57efe05"
+    },
+    {
+      "path": "scripts/core/checkout_drift.py",
+      "sha256": "7e4ba0316ae00a9317e4152ef9aba369168bd995b53367fdc87703413dc37c63"
+    },
+    {
       "path": "scripts/core/constants.py",
       "sha256": "a3868e7eb1d5b4846ed4c7066d3dc8bb2b931f696fd1b9b95436150d1334db2c"
     },
@@ -1034,7 +1042,7 @@
     },
     {
       "path": "scripts/core/skip_audit.py",
-      "sha256": "25ec9775bc28d6a61d2f12c8a8cbe85bf6ef79e276267ea3d5b3751da6b1f7bd"
+      "sha256": "7edcc7a66efa2a6fe8f8e604e31cf0f16213a4131fa5dd34b10a952281fb7095"
     },
     {
       "path": "scripts/craft_spine.py",
@@ -1270,7 +1278,7 @@
     },
     {
       "path": "scripts/final/delivery_class.py",
-      "sha256": "0ea64e57ca618d82f0cd8026f9ea2160af7115ede9ff456b1972e2acf8d629f3"
+      "sha256": "f65933bb571ac3452887a03abcc1bf7767542aaefe33b409a780749d2c5eb80b"
     },
     {
       "path": "scripts/final/enhance.py",
@@ -1958,7 +1966,7 @@
     },
     {
       "path": "scripts/narrative/dialogue_speaker_frame_gate.py",
-      "sha256": "fa4572da30ebec18fd2cbeb38192b856b26579bbfabed3b2c29fdd4cb12147a9"
+      "sha256": "55aa69c017031831a286f7dd7851e75e9f4b79f4f6c1513c111addd7a18c4491"
     },
     {
       "path": "scripts/narrative/dialogue_style.py",
@@ -2478,7 +2486,7 @@
     },
     {
       "path": "scripts/post/closeout.py",
-      "sha256": "6e5b64d963378f93ac5a05b2cf6bccbadd8e603eb77f640e3b23118595e50c42"
+      "sha256": "ef017c16f788cb84d340ff562e058d4f63b81cae0ab4d1826e23b581cf215d1d"
     },
     {
       "path": "scripts/post/color_grade.py",
