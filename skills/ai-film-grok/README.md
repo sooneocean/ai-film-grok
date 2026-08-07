@@ -92,25 +92,30 @@ Grok Agent（规划 + Prompt 优化 + 角色一致性 + dispatch）
 
 ## 技术栈（你实际在用什么）
 
-### 核心生成：四武器 + 证据化路由（v2.39）
+### 核心生成：默认四件套 + 证据化路由（2026-08-07 清心智）
 
-| 能力 | 在本 skill 中的角色 | 入口 |
-|------|---------------------|------|
-| **Grok Imagine（图像）** | 文生图 / 图生图：风格样张、定妆、每镜关键帧 | `image_gen`、`image_edit` |
-| **Grok Imagine Video** | 纯云 / hybrid 安全 bulk；`h3_primary` 下仅 opt-in | `image_to_video` · OAuth video |
-| **FRW LTX 2.3** | **安全向**对白讲话镜原生有声；分类技术失败 fallback | `"$AIFILM" frw img2video-audio --model ltx2.3` |
-| **FRW API I2V / i2i** | Grok 不可用后的 I2V 备选；**still-challenge** 刷更好静帧 | `frw img2video` · `still-challenge` |
-| **本机 MiniMax H3（5090）** | `hybrid_h3`：肉戏/高难/受限对白；**FLF** 首尾帧；R2V 能量位 | `aifilm h3 plan\|run\|next\|cycle` |
-| **Qwen I2I（状态照）** | 衣着/状态前进的状态照链 | 见 stages/visual · state-index |
+| 能力 | 默认角色 | 入口 |
+|------|----------|------|
+| **Qwen 静帧 / 状态照** | still primary：定妆、状态前进、修片 | stages/visual · state-index · still-challenge |
+| **本机 MiniMax H3（5090）** | **motion primary**（`h3_primary`）：I2V/FLF/R2V/T2V | `aifilm h3 plan\|run\|next\|cycle` |
+| **Edge 中文 TTS** | 口白 / 字幕时钟；对白有声镜优先片内原音 | `final --tts-backend edge` · `prefer_native` |
+| **rnb BGM** | 色气默认床轨 | `--music-mood rnb` · bgm library |
+
+| secondary / escape | 角色 | 入口 |
+|---------------------|------|------|
+| **Grok Imagine 图/视频** | 云静帧辅；`h3_primary` 下视频仅 technical/opt-in escape | `image_gen` / `image_to_video` |
+| **FRW LTX 2.3** | 显式 `ltx23_*` 安全向对白有声 | `frw img2video-audio` |
+| **FRW API I2V / i2i** | 非 Seedance bulk；still-challenge / 显式 escape | `frw img2video` · still-challenge |
+
+**已退役 · 禁规划**：Seedance bulk · Wan22 本地 I2V · 后期 lipsync · 日文生产路径。见 [weapon-inventory](references/weapon-inventory.md) · hard-defaults「已退役勿规划」。
 
 要点：
 
-- **分层（当前季）**：静帧默认 **Grok**；动作 **Grok bulk** → 对白安全向 **FRW LTX** → 受限/肉戏 **H3**；切换写 receipt，禁静默换 provider。  
-- **FLF**：首+尾静帧齐 → H3 优先 first+last frame；无 last → I2V；`force_r2v` 时 last 作 pose land。  
-- **Fill-Idle**：GPU 空闲才 P0→P1→P2；多 take 只 **pk shortlist**，**人 promote**；final 不等 P2。  
-- FRW 须区分 `FRW_API_KEY`（任务）与 `FRW_TOKEN`（上传 JWT）；上传前 `upload-probe`；i2i 全局限速 ≥30s。  
-- Python **不内嵌 key**：Grok 由 agent / OAuth；FRW 经 `frw_dispatch`；H3 经 Comfy 隧道；本仓负责 **规格、队列、QA、成片门禁**。  
-- **单镜头 provider 原则**：同 shot 一旦 fallback 到 FRW/H3，后续重试固定该轨。
+- **分层（当前季）**：静帧 **Qwen/Grok 辅**；动作 **`h3_primary` 全镜 H3**；云 bulk 仅 Grok escape 或显式 LTX。  
+- **FLF**：首+尾静帧齐 → H3 first+last；无 last → I2V；`force_r2v` 时 last 作 pose land。  
+- **Fill-Idle**：GPU 空闲才 P0→P1→P2；多 take **pk shortlist** + **人 promote**；final 不等 P2。  
+- **对白**：`prefer_native`；`final --lipsync` **仅 off**（v2.40 墓碑）。  
+- Python **不内嵌 key**：H3 经 Comfy 隧道；Grok OAuth；本仓负责规格/队列/QA/门禁。
 ### 本地控制台与成片
 
 高质量竖屏项目可显式启用 authored creative gates：
@@ -433,7 +438,7 @@ Private skill for team use unless otherwise stated.
 <!-- BEGIN GENERATED: project-status -->
 ### 当前项目状态（自动同步）
 
-- 插件版本：`2.41.23`
+- 插件版本：`2.41.25`
 - Published skills：`2`
 - Skill Registry：`32/34` 项标记为 `implemented`
 - Python 脚本：`876` 个

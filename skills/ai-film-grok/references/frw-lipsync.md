@@ -1,17 +1,15 @@
-# FRW 口型（音画同步）· 接入 ai-film-grok
+# FRW 口型（音画同步）· **ARCHIVED 墓碑**
 
-> 让**对白近景**嘴型跟旁白更贴，影片更顺。  
-> **说书人默认仍 off**——全片硬上口型会毁动漫脸。  
-> 2026-07-21 本机 key 探针：**seedance lipsync=403**；**ltx/wan lipsync=502**。代码路径已接好，平台恢复即可用。
+> **v2.40 起后期对嘴已从生产路径移除。** 本档仅历史说明；**禁止**规划 `frw-lipsync` / 节点对嘴。  
+> 现行：对白有声 = **Grok / H3 原音** `prefer_native`；`final --lipsync` **仅 off**。  
+> 政策真相：[lipsync.md](lipsync.md) · route-catalog `status=tombstone` · hard-defaults 已退役勿规划。
 
-## 一句话
+## 历史一句话（勿当 next）
 
 ```text
-storyteller / 中远景  → lipsync off（默认）
-character 近景 + lipsync:true + 短句 VO
-  → aifilm frw-lipsync probe
-  → 可用则 face still + edge VO → FRW 音画同步 → register
-  → 不可用则 local Wav2Lip（须 backend-lock）或跳过
+# 已废 · 仅考古
+storyteller / 中远景  → lipsync off
+character 近景 → 勿走 frw-lipsync；用 H3/Grok 原音
 ```
 
 ## FRW 模板（线上）

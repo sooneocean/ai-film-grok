@@ -515,10 +515,11 @@ def resolve_layout(package: dict[str, Any], layout: str) -> str:
 
 
 
-# W4 peel: pure HTML builders live in export_html
+# W4 peel: pure HTML builders live in export_html (re-export for hard-compat imports)
 from post.export_html import (  # noqa: E402, F401
     build_end_roll_html,
     build_platform_ending_html,
+    build_platform_opening_html,
     build_suspense_audio_tags,
     build_title_sequence_html,
     derive_credits_from_spec,

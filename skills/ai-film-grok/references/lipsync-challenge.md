@@ -1,8 +1,10 @@
-# 开源唇同步挑战赛
+# 开源唇同步挑战赛 · **ARCHIVED 非生产**
 
-挑战赛是独立的证据控制面，不执行模型、下载权重或修改 RTX 节点。生产默认仍是
-LatentSync 1.6；任何报告都只能把方案标成 `production_candidate`，不能自动改
-`final --lipsync auto`。
+> **v2.40 起后期 lipsync 已从生产移除。** 本档仅历史挑战赛证据；**禁止**当生产晋级或改 `final --lipsync`。  
+> 现行政策：[lipsync.md](lipsync.md) · 对白原音 prefer_native。
+
+挑战赛曾是独立证据控制面（不执行模型）。**不得**再写「生产默认 LatentSync」；
+`final --lipsync` **仅 off**。
 
 ## 固定赛道
 

@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.41.25] - 2026-08-07
+
+### Fixed
+- **platform package collect:** re-export `build_platform_opening_html` from `export_composition` (W4 peel left it importable only via `export_html`).
+- **export_html:** restore missing stdlib imports (`html`, `math`, `os`, `struct`, `tempfile`, `wave`) after peel — end-roll/opening/suspense stings no longer `NameError`.
+
+### Changed
+- INDEX / frw-lipsync / seedance-camera-vocab: archived · 非生产 wording for lipsync/Seedance legacy docs (mind clear).
+
 ## [2.41.24] - 2026-08-07
 
 ### Changed (retired-weapon clear · mind surface round 4)

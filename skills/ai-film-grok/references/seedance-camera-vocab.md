@@ -1,8 +1,9 @@
-# Seedance 运镜/视觉词库（cinema_prompt 适配）
+# 运镜中文词表（cinema_prompt · 原 Seedance 桥）
 
-> 2026-07-23 · ai-film-grok × songguoxs/seedance-prompt-skill
-> **用途**：`scripts/cinema_prompt.py` 的词库源，供 I2V provider 生成电影级运镜 prompt。
-> **母法**：词库是 Seedance 的 camera language + visual styles 适配版；不替代 I2V 接戏动作。
+> **非 Seedance 生产主链。** Seedance bulk 已退役（2026-08-07）；运动 primary = **MiniMax H3**。  
+> 本档只作 **中文运镜 / 视觉词库**，供 `cinema_prompt` 与任意 I2V 后端拼 prompt。  
+> 代码入口优先：`motion_prompt_zh_pack`（legacy 名 `seedance_bridge`）。  
+> 历史来源：2026-07-23 songguoxs camera language 适配；**勿**规划 `provider=seedance`。
 
 ## 一句话
 
@@ -16,7 +17,7 @@
 
 ## Camera Language（运镜语言）
 
-来源：Seedance camera language 词库。
+中文运镜词表（历史自 Seedance camera language 改编；现与后端无关）。
 
 ### 镜头景别（Shot types）
 

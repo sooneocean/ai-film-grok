@@ -3,7 +3,8 @@
 > **165** 个 reference Markdown 的分类导航（含 stages / lessons）。agent 按需加载时先查此表，再读目标文件。  
 > 踩坑 lessons **77** 个，见末节按日期归档；新规则须标 P 码 + 层。  
 > **文档分层（2026-08-03）**：`hard-defaults`（机读）→ `stages/*`（回合默认）→ `memory/*`（短卡）→ `lessons-*`（按需复盘）。勿在 Agents 复写 IRON 正文。  
-> **用户主进度只有 7 步**（SKILL）；八环 / Professional 11-stage 为内部投影。
+> **用户主进度只有 7 步**（SKILL）；八环 / Professional 11-stage 为内部投影。  
+> **默认武器心智（2026-08-07）**：静帧 Qwen · 运动 H3 · 口白 Edge 中文 · BGM rnb；**禁** Seedance bulk / Wan22 I2V / 后期 lipsync / 日文生产路径。见 [weapon-inventory.md](weapon-inventory.md) · [hard-defaults 已退役勿规划](hard-defaults.md)。
 
 ---
 
@@ -78,18 +79,18 @@
 | [comfy-lan-control.md](comfy-lan-control.md) | 私有区网 ComfyUI 5090 控制、API 工作流与安全门禁 |
 | [local-omni-review.md](local-omni-review.md) | 私网多模态影格审片：hash-bound、candidate-only、无云端回退 |
 | [speech-preview.md](speech-preview.md) | 私有 5090 Speech-to-Speech 互动对白预演：loopback、容量门、候选回执 |
-| [frw-degrade-dispatch.md](frw-degrade-dispatch.md) | FRW Seedance/LTX/经典 dispatch |
+| [frw-degrade-dispatch.md](frw-degrade-dispatch.md) | FRW 降级 dispatch（历史；现行 motion=H3） |
 | [frw-ab-workflow.md](frw-ab-workflow.md) | FRW 全模型 pilot fan-out、机器排名、人审 champion＋challenger |
-| [ltx-env-plate.md](ltx-env-plate.md) | FRW LTX T2V 无角色环境床 |
-| [frw-lipsync.md](frw-lipsync.md) | FRW 口型音画同步 |
-| [seedance-camera-vocab.md](seedance-camera-vocab.md) | Seedance 运镜/视觉词库 |
+| [ltx-env-plate.md](ltx-env-plate.md) | FRW LTX T2V 无角色环境床（opt-in secondary） |
+| [frw-lipsync.md](frw-lipsync.md) | **ARCHIVED 墓碑** · 后期 FRW 口型已移除（v2.40） |
+| [seedance-camera-vocab.md](seedance-camera-vocab.md) | **运镜中文词表**（原 Seedance 桥；非 Seedance 主链） |
 | [dialogue-i2i-frw-priority-and-5090-readdress](lessons-2026-07-29-dialogue-i2i-frw-priority-and-5090-readdress.md) | 历史 FRW i2i 事故与 5090 重地址恢复；现行政策为 Qwen 主路由、FRW 明确回退 |
 
 ## 工具栈 · 音频
 
 | 文件 | 主题 |
 |---|---|
-| [audio-fallback.md](audio-fallback.md) | 音频三阶梯 TTS/BGM/Lipsync |
+| [audio-fallback.md](audio-fallback.md) | 音频阶梯 TTS/BGM（lipsync 已退役） |
 | [loudnorm-policy.md](loudnorm-policy.md) | 响度标准 LUFS -16±2（单一真相） |
 | [audio-recipe.md](audio-recipe.md) | 场景自适应声轨配方 |
 | [scene-sound-standard.md](scene-sound-standard.md) | **P0** 每次运行场景声音检查、环境音/拟音契约与交付门 |
@@ -98,8 +99,8 @@
 | [voices.md](voices.md) | 旁白与声线一致性 |
 | [vo-modes.md](vo-modes.md) | VO Modes 口白策略 |
 | [opensource-tts.md](opensource-tts.md) | 开源 TTS 与一角一声 |
-| [lipsync.md](lipsync.md) | Lip-sync 后端政策 |
-| [lipsync-challenge.md](lipsync-challenge.md) | 五后端开源唇同步挑战赛、盲测与晋级规则 |
+| [lipsync.md](lipsync.md) | **墓碑政策** · 后期对嘴 v2.40 移除 · prefer_native |
+| [lipsync-challenge.md](lipsync-challenge.md) | **ARCHIVED** · 历史五后端挑战；禁当生产晋级 |
 
 ## 工具栈 · 后期
 
@@ -186,7 +187,7 @@
 
 | 文件 | 主题 |
 |---|---|
-| **[rtx5090-lipsync-routing](lessons-2026-07-28-rtx5090-lipsync-routing.md)** | **P0 Voice→Post**：Wav2Lip 只作基线；LatentSync/MuseTalk 目标梯队；5090 CUDA 12.8 与实片 canary 门 |
+| **[rtx5090-lipsync-routing](lessons-2026-07-28-rtx5090-lipsync-routing.md)** | **ARCHIVED 非生产** · 历史 lipsync 路由；现行=原音 prefer_native（v2.40） |
 
 ### 2026-07-24
 
@@ -254,13 +255,13 @@
 | [editor-cut-ecchi-scale](lessons-2026-07-20-editor-cut-ecchi-scale.md) | 剪辑色气尺度 |
 | [editorial-craft](lessons-2026-07-20-editorial-craft.md) | 剪辑工艺 |
 | [frame-chain](lessons-2026-07-20-frame-chain.md) | 帧链 |
-| [frw-2v-first](lessons-2026-07-20-frw-2v-first.md) | FRW 2V 优先 |
+| [frw-2v-first](lessons-2026-07-20-frw-2v-first.md) | **ARCHIVED 语境** · 历史 FRW/Seedance 优先；现行 h3_primary |
 | [frw-ltx-probe](lessons-2026-07-20-frw-ltx-probe.md) | FRW LTX 探测 |
 | [layer-routing](lessons-2026-07-20-layer-routing.md) | 分层路由 |
 | [meaningful-motion](lessons-2026-07-20-meaningful-motion.md) | 有意义运动 |
 | [motion-transition](lessons-2026-07-20-motion-transition.md) | 运动转场 |
 | [sediment-cn-codex](lessons-2026-07-20-sediment-cn-codex.md) | 沉淀 |
-| [seedance-quality](lessons-2026-07-20-seedance-quality.md) | Seedance 质量 |
+| [seedance-quality](lessons-2026-07-20-seedance-quality.md) | **ARCHIVED 非生产** · 历史 Seedance bulk 质量；现行 motion=H3 |
 | [title-double-burn](lessons-2026-07-20-title-double-burn.md) | 标题双烧 |
 | [transition-motion-v2](lessons-2026-07-20-transition-motion-v2.md) | 转场运动 v2 |
 | [vo-atempo-three-axis](lessons-2026-07-20-vo-atempo-three-axis.md) | VO atempo 三轴 |

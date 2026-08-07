@@ -229,7 +229,7 @@ flowchart TB
   subgraph VOI["2 · 语音层 · 可插拔"]
     TTS["TTS 默认 edge<br/>+ voicebox / grok / minimax / fish / external"]
     BGM["BGM 默认程序化 rnb<br/>+ 用户提供的已授权曲库"]
-    LIP["Lipsync 默认 off<br/>+ MuseTalk / Wav2Lip / FRW lipsync"]
+    LIP["Lipsync 已移除 v2.40<br/>prefer_native 原音 · final --lipsync off only"]
   end
 
   subgraph POST["3–4 · 设计 + 后处理 · 可插拔"]
@@ -428,18 +428,17 @@ AIFILM_TTS_BACKEND=edge          # 推荐中文成片
 | 用户文件 | — | `--music <path>` | 优先于生成 |
 | 外接生成 | off | `AIFILM_MUSIC_ARGV` | 失败回落池 / 程序化 |
 
-### 5 · Lipsync（口型）
+### 5 · Lipsync（口型）— **已退役（v2.40）**
 
-| 后端 | 默认 | 说明 |
-|------|------|------|
-| `off` | **是** | 说书强制 off |
-| MuseTalk / Wav2Lip | 否 | `backend-lock` 审权重后 lock |
-| FRW lipsync | 否 | `frw-lipsync probe`→201 再 run；403/502 跳过 |
-| `external` | 否 | `AIFILM_LIPSYNC_ARGV` JSON argv |
+| 状态 | 说明 |
+|------|------|
+| **生产** | 后期对嘴 **代码墓碑**；`final --lipsync` **仅 `off`** |
+| **对白有声** | Grok / 5090 H3 **原音** `prefer_native`（禁 Edge 叠念同句） |
+| **历史** | MuseTalk / Wav2Lip / FRW lipsync → 只读 [lipsync.md](./skills/ai-film-grok/references/lipsync.md) |
 
 ```bash
-AIFILM_LIPSYNC_BACKEND=off
-# final 时：--lipsync off|auto|require
+# 唯一合法：
+final --lipsync off
 ```
 
 ### 6 · 后期合成引擎
@@ -626,7 +625,7 @@ MIT © [dex](https://github.com/sooneocean)
 <!-- BEGIN GENERATED: project-status -->
 ### 当前项目状态（自动同步）
 
-- 插件版本：`2.41.23`
+- 插件版本：`2.41.25`
 - Published skills：`2`
 - Skill Registry：`32/34` 项标记为 `implemented`
 - Python 脚本：`876` 个

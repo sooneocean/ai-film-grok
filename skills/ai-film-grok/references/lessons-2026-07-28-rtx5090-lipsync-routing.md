@@ -1,8 +1,7 @@
-# Lessons · RTX 5090 剧情对白口型路由
+# Lessons · RTX 5090 剧情对白口型路由 · **ARCHIVED 非生产**
 
-> 2026-07-28 · **P0 / Voice→Post**
-> 状态：**PARTIAL：LatentSync 1.6 已通过 RTX 5090 技术 canary；尚未通过生产晋升矩阵与人工完整观看批准**。
-> 目标：让 Grok/I2V 已有剧情镜头中的角色按最终对白开口，同时尽量保留原表演、身份、背景与摄影运动。
+> **现行（v2.40+）**：后期对嘴已移除；对白 = Grok/H3 **原音** `prefer_native`。本课仅历史 canary。  
+> 2026-07-28 · 历史 P0 Voice→Post · 状态当时 PARTIAL（LatentSync canary）。
 
 ## 一句话
 

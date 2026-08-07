@@ -1,7 +1,7 @@
-# Lessons · FRW 2V 优先（无限配额）
+# Lessons · FRW 2V 优先（无限配额）· **ARCHIVED 语境**
 
-> 2026-07-20 · 映射 **P1 身份连续** + **P2 时空连续** + **P5 分层表达**  
-> 触发：用户明确「FRW API 无限，确定性部分优先用 2V」
+> **现行**：`h3_primary` 运动主轨；Seedance bulk 退役；FRW 仅 LTX/API 显式 secondary。  
+> 2026-07-20 · 历史决策（当时「FRW 无限配额优先 2V」）。
 
 ## 问题
 

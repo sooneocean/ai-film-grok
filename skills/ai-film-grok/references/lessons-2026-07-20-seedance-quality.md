@@ -1,9 +1,9 @@
-# Lessons · FRW Seedance 质量纪律（胃镜室复盘）
+# Lessons · FRW Seedance 质量纪律（胃镜室复盘）· **ARCHIVED 非生产**
 
-> **Superseded for current routing:** 本文保留 2026-07-20 历史事故与当时策略；当前生产默认为 Grok primary，FRW 仅在明确技术故障并记录 provider-switch receipt 后 fallback。
+> **现行（2026-08-07）**：Seedance bulk **退役**；motion primary = **H3**；禁规划 `provider=seedance`。  
+> 本文仅保留 2026-07-20 历史事故与当时策略（当时曾走 FRW/Seedance bulk）。
 
-> 2026-07-20 · **P0 可观测变化 · P1 身份连续 · P5 分层**  
-> 样本：`xixifu-autopsy-60s`（胃镜室的第十三号）— 用户判定「影片质量非常差」。
+> 2026-07-20 · 历史 P0 · 样本 `xixifu-autopsy-60s` — 用户判定质量差。
 
 ## 一句话
 

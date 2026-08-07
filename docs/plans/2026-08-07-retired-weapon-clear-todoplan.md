@@ -264,3 +264,7 @@ rg -n 'Seedance bulk|comfy-wan22|final --lipsync auto' \
 - lipsync routes tombstone + list hide
 - doctor weapon_inventory counts-only retired
 - research_weapons not select_weapon
+
+## Round 5 closeout (2.41.25)
+
+- M4 docs: INDEX/README/vocab/lessons archive banners

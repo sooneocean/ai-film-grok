@@ -2,8 +2,15 @@
 
 from __future__ import annotations
 
+import html
+import math
+import os
+import struct
+import tempfile
+import wave
 from pathlib import Path
 from typing import Any
+
 
 def preset_hf_styles(preset: str, *, width: int) -> dict[str, str]:
     """CSS fragments + motion params for HyperFrames title/captions."""
