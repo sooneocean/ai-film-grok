@@ -1,0 +1,33 @@
+{
+  "status": "DONE",
+  "ok": true,
+  "kind": "h3-official-ab-score",
+  "seed": 20260807,
+  "at": "2026-08-07T04:35:00Z",
+  "plugin": "2.40.84",
+  "pairs": {
+    "dialogue_cu": {
+      "legacy_mean": 1.104,
+      "official_mean": 1.2359,
+      "motion_mean_winner": "tie"
+    },
+    "high_motion": {
+      "legacy_mean": 20.67,
+      "official_mean": 18.58,
+      "motion_mean_winner": "legacy"
+    },
+    "soft_portrait": {
+      "legacy_mean": 4.13,
+      "official_mean": 1.47,
+      "motion_mean_winner": "legacy"
+    }
+  },
+  "policy": {
+    "default_dialect": "auto",
+    "dialogue": "official",
+    "high_motion": "legacy",
+    "else": "official",
+    "default_flip_ready": false
+  },
+  "burns": "6/6 official+legacy families on seed 20260807"
+}

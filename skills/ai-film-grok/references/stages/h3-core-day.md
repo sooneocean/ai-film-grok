@@ -33,6 +33,17 @@
 | 高动 / 大嘴 / force_r2v | **R2V** |
 | 无脸 env | **T2V** |
 
+
+## prompt 方言（auto 默认）
+
+| 方言 | 何时 | 形态 |
+|------|------|------|
+| **auto**（默认） | 未强制 env | 对白→official · high→legacy · 其他 official |
+| **official** | `AIFILM_H3_PROMPT_DIALECT=official` | 三字段 / Ref2VA + `<d>[Mandarin]` |
+| **legacy** | `…=legacy` 或 `prompt_format=timeline` | `[0s-2s] Primary action…` |
+
+O3 canary：`skills/ai-film-grok/artifacts/2026-08-07-h3-official-ab-canary.json`（6/6 seed 20260807）。
+
 ## Fill-Idle（h3_primary 语义）
 
 - **P0** = 缺 approved clip 的主生成（不是「挑战 Grok」）

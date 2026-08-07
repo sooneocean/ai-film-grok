@@ -1505,6 +1505,10 @@
       "sha256": "101124905b67810f03f09c9b19b59398c25da62d24910144c5df2fa1e8aa915b"
     },
     {
+      "path": "scripts/h3_official_prompt.py",
+      "sha256": "ce95afe793239e6997e8ed0eb482f22b03042f43e5df25209a09497c047f8798"
+    },
+    {
       "path": "scripts/h3_ship_native.py",
       "sha256": "dcbca9863cfacc41239fd37d375babf7f6103329715a533249aa49b4bacd208e"
     },
@@ -1717,6 +1721,10 @@
       "sha256": "f39c960dd4180ec85c042fceb04944dec5e2de2cb6aa8e116401dba0d4530794"
     },
     {
+      "path": "scripts/media/h3_official_prompt.py",
+      "sha256": "ad6935f5547cb33a94283a8ee89b816453342aaa1c7b9d7c26dd2bc6e488d87d"
+    },
+    {
       "path": "scripts/media/h3_ship_native.py",
       "sha256": "a80e8086b333219e2f0fd4705b9ee2512233fff91fe24bbebcb1340a8c2a431b"
     },
@@ -1726,7 +1734,7 @@
     },
     {
       "path": "scripts/media/h3_workflow.py",
-      "sha256": "0a38e6249599dfd3486ab31158436dd4eedf3c8b44625989d73828dccc6bdba6"
+      "sha256": "c1bf4dc223d66c5ac00d1380c5543a734c6b6a40df18b6b14de596db5e502c67"
     },
     {
       "path": "scripts/media/i2v_motion_gate.py",

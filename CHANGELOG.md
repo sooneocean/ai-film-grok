@@ -11,6 +11,24 @@
 - **测试：** 新增 `test_onboarding_planner.py`（启发式分解单测）；`test_web_api` / `test_review_ui` 扩 onboarding 上传/拆解/plan/go、409 冲突、跨域 403、坏 token 401、file path-escape 404。
 - **修复：** `review_ui.do_POST` 缩进错位（try 块越级）；`onboarding.handle_upload` 缺 `import os`；`onboarding` 多余 `import re`；`onboarding_planner` 未用 `LocalLLMError` 导入。刷新 `runtime-lock.json`。
 
+## [2.40.85] - 2026-08-07
+
+### Added (CTO eng closeout · D7.2 + C6.3 empty + B3 OPEN_OPS)
+- **D7.2 CI typecheck:** new `typecheck` job runs `make type` (scoped util mypy seed); included in `merge-gate` AND of required jobs.
+- **C6.3 Lane A:** re-scan top-level non-shim modules → **0** safe-delete candidates (queue already drained; hard-compat shims retained).
+- **B3 closeout canary:** `artifacts/2026-08-07-b3-ops-canary-closeout.json` — Comfy 18188 up; eng-day no exclusive drain → **OPEN_OPS** (honest partial success).
+- **OPEN reconcile:** C5 full · C6.1/3/4/5 · D7.2/4 · B3 OPEN_OPS closed for eng-day; C4 remains **bug-driven only**; content P8 / B3.4 deferred.
+
+## [2.40.84] - 2026-08-07
+
+### Added (H3 official prompt dialect · O3 canary → auto)
+- **`h3_official_prompt`:** MiniMax `h3-prompt-writing` serializer (`integrated_multimodal_description` / soundscape / music; Ref2VA six-section; `<d>[Lang]` dialogue).
+- **Default dialect `auto`:** dialogue → official; high-motion → legacy timeline (canary mean); else official. Force via `AIFILM_H3_PROMPT_DIALECT=official|legacy`.
+- **Round-2 high-motion densify** in official path (half-second pose thrash + strong camera + energetic soundscape).
+- **Wiring:** `h3_workflow._prompt_for_shot` dialect switch; vendor pin `references/vendor/minimax-h3/`; hard-defaults + h3-core-day.
+- **Evidence:** `skills/ai-film-grok/artifacts/2026-08-07-h3-official-ab-canary.json` (6/6 seed 20260807).
+- **Tests:** `tests/test_h3_official_prompt.py`.
+
 ## [2.40.83] - 2026-08-07
 
 ### Fixed / Changed (CTO C6.5 mypy incremental expand)
