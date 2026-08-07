@@ -40,11 +40,10 @@ def load_rehearsal_receipt(root: Path) -> dict[str, Any] | None:
     path = rehearsal_receipt_path(root)
     if not path.is_file():
         return None
-    try:
-        raw = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return None
-    return raw if isinstance(raw, dict) else None
+    from util import soft_json
+
+    data = soft_json(path)
+    return data or None
 
 
 def measured_vo_by_shot(root: Path) -> dict[str, float]:
@@ -72,10 +71,12 @@ def _load_spec(root: Path, spec_path: Path | None) -> dict[str, Any]:
     path = Path(spec_path).expanduser().resolve() if spec_path else (root / "film-spec.json")
     if not path.is_file():
         raise TTSRehearsalError(f"film-spec missing: {path}")
+    from util import require_json_as
+
     try:
-        raw = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
-        raise TTSRehearsalError(f"cannot read film-spec: {exc}") from exc
+        raw = require_json_as(path, TTSRehearsalError)
+    except TTSRehearsalError:
+        raise
     if not isinstance(raw, dict):
         raise TTSRehearsalError("film-spec must be a JSON object")
     return raw
@@ -533,7 +534,9 @@ def bind_receipt_to_spec_timing(
     spec_path = root / "film-spec.json"
     if spec_path.is_file():
         try:
-            raw = json.loads(spec_path.read_text(encoding="utf-8"))
+            from util import soft_json
+
+            raw = soft_json(spec_path)
             if isinstance(raw, dict):
                 try:
                     shots = validate_film_spec(raw, assign_missing_ids=False)

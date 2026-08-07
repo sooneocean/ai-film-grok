@@ -20,7 +20,7 @@ from narrative_control import (
     graph_locked_for_projection,
 )
 from story_plan import project_graph_to_film_spec
-from util import utc_now, write_json
+from util import utc_now, write_json, soft_json
 
 
 class GraphMutationError(RuntimeError):
@@ -33,7 +33,7 @@ def run(args: argparse.Namespace, root: Path) -> tuple[dict[str, Any], int]:
     root = Path(root).expanduser().resolve()
     if action == "derive":
         path = graph_path(root)
-        existing = json.loads(path.read_text(encoding="utf-8")) if path.is_file() else {}
+        existing = soft_json(path) if path.is_file() else {}
         if int(existing.get("schema_version") or 0) >= GRAPH_SCHEMA_VERSION:
             raise GraphMutationError(
                 "canonical drama-graph exists; use aifilm graph project or plan edit, not graph derive"
@@ -54,14 +54,14 @@ def run(args: argparse.Namespace, root: Path) -> tuple[dict[str, Any], int]:
 
     if action == "import":
         path = graph_path(root)
-        existing = json.loads(path.read_text(encoding="utf-8")) if path.is_file() else {}
+        existing = soft_json(path) if path.is_file() else {}
         if int(existing.get("schema_version") or 0) >= GRAPH_SCHEMA_VERSION:
             raise GraphMutationError(
                 "canonical drama-graph already exists; refusing legacy import overwrite"
             )
         graph = derive_graph(root, write=False)
         spec_path = root / "film-spec.json"
-        spec = json.loads(spec_path.read_text(encoding="utf-8")) if spec_path.is_file() else {}
+        spec = soft_json(spec_path) if spec_path.is_file() else {}
         director_intent = (
             spec.get("director_intent") if isinstance(spec.get("director_intent"), dict) else {}
         )
@@ -135,7 +135,7 @@ def run(args: argparse.Namespace, root: Path) -> tuple[dict[str, Any], int]:
 
     if action == "project":
         path = graph_path(root)
-        graph = json.loads(path.read_text(encoding="utf-8")) if path.is_file() else {}
+        graph = soft_json(path) if path.is_file() else {}
         if int(graph.get("schema_version") or 0) < GRAPH_SCHEMA_VERSION:
             raise GraphMutationError(
                 "graph project requires canonical graph v2; run aifilm graph import first"
@@ -153,7 +153,7 @@ def run(args: argparse.Namespace, root: Path) -> tuple[dict[str, Any], int]:
                 )
             )
         spec_path = root / "film-spec.json"
-        existing = json.loads(spec_path.read_text(encoding="utf-8")) if spec_path.is_file() else {}
+        existing = soft_json(spec_path) if spec_path.is_file() else {}
         has_shots = any(
             isinstance(scene, dict) and scene.get("shots")
             for scene in (existing.get("scenes") or [])
@@ -164,7 +164,7 @@ def run(args: argparse.Namespace, root: Path) -> tuple[dict[str, Any], int]:
             )
         norm_path = root / "receipts" / "story-normalize.json"
         normalized = (
-            json.loads(norm_path.read_text(encoding="utf-8")) if norm_path.is_file() else None
+            soft_json(norm_path) if norm_path.is_file() else None
         )
         spec = project_graph_to_film_spec(graph, base_spec=existing, normalized=normalized)
         write_json(spec_path, spec)

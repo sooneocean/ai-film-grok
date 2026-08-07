@@ -36,7 +36,7 @@ from security_policy import (
     safe_output_path,
     safe_workspace_directory,
 )
-from util import run_compose_env, utc_now, write_json
+from util import require_json_as, run_compose_env, utc_now, write_json
 
 SCHEMA_VERSION = 1
 
@@ -46,9 +46,7 @@ class ComposeRenderError(FilmError):
 
 
 def read_json(path: Path) -> dict[str, Any]:
-    """Strict JSON — util.require_json remapped to ComposeRenderError."""
-    from util import require_json_as
-
+    """Hard-compat facade: util.require_json_as → ComposeRenderError (C5.3 no local parser)."""
     return require_json_as(path, ComposeRenderError)
 
 

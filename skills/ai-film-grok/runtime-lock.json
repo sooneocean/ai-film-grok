@@ -174,7 +174,7 @@
     },
     {
       "path": "scripts/assets/face_identity.py",
-      "sha256": "4922b1593d21a099df152359434fc7780754993d7e607e0d2b55ff39889ebcae"
+      "sha256": "87659778f72ac066d748ce1dac9c2f042cfc5cac66a51252a72395e363e4f7d6"
     },
     {
       "path": "scripts/assets/face_identity_hash.py",
@@ -302,7 +302,7 @@
     },
     {
       "path": "scripts/audio/elevenlabs_canary.py",
-      "sha256": "8ff9b5e8bd3d2341b26421f49e0dd26c08c21e1984ae873793676bd984d55c98"
+      "sha256": "43b3870b31f81ce371d6699e534c3b7ec456ad593e6b00f53642566de66505b4"
     },
     {
       "path": "scripts/audio/event_voice_stem.py",
@@ -402,7 +402,7 @@
     },
     {
       "path": "scripts/audio/tts_rehearsal.py",
-      "sha256": "6d875666fb9ffc5f7a06847db985baf425ab36610d07dfcee0aa38706e785928"
+      "sha256": "a7d1be98c105aade2a6e98df42eb5a22b4814699114d8a2d45d50064394fcf85"
     },
     {
       "path": "scripts/audio/vibevoice_asr_review.py",
@@ -614,7 +614,7 @@
     },
     {
       "path": "scripts/cli/cli_graph_mutation.py",
-      "sha256": "368557e7f99ab083d3ece4b2aeb735ab5bd22d54c9051b2879b096fc7f799dbb"
+      "sha256": "6f1ce331bd03765f53b85b62c47b797660f23fc2c4e9a7a11c523be79f5802d2"
     },
     {
       "path": "scripts/cli/cli_h3.py",
@@ -1294,7 +1294,7 @@
     },
     {
       "path": "scripts/final/io.py",
-      "sha256": "3af19758b6e1982345079fd089e3fe3e254be38356bda92d0a2d2940af019d1a"
+      "sha256": "b47a18efe383e537100e8630c257cbe12de4f7cffae62a78aafe90512d9a4e67"
     },
     {
       "path": "scripts/final/manifest.py",
@@ -1730,11 +1730,11 @@
     },
     {
       "path": "scripts/media/i2v_motion_gate.py",
-      "sha256": "e4a45952932f9f3fe7c7a363ae39ba189d145dc5af3c9b156a4e64c4bc68ec16"
+      "sha256": "d373c8407ee9fa6b33ad0a1f0f96dcde24d7ac7b00d05e2d003cb1a00f83007f"
     },
     {
       "path": "scripts/media/i2v_provider.py",
-      "sha256": "acff92cdc36ee0015509da8978ada5d6e3799e1fb70678485eac6c81a1c3fe1f"
+      "sha256": "ccf6b2ffeb043413bf4dbd84bfb8987b9b9a4ef6da4813086b2db2b1ae1c6010"
     },
     {
       "path": "scripts/media/interactive_orchestration.py",
@@ -1778,7 +1778,7 @@
     },
     {
       "path": "scripts/media/pilot_review.py",
-      "sha256": "8573c9269480b9caca0467266ced60494c7453a07191f9ca40f45c09e1a76bdd"
+      "sha256": "4c6393c2491dc007536aa14b03fd1c9b0a90cc05947a46aba4240ed0b5fe183d"
     },
     {
       "path": "scripts/media/provider_canary.py",
@@ -2470,7 +2470,7 @@
     },
     {
       "path": "scripts/post/auto_cut.py",
-      "sha256": "186e87f796e6d33905746bc61aef0870d510fae416bdbdc04b6c7af50f7d9c4a"
+      "sha256": "7cb0602cb7d654524ec7fc49eae6af84cfdc47d622a18b029a02fa9eab74e3e1"
     },
     {
       "path": "scripts/post/burn_srt_pil.py",
@@ -2494,11 +2494,11 @@
     },
     {
       "path": "scripts/post/compose_preview.py",
-      "sha256": "6ce175103143a8dc25757a8d007c0617ba159017dbebd9955a26bf3f6e0abaaa"
+      "sha256": "7ab86c5be0fca1b4b1fd1c32fd39e67eb619dff1892ead77c86f67b1ab7227d8"
     },
     {
       "path": "scripts/post/compose_render.py",
-      "sha256": "c476053306dbe911b2a19daa96d2da059f29363d6f2f0aa04536ad2d10af42ca"
+      "sha256": "d53922fabd9890e6ec816ea303cc16cc4d0ca410a60f2b25e18cbc1bd43e386d"
     },
     {
       "path": "scripts/post/dailies.py",
@@ -2510,7 +2510,7 @@
     },
     {
       "path": "scripts/post/export_composition.py",
-      "sha256": "363d38bad90150e4e4a36e4aea09a983f378a702e1b58ef1cf3bd7ff6f1fcf3a"
+      "sha256": "6365ede83199809175445659f511a68c2c5da40259f14a852dc2f24d0139be6e"
     },
     {
       "path": "scripts/post/export_cues.py",
@@ -2582,7 +2582,7 @@
     },
     {
       "path": "scripts/post/render_final.py",
-      "sha256": "e36ed65b7a63b0d697590a0e865aa4d2929ee3636fc042e301a63ab46d1e898c"
+      "sha256": "d719767fbfd3e2e66a4b0ef30a6c9aa7e8d4deda006f2c88bb664488a1a9511c"
     },
     {
       "path": "scripts/post/render_final_music.py",
@@ -2918,7 +2918,7 @@
     },
     {
       "path": "scripts/spine/context_routing.py",
-      "sha256": "a0620611e6aa251e720b4297226da6d423163a53254188f8e8a36cee6ee62557"
+      "sha256": "a0c1d43a7398ad5d5fc0e9017d16bcbe831b926d00be62ff09f22d1ef3df4a63"
     },
     {
       "path": "scripts/spine/continue_handoff.py",
@@ -2934,7 +2934,7 @@
     },
     {
       "path": "scripts/spine/dispatch_compact.py",
-      "sha256": "456a7dbe347c2d891880d8225a22b3c04ae511a7b2bb41e7adffc13db312a9d4"
+      "sha256": "1d5494658a7b7e3f8a0d2046e91ea96359f4c12359ad8086a371e255fb949756"
     },
     {
       "path": "scripts/spine/next_actions.py",

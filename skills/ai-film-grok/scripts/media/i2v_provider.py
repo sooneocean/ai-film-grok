@@ -479,7 +479,9 @@ class GrokI2VProvider(I2VProvider):
             try:
                 import json
 
-                data = json.loads(receipt.read_text(encoding="utf-8"))
+                from util import soft_json
+
+                data = soft_json(receipt)
                 recorded_model = str(data.get("provider_model") or data.get("model") or "").strip()
                 available = bool(
                     data.get("ok")
@@ -572,7 +574,9 @@ class SeedanceProvider(I2VProvider):
                 try:
                     import json
 
-                    data = json.loads(receipt.read_text(encoding="utf-8"))
+                    from util import soft_json
+
+                    data = soft_json(receipt)
                     code = data.get("code") or data.get("status_code")
                     available = str(code) == "201" or bool(data.get("success"))
                     return CapabilityReport(
@@ -692,10 +696,9 @@ class FrwImg2VideoProvider(SeedanceProvider):
                 detail={"canary_required": True},
             )
         receipt = root / "receipts" / "frw-api-i2v-canary.json"
-        try:
-            data = json.loads(receipt.read_text(encoding="utf-8"))
-        except (OSError, ValueError):
-            data = {}
+        from util import soft_json
+
+        data = soft_json(receipt)
         approved = bool(
             data.get("ok")
             and _canary_output_is_bound(root, data)
@@ -758,10 +761,9 @@ class FrwLtx23AudioProvider(SeedanceProvider):
                 detail={"canary_required": True},
             )
         receipt = root / "receipts" / "frw-ltx23-i2v-audio-canary.json"
-        try:
-            data = json.loads(receipt.read_text(encoding="utf-8"))
-        except (OSError, ValueError):
-            data = {}
+        from util import soft_json
+
+        data = soft_json(receipt)
         approved = bool(
             data.get("ok")
             and _canary_output_is_bound(root, data)
@@ -830,10 +832,9 @@ class FrwWanProvider(SeedanceProvider):
                 detail={"canary_required": True},
             )
         receipt = root / "receipts" / "frw-wan-i2v-canary.json"
-        try:
-            data = json.loads(receipt.read_text(encoding="utf-8"))
-        except (OSError, ValueError):
-            data = {}
+        from util import soft_json
+
+        data = soft_json(receipt)
         model = str(data.get("provider_model") or data.get("model") or "").lower()
         approved = bool(
             data.get("ok")
@@ -1028,7 +1029,9 @@ class LocalComfyWan22Provider(I2VProvider):
                     WAN22_OFFICIAL_PROFILE,
                 )
 
-                detail = json.loads(receipt.read_text(encoding="utf-8"))
+                from util import soft_json
+
+                detail = soft_json(receipt)
                 profile_name = self._resolve_profile_name(kwargs)
                 profile = {
                     WAN22_ADULT_PROFILE["name"]: WAN22_ADULT_PROFILE,

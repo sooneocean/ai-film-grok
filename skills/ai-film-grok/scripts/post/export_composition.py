@@ -48,7 +48,7 @@ from transition_ops import (
     assert_hyperframes_safe_operations,
     bind_transition_operations_to_timeline,
 )
-from util import utc_now, write_json
+from util import require_json_as, utc_now, write_json
 
 SCHEMA_VERSION = 1
 ENGINES = ("hyperframes", "remotion", "both")
@@ -74,9 +74,7 @@ def write_text(path: Path, text: str) -> None:
 
 
 def read_json(path: Path) -> dict[str, Any]:
-    """Strict JSON — util.require_json remapped to ComposeExportError."""
-    from util import require_json_as
-
+    """Hard-compat facade: util.require_json_as → ComposeExportError (C5.3 no local parser)."""
     return require_json_as(path, ComposeExportError)
 
 

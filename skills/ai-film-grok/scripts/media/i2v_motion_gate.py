@@ -561,11 +561,10 @@ def assert_i2v_final_gate_for_export(root: Path | str) -> dict[str, Any]:
             "Desktop export requires receipts/i2v-final-gate.json ok=true; "
             f'run: aifilm i2v-motion-gate --root "{base}" --write'
         )
-    try:
-        gate = json.loads(gate_path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
-        raise I2VMotionGateError(f"Desktop export cannot read i2v-final-gate.json: {exc}") from exc
-    if not isinstance(gate, dict) or gate.get("ok") is not True:
+    from util import soft_json
+
+    gate = soft_json(gate_path)
+    if not gate or gate.get("ok") is not True:
         raise I2VMotionGateError(
             "Desktop export blocked by i2v-final-gate (ok!=true); "
             f'fix means then: aifilm i2v-motion-gate --root "{base}" --write. '
@@ -716,12 +715,14 @@ def ensure_take_means(
         existing: float | None = None
         if side.is_file() and not recompute:
             try:
-                data = json.loads(side.read_text(encoding="utf-8"))
+                from util import soft_json
+
+                data = soft_json(side)
                 for key in ("mean", "mean_absdiff", "motion_mean"):
                     if data.get(key) is not None:
                         existing = float(data[key])
                         break
-            except (OSError, json.JSONDecodeError, TypeError, ValueError):
+            except (TypeError, ValueError):
                 existing = None
         if existing is not None:
             skipped.append({"path": str(video), "mean": existing, "reason": "sidecar"})
@@ -758,15 +759,7 @@ def collect_motion_gate_rows(
     Missing mean → row still emitted (gate will flag MEAN missing / fail floor).
     """
     base = Path(root).expanduser().resolve()
-    try:
-        from util import read_json
-    except Exception:  # noqa: BLE001
-
-        def read_json(path: Path) -> dict[str, Any] | None:  # type: ignore[misc]
-            try:
-                return json.loads(path.read_text(encoding="utf-8"))
-            except Exception:
-                return None
+    from util import read_json
 
     if measure_missing:
         ensure_take_means(base, recompute=False, write_sidecars=True)

@@ -41,11 +41,10 @@ def load_preview_receipt(root: Path) -> dict[str, Any] | None:
     path = preview_receipt_path(root)
     if not path.is_file():
         return None
-    try:
-        raw = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, ValueError, json.JSONDecodeError):
-        return None
-    return raw if isinstance(raw, dict) else None
+    from util import soft_json
+
+    data = soft_json(path)
+    return data or None
 
 
 def has_valid_preview_receipt(root: Path) -> bool:

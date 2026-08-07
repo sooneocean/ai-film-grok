@@ -20,8 +20,8 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
-from security_policy import atomic_write_bytes, atomic_write_text
-from util import utc_now
+from security_policy import atomic_write_bytes
+from util import utc_now, write_json
 
 API_URL = "https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
 VOICES_URL = "https://api.elevenlabs.io/v1/voices"
@@ -174,7 +174,8 @@ def _audio_metrics(path: Path, *, chars: int) -> dict[str, Any]:
 
 
 def _write_json(path: Path, payload: dict[str, Any]) -> None:
-    atomic_write_text(path, json.dumps(payload, ensure_ascii=False, indent=2) + "\n")
+    """C5.3: facade over util.write_json (atomic pretty JSON)."""
+    write_json(path, payload)
 
 
 def _load_armory(path: Path) -> dict[str, Any]:

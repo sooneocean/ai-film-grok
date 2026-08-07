@@ -126,7 +126,9 @@ def compute_state_hash(
             digest.update(str(rel).encode("utf-8"))
             digest.update(b"\0")
             if path.name == "manifest.json":
-                manifest = json.loads(path.read_text(encoding="utf-8"))
+                from util import soft_json
+
+                manifest = soft_json(path)
                 if isinstance(manifest, dict):
                     manifest.pop("updated_at", None)
                 digest.update(
@@ -139,9 +141,10 @@ def compute_state_hash(
                 )
             elif path.name in _STATE_OK_ONLY:
                 # Ignore at/steps thrash; track only machine-green signal
-                try:
-                    body = json.loads(path.read_text(encoding="utf-8"))
-                except (OSError, ValueError, json.JSONDecodeError):
+                from util import read_json
+
+                body = read_json(path)
+                if body is None:
                     digest.update(b"unreadable")
                 else:
                     if isinstance(body, dict):

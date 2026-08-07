@@ -42,9 +42,8 @@ class PilotReviewError(RuntimeError):
     pass
 
 
-def read_json(path: Path) -> dict[str, Any]:
-    """Soft JSON — missing/invalid becomes ``{}`` (alias of util.soft_json)."""
-    return soft_json(path)
+# C5.3: no local JSON parser — soft_json is the util soft dict API.
+read_json = soft_json
 
 
 def flatten_shots(spec: dict[str, Any]) -> list[dict[str, Any]]:

@@ -93,3 +93,26 @@ def test_final_stages_uses_soft_json_not_local_def() -> None:
     src = inspect.getsource(final_stages)
     assert "def _read_json" not in src
     assert "soft_json" in src
+
+
+def test_c53_migrated_modules_prefer_util_helpers() -> None:
+    """C5.3 touch wave: hotpath modules should not re-paste soft object load."""
+    scripts = SCRIPTS
+    targets = [
+        scripts / "cli" / "cli_graph_mutation.py",
+        scripts / "post" / "compose_preview.py",
+        scripts / "spine" / "context_routing.py",
+        scripts / "assets" / "face_identity.py",
+        scripts / "media" / "i2v_motion_gate.py",
+    ]
+    paste = 'json.loads('
+    for path in targets:
+        text = path.read_text(encoding="utf-8")
+        # soft dict film-spec style paste banned in these files after C5.3
+        banned = 'json.loads(path.read_text'
+        banned2 = 'json.loads(spec_path.read_text'
+        banned3 = 'json.loads(gate_path.read_text'
+        for b in (banned, banned2, banned3):
+            assert b not in text, f"{path.name} still has paste {b}"
+        # must reference util helpers
+        assert "soft_json" in text or "require_json" in text, path.name

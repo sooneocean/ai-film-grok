@@ -207,12 +207,7 @@ def resolve_font() -> str:
 
 
 
-def read_json(path: Path) -> dict[str, Any]:
-    """Strict JSON — util.require_json_fnv (FileNotFoundError / ValueError)."""
-    from util import require_json_fnv
-
-    return require_json_fnv(path)
-
+# C5.3: read_json is re-exported from final.io (require_json_fnv) — no local copy.
 
 from final.tts_tracks import (  # noqa: E402, F401
     DEFAULT_VOCAL_COLOR_GAIN as _TTS_DEFAULT_VOCAL_COLOR_GAIN,

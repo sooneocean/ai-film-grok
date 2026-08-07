@@ -13,8 +13,10 @@ ROUTING_PATH = SKILL_ROOT / "registry" / "context-routing.json"
 
 
 def load_context_routing(path: Path = ROUTING_PATH) -> dict[str, Any]:
-    data = json.loads(path.read_text(encoding="utf-8"))
-    if not isinstance(data, dict) or int(data.get("schema_version") or 0) != 1:
+    from util import require_json_fnv
+
+    data = require_json_fnv(path)
+    if int(data.get("schema_version") or 0) != 1:
         raise ValueError("context routing schema_version must be 1")
     return data
 

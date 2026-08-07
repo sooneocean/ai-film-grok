@@ -230,7 +230,9 @@ def build_edl_for_root(
     ingest_receipt = root / "receipts" / "footage-ingest" / f"{source_id}.json"
     if not ingest_receipt.is_file():
         raise AutoCutError(f"no ingest receipt for {source_id}; run ingest-footage first")
-    receipt_data = json.loads(ingest_receipt.read_text(encoding="utf-8"))
+    from util import soft_json
+
+    receipt_data = soft_json(ingest_receipt)
     source_path = receipt_data.get("source_path") or ""
 
     edl = build_edl(

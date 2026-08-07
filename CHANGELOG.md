@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.40.77] - 2026-08-07
+
+### Added / Changed (CTO C5.3 JSON I/O single entry)
+- **Facades only:** `compose_render` / `export_composition` / `final.io` thin `read_json` → `util.require_json_as` / `require_json_fnv`; `pilot_review.read_json = soft_json`; drop shadow `render_final` local def (re-export `final.io`).
+- **Kill reimplementation:** `i2v_motion_gate` nested `json.loads` fallback removed; `elevenlabs_canary._write_json` → `util.write_json`.
+- **Call-site soft/strict wave:** face_identity · tts_rehearsal · cli_graph_mutation · i2v_provider · auto_cut · compose_preview · context_routing · dispatch_compact → `soft_json` / `require_json_fnv` / `read_json`.
+- **Contract tests:** `tests/test_c5_json_io_single_entry.py` (whitelist facades, no nested reimpl, no local `_write_json` dump).
+
 ## [2.40.76] - 2026-08-07
 
 ### Added (CTO eng-day · C5.2 FilmError + CLI skip residual + C5.1 expand)

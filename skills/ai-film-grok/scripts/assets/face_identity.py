@@ -24,7 +24,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from util import sha256_file as _sha256_file
+from util import sha256_file as _sha256_file, soft_json
 from util import utc_now
 
 RECEIPT_NAME = "face-identity.json"
@@ -246,8 +246,8 @@ def load_receipt(root: Path) -> dict[str, Any]:
             "enrolled": {},
             "checks": [],
         }
-    data = json.loads(path.read_text(encoding="utf-8"))
-    if not isinstance(data, dict):
+    data = soft_json(path)
+    if not data:
         return {
             "schema_version": SCHEMA_VERSION,
             "kind": "face-identity",
@@ -413,7 +413,7 @@ def enroll_from_bible(root: Path) -> dict[str, Any]:
     bible_path = root / "style-bible.json"
     if not bible_path.is_file():
         return {"ok": False, "error": "style-bible.json missing", "enrolled": []}
-    bible = json.loads(bible_path.read_text(encoding="utf-8"))
+    bible = soft_json(bible_path)
     cast = bible.get("cast_masters") if isinstance(bible.get("cast_masters"), dict) else {}
     done = []
     errors = []
@@ -482,7 +482,7 @@ def audit_keyframes(
     spec_path = root / "film-spec.json"
     if spec_path.is_file():
         try:
-            spec = json.loads(spec_path.read_text(encoding="utf-8"))
+            spec = soft_json(spec_path)
             for sc in spec.get("scenes") or []:
                 if not isinstance(sc, dict):
                     continue
@@ -578,7 +578,7 @@ def _shot_empty_cast(root: Path, shot_id: str) -> bool:
     if not spec_path.is_file():
         return False
     try:
-        spec = json.loads(spec_path.read_text(encoding="utf-8"))
+        spec = soft_json(spec_path)
         for sc in spec.get("scenes") or []:
             for sh in sc.get("shots") or []:
                 if str(sh.get("id")) != shot_id:
@@ -605,7 +605,7 @@ def post_audit_face_status(root: Path) -> dict[str, Any]:
     cast_masters: dict[str, Any] = {}
     if bible_path.is_file():
         try:
-            bible = json.loads(bible_path.read_text(encoding="utf-8"))
+            bible = soft_json(bible_path)
             cm = bible.get("cast_masters")
             if isinstance(cm, dict):
                 cast_masters = cm
