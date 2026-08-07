@@ -26,7 +26,7 @@
 
 1. `aifilm music-director draft --root …` → `audio/music-director-plan.json`
 2. 导演改 plan：`mute_windows`（plate 内错句静音）· `mute_entire`/`lane=silence` · `peak_fix=auto` · BGM `duck_db`
-3. `aifilm music-director apply --root …` → `audio/native_directed/{shot}.wav` + apply 回执
+3. `aifilm music-director set …`（mute 窗）→ `audit` → `apply --root …` → `audio/native_directed/{shot}.wav` + apply 回执
 4. `aifilm music-director review --root …` → 抽听点 / mute 列表 / peak
 5. `aifilm final …` 自动优先 directed stem（仍 XOR 禁叠 Edge）
 

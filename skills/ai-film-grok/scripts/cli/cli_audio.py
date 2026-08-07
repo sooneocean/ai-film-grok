@@ -491,6 +491,29 @@ def add_audio_parsers(sub: argparse._SubParsersAction[argparse.ArgumentParser]) 
         "review", help="Human listen map: mutes, peaks, BGM ducks (no picture retimes)"
     )
     md_review.add_argument("--root", required=True)
+    md_set = md_sub.add_parser(
+        "set",
+        help="Edit one shot in music-director plan (mute window / peak / BGM duck)",
+    )
+    md_set.add_argument("--root", required=True)
+    md_set.add_argument("--shot", required=True, help="shot id")
+    md_set.add_argument(
+        "--mute-window",
+        default=None,
+        help="plate-local START:END seconds, e.g. 1.2:2.0",
+    )
+    md_set.add_argument("--reason", default="wrong_line")
+    md_set.add_argument("--mute-entire", action=argparse.BooleanOptionalAction, default=None)
+    md_set.add_argument("--peak-fix", choices=("auto", "off"), default=None)
+    md_set.add_argument("--gain", type=float, default=None)
+    md_set.add_argument("--lane", choices=("native", "post_tts", "silence"), default=None)
+    md_set.add_argument("--duck-db", type=float, default=None)
+    md_set.add_argument("--energy", type=float, default=None)
+    md_set.add_argument("--mute-bed", action=argparse.BooleanOptionalAction, default=None)
+    md_audit = md_sub.add_parser(
+        "audit", help="Probe native peaks for plan shots; list hot stems"
+    )
+    md_audit.add_argument("--root", required=True)
 
 
 def cmd_audio_plan(args: argparse.Namespace) -> int:
@@ -631,6 +654,43 @@ def cmd_music_director(args: argparse.Namespace) -> int:
             report = build_review(root, plan)
             _emit(report)
             return 0
+        if action == "set":
+            plan = load_plan(root)
+            if plan is None:
+                plan = draft_and_save(root)["plan"]
+            mute_window = None
+            raw_mw = getattr(args, "mute_window", None)
+            if raw_mw:
+                token = str(raw_mw).replace("-", ":", 1) if ":" not in str(raw_mw) else str(raw_mw)
+                parts = token.split(":")
+                if len(parts) != 2:
+                    raise FilmError("--mute-window needs START:END seconds")
+                mute_window = (float(parts[0]), float(parts[1]))
+            from music_director import set_shot_controls
+
+            plan = set_shot_controls(
+                plan,
+                str(args.shot),
+                mute_window=mute_window,
+                mute_reason=str(getattr(args, "reason", None) or "wrong_line"),
+                mute_entire=getattr(args, "mute_entire", None),
+                peak_fix=getattr(args, "peak_fix", None),
+                gain=getattr(args, "gain", None),
+                lane=getattr(args, "lane", None),
+                duck_db=getattr(args, "duck_db", None),
+                energy=getattr(args, "energy", None),
+                mute_bed=getattr(args, "mute_bed", None),
+            )
+            path = save_plan(root, plan)
+            _emit({"ok": True, "path": str(path), "shot": str(args.shot), "plan": plan})
+            return 0
+        if action == "audit":
+            from music_director import audit_native_peaks
+
+            plan = load_plan(root)
+            report = audit_native_peaks(root, plan)
+            _emit(report)
+            return 0 if report.get("ok") else 1
         raise FilmError(f"unknown music-director action: {action}")
     except MusicDirectorError as exc:
         raise FilmError(str(exc)) from exc

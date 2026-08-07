@@ -22,6 +22,11 @@ from music_director import (
     normalize_plan,
     resolve_directed_native_path,
     save_plan,
+    set_shot_controls,
+    apply_light_process_samples,
+    load_audio_samples,
+    discover_native_source,
+    audit_native_peaks,
 )
 
 
@@ -226,3 +231,98 @@ def test_bgm_overlay_and_full_apply(tmp_path: Path) -> None:
     assert row["duck_db"] == -12.0
     spec = json.loads((root / "film-spec.json").read_text(encoding="utf-8"))
     assert spec["shots"][0]["music_cue"]["duck_db"] == -12.0
+
+
+def test_set_shot_controls_adds_mute_window_and_duck() -> None:
+    plan = draft_plan(
+        spec={"shots": [{"id": "s1", "nar": "a", "dialogue_audio_lane": "native"}]}
+    )
+    plan = set_shot_controls(
+        plan,
+        "s1",
+        mute_window=(1.0, 1.5),
+        mute_reason="wrong_line",
+        duck_db=-9.0,
+    )
+    voice = plan["native_voice"]["shots"][0]
+    assert voice["mute_windows"][0]["start_sec"] == 1.0
+    assert voice["mute_windows"][0]["reason"] == "wrong_line"
+    bgm = plan["bgm"]["shots"][0]
+    assert bgm["duck_db"] == -9.0
+
+
+def test_discover_prefers_clips_media(tmp_path: Path) -> None:
+    root = tmp_path / "film"
+    clips = root / "clips"
+    clips.mkdir(parents=True)
+    # tiny silent wav as "clip" media
+    import wave
+    import numpy as np
+
+    wav = clips / "s9.wav"
+    pcm = (np.zeros(800, dtype=np.float32) * 0).astype(np.int16)
+    # write via wave
+    with wave.open(str(wav), "wb") as wf:
+        wf.setnchannels(1)
+        wf.setsampwidth(2)
+        wf.setframerate(8000)
+        wf.writeframes(pcm.tobytes())
+    hit = discover_native_source(root, "s9")
+    assert hit == wav
+
+
+def test_light_process_removes_dc_offset() -> None:
+    import numpy as np
+
+    sr = 1000
+    samples = np.ones(sr, dtype=np.float32) * 0.2  # DC
+    out = apply_light_process_samples(samples, sr)
+    assert abs(float(np.mean(out))) < 0.05
+
+
+def test_load_audio_samples_wav(tmp_path: Path) -> None:
+    import numpy as np
+    import wave
+
+    path = tmp_path / "t.wav"
+    sr = 8000
+    pcm = (np.linspace(-0.5, 0.5, sr) * 32767).astype(np.int16)
+    with wave.open(str(path), "wb") as wf:
+        wf.setnchannels(1)
+        wf.setsampwidth(2)
+        wf.setframerate(sr)
+        wf.writeframes(pcm.tobytes())
+    samples, out_sr, meta = load_audio_samples(path)
+    assert out_sr == sr
+    assert meta["decode"] == "wav"
+    assert len(samples) == sr
+
+
+def test_audit_marks_hot_peak(tmp_path: Path) -> None:
+    import json
+    import numpy as np
+    import wave
+
+    root = tmp_path / "film"
+    native = root / "audio" / "native"
+    native.mkdir(parents=True)
+    sr = 4000
+    hot = (np.ones(sr, dtype=np.float32) * 0.99)
+    pcm = (hot * 32767).astype(np.int16)
+    with wave.open(str(native / "h1.wav"), "wb") as wf:
+        wf.setnchannels(1)
+        wf.setsampwidth(2)
+        wf.setframerate(sr)
+        wf.writeframes(pcm.tobytes())
+    (root / "film-spec.json").write_text(
+        json.dumps(
+            {
+                "audio_policy": "prefer_native",
+                "shots": [{"id": "h1", "nar": "hi", "dialogue_audio_lane": "native"}],
+            }
+        ),
+        encoding="utf-8",
+    )
+    plan = draft_plan(root=root)
+    rep = audit_native_peaks(root, plan)
+    assert "h1" in rep["hot_shot_ids"]

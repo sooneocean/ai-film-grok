@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.41.10] - 2026-08-07
+
+### Added (Music Director R2 · production harden)
+- **ffmpeg decode** for non-wav native sources (mp3/m4a/mp4/clips) via `load_audio_samples`.
+- **discover** expands to `clips/` + manifest clip paths.
+- **light process** on apply (DC + ~80Hz highpass; no agate).
+- **CLI** `music-director set` (mute window/entire, duck, peak) · `audit` (hot peak probe).
+- Tests extended in `test_music_director_plan.py`.
+
+
 ## [2.41.9] - 2026-08-07
 
 ### Changed (monolith W2–W4 peels)

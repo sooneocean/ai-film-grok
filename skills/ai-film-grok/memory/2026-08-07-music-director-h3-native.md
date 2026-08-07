@@ -5,13 +5,14 @@
 ## 三句
 
 1. **prefer_native** 主链：错台词 v1 = **音频 mute**（时间窗或整镜 silence），画面不动。
-2. 单一真相：`audio/music-director-plan.json` → apply → `audio/native_directed/` + final 自动读。
-3. 爆音：`peak_fix=auto` + true-peak 上限；轻处理默认仍禁狠 gate。
+2. 单一真相：`audio/music-director-plan.json` → set/audit → apply → `audio/native_directed/` + final 自动读。
+3. 爆音：`peak_fix=auto` + true-peak；apply 默认 light 处理；非 wav（mp4/m4a）经 ffmpeg 解码。
 
 ## 清单
 
 - [ ] draft plan
-- [ ] 写 mute_windows / duck_db
+- [ ] `set --mute-window` / duck / mute-entire
+- [ ] `audit` 看 hot 镜
 - [ ] apply
 - [ ] review 抽听
 - [ ] final

@@ -21,3 +21,14 @@
 - stems：`audio/native_directed/{shot_id}.wav`
 - receipt：`receipts/music-director-apply.json`
 - final：`resolve_directed_native_path` + BGM overlay on `shot_dicts`
+
+## R2（2026-08-07 next round）
+
+| 项 | 状态 |
+|----|------|
+| ffmpeg 解码 mp3/m4a/mp4 | SHIPPED `load_audio_samples` |
+| clips/manifest 发现源 | SHIPPED `discover_native_source` |
+| light process | SHIPPED（禁 agate） |
+| CLI set / audit | SHIPPED |
+| ASR 自动判错句 | residual |
+| 画面剪 | residual editor_cut |

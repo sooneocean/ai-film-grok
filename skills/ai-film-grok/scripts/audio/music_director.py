@@ -10,6 +10,7 @@ Single source of truth: ``audio/music-director-plan.json``.
 from __future__ import annotations
 
 import json
+import tempfile
 import wave
 from copy import deepcopy
 from pathlib import Path
@@ -433,37 +434,58 @@ def apply_bgm_to_shots(shots: list[dict[str, Any]], plan: dict[str, Any]) -> int
 
 
 def discover_native_source(root: Path, shot_id: str) -> Path | None:
-    """Find registered or conventional native audio for one shot."""
+    """Find registered or conventional native audio for one shot.
+
+    Order: audio/native → native/ → manifest.native_audio → clips media.
+    """
     root = Path(root).expanduser().resolve()
-    candidates = [
-        root / "audio" / "native" / f"{shot_id}.wav",
-        root / "audio" / "native" / f"{shot_id}.mp3",
-        root / "audio" / "native" / f"{shot_id}.m4a",
-        root / "native" / f"{shot_id}.wav",
-    ]
+    candidates: list[Path] = []
+    for folder in (root / "audio" / "native", root / "native", root / "clips"):
+        for ext in (".wav", ".mp3", ".m4a", ".aac", ".flac", ".mp4", ".mov", ".webm"):
+            candidates.append(folder / f"{shot_id}{ext}")
     for path in candidates:
         if path.is_file():
             return path
     manifest_path = root / "manifest.json"
-    if manifest_path.is_file():
-        man = read_json(manifest_path)
-        if isinstance(man, dict):
-            clips = man.get("clips") or {}
-            rec = clips.get(shot_id) if isinstance(clips, dict) else None
-            if isinstance(rec, dict):
-                na = rec.get("native_audio")
-                if isinstance(na, dict) and na.get("path"):
-                    rel = str(na["path"])
-                    for base in (root / "audio" / "native", root / "native", root):
-                        cand = (base / rel).resolve() if not Path(rel).is_absolute() else Path(rel)
-                        try:
-                            if cand.is_file() and str(cand).startswith(str(root)):
-                                return cand
-                        except OSError:
-                            continue
-                    abs_cand = Path(rel)
-                    if abs_cand.is_file():
-                        return abs_cand
+    if not manifest_path.is_file():
+        return None
+    man = read_json(manifest_path)
+    if not isinstance(man, dict):
+        return None
+    clips = man.get("clips") or {}
+    rec = clips.get(shot_id) if isinstance(clips, dict) else None
+    if not isinstance(rec, dict):
+        return None
+
+    def _resolve_rel(rel: str) -> Path | None:
+        rel = str(rel)
+        if Path(rel).is_absolute() and Path(rel).is_file():
+            return Path(rel)
+        for base in (
+            root / "audio" / "native",
+            root / "native",
+            root / "clips",
+            root / "audio",
+            root,
+        ):
+            cand = (base / rel).resolve()
+            try:
+                if cand.is_file() and str(cand).startswith(str(root)):
+                    return cand
+            except OSError:
+                continue
+        return None
+
+    na = rec.get("native_audio")
+    if isinstance(na, dict) and na.get("path"):
+        hit = _resolve_rel(str(na["path"]))
+        if hit is not None:
+            return hit
+    for key in ("path", "file", "clip", "video", "mp4"):
+        if rec.get(key):
+            hit = _resolve_rel(str(rec[key]))
+            if hit is not None:
+                return hit
     return None
 
 
@@ -476,11 +498,102 @@ def _read_wav(path: Path) -> tuple[np.ndarray, int, int]:
         nframes = wf.getnframes()
         raw = wf.readframes(nframes)
     if sw != 2:
-        raise MusicDirectorError(f"only 16-bit PCM wav supported for apply: {path}")
+        raise MusicDirectorError(f"only 16-bit PCM wav supported without ffmpeg: {path}")
     data = np.frombuffer(raw, dtype=np.int16).astype(np.float32) / 32768.0
     if nch > 1:
         data = data.reshape(-1, nch).mean(axis=1)
     return data, int(sr), int(nch)
+
+
+def _ffmpeg_decode_to_wav(source: Path, dest: Path, *, sr: int = 48000) -> Path:
+    """Decode any ffmpeg-readable media to mono s16le wav."""
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    from util.subprocess import run_ffmpeg
+
+    run_ffmpeg(
+        [
+            "ffmpeg",
+            "-y",
+            "-i",
+            str(source),
+            "-vn",
+            "-ac",
+            "1",
+            "-ar",
+            str(int(sr)),
+            "-c:a",
+            "pcm_s16le",
+            str(dest),
+        ],
+        check=True,
+    )
+    if not dest.is_file():
+        raise MusicDirectorError(f"ffmpeg failed to decode audio from {source}")
+    return dest
+
+
+def load_audio_samples(
+    path: Path,
+    *,
+    work_dir: Path | None = None,
+    target_sr: int = 48000,
+) -> tuple[np.ndarray, int, dict[str, Any]]:
+    """Load mono float samples from wav or any ffmpeg media.
+
+    Returns (samples, sr, meta) where meta notes decode path.
+    """
+    path = Path(path)
+    meta: dict[str, Any] = {"source": str(path), "decode": "wav"}
+    if path.suffix.lower() == ".wav":
+        try:
+            samples, sr, nch = _read_wav(path)
+            meta["channels_src"] = nch
+            return samples, sr, meta
+        except (MusicDirectorError, wave.Error, EOFError) as exc:
+            meta["wav_direct_error"] = str(exc)[:160]
+    # ffmpeg path for mp3/m4a/mp4/video or broken wav
+    tmp_root = Path(work_dir) if work_dir is not None else path.parent
+    tmp_root.mkdir(parents=True, exist_ok=True)
+    tmp = tmp_root / f"_md_decode_{path.stem}_{abs(hash(str(path))) % 10_000_000}.wav"
+    try:
+        _ffmpeg_decode_to_wav(path, tmp, sr=target_sr)
+        samples, sr, nch = _read_wav(tmp)
+        meta.update({"decode": "ffmpeg", "channels_src": nch, "decoded_wav": str(tmp)})
+        return samples, sr, meta
+    except Exception as exc:  # noqa: BLE001
+        raise MusicDirectorError(f"cannot load audio from {path}: {exc}") from exc
+    finally:
+        # keep decoded temp only if work_dir provided for audit; else delete
+        if work_dir is None and tmp.is_file():
+            try:
+                tmp.unlink()
+            except OSError:
+                pass
+
+
+def apply_light_process_samples(samples: np.ndarray, sr: int) -> np.ndarray:
+    """Mild H3-native-aligned cleanup without agate / dual arnndn.
+
+    - DC remove
+    - simple 1-pole highpass ~80Hz
+    - soft clip guard (does not replace peak_fix)
+    """
+    if samples.size == 0:
+        return samples
+    out = samples.astype(np.float32).copy()
+    out = out - float(np.mean(out))
+    # one-pole highpass ~80 Hz
+    fc = 80.0
+    x = float(np.exp(-2.0 * np.pi * fc / max(float(sr), 1.0)))
+    y = 0.0
+    prev = 0.0
+    hp = np.empty_like(out)
+    for i, s in enumerate(out):
+        y = x * (y + s - prev)
+        prev = s
+        hp[i] = y
+    # soft ceiling only (peak_fix still owns true-peak policy)
+    return np.clip(hp, -0.98, 0.98)
 
 
 def _write_wav_mono(path: Path, samples: np.ndarray, sr: int) -> None:
@@ -594,7 +707,8 @@ def apply_native_voice_plan(
             shot_rows.append(entry)
             continue
         try:
-            samples, sr, _nch = _read_wav(source)
+            work = root / "audio" / "_music_director_work"
+            samples, sr, decode_meta = load_audio_samples(source, work_dir=work)
         except MusicDirectorError as exc:
             entry["status"] = "read_error"
             entry["error"] = str(exc)
@@ -603,6 +717,9 @@ def apply_native_voice_plan(
             shot_rows.append(entry)
             continue
         source_sha = sha256_file(source)
+        process = str(plan["native_voice"].get("default_process") or "light")
+        if process == "light":
+            samples = apply_light_process_samples(samples, sr)
         muted = apply_mute_windows_samples(
             samples,
             sr,
@@ -616,6 +733,7 @@ def apply_native_voice_plan(
             peak_fix=str(row["peak_fix"]),
             limiter=float(peak_pol["limiter"]),
         )
+        peak_meta = {**peak_meta, "decode": decode_meta.get("decode"), "process": process}
         dest = directed_stem_path(root, sid)
         if not dry_run:
             _write_wav_mono(dest, fixed, sr)
@@ -846,6 +964,129 @@ def build_review(root: Path, plan: dict[str, Any] | None = None) -> dict[str, An
         "wrong_line_policy": "audio_mute_v1",
     }
 
+
+
+
+def set_shot_controls(
+    plan: dict[str, Any],
+    shot_id: str,
+    *,
+    mute_window: tuple[float, float] | None = None,
+    mute_reason: str = "wrong_line",
+    mute_entire: bool | None = None,
+    peak_fix: str | None = None,
+    gain: float | None = None,
+    lane: str | None = None,
+    duck_db: float | None = None,
+    energy: float | None = None,
+    mute_bed: bool | None = None,
+) -> dict[str, Any]:
+    """Director convenience: mutate one shot in plan (native + optional BGM)."""
+    plan = normalize_plan(plan)
+    sid = str(shot_id).strip()
+    if not sid:
+        raise MusicDirectorError("shot_id required")
+    voice_by = {r["shot_id"]: dict(r) for r in plan["native_voice"]["shots"]}
+    row = voice_by.get(sid) or {
+        "shot_id": sid,
+        "lane": "native",
+        "gain": 1.0,
+        "peak_fix": "auto",
+        "mute_windows": [],
+        "mute_entire": False,
+        "reason": "director_set",
+        "caption_policy": "keep_chinese",
+    }
+    if mute_window is not None:
+        start, end = float(mute_window[0]), float(mute_window[1])
+        wins = list(row.get("mute_windows") or [])
+        wins.append(
+            {
+                "start_sec": start,
+                "end_sec": end,
+                "reason": mute_reason,
+                "source": "director",
+            }
+        )
+        row["mute_windows"] = wins
+    if mute_entire is not None:
+        row["mute_entire"] = bool(mute_entire)
+        if row["mute_entire"]:
+            row["lane"] = "silence"
+    if peak_fix is not None:
+        row["peak_fix"] = peak_fix
+    if gain is not None:
+        row["gain"] = float(gain)
+    if lane is not None:
+        row["lane"] = lane
+    if mute_reason and mute_window is not None:
+        row["reason"] = mute_reason
+    voice_by[sid] = row
+    plan["native_voice"]["shots"] = list(voice_by.values())
+
+    if any(v is not None for v in (duck_db, energy, mute_bed)):
+        bgm_by = {r["shot_id"]: dict(r) for r in plan["bgm"]["shots"]}
+        brow = bgm_by.get(sid) or {
+            "shot_id": sid,
+            "mood": plan["bgm"]["default_mood"],
+            "energy": 0.55,
+            "duck_db": 0.0,
+            "mute_bed": False,
+        }
+        if duck_db is not None:
+            brow["duck_db"] = float(duck_db)
+        if energy is not None:
+            brow["energy"] = float(energy)
+        if mute_bed is not None:
+            brow["mute_bed"] = bool(mute_bed)
+        bgm_by[sid] = brow
+        plan["bgm"]["shots"] = list(bgm_by.values())
+    plan["source"] = "director"
+    return normalize_plan(plan)
+
+
+def audit_native_peaks(root: Path, plan: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Probe max peak per discovered source; suggest listen points for hot stems."""
+    root = Path(root).expanduser().resolve()
+    plan = normalize_plan(plan if plan is not None else (load_plan(root) or draft_plan(root=root)))
+    thr = float(plan["native_voice"]["peak_policy"]["true_peak_dbtp"])
+    rows: list[dict[str, Any]] = []
+    listen: list[float] = []
+    work = root / "audio" / "_music_director_work"
+    for row in plan["native_voice"]["shots"]:
+        sid = row["shot_id"]
+        src = discover_native_source(root, sid)
+        if src is None:
+            rows.append({"shot_id": sid, "status": "missing_source"})
+            continue
+        try:
+            samples, sr, meta = load_audio_samples(src, work_dir=work)
+            peak = _max_dbfs(samples)
+            hot = peak > thr
+            item = {
+                "shot_id": sid,
+                "status": "ok",
+                "source": str(src),
+                "peak_dbfs": round(peak, 3),
+                "hot": hot,
+                "threshold_dbtp": thr,
+                "decode": meta.get("decode"),
+                "duration_sec": round(len(samples) / float(sr), 3) if sr else 0.0,
+            }
+            rows.append(item)
+            if hot:
+                listen.append(0.0)  # plate-local; review maps by shot
+        except MusicDirectorError as exc:
+            rows.append({"shot_id": sid, "status": "error", "error": str(exc)[:200]})
+    hot_ids = [r["shot_id"] for r in rows if r.get("hot")]
+    return {
+        "schema": "aifilm-music-director-audit-v1",
+        "ok": all(r.get("status") in {"ok", "missing_source"} for r in rows),
+        "true_peak_dbtp": thr,
+        "hot_shot_ids": hot_ids,
+        "shots": rows,
+        "suggest_peak_fix_auto": hot_ids,
+    }
 
 def draft_and_save(root: Path) -> dict[str, Any]:
     plan = draft_plan(root=root)
