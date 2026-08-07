@@ -6,8 +6,8 @@ runtime.  It never downloads a model or substitutes another provider.
 
 Required local configuration::
 
-  COSYVOICE_ROOT=/Users/dex/Developer/CosyVoice
-  COSYVOICE_MODEL_DIR=/Users/dex/Developer/CosyVoice/pretrained_models/Fun-CosyVoice3-0.5B-hf
+  COSYVOICE_ROOT=$HOME/Developer/CosyVoice
+  COSYVOICE_MODEL_DIR=$HOME/Developer/CosyVoice/pretrained_models/Fun-CosyVoice3-0.5B-hf
   COSYVOICE_MODE=zero_shot
   COSYVOICE_REF_WAV=/absolute/path/to/licensed-reference.wav
   COSYVOICE_PROMPT_TEXT='reference transcript'

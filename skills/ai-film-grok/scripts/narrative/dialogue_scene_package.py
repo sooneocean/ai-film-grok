@@ -30,12 +30,6 @@ REQUIRED_LINE_KEYS = frozenset(
 )
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 _MAX_EVIDENCE_BYTES = 512 * 1024 * 1024
-_FFPROBE_CANDIDATES = (
-    Path("/opt/homebrew/bin/ffprobe"),
-    Path("/home/linuxbrew/.linuxbrew/bin/ffprobe"),
-    Path("/usr/local/bin/ffprobe"),
-    Path("/usr/bin/ffprobe"),
-)
 
 
 def _shots(spec: dict[str, Any]) -> list[dict[str, Any]]:
@@ -61,14 +55,9 @@ def _fd_sha256(file_fd: int) -> str | None:
 
 
 def _ffprobe_path() -> Path | None:
-    for candidate in _FFPROBE_CANDIDATES:
-        try:
-            resolved = candidate.resolve(strict=True)
-        except OSError:
-            continue
-        if resolved.is_file() and os.access(resolved, os.X_OK):
-            return resolved
-    return None
+    from util.paths import resolve_tool
+
+    return resolve_tool("ffprobe")
 
 
 def _probe_media_fd(file_fd: int, expected: str) -> bool:

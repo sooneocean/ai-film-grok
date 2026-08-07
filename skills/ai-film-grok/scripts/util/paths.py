@@ -62,3 +62,35 @@ def first_existing_file(*candidates: Path) -> Path | None:
         if resolved.is_file():
             return resolved
     return None
+
+
+def resolve_tool(name: str) -> Path | None:
+    """Locate an executable on PATH / brew / system bindirs (C5.6).
+
+    Prefer ``shutil.which`` so caller PATH wins; fall back to known brew/system
+    locations **only when those directories exist**. Never returns a non-existent path.
+    """
+    import os
+    import shutil
+
+    tool = str(name or "").strip()
+    if not tool or "/" in tool or tool in {".", ".."}:
+        return None
+    which = shutil.which(tool)
+    if which:
+        try:
+            resolved = Path(which).resolve(strict=True)
+        except OSError:
+            resolved = None
+        if resolved is not None and resolved.is_file() and os.access(resolved, os.X_OK):
+            return resolved
+    candidates: list[Path] = []
+    hb = homebrew_bin()
+    if hb:
+        candidates.append(Path(hb) / tool)
+    for base in ("/usr/local/bin", "/usr/bin", "/bin"):
+        candidates.append(Path(base) / tool)
+    found = first_existing_file(*candidates)
+    if found is not None and os.access(found, os.X_OK):
+        return found
+    return None

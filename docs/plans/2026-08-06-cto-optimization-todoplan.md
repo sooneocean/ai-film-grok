@@ -4,7 +4,7 @@
 
 | 项 | 本机探针（2026-08-06 · plugins checkout） |
 |----|------------------------------------------|
-| 版本 | `plugin.json` **2.40.79**（C5.5 subprocess timeout · 本轮） |
+| 版本 | `plugin.json` **2.40.81**（C5.6 path externalization · 本轮） |
 | 源码 | scripts **~688** `.py` / **~170k** LOC |
 | 巨石函数 ≥200 行 | **74**；最大 `render_final` **2456** / `validate_film_spec` **2322** / `run_preflight` **1937** / `build_dispatch` **1249** |
 | 顶层模块 | ~349（约 **256** 薄 shim + ~**93** 仍厚） |
@@ -183,7 +183,7 @@
 | **C5.3** | **JSON I/O 唯一入口** | 删本地 `read_json` 副本；`util.read_json` / `require_json` | grep 无新副本 | ✅ 2.40.77 facades + contract test |
 | **C5.4** | **except Exception 纪律** | 必须 log+重抛或显式 partial；CR blocker | REVIEW_CHECKLIST 一条 | ✅ 2.40.76 checklist |
 | **C5.5** | **subprocess timeout 触达补** | 不扫全仓 150 处；改到哪补到哪 | 触达点有 timeout | ✅ 2.40.79 util None→60 + contract |
-| **C5.6** | **路径外部化** | 禁硬编码 `/Users/dex` `/opt/homebrew` | 0 生产路径硬编码 |
+| **C5.6** | **路径外部化** | 禁硬编码 `/Users/dex` `/opt/homebrew` | 0 生产路径硬编码 | ✅ 2.40.81 resolve_tool + contract |
 
 ---
 
@@ -252,7 +252,7 @@
 | 4 | 真片 ship-prep 人链 / 诚实 PARTIAL | A2 | **P0** · honesty-rail R0–R5 CLOSED 2.40.75（skip 触达 + closeout PARTIAL） |
 | 5 | 5090 drain 或 OPEN_OPS | B3 | **P0 ops** · eng-day canary OPEN_OPS ✅ 2.40.76 round2 |
 | 6 | 触达式 peel：final / validate / preflight | C4 | **P1** |
-| 7 | logging + FilmError + JSON I/O 增量 | C5 | **P1** · C5.1–C5.5 ✅ 2.40.79 · 余 C5.6 路径 |
+| 7 | logging + FilmError + JSON I/O 增量 | C5 | **P1** · C5.1–C5.6 ✅ 2.40.81 |
 | 8 | legacy 迁 5–10/周 + 基座测 | C6 | **P1** · C6.1 empty ✅ · C6.4 ✅ 2.40.78–80 · 余 C6.5 mypy |
 | 9 | CI 版本指针 + mypy 扩 | D7 | **P1** |
 | 10 | subprocess timeout 触达补 | C5.5 | **P1** · ✅ 2.40.79 util/compose default |

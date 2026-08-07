@@ -34,7 +34,7 @@
     },
     {
       "path": "scripts/adapters/cosyvoice_local_tts.py",
-      "sha256": "4d82504030f1f16030ffb38ccac19893cda3b9a200f0493ff32c7f90a7155b03"
+      "sha256": "c3ca32dbc54a1d6e18182ececbdc8ff094b7604a6dcf4233da9fef904290a39d"
     },
     {
       "path": "scripts/adapters/cosyvoice_tts.py",
@@ -78,7 +78,7 @@
     },
     {
       "path": "scripts/adapters/piper_local_tts.py",
-      "sha256": "605a04ba81e60cb0e7486e705dfb1e0d4a47241878f870ccd8ddb2d45c872adb"
+      "sha256": "36b8b5c4f77e062228a18a36fe740aebb7b8157d0c749a30349070ec5587758e"
     },
     {
       "path": "scripts/adapters/qwen3_tts.py",
@@ -1726,7 +1726,7 @@
     },
     {
       "path": "scripts/media/h3_workflow.py",
-      "sha256": "0a38e6249599dfd3486ab31158436dd4eedf3c8b44625989d73828dccc6bdba6"
+      "sha256": "c1bf4dc223d66c5ac00d1380c5543a734c6b6a40df18b6b14de596db5e502c67"
     },
     {
       "path": "scripts/media/i2v_motion_gate.py",
@@ -1958,7 +1958,7 @@
     },
     {
       "path": "scripts/narrative/dialogue_scene_package.py",
-      "sha256": "d70e6aed2f14cfa07b7e6f7480d16ab5ad2f678d4fca4b6c19cddfbb23e132b0"
+      "sha256": "2fffa2b27d684b96a03b930be760cf509dd6d19af79c3ddea20fe2f4285f43fc"
     },
     {
       "path": "scripts/narrative/dialogue_screenplay.py",
@@ -3102,7 +3102,7 @@
     },
     {
       "path": "scripts/util/paths.py",
-      "sha256": "539651009d5f07163ec8680c8392f1a57497f8bc336713dcc1f06b76197935fe"
+      "sha256": "b1df30d97be3173cf9a40c9bce18e182eae281608d71af9145e823ddaca5314b"
     },
     {
       "path": "scripts/util/retry.py",

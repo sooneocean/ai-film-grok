@@ -23,12 +23,6 @@ DEFAULT_VOICE = "zh_CN-chaowen-medium"
 DEFAULT_BINARY = (
     Path(__file__).resolve().parents[4] / ".local-runtimes" / "piper-mac" / "bin" / "piper"
 )
-_FFMPEG_CANDIDATES = (
-    Path("/opt/homebrew/bin/ffmpeg"),
-    Path("/home/linuxbrew/.linuxbrew/bin/ffmpeg"),
-    Path("/usr/local/bin/ffmpeg"),
-    Path("/usr/bin/ffmpeg"),
-)
 
 
 def _contains_symlink(path: Path) -> bool:
@@ -87,14 +81,12 @@ def _subprocess_env() -> dict[str, str]:
 
 
 def _ffmpeg_path() -> Path:
-    for candidate in _FFMPEG_CANDIDATES:
-        try:
-            resolved = candidate.resolve(strict=True)
-        except OSError:
-            continue
-        if resolved.is_file() and os.access(resolved, os.X_OK):
-            return resolved
-    raise PiperError("PIPER_FFMPEG_UNAVAILABLE")
+    from util.paths import resolve_tool
+
+    found = resolve_tool("ffmpeg")
+    if found is None:
+        raise PiperError("PIPER_FFMPEG_UNAVAILABLE")
+    return found
 
 
 def _open_output_parent(out: Path) -> tuple[Path, int]:

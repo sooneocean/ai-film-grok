@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.40.81] - 2026-08-07
+
+### Changed (CTO C5.6 path externalization)
+- **`util.paths.resolve_tool`:** portable tool lookup via `shutil.which` + existing brew/system bindirs.
+- **Migrated:** `dialogue_scene_package` · `piper_local_tts` off hardcoded brew tool paths.
+- **Docs:** `cosyvoice_local_tts` examples use `$HOME/...` (no `/Users/dex`).
+- **Contract tests:** `test_c5_path_externalization` + `resolve_tool` units.
+
 ## [2.40.80] - 2026-08-07
 
 ### Added (CTO C6.4 base contracts · config_loader + core.gates)

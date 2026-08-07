@@ -42,3 +42,24 @@ def test_first_existing_file_picks_real_then_none():
     # returns the resolved (symlink-normalized) existing path
     assert P.first_existing_file(Path("/nope/missing"), real) == real.resolve()
     assert P.first_existing_file(Path("/nope/a"), Path("/nope/b")) is None
+
+
+def test_resolve_tool_finds_shutil_which(monkeypatch, tmp_path: Path):
+    import shutil
+    import util.paths as P
+
+    fake = tmp_path / "ffprobe"
+    fake.write_text("#!/bin/sh\n", encoding="utf-8")
+    fake.chmod(0o755)
+    monkeypatch.setattr(shutil, "which", lambda name: str(fake) if name == "ffprobe" else None)
+    got = P.resolve_tool("ffprobe")
+    assert got is not None
+    assert got.resolve() == fake.resolve()
+
+
+def test_resolve_tool_rejects_path_injection():
+    import util.paths as P
+
+    assert P.resolve_tool("../ffprobe") is None
+    assert P.resolve_tool("") is None
+    assert P.resolve_tool("ffprobe/../x") is None
