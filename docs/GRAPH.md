@@ -337,7 +337,6 @@ flowchart TD
 - `skills/ai-film-grok/tests/test_motion_plan.py`
 - `skills/ai-film-grok/tests/test_motion_prompt_spine.py`
 - `skills/ai-film-grok/tests/test_music_cue.py`
-- `skills/ai-film-grok/tests/test_music_director_plan.py`
 - `skills/ai-film-grok/tests/test_music_editor.py`
 - `skills/ai-film-grok/tests/test_music_spotting_verify.py`
 - `skills/ai-film-grok/tests/test_music_template.py`
