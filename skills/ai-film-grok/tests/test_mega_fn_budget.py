@@ -20,7 +20,6 @@ ALLOWLIST: frozenset[tuple[str, str]] = frozenset(
         # P0 orchestrators (Wave 1–3 targets)
         # validate_film_spec peeled under budget (W2) — residual body leaf allowlisted
         ("plan/film_spec_validate_body.py", "apply_bgm_shots_and_edit_body"),
-        ("gates/preflight.py", "run_preflight"),
         # Secondary mega-fns discovered 2026-08-07 probe (Wave 6 watch)
         ("post/closeout.py", "closeout_status"),
         ("spine/dispatch.py", "build_dispatch"),
@@ -101,7 +100,6 @@ def test_no_new_mega_functions_without_allowlist() -> None:
     # Known P0 mega-fns / peel targets must still be present (don't silently delete)
     for required in (
         ("plan/film_spec_validate_body.py", "apply_bgm_shots_and_edit_body"),
-        ("gates/preflight.py", "run_preflight"),
     ):
         assert required in ALLOWLIST
         path = SCRIPTS / required[0]
