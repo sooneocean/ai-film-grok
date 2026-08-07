@@ -584,6 +584,188 @@ def _build_base_imd(
     return open_body
 
 
+
+_REF_DUTY = {
+    "identity": "identity lock (same face, hair, body)",
+    "style": "style and medium lock",
+    "pose": "end pose / composition land target (last frame)",
+    "wardrobe_state": "wardrobe and body state",
+    "contact": "contact / detail insert",
+    "last": "end pose land target (last frame)",
+    "last_as_pose_ref": "end pose land target (last frame)",
+    "end": "end pose land target (last frame)",
+    "first": "start frame identity (first frame)",
+    "face": "face identity lock",
+    "cast": "cast identity lock",
+    "reference": "subject reference",
+}
+
+
+def _ref_role(ref: dict[str, Any]) -> str:
+    return str(ref.get("role") or ref.get("source") or "reference").strip().lower()
+
+
+def _ref_duty(role: str) -> str:
+    return _REF_DUTY.get(role, "subject reference")
+
+
+def _merge_official_refs(
+    shot: dict[str, Any],
+    refs: list[dict[str, Any]] | None = None,
+) -> list[dict[str, Any]]:
+    """Deep-merge explicit refs + shot.media_pack + dsl/h3 ref hints (P2)."""
+    out: list[dict[str, Any]] = []
+    seen_paths: set[str] = set()
+
+    def _add(item: dict[str, Any]) -> None:
+        if not isinstance(item, dict):
+            return
+        p = str(item.get("path") or item.get("url") or "").strip()
+        key = p or f"{_ref_role(item)}:{item.get('label') or item.get('id') or len(out)}"
+        if key in seen_paths:
+            return
+        seen_paths.add(key)
+        out.append(dict(item))
+
+    for r in refs or []:
+        if isinstance(r, dict):
+            _add(r)
+        elif r:
+            _add({"path": str(r), "role": "reference"})
+
+    pack = shot.get("media_pack") if isinstance(shot.get("media_pack"), dict) else {}
+    for r in pack.get("refs") or []:
+        if isinstance(r, dict):
+            _add(r)
+    last = pack.get("last") if isinstance(pack.get("last"), dict) else None
+    if last and last.get("path"):
+        _add({**last, "role": last.get("role") or "pose", "source": last.get("source") or "media_pack_last"})
+    first = pack.get("first") if isinstance(pack.get("first"), dict) else None
+    if first and first.get("path"):
+        # first is Picture 1 anchor — keep as first role if not already present
+        _add({**first, "role": first.get("role") or "first", "source": first.get("source") or "media_pack_first"})
+
+    dsl = shot.get("dsl") if isinstance(shot.get("dsl"), dict) else {}
+    for key in ("h3_refs", "r2v_refs", "reference_images"):
+        blob = shot.get(key) or dsl.get(key)
+        if isinstance(blob, list):
+            for r in blob:
+                if isinstance(r, dict):
+                    _add(r)
+                elif r:
+                    _add({"path": str(r), "role": "reference"})
+    # path-only last/end stills on shot
+    for key, role in (
+        ("last_frame", "pose"),
+        ("end_still", "pose"),
+        ("last_path", "pose"),
+        ("pose_ref", "pose"),
+    ):
+        raw = shot.get(key) or dsl.get(key)
+        if raw:
+            _add({"path": str(raw), "role": role, "source": key})
+    return out
+
+
+def _env_light_bits(shot: dict[str, Any]) -> str:
+    dsl = shot.get("dsl") if isinstance(shot.get("dsl"), dict) else {}
+    bits: list[str] = []
+    for k in ("location", "setting", "environment", "scene", "place"):
+        v = str(dsl.get(k) or shot.get(k) or "").strip()
+        if v:
+            bits.append(v)
+            break
+    for k in ("lighting", "light", "time_of_day"):
+        v = str(dsl.get(k) or shot.get(k) or "").strip()
+        if v:
+            bits.append(f"lighting: {v}")
+            break
+    if not bits:
+        bits.append("the same continuous environment as the opening reference")
+    return "; ".join(bits)
+
+
+def _densify_ref_detailed(
+    shot: dict[str, Any],
+    *,
+    style: str,
+    size: str,
+    subject: str,
+    action: str,
+    cam: str,
+    dlg: str,
+    duration_sec: float,
+    has_picture2: bool,
+) -> str:
+    """Aim for GUIDE-like dense detailed_description (soft target ~120–350 words)."""
+    tier = _tier(shot)
+    env = _env_light_bits(shot)
+    wardrobe = str(
+        shot.get("wardrobe_state")
+        or (shot.get("dsl") or {}).get("wardrobe_state")
+        or ""
+    ).strip()
+    wardrobe_bit = (
+        f" Wardrobe state stays {wardrobe} with no re-dress after undress."
+        if wardrobe
+        else " Wardrobe, hair, and accessories stay locked to the reference."
+    )
+    beats = [
+        (
+            f"The target video uses a {style} look with consistent color grading and "
+            f"stable key light across the full {duration_sec:.1f}s. "
+        ),
+        (
+            f"[Shot 1] {size} opens on <Subject 1> ({subject}) from <Picture 1> inside "
+            f"{env}. {cam} as {action}. "
+        ),
+        (
+            "Composition stays explicit about subject scale in frame, eye-line, "
+            "hand/limb positions, and background depth; every half-second shows a "
+            "readable body or fabric change rather than a frozen portrait. "
+        ),
+    ]
+    if tier == "high":
+        beats.append(
+            "HIGH-ENERGY path: weight shifts, torso torque, grip changes, hair and cloth "
+            "inertia, and silhouette evolution remain continuous without idle holds. "
+        )
+    elif tier == "soft":
+        beats.append(
+            "SOFT path: micro blinks, breath lifts the chest, tiny head sway and hair "
+            "drift keep life in the frame without large pose jumps. "
+        )
+    else:
+        beats.append(
+            "MEDIUM path: natural weight transfer and small head/hand adjustments "
+            "punctuate the action so motion never stalls mid-clip. "
+        )
+    if dlg:
+        if "(S1)" in dlg and not dlg.strip().startswith("<Subject"):
+            dlg_body = re.sub(r"^.*? \(S1\)", "<Subject 1> (S1)", dlg, count=1)
+            beats.append(f"{dlg_body}. ")
+        elif "(S1)" in dlg:
+            beats.append(f"{dlg}. ")
+        else:
+            beats.append(f"<Subject 1> (S1) {dlg}. ")
+    else:
+        beats.append(
+            "No on-screen speech; diegetic physical sounds and fabric foley follow "
+            "the visible events only. "
+        )
+    beats.append(wardrobe_bit + " ")
+    if has_picture2:
+        beats.append(
+            "Motion continuously approaches the landing pose, spacing, and composition "
+            "established by <Picture 2>, with intermediate poses remaining observable. "
+        )
+    beats.append(
+        "The final moments resolve into a clear ending pose and composition without "
+        "freezing mid-action; identity, hair, and face geometry stay fully preserved."
+    )
+    return "".join(beats).strip()
+
+
 def _build_ref2va(
     shot: dict[str, Any],
     *,
@@ -596,9 +778,9 @@ def _build_ref2va(
     duration_sec: float,
     refs: list[dict[str, Any]] | None = None,
 ) -> str:
-    """Six-section full-reference rewrite."""
-    ref_list = [r for r in (refs or []) if isinstance(r, dict)]
-    # Labels
+    """Six-section full-reference rewrite (P2: multi-ref duties + dense detailed)."""
+    ref_list = _merge_official_refs(shot, refs)
+
     definitions: list[str] = [
         f"<Subject 1> is {subject} in <Picture 1>, with locked face identity, hair, and wardrobe."
     ]
@@ -606,66 +788,78 @@ def _build_ref2va(
         "<Subject 1> (appears in [Shot 1]): fully_preserved - identity, hair, and wardrobe retained.",
         "<Picture 1> ([Shot 1] first frame / primary reference): fully_preserved - opening appearance and composition anchor.",
     ]
+
+    # Picture labels: start at 1 for primary still; extra refs map to Picture 2+
+    # Prefer pose/last as Picture 2; identity/style as Subject 2 or next Picture.
     picture_n = 1
-    for ref in ref_list[:3]:
-        role = str(ref.get("role") or ref.get("source") or "reference").strip()
-        if role in {"pose", "last", "end", "last_as_pose_ref"}:
-            picture_n = max(picture_n, 2)
-            if not any("<Picture 2>" in d for d in definitions):
+    subject_n = 1
+    saw_pose_picture = False
+    for ref in ref_list:
+        role = _ref_role(ref)
+        duty = _ref_duty(role)
+        if role in {"first"}:
+            # already covered by Picture 1; annotate duty only once
+            if not any("start frame" in d for d in definitions):
                 definitions.append(
-                    "<Picture 2> is the end-pose / landing reference for [Shot 1], "
-                    "defining the final body pose and composition target."
+                    f"<Picture 1> duty: {duty}."
+                )
+            continue
+        if role in {"pose", "last", "end", "last_as_pose_ref"}:
+            if not saw_pose_picture:
+                picture_n = max(picture_n, 2)
+                saw_pose_picture = True
+                definitions.append(
+                    f"<Picture 2> is the end-pose / landing reference for [Shot 1], "
+                    f"defining the final body pose and composition target ({duty})."
                 )
                 retention.append(
                     "<Picture 2> ([Shot 1] end pose): fully_preserved - final landing pose and framing target."
                 )
-        elif role in {"identity", "cast", "style", "face"} and not any(
-            "<Subject 2>" in d for d in definitions
-        ):
-            definitions.append(
-                f"<Subject 2> is an identity/style reference ({role}) supporting <Subject 1>, "
-                "cited for face and wardrobe consistency."
-            )
-            retention.append(
-                "<Subject 2> (appears in [Shot 1]): fully_preserved - face/style support retained."
-            )
+            continue
+        if role in {"identity", "cast", "style", "face"}:
+            subject_n = max(subject_n, 2)
+            if not any(f"<Subject {subject_n}>" in d for d in definitions):
+                definitions.append(
+                    f"<Subject {subject_n}> is an identity/style reference ({role}) "
+                    f"supporting <Subject 1> — {duty}."
+                )
+                retention.append(
+                    f"<Subject {subject_n}> (appears in [Shot 1]): fully_preserved - "
+                    f"{role} support retained."
+                )
+            continue
+        # other refs → next Picture label with explicit duty (absorbs r2v_ref_prompt_clause)
+        picture_n += 1
+        pn = picture_n
+        definitions.append(
+            f"<Picture {pn}> is a {role} reference for [Shot 1] — {duty}."
+        )
+        retention.append(
+            f"<Picture {pn}> ([Shot 1]): fully_preserved - {role} reference retained."
+        )
+
+    has_picture2 = any("<Picture 2>" in d for d in definitions)
 
     task_types = ["reference generation", "keyframe completion"]
     summary = (
         f"[{' + '.join(task_types)}] The target video animates <Subject 1> from <Picture 1> "
         f"for approximately {duration_sec:.1f} seconds with continuous motion and locked identity."
     )
-    if any("<Picture 2>" in d for d in definitions):
+    if has_picture2:
         summary += " Motion lands toward <Picture 2> as the end-pose reference."
+    if subject_n >= 2:
+        summary += " Secondary subject/style references stay fully preserved."
 
-    body = (
-        f"[Shot 1] {size} opens on <Subject 1> from <Picture 1>. {cam} as {action}."
-    )
-    if dlg:
-        # Prefer <Subject 1> (S1) form
-        if "(S1)" in dlg and not dlg.strip().startswith("<Subject"):
-            # rewrite first speaker mention
-            dlg_body = re.sub(
-                r"^.*? \(S1\)",
-                "<Subject 1> (S1)",
-                dlg,
-                count=1,
-            )
-            body += f" {dlg_body}"
-        else:
-            body += f" <Subject 1> (S1) {dlg}" if "(S1)" not in dlg else f" {dlg}"
-        if not body.rstrip().endswith("."):
-            body += "."
-    body += (
-        " The shot stays detailed about composition, subject position, environment light, "
-        "and continuous state changes rather than a plot summary. Ends on a clear pose"
-    )
-    if any("<Picture 2>" in d for d in definitions):
-        body += " that approaches the landing established by <Picture 2>"
-    body += "."
-
-    detailed = (
-        f"The target video uses a {style} look with consistent color and lighting. {body}"
+    detailed = _densify_ref_detailed(
+        shot,
+        style=style,
+        size=size,
+        subject=subject,
+        action=action,
+        cam=cam,
+        dlg=dlg,
+        duration_sec=duration_sec,
+        has_picture2=has_picture2,
     )
 
     has_dlg = bool(dlg)
@@ -712,6 +906,7 @@ def compile_official_h3_prompt(
     dlg = _dlg(shot, subject_label=f"{subject}")
 
     if official == "Ref2VA":
+        merged_refs = _merge_official_refs(shot, refs)
         return _build_ref2va(
             shot,
             style=style,
@@ -721,7 +916,7 @@ def compile_official_h3_prompt(
             cam=cam,
             dlg=dlg,
             duration_sec=dur,
-            refs=refs,
+            refs=merged_refs,
         )
 
     imd = _build_base_imd(

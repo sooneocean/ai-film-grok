@@ -1,7 +1,7 @@
 # H3 官方 Prompt 方言对齐 · 优化 Todo Plan
 
-**Status：** **P0 + P1 核心 SHIP · 2026-08-07**（P2–P3 canary 待 5090 idle）  
-**Plugin：** 2.40.86  
+**Status：** **P0–P2 SHIP · 2026-08-07**（P3 二次 canary 待 5090 idle / 人审口型）  
+**Plugin：** 2.40.89  
 **上游 base：** https://huggingface.co/MiniMaxAI/MiniMax-H3/blob/main/docs/VIDEO_PROMPT_WRITING_GUIDE_base_en.md  
 **上游 ref：** https://huggingface.co/MiniMaxAI/MiniMax-H3/blob/main/docs/VIDEO_PROMPT_WRITING_GUIDE_ref_en.md  
 **基线 import 板：** [2026-08-07-h3-official-prompt-import-todoplan.md](2026-08-07-h3-official-prompt-import-todoplan.md)（O0–O3）  
@@ -23,7 +23,7 @@
 |------|------|------|
 | **P0** | unpark 编译器 + T2VA bug + 禁 2V/legacy 尾缀 + tests | ✅ |
 | **P1** | Base：align / shot 语法 / 运镜 / 对白 / sound+music / validate | ✅ 核心 |
-| **P2** | Ref2VA 多 ref labels + media_pack 深合并 | 🟡 骨架+pose Picture2；词数密度待加 |
+| **P2** | Ref2VA 多 ref labels + media_pack 深合并 + detailed densify | ✅ |
 | **P3** | combo family / receipt 字段 / 二次 canary | ⬜ |
 | **P4** | 本文档 + memory + hard-defaults 指针 | ✅ |
 | **P5** | L2VA 产线入口 / 默认全 official | ⬜ 可选 |
@@ -60,9 +60,9 @@ export AIFILM_H3_OFFICIAL_SOFT=1
 
 ## 仍开
 
-- P2.5 detailed_description 350–500 词密度  
-- P3.5 同 seed 二次 canary（mean + 人审口型）→ 是否翻高动 auto  
-- P2.6 完全吃掉 `r2v_ref_prompt_clause` 进 definitions（official 路径已不 append）
+- P2.5 detailed 词数可再抬到 GUIDE 350–500（现 soft densify ≥80 单测；长镜再加 beat 切）  
+- P3.5 同 seed 二次 canary（mean + 人审口型）→ 是否翻高动 auto（GPU busy 不抢）  
+- P2.6 ✅ official definitions 已吸收 duty；legacy 路径仍可 append clause  
 
 ---
 
