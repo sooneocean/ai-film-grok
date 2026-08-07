@@ -584,6 +584,45 @@ def plan_h3_shot(
         }
     except Exception as exc:  # noqa: BLE001 — plan must not die on optional receipt
         plan["generation_request"] = {"ok": False, "error": str(exc)[:200]}
+    # P3/R5 · official dialect dry-run on plan (no GPU) — agent can read before submit
+    try:
+        from h3_official_prompt import preview_official_h3_prompt
+
+        pack_refs = [
+            r
+            for r in (media_pack.get("refs") or [])
+            if isinstance(r, dict)
+        ]
+        if last_path is not None:
+            pack_refs = list(pack_refs) + [
+                {"path": str(last_path), "role": "pose", "source": last_source or "last"}
+            ]
+        preview = preview_official_h3_prompt(
+            shot,
+            mode=mode,
+            spec=spec,
+            duration_sec=max_dur,
+            refs=pack_refs or None,
+        )
+        plan["prompt_preview"] = {
+            "dialect": preview.get("dialect"),
+            "official_mode": preview.get("official_mode"),
+            "validate_ok": preview.get("validate_ok"),
+            "validate_issues": preview.get("validate_issues") or [],
+            "word_count_total": preview.get("word_count_total"),
+            "word_count_detailed": preview.get("word_count_detailed"),
+            "high_motion_official": preview.get("high_motion_official"),
+            "has_prompt": bool(preview.get("prompt")),
+        }
+        if preview.get("prompt"):
+            pdir = base / "receipts" / "prompts"
+            pdir.mkdir(parents=True, exist_ok=True)
+            (pdir / f"{shot_id}.h3.preview.txt").write_text(
+                str(preview["prompt"]).rstrip() + "\n", encoding="utf-8"
+            )
+            plan["prompt_preview"]["receipt"] = f"receipts/prompts/{shot_id}.h3.preview.txt"
+    except Exception as exc:  # noqa: BLE001
+        plan["prompt_preview"] = {"ok": False, "error": str(exc)[:200]}
     return plan
 
 

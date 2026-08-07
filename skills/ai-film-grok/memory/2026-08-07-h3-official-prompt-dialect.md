@@ -2,23 +2,23 @@
 
 ## 原话
 
-> 继续推进
+> 依照两份官方文件要求帮我优化代码 · 再进行一轮升级迭代
 
 ## 三句
 
-1. P2.5 densify：Ref2VA detailed 350–500；I2VA 半秒/中段 densify。  
-2. P3 receipt：`.h3.meta.json` + `.h3.official.txt`；combo family 字段进回执。  
-3. 二次 canary reburn **OPEN_OPS**（queue busy 零 submit）；默认 high→legacy 不翻。
+1. 官方 base 三字段 + Ref2VA 六段已编译；T2VA **禁**误写 Picture1；official 禁 2V stage。  
+2. **默认 auto**：对白/R2V/多 ref→official；high→legacy（`AIFILM_H3_HIGH_MOTION_OFFICIAL=1` 可翻）。  
+3. R5：combo official families + plan `prompt_preview`；真烧 canary 仍待 5090。
 
 ## 清单
 
-- [x] P0–P2  
-- [x] P2.5 densify + tests  
-- [x] P3 receipt fields  
-- [ ] P3 reburn mean 对照（idle 后再烧）  
-- [ ] 默认全 official / high auto flip  
+- [x] 编译器 + vendor pin + validate  
+- [x] densify + run receipt + plan preview  
+- [x] combo R5 official families  
+- [x] onscreen text + scenetrans  
+- [ ] 高动二次 canary → 是否默认翻 official  
 
 ## 链
 
-- 进度：`artifacts/2026-08-07-h3-official-p25-p3-progress.json`  
 - 优化板：`docs/plans/2026-08-07-h3-official-prompt-optimize-todoplan.md`  
+- canary：`artifacts/2026-08-07-h3-official-ab-canary.json`  

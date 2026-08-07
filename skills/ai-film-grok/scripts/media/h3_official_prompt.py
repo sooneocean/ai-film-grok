@@ -64,6 +64,16 @@ def resolve_prompt_dialect(
     return _auto_dialect_for_shot(shot if isinstance(shot, dict) else {})
 
 
+def high_motion_official_enabled() -> bool:
+    """Opt-in: high-motion auto dialect uses official densify (not legacy timeline).
+
+    Escape / enable: ``AIFILM_H3_HIGH_MOTION_OFFICIAL=1``.
+    Default off until P3.5 reburn proves mean+look (O3 mean favored legacy).
+    """
+    raw = os.environ.get("AIFILM_H3_HIGH_MOTION_OFFICIAL", "0").strip().lower()
+    return raw in {"1", "true", "yes", "on"}
+
+
 def _auto_dialect_for_shot(shot: dict[str, Any]) -> str:
     try:
         from motion_prompt_spine import motion_tier_for, spoken_dialogue_text
@@ -81,10 +91,20 @@ def _auto_dialect_for_shot(shot: dict[str, Any]) -> str:
         tier = str(
             dsl.get("prompt_tier") or shot.get("prompt_tier") or "medium"
         ).lower()
+    # Multi-ref / explicit R2V wants six-section labels, not legacy timeline.
+    mode_hint = str(
+        shot.get("h3_mode") or shot.get("mode") or (shot.get("dsl") or {}).get("h3_mode") or ""
+    ).strip().lower()
+    if mode_hint in {"r2v", "ref2v", "ref2va", "reference", "reference_to_video"}:
+        return "official"
+    mp = shot.get("media_pack") if isinstance(shot.get("media_pack"), dict) else {}
+    refs = mp.get("refs") if isinstance(mp.get("refs"), list) else []
+    if len(refs) >= 2:
+        return "official"
     if has_dlg:
         return "official"
     if tier == "high":
-        return "legacy"
+        return "official" if high_motion_official_enabled() else "legacy"
     return "official"
 
 
@@ -165,21 +185,56 @@ def _format_dialogue_clause(events: list[dict[str, str]], *, subject_label: str 
         sid = f"S{i}"
         d = ev["text"]
         lang = _lang_tag(d)
+        # Multi-line carry: mark continuity with official <scenetrans> when same speaker
+        # continues after a prior cue (GUIDE base §4.4).
+        cont = ""
+        if i > 1 and events[i - 2].get("speaker") == ev.get("speaker"):
+            cont = (
+                " <scenetrans> the spoken line continues seamlessly across the cut "
+                "</scenetrans> "
+            )
         tag = f"<d>[{lang}] {d}</d>"
         who = subject_label.strip() or "the visible character with a clear natural voice"
         if ev.get("speaker"):
             who = f"{ev['speaker']} with a clear natural voice"
         if ev.get("screen_mode") == "off_camera":
             parts.append(
-                f"{who} ({sid}) says in an off-screen voiceover: {tag} "
+                f"{who} ({sid}) says in an off-screen voiceover: {cont}{tag} "
                 "while the on-screen lips remain completely closed"
             )
         else:
             parts.append(
-                f"{who} ({sid}) says: {tag} with clear jaw open-close and "
+                f"{who} ({sid}) says: {cont}{tag} with clear jaw open-close and "
                 "visible lip shapes on each syllable"
             )
+    # Truncation at clip end when last line may be cut off by duration
+    if parts and any(str(ev.get("cutoff") or "").lower() in {"1", "true", "yes"} for ev in events):
+        parts[-1] = parts[-1].rstrip(".") + " <cutoff> speech is truncated by the end of the video."
     return " ".join(parts)
+
+
+def _onscreen_text_clause(shot: dict[str, Any]) -> str:
+    """Visible on-screen text (sign/banner) — English double quotes, verbatim (GUIDE §4.5)."""
+    dsl = shot.get("dsl") if isinstance(shot.get("dsl"), dict) else {}
+    raw = (
+        dsl.get("onscreen_text")
+        or dsl.get("visible_text")
+        or dsl.get("sign_text")
+        or shot.get("onscreen_text")
+        or shot.get("visible_text")
+        or ""
+    )
+    if isinstance(raw, (list, tuple)):
+        texts = [str(x).strip() for x in raw if str(x).strip()]
+    else:
+        texts = [str(raw).strip()] if str(raw).strip() else []
+    if not texts:
+        return ""
+    bits = []
+    for t in texts[:3]:
+        # Preserve original; wrap in ASCII double quotes per official guide.
+        bits.append(f'On-screen text reading "{t}" is clearly visible in the frame.')
+    return " ".join(bits)
 
 
 def _dlg(shot: dict[str, Any], *, subject_label: str = "") -> str:
@@ -1008,6 +1063,9 @@ def compile_official_h3_prompt(
         tier=tier,
         duration_sec=dur,
     )
+    onscreen = _onscreen_text_clause(shot)
+    if onscreen and onscreen not in imd:
+        imd = imd.rstrip(".") + f". {onscreen}"
     # Count shots for FL/L alignment last index
     last_n = max(1, len(re.findall(r"\[Shot \d+\]", imd)))
     align = _alignment_line(official, duration_sec=dur, last_shot_n=last_n)
@@ -1110,11 +1168,55 @@ def official_soft_validate() -> bool:
     return raw in {"1", "true", "yes", "on"}
 
 
+def preview_official_h3_prompt(
+    shot: dict[str, Any],
+    *,
+    mode: str = "i2v",
+    spec: dict[str, Any] | None = None,
+    duration_sec: float | None = None,
+    refs: list[dict[str, Any]] | None = None,
+    dialect: str | None = None,
+) -> dict[str, Any]:
+    """Dry-run compile + validate for plan/CLI (no GPU).
+
+    Returns dialect resolution, official mode, prompt text, validate result,
+    and word counts — used by ``plan_h3_shot`` receipts and agent previews.
+    """
+    sh = shot if isinstance(shot, dict) else {}
+    dial = resolve_prompt_dialect(sh, explicit=dialect)
+    official_mode = map_official_mode(mode)
+    prompt = ""
+    check: dict[str, Any] = {"ok": None, "issues": [], "official_mode": official_mode}
+    if dial == "official":
+        prompt = compile_official_h3_prompt(
+            sh, mode=mode, spec=spec, duration_sec=duration_sec, refs=refs
+        )
+        check = validate_official_prompt(prompt, mode=mode)
+    return {
+        "kind": "h3-prompt-preview",
+        "dialect": dial,
+        "official_mode": official_mode if dial == "official" else None,
+        "mode": (mode or "i2v").strip().lower(),
+        "prompt": prompt,
+        "validate_ok": check.get("ok"),
+        "validate_issues": list(check.get("issues") or []),
+        "has_dialogue_tag": bool(check.get("has_dialogue_tag")),
+        "word_count_total": len(prompt.split()) if prompt else 0,
+        "word_count_detailed": official_prompt_word_count(prompt) if prompt else 0,
+        "word_count_imd": (
+            official_prompt_word_count(prompt, field="imd") if prompt else 0
+        ),
+        "high_motion_official": high_motion_official_enabled(),
+    }
+
+
 __all__ = [
     "compile_official_h3_prompt",
+    "high_motion_official_enabled",
     "map_official_mode",
     "official_prompt_word_count",
     "official_soft_validate",
+    "preview_official_h3_prompt",
     "resolve_prompt_dialect",
     "validate_official_prompt",
 ]

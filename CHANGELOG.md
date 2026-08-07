@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.40.94] - 2026-08-07
+
+### Changed (H3 official prompt · R5 upgrade iteration)
+- **Combo families:** `dialogue_mouth_official` / `high_motion_official` / `soft_portrait_official` + `R5_OFFICIAL_COMBO_ORDER` (`build_combo_matrix(round=5)`); `compile_family_author_prompt` routes `prompt_format=official` through `h3_official_prompt`.
+- **Auto dialect:** R2V / multi-ref → official; high-motion stays legacy unless `AIFILM_H3_HIGH_MOTION_OFFICIAL=1`.
+- **GUIDE gaps:** on-screen text (`onscreen_text` → `"…"`); multi-cue `<scenetrans>` continuity.
+- **Plan dry-run:** `preview_official_h3_prompt` + `plan_h3_shot.prompt_preview` + `*.h3.preview.txt` receipt (no GPU).
+- **Tests:** official scenetrans/opt-in/preview + combo R5 compile (40 green with combo suite).
+
 ## [2.40.93] - 2026-08-07
 
 ### Fixed / Changed (C6.5 core package imports + CI coverage floors real impl)

@@ -253,7 +253,127 @@ PROMPT_FAMILIES: dict[str, dict[str, Any]] = {
             "No morphing, no face swap, no frozen mouth."
         ),
     },
+    # Official MiniMax dialect A/B (prompt_format=official → h3_official_prompt).
+    "dialogue_mouth_official": {
+        "lane_tags": ["dialogue_mouth_energy", "hero_identity_lock", "official_ab"],
+        "shot_role": "hero",
+        "heat_phase": "build",
+        "wardrobe_state": "clothed",
+        "prompt_tier": "medium",
+        "dramatic_function": "dialogue",
+        "screen_mode": "on_camera",
+        "shot_size": "cu",
+        "nar": "official MiniMax dialogue CU with <d> Mandarin tags",
+        "dsl": {
+            "action": "face camera and speak with clear jaw open-close each syllable",
+            "motion": "cheeks and jaw move; brows engage; tiny head nods with speech rhythm",
+            "visible_change": "lips and jaw articulate every Mandarin syllable; mouth energy high",
+            "camera_prompt": "locked ECU mouth-priority close-up",
+            "environment": "soft key light micro-shift on face",
+            "subject": "young woman",
+            "style": "cel-anime",
+            "prompt_format": "official",
+        },
+        "prompt_format": "official",
+        "audio_cues": [
+            {
+                "kind": "voice",
+                "line_type": "dialogue",
+                "speaker": "hero",
+                "spoken_text": "过来，靠近一点，别停。",
+                "screen_mode": "on_camera",
+            }
+        ],
+        "author_prompt": None,
+    },
+    "high_motion_official": {
+        "lane_tags": ["high_motion_energy", "hero_identity_lock", "official_ab"],
+        "shot_role": "hero",
+        "heat_phase": "act",
+        "wardrobe_state": "clothed",
+        "prompt_tier": "high",
+        "nar": "official MiniMax high-motion densify (three-field / Ref2VA)",
+        "dsl": {
+            "action": (
+                "full-body weight shifts and torso torque every 0.5s; hands re-grip; "
+                "hips and shoulders counter-rotate hard"
+            ),
+            "motion": (
+                "aggressive handheld push-in plus lateral whip; hair and clothes snap with inertia"
+            ),
+            "visible_change": (
+                "pose silhouette changes large every half second; high optical flow; not micro-breath"
+            ),
+            "camera_prompt": "aggressive handheld push-in plus lateral whip",
+            "environment": "hair and clothes snap with inertia; dust and fabric thrash",
+            "subject": "athletic woman",
+            "style": "cel anime",
+            "prompt_format": "official",
+        },
+        "prompt_format": "official",
+        "author_prompt": None,
+    },
+    "soft_portrait_official": {
+        "lane_tags": ["hero_identity_lock", "official_ab"],
+        "shot_role": "hero",
+        "heat_phase": "setup",
+        "wardrobe_state": "clothed",
+        "prompt_tier": "soft",
+        "nar": "official MiniMax soft portrait micro-life",
+        "dsl": {
+            "action": "eyes track camera with soft blinks, breath lifts chest continuously",
+            "motion": "tiny head sway and hair drift; locked identity, no morph",
+            "visible_change": "every half-second a small natural micro-change; never a still photo",
+            "camera_prompt": "locked static medium close-up",
+            "environment": "hair micro-drift and fabric settle",
+            "subject": "young woman",
+            "style": "cel-anime",
+            "prompt_format": "official",
+        },
+        "prompt_format": "official",
+        "author_prompt": None,
+    },
 }
+
+# Round-5: official dialect A/B vs timeline (no GPU required for compile unit tests).
+R5_OFFICIAL_COMBO_ORDER: list[dict[str, Any]] = [
+    {
+        "combo_id": "r5_dlg_official_i2v",
+        "mode": "i2v",
+        "family": "dialogue_mouth_official",
+        "shot_id": "s_dlg_off",
+    },
+    {
+        "combo_id": "r5_high_official_i2v",
+        "mode": "i2v",
+        "family": "high_motion_official",
+        "shot_id": "s_hi_off",
+    },
+    {
+        "combo_id": "r5_high_official_r2v",
+        "mode": "r2v",
+        "family": "high_motion_official",
+        "shot_id": "s_hi_off",
+    },
+    {
+        "combo_id": "r5_soft_official_i2v",
+        "mode": "i2v",
+        "family": "soft_portrait_official",
+        "shot_id": "s_soft_off",
+    },
+    {
+        "combo_id": "r5_dlg_tl_i2v",
+        "mode": "i2v",
+        "family": "dialogue_mouth_max",
+        "shot_id": "s_dlg_tl",
+    },
+    {
+        "combo_id": "r5_high_tl_i2v",
+        "mode": "i2v",
+        "family": "high_motion_max",
+        "shot_id": "s_hi_tl",
+    },
+]
 
 DEFAULT_COMBO_ORDER: list[dict[str, Any]] = [
     {"combo_id": "soft_i2v", "mode": "i2v", "family": "soft_portrait", "shot_id": "s_soft"},
@@ -408,6 +528,8 @@ def build_combo_matrix(
 ) -> list[ComboSpec]:
     if order is not None:
         rows = order
+    elif int(round) >= 5:
+        rows = list(R5_OFFICIAL_COMBO_ORDER)
     elif int(round) >= 4:
         rows = list(R4_POST_FIX_ORDER)
     elif int(round) >= 3:
@@ -481,16 +603,22 @@ def compile_family_author_prompt(
     duration_sec: float = 5.0,
     mode: str = "i2v",
 ) -> str:
-    """Compile Layer-4 timeline (or flat override) author prompt for a combo family."""
+    """Compile author prompt for a combo family (timeline / flat / official)."""
     fam = PROMPT_FAMILIES[family]
     pfmt = str(fam.get("prompt_format") or "timeline").strip().lower()
     if pfmt == "flat" and fam.get("author_prompt"):
         return str(fam["author_prompt"]).strip()
     if fam.get("author_prompt"):
         return str(fam["author_prompt"]).strip()
+    shot = shot_dict_for_family(family, shot_id or f"s_{family}")
+    if pfmt in {"official", "h3_official", "minimax", "native"}:
+        from h3_official_prompt import compile_official_h3_prompt
+
+        return compile_official_h3_prompt(
+            shot, mode=mode, duration_sec=float(duration_sec)
+        ).strip()
     from motion_prompt_spine import build_h3_temporal_prompt
 
-    shot = shot_dict_for_family(family, shot_id or f"s_{family}")
     return build_h3_temporal_prompt(
         {}, shot, mode=mode, duration_sec=float(duration_sec)
     ).strip()

@@ -266,3 +266,53 @@ def test_base_i2va_has_half_second_densify() -> None:
     assert "half-second" in text or "Within the same continuous take" in text
     assert validate_official_prompt(text, mode="i2v")["ok"] is True
 
+
+def test_high_motion_official_opt_in(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("AIFILM_H3_PROMPT_DIALECT", "auto")
+    monkeypatch.delenv("AIFILM_H3_HIGH_MOTION_OFFICIAL", raising=False)
+    assert resolve_prompt_dialect(_hi_shot()) == "legacy"
+    monkeypatch.setenv("AIFILM_H3_HIGH_MOTION_OFFICIAL", "1")
+    assert resolve_prompt_dialect(_hi_shot()) == "official"
+
+
+def test_r2v_mode_hint_forces_official(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("AIFILM_H3_PROMPT_DIALECT", "auto")
+    monkeypatch.delenv("AIFILM_H3_HIGH_MOTION_OFFICIAL", raising=False)
+    shot = _hi_shot()
+    shot["h3_mode"] = "r2v"
+    assert resolve_prompt_dialect(shot) == "official"
+
+
+def test_onscreen_text_and_scenetrans() -> None:
+    shot = _dlg_shot()
+    shot["dsl"]["onscreen_text"] = "营业中"
+    shot["audio_cues"] = [
+        {
+            "kind": "voice",
+            "spoken_text": "第一句。",
+            "screen_mode": "on_camera",
+            "speaker": "hero",
+        },
+        {
+            "kind": "voice",
+            "spoken_text": "第二句继续。",
+            "screen_mode": "on_camera",
+            "speaker": "hero",
+        },
+    ]
+    text = compile_official_h3_prompt(shot, mode="i2v", duration_sec=5.0)
+    assert '"营业中"' in text
+    assert "<scenetrans>" in text
+    assert "(S1)" in text and "(S2)" in text
+    assert validate_official_prompt(text, mode="i2v")["ok"] is True
+
+
+def test_preview_official_payload() -> None:
+    from h3_official_prompt import preview_official_h3_prompt
+
+    prev = preview_official_h3_prompt(_dlg_shot(), mode="i2v", duration_sec=5.0)
+    assert prev["dialect"] == "official"
+    assert prev["validate_ok"] is True
+    assert "integrated_multimodal_description:" in prev["prompt"]
+    assert prev["word_count_total"] > 20
+
