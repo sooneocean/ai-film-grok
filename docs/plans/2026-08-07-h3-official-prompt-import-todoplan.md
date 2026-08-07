@@ -1,8 +1,9 @@
 # MiniMax H3 官方 Skill 逻辑导入 · Todo Plan
 
-**Status：** **O0–O3 SHIP · Round-2 auto 默认 · 2026-08-07**  
-**Plugin：** 2.40.84  
+**Status：** **O0–O3 SHIP · 后续优化见 optimize 板 · 2026-08-07**  
+**Plugin：** 2.40.86（optimize 叠加）  
 **上游：** https://github.com/MiniMax-AI/MiniMax-H3/tree/main/skills/h3-prompt-writing  
+**下一板：** [2026-08-07-h3-official-prompt-optimize-todoplan.md](2026-08-07-h3-official-prompt-optimize-todoplan.md)
 
 ## 实现快照
 

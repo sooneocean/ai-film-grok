@@ -195,7 +195,7 @@
 |----|------|------|------|
 | **C6.1** | **低 importer 优先迁** | 每周 **5–10** 模块 → package + 薄 shim | metabolism inventory 更新 | ✅ safe queue empty · guard 2.40.78 |
 | **C6.2** | **优先厚顶层** | `workflow_pack` / `input_fidelity` / `state_index_gate` / `prompt_injector` / `shortform_director`… | 归属 spine/gates/plan | IRON 禁 vanity；bug-driven peel only |
-| **C6.3** | **Lane A 删除** | 0 import ∧ 0 CLI ∧ 0 test → 删 | 每 batch 报告 | ✅ 2.40.85 re-scan empty (shims retained) |
+| **C6.3** | **Lane A 删除** | 0 import ∧ 0 CLI ∧ 0 test → 删 | 每 batch 报告 | ✅ 2.40.85 empty · 4 intentional residuals allowlisted + guard test |
 | **C6.4** | **基座测试补漏** | `core/*` `util/*` 公共 API | P4 延续；每模块 ≥ 契约测 | ✅ 2.40.78 media_ops/film_spec · 2.40.80 config_loader/gates |
 | **C6.5** | **mypy 增量扩名单** | `make type` 每清一文件加名单；禁一次开全树 | 零新增错误 | ✅ 2.40.83 util×9 + fix shim import |
 

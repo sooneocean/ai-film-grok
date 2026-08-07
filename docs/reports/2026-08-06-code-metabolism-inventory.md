@@ -1,9 +1,11 @@
 # Code metabolism inventory — TERMINAL residual freeze
 
 **Generated:** 2026-08-07  
-**Latest batch:** 2.40.78 (C6.1 empty re-verify + C6.4 base contracts)  
-**Structure status:** **SAFE QUEUE DONE** · only hub + thrash orchestrator left on purpose  
-**Guard:** `tests/test_c6_migrate_queue_empty.py` fails if a new thick top-level appears outside IRON residual set.
+**Latest batch:** 2.40.86 (Lane A allowlist guard + H3 official GUIDE align)  
+**Structure status:** **SAFE QUEUE DONE** · C6.1 migrate empty · **C6.3 Lane A empty** (no safe whole-file deletes)  
+**Guards:**  
+- `tests/test_c6_migrate_queue_empty.py` — thick top-level residual set  
+- `tests/test_c6_lane_a_delete_scan.py` — 0-import hits only allowlisted examples/tools
 
 ## Summary (post 2.40.47)
 
