@@ -184,6 +184,113 @@ def test_onboarding_go_incomplete(client, monkeypatch):
     assert r.status_code == 400
 
 
+# ---- onboarding v2: brief -> upload -> decompose -> plan -> go ----
+_PNG_B64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="
+
+
+def test_onboarding_brief_saved(client):
+    headers = {"X-Review-Token": TOKEN, "Origin": f"http://127.0.0.1:{PORT}"}
+    r = client.post(
+        "/api/onboarding/brief", headers=headers,
+        json={"story_text": "林晚说：你好。", "hints": ["甜宠"]},
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["brief"]["story_text"] == "林晚说：你好。"
+
+
+def test_onboarding_upload_and_file_serve(client):
+    headers = {"X-Review-Token": TOKEN, "Origin": f"http://127.0.0.1:{PORT}"}
+    r = client.post(
+        "/api/upload", headers=headers,
+        json={"filename": "lead.png", "data_url": "data:image/png;base64," + _PNG_B64},
+    )
+    assert r.status_code == 200, r.text
+    path = r.json()["path"]
+    assert path.startswith("intake/characters/")
+    g = client.get("/api/file?path=" + path, headers={"X-Review-Token": TOKEN})
+    assert g.status_code == 200
+    assert g.headers["content-type"].startswith("image/")
+
+
+def test_onboarding_file_path_escape_rejected(client):
+    r = client.get("/api/file?path=" + "../" * 6 + "etc/passwd", headers={"X-Review-Token": TOKEN})
+    assert r.status_code == 404
+
+
+def test_onboarding_brief_decompose_heuristic(client):
+    headers = {"X-Review-Token": TOKEN, "Origin": f"http://127.0.0.1:{PORT}"}
+    r = client.post(
+        "/api/onboarding/decompose", headers=headers,
+        json={"brief": {"story_text": "林晚说：今晚的雨真大。顾沉道：进来避避吧。", "image_paths": [], "hints": []}},
+    )
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["plan_source"] == "heuristic"
+    names = [c["name"] for c in body["plan"]["characters"]]
+    assert "林晚" in names and "顾沉" in names
+    assert body["plan"]["genre"] and body["plan"]["heat_scale"]
+
+
+def test_onboarding_decompose_then_plan_then_go_writes_canonical(client, monkeypatch, tmp_path):
+    monkeypatch.setattr("onboarding._try_advance", lambda base: (True, "advanced: ok"))
+    monkeypatch.delenv("AIFILM_LOCAL_LLM_BASE_URL", raising=False)
+    headers = {"X-Review-Token": TOKEN, "Origin": f"http://127.0.0.1:{PORT}"}
+    story = "林晚说：今晚的雨真大。顾沉道：进来避避吧。"
+
+    d = client.post(
+        "/api/onboarding/decompose", headers=headers,
+        json={"brief": {"story_text": story, "image_paths": [], "hints": []}},
+    )
+    assert d.status_code == 200, d.text
+    rev = d.json()["revision"]
+
+    # edit the plan (rename the lead) and persist it
+    plan = d.json()["plan"]
+    plan["title"] = "雨夜书店"
+    p = client.post("/api/onboarding/plan", headers=headers, json={"plan": plan, "expected_revision": rev})
+    assert p.status_code == 200, p.text
+    rev = p.json()["revision"]
+
+    g = client.post("/api/onboarding/go", headers=headers, json={"expected_revision": rev})
+    assert g.status_code == 200, g.text
+    root = client.app.state.root
+    assert (Path(root) / "film-spec.json").is_file()
+    spec = json.loads((Path(root) / "film-spec.json").read_text(encoding="utf-8"))
+    assert spec["title"] == "雨夜书店"
+    assert (Path(root) / "style-bible.json").is_file()
+    assert (Path(root) / "intake-manifest.json").is_file()
+
+
+def test_onboarding_decompose_stale_conflict(client):
+    headers = {"X-Review-Token": TOKEN, "Origin": f"http://127.0.0.1:{PORT}"}
+    story = "林晚说：你好。"
+    first = client.post(
+        "/api/onboarding/decompose", headers=headers,
+        json={"brief": {"story_text": story, "image_paths": [], "hints": []}},
+    )
+    assert first.status_code == 200
+    stale = client.post(
+        "/api/onboarding/decompose", headers=headers,
+        json={"brief": {"story_text": story, "image_paths": [], "hints": []}, "expected_revision": 0},
+    )
+    assert stale.status_code == 409, stale.text
+
+
+def test_onboarding_new_endpoints_require_auth(client):
+    headers = {"Origin": f"http://127.0.0.1:{PORT}"}
+    assert client.post("/api/upload", headers=headers, json={"filename": "x.png", "data_url": "data:image/png;base64,xx"}).status_code == 401
+    assert client.post("/api/onboarding/brief", headers=headers, json={"story_text": "x"}).status_code == 401
+    assert client.post("/api/onboarding/decompose", headers=headers, json={}).status_code == 401
+    assert client.post("/api/onboarding/plan", headers=headers, json={"plan": {}}).status_code == 401
+
+
+def test_onboarding_new_endpoints_cross_origin_rejected(client):
+    headers = {"X-Review-Token": TOKEN, "Origin": "http://evil.example.com"}
+    assert client.post("/api/upload", headers=headers, json={"filename": "x.png", "data_url": "data:image/png;base64,xx"}).status_code == 403
+    assert client.post("/api/onboarding/decompose", headers=headers, json={"brief": {"story_text": "x"}}).status_code == 403
+    assert client.post("/api/onboarding/plan", headers=headers, json={"plan": {}}).status_code == 403
+
+
 def test_select_rejected_on_blocking_gate_gateway(client, tmp_path):
     # P6: a hard (required) gate failure must reject selection with 403 at the
     # gateway layer and must NOT write the ledger or the production manifest.

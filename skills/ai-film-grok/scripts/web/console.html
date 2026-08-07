@@ -110,6 +110,44 @@
     * { transition: none !important; animation: none !important; }
     canvas#hero { display: none; }
   }
+  /* onboarding v2 (brief -> thinking -> plan) */
+  .dropzone { border: 1.5px dashed var(--panel-brd); border-radius: 14px; padding: 1.1rem; text-align: center; cursor: pointer;
+    transition: border-color .2s, background .2s; background: color-mix(in srgb, var(--panel) 55%, transparent); }
+  .dropzone.drag { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); }
+  .dz-inner { color: var(--muted); }
+  .dz-link { color: var(--accent); font-weight: 600; }
+  .ob-images { display: flex; gap: .6rem; flex-wrap: wrap; margin-top: .7rem; justify-content: center; }
+  .ob-image { position: relative; }
+  .ob-image img { width: 76px; height: 76px; object-fit: cover; border-radius: 12px; border: 1px solid var(--panel-brd); }
+  .ob-image .rm { position: absolute; top: -6px; right: -6px; background: var(--danger); color: #fff; border: 0;
+    border-radius: 50%; width: 20px; height: 20px; cursor: pointer; line-height: 1; font-size: .7rem; }
+  .hintrow { display: flex; gap: .5rem; flex-wrap: wrap; }
+  .chip.hint[aria-pressed="true"] { background: linear-gradient(135deg, var(--accent), var(--accent2)); color: #06121a; border-color: transparent; }
+  .thinking { margin: 1.1rem 0; }
+  .tk-step { display: flex; align-items: center; gap: .6rem; padding: .5rem .2rem; color: var(--muted); transition: color .3s; }
+  .tk-step.done { color: var(--txt); }
+  .tk-ico { width: 1.2rem; display: inline-block; text-align: center; color: var(--accent); font-weight: 700; }
+  .plan-head { display: flex; flex-direction: column; margin-bottom: .4rem; }
+  .src-badge { font-size: .72rem; font-weight: 600; padding: .15rem .6rem; border-radius: 999px; vertical-align: middle; margin-left: .3rem; }
+  .src-badge.llm { background: color-mix(in srgb, var(--accent) 26%, transparent); color: var(--accent); border: 1px solid var(--accent); }
+  .src-badge.heuristic { background: color-mix(in srgb, var(--warn) 22%, transparent); color: var(--warn); border: 1px solid var(--warn); }
+  .ob-plan label { display: block; font-size: .8rem; color: var(--muted); margin: .6rem 0 .2rem; }
+  .ob-plan input, .ob-plan textarea, .ob-plan select { width: 100%; background: var(--bg2); color: var(--txt);
+    border: 1px solid var(--panel-brd); border-radius: 10px; padding: .5rem; font: inherit; }
+  .ob-plan .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: .8rem; }
+  .ob-plan .grp { margin: 1.1rem 0; border-top: 1px solid var(--panel-brd); padding-top: 1rem; }
+  .ob-plan .grp > h4 { margin: .1rem 0 .6rem; }
+  .char-card { position: relative; }
+  .char-card .lead { position: absolute; top: .6rem; right: .6rem; font-size: .68rem; background: var(--accent2); color: #06121a;
+    padding: .1rem .55rem; border-radius: 999px; font-weight: 600; }
+  .char-card .rmc { position: absolute; top: .5rem; left: .5rem; background: var(--danger); color: #fff; border: 0;
+    border-radius: 50%; width: 20px; height: 20px; cursor: pointer; line-height: 1; }
+  .char-thumb { width: 100%; height: 120px; object-fit: cover; border-radius: 10px; margin-bottom: .5rem; border: 1px solid var(--panel-brd); }
+  .scene-line { border-left: 3px solid var(--accent); padding-left: .7rem; margin: .5rem 0; }
+  .scene-line .st { font-weight: 600; }
+  .scene-line .sm { color: var(--muted); font-size: .8rem; }
+  details.legacy { border-top: 1px solid var(--panel-brd); padding-top: .9rem; margin-top: 1.4rem; }
+  details.legacy summary { cursor: pointer; color: var(--muted); font-size: .88rem; padding: .3rem 0; }
 </style>
 </head>
 <body>
@@ -166,41 +204,80 @@
 
   <section id="onboarding" class="tabpane hidden" role="tabpanel" aria-labelledby="tab-onboarding">
     <div class="panel">
-      <h3 style="margin-top:0">起步向导 <span class="muted" style="font-weight:400;font-size:.8rem">逐步录入 参考物 → 故事 → 角色，最后推动 Go 启动流水线</span></h3>
-      <div id="ob-stepper" class="kindrow"></div>
+      <h3 style="margin-top:0">起步向导 <span class="muted" style="font-weight:400;font-size:.8rem">贴故事 + 主角图 → AI 拆解出方案，确认即启动流水线</span></h3>
 
-      <div class="ob-step">
-        <h4>① 参考物（视觉 / 风格参考）</h4>
-        <div id="ob-refs"></div>
-        <div style="display:flex;gap:.5rem;flex-wrap:wrap">
-          <input id="ob-ref-url" class="ghost-btn" style="flex:1;min-width:200px" placeholder="参考图 / 视频 URL 或本地路径" aria-label="参考物 URL 或路径">
-          <input id="ob-ref-note" class="ghost-btn" style="flex:1;min-width:160px" placeholder="备注（可选）" aria-label="参考物备注">
-          <button class="ghost-btn" id="ob-ref-add">+ 添加</button>
+      <!-- Stage 1: Brief -->
+      <div id="ob-brief-pane">
+        <h4>① 你的故事 <span class="muted" style="font-weight:400">（只需这一项，主角图可选）</span></h4>
+        <textarea id="ob-story-text" rows="9" style="width:100%;background:var(--bg2);color:var(--txt);border:1px solid var(--panel-brd);border-radius:10px;padding:.6rem" placeholder="把你的故事 / 设定粘贴到这里。例如：林晚是归国的调香师，在旧书店遇见沉默的老板顾沉，两人在雨夜里逐渐靠近……" aria-label="故事文本"></textarea>
+
+        <h4 style="margin-top:1rem">主角图 <span class="muted" style="font-weight:400">（可选 · 拖拽或点击上传，仅存本地，不上云）</span></h4>
+        <div id="ob-drop" class="dropzone" role="button" tabindex="0" aria-label="上传主角图">
+          <input id="ob-file" type="file" accept="image/png,image/jpeg,image/webp" multiple hidden />
+          <div class="dz-inner">📷 把图片拖到这里，或 <span class="dz-link">点击选择</span></div>
+          <div id="ob-images" class="ob-images" aria-live="polite"></div>
         </div>
-        <button class="pick" data-savestep="references">保存这一步</button>
+
+        <h4 style="margin-top:1rem">氛围偏好 <span class="muted" style="font-weight:400">（可选 · 帮 AI 校准基调）</span></h4>
+        <div id="ob-hints" class="hintrow" role="group" aria-label="氛围偏好">
+          <button type="button" class="chip hint" data-h="甜宠" aria-pressed="false">甜宠</button>
+          <button type="button" class="chip hint" data-h="悬疑" aria-pressed="false">悬疑</button>
+          <button type="button" class="chip hint" data-h="治愈" aria-pressed="false">治愈</button>
+          <button type="button" class="chip hint" data-h="性感" aria-pressed="false">性感</button>
+          <button type="button" class="chip hint" data-h="虐恋" aria-pressed="false">虐恋</button>
+          <button type="button" class="chip hint" data-h="纯爱" aria-pressed="false">纯爱</button>
+        </div>
+
+        <button class="pick magnetic" id="ob-decompose" style="margin-top:1.1rem">✨ 让 AI 拆解</button>
       </div>
 
-      <div class="ob-step">
-        <h4>② 故事（剧情 / 脚本）</h4>
-        <textarea id="ob-story" rows="8" style="width:100%;background:var(--bg2);color:var(--txt);border:1px solid var(--panel-brd);border-radius:10px;padding:.6rem" placeholder="粘贴故事 / 脚本文本…" aria-label="故事文本"></textarea>
-        <button class="pick" data-savestep="story">保存这一步</button>
-      </div>
+      <!-- Stage 2: thinking -->
+      <div id="ob-thinking" class="thinking" style="display:none" role="status" aria-live="polite"></div>
 
-      <div class="ob-step">
-        <h4>③ 角色（演员 / 人物）</h4>
-        <div id="ob-chars"></div>
-        <div style="display:flex;gap:.5rem;flex-wrap:wrap">
-          <input id="ob-char-id" class="ghost-btn" style="width:120px" placeholder="id（英文）" aria-label="角色 id">
-          <input id="ob-char-name" class="ghost-btn" style="flex:1;min-width:140px" placeholder="名称" aria-label="角色名称">
-          <input id="ob-char-desc" class="ghost-btn" style="flex:1;min-width:180px" placeholder="外貌 / 身份描述" aria-label="角色描述">
-          <input id="ob-char-img" class="ghost-btn" style="flex:1;min-width:180px" placeholder="参考图 URL / 路径" aria-label="角色参考图">
-          <button class="ghost-btn" id="ob-char-add">+ 添加</button>
+      <!-- Stage 3: plan -->
+      <div id="ob-plan-pane" style="display:none">
+        <div class="plan-head">
+          <h4 style="margin:0">② 拆解方案 <span id="ob-src" class="src-badge"></span></h4>
+          <p class="muted" style="font-size:.8rem;margin:.2rem 0 0">这只是一个提案 —— 你可以直接编辑，确认后才会写入流水线。</p>
         </div>
-        <button class="pick" data-savestep="characters">保存这一步</button>
+        <div id="ob-plan" class="ob-plan"></div>
+        <button class="pick magnetic" id="ob-confirm">✅ 确认并启动流水线</button>
       </div>
 
       <div id="ob-go-banner" class="banner" style="display:none" role="status" aria-live="polite"></div>
-      <button class="pick" id="ob-go" disabled style="opacity:.5">🚀 Go · 启动流水线</button>
+
+      <details class="legacy">
+        <summary>手动录入（高级）</summary>
+        <div id="ob-stepper" class="kindrow"></div>
+        <div class="ob-step">
+          <h4>① 参考物（视觉 / 风格参考）</h4>
+          <div id="ob-refs"></div>
+          <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+            <input id="ob-ref-url" class="ghost-btn" style="flex:1;min-width:200px" placeholder="参考图 / 视频 URL 或本地路径" aria-label="参考物 URL 或路径">
+            <input id="ob-ref-note" class="ghost-btn" style="flex:1;min-width:160px" placeholder="备注（可选）" aria-label="参考物备注">
+            <button class="ghost-btn" id="ob-ref-add">+ 添加</button>
+          </div>
+          <button class="pick" data-savestep="references">保存这一步</button>
+        </div>
+        <div class="ob-step">
+          <h4>② 故事（剧情 / 脚本）</h4>
+          <textarea id="ob-story" rows="6" style="width:100%;background:var(--bg2);color:var(--txt);border:1px solid var(--panel-brd);border-radius:10px;padding:.6rem" placeholder="粘贴故事 / 脚本文本…" aria-label="故事文本（手动）"></textarea>
+          <button class="pick" data-savestep="story">保存这一步</button>
+        </div>
+        <div class="ob-step">
+          <h4>③ 角色（演员 / 人物）</h4>
+          <div id="ob-chars"></div>
+          <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+            <input id="ob-char-id" class="ghost-btn" style="width:120px" placeholder="id（英文）" aria-label="角色 id">
+            <input id="ob-char-name" class="ghost-btn" style="flex:1;min-width:140px" placeholder="名称" aria-label="角色名称">
+            <input id="ob-char-desc" class="ghost-btn" style="flex:1;min-width:180px" placeholder="外貌 / 身份描述" aria-label="角色描述">
+            <input id="ob-char-img" class="ghost-btn" style="flex:1;min-width:180px" placeholder="参考图 URL / 路径" aria-label="角色参考图">
+            <button class="ghost-btn" id="ob-char-add">+ 添加</button>
+          </div>
+          <button class="pick" data-savestep="characters">保存这一步</button>
+        </div>
+        <button class="pick" id="ob-go" disabled style="opacity:.5">🚀 Go · 启动流水线</button>
+      </details>
     </div>
   </section>
 </main>
@@ -469,11 +546,18 @@ if (!REDUCE) {
   })();
 }
 
-// ---- onboarding wizard (references -> story -> characters -> go) ----
+// ---- onboarding wizard v2 (brief -> thinking -> plan) ----
 const STEP_LABEL = { references: '参考物', story: '故事', characters: '角色' };
+const GENRE_OPTS = ['adult','romance','thriller','drama','slife','scifi'];
+const HEAT_OPTS = ['max','mild'];
+const THINK_STEPS = ['读取并理解你的故事','分析结构与情绪基调','识别主角与配角','规划分镜段落','建议声线 & BGM 氛围'];
 let obRevision = 0;
 let obRefs = [];
 let obChars = [];
+let obPlan = null;
+let obPlanSource = null;
+let obImages = [];        // [{path, name, dataUrl}]
+let obHints = new Set();
 
 function renderRefs(){
   document.getElementById('ob-refs').innerHTML = obRefs.length
@@ -499,22 +583,154 @@ function updateGo(state){
   if (allDone){ banner.style.display='block'; banner.className='banner clear'; banner.textContent='✅ 三步已完成，可以启动流水线。'; }
   else { banner.style.display='none'; }
 }
-async function loadOnboarding(){
+function imgSrc(im){
+  return im.dataUrl ? im.dataUrl : ('/api/file?path=' + encodeURIComponent(im.path));
+}
+function renderImages(){
+  document.getElementById('ob-images').innerHTML = obImages.length
+    ? obImages.map((im,i)=>`<div class="ob-image"><img src="${imgSrc(im)}" alt="${esc(im.name)}"><button type="button" class="rm" data-rmimg="${i}" aria-label="移除图片">✕</button></div>`).join('')
+    : '';
+}
+function fileToDataUrl(file){
+  return new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.onerror = () => rej(new Error('read failed')); fr.readAsDataURL(file); });
+}
+async function addFiles(files){
+  for (const file of files){
+    if (!/^image\/(png|jpeg|webp)$/.test(file.type)){ toast('仅支持 PNG / JPEG / WEBP', true); continue; }
+    try {
+      const dataUrl = await fileToDataUrl(file);
+      const r = await api('/api/upload', { method:'POST', headers:{'Content-Type':'application/json', Origin:location.origin}, body: JSON.stringify({ filename: file.name, data_url: dataUrl }) });
+      obImages.push({ path: r.path, name: file.name, dataUrl });
+    } catch(e){ toast('上传失败：'+e.message, true); }
+  }
+  renderImages();
+}
+function toggleHint(btn){
+  const h = btn.dataset.h;
+  if (obHints.has(h)){ obHints.delete(h); btn.setAttribute('aria-pressed','false'); }
+  else { obHints.add(h); btn.setAttribute('aria-pressed','true'); }
+}
+function showThinking(){
+  const box = document.getElementById('ob-thinking');
+  box.innerHTML = THINK_STEPS.map((t,i)=>`<div class="tk-step" data-i="${i}"><span class="tk-ico">⠿</span> ${esc(t)}</div>`).join('');
+  box.style.display='block';
+  document.getElementById('ob-plan-pane').style.display='none';
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  THINK_STEPS.forEach((t,i)=>{
+    setTimeout(()=>{ const el = box.querySelector(`[data-i="${i}"]`); if (el){ el.classList.add('done'); el.querySelector('.tk-ico').textContent='✓'; } }, reduce ? 0 : 350*(i+1));
+  });
+}
+function markThinkingDone(){
+  document.querySelectorAll('#ob-thinking .tk-step').forEach(el=>{ el.classList.add('done'); const ic = el.querySelector('.tk-ico'); if (ic) ic.textContent='✓'; });
+}
+function renderPlan(plan, source){
+  obPlan = plan || {};
+  obPlanSource = source || '';
+  obPlan.characters = obPlan.characters || [];
+  obPlan.scenes = obPlan.scenes || [];
+  obPlan.voice_suggestions = obPlan.voice_suggestions || [];
+  obPlan.shot_hints = obPlan.shot_hints || [];
+
+  const srcEl = document.getElementById('ob-src');
+  if (source === 'llm'){ srcEl.textContent='AI 拆解'; srcEl.className='src-badge llm'; }
+  else if (source === 'heuristic'){ srcEl.textContent='启发式兜底（无本地 LLM）'; srcEl.className='src-badge heuristic'; }
+  else { srcEl.textContent=''; srcEl.className='src-badge'; }
+
+  const meta = `
+    <div class="grp">
+      <div class="row2">
+        <div><label>片名</label><input id="ob-title" value="${esc(obPlan.title||'')}"></div>
+        <div><label>主题（可选）</label><input id="ob-theme" value="${esc(obPlan.theme||'')}"></div>
+      </div>
+      <div class="row2">
+        <div><label>类型</label><select id="ob-genre">${GENRE_OPTS.map(g=>`<option value="${g}" ${g===obPlan.genre?'selected':''}>${g}</option>`).join('')}</select></div>
+        <div><label>热度</label><select id="ob-heat">${HEAT_OPTS.map(hh=>`<option value="${hh}" ${hh===obPlan.heat_scale?'selected':''}>${hh}</option>`).join('')}</select></div>
+      </div>
+    </div>`;
+
+  const chars = obPlan.characters.map((c, i) => {
+    const voice = (obPlan.voice_suggestions.find(v=>v.character_id===c.id)||{}).voice
+              || (obPlan.voice_suggestions[i] && obPlan.voice_suggestions[i].voice)
+              || ZH_VOICES[i % ZH_VOICES.length];
+    const img = c.reference_image ? `<img class="char-thumb" src="${imgSrc({path:c.reference_image})}" alt="${esc(c.name)}">` : '';
+    return `<div class="card char-card" data-ci="${i}">
+      ${c.is_lead ? '<span class="lead">主角</span>' : ''}
+      ${obPlan.characters.length>1 ? `<button type="button" class="rmc" data-rmc="${i}" aria-label="移除角色">✕</button>` : ''}
+      ${img}
+      <label>名称</label><input id="ob-cname-${i}" value="${esc(c.name||'')}">
+      <label>身份 / 描述</label><textarea id="ob-cdesc-${i}" rows="2">${esc(c.description||'')}</textarea>
+      <label>声线</label><select id="ob-voice-${i}">${ZH_VOICES.map(v=>`<option value="${v}" ${v===voice?'selected':''}>${v}</option>`).join('')}</select>
+    </div>`;
+  }).join('');
+
+  const scenes = obPlan.scenes.map((sc,i)=>`<div class="scene-line"><div class="st">${i+1}. ${esc(sc.title||'')}</div>${sc.summary?`<div class="sm">${esc(sc.summary)}</div>`:''}</div>`).join('')
+    || '<p class="muted">未拆分出分镜段落。</p>';
+  const shots = (obPlan.shot_hints||[]).map(h=>`<span class="chip">${esc(typeof h==='string'?h:JSON.stringify(h))}</span>`).join('')
+    || '<span class="muted">（无）</span>';
+
+  document.getElementById('ob-plan').innerHTML = `
+    ${meta}
+    <div class="grp"><h4>角色（可编辑 / 移除）</h4><div class="grid">${chars}</div></div>
+    <div class="grp"><h4>分镜段落</h4>${scenes}</div>
+    <div class="grp"><h4>镜头提示</h4><div class="hintrow">${shots}</div></div>
+    <div class="grp"><label>BGM 氛围</label><input id="ob-bgm" value="${esc(obPlan.bgm_mood||'')}"></div>`;
+
+  document.getElementById('ob-brief-pane').style.display = 'none';
+  document.getElementById('ob-thinking').style.display = 'none';
+  document.getElementById('ob-plan-pane').style.display = 'block';
+}
+function collectPlan(){
+  const p = obPlan;
+  p.title = document.getElementById('ob-title').value.trim();
+  p.theme = document.getElementById('ob-theme').value.trim();
+  p.genre = document.getElementById('ob-genre').value;
+  p.heat_scale = document.getElementById('ob-heat').value;
+  p.bgm_mood = document.getElementById('ob-bgm').value.trim();
+  p.characters = p.characters.map((c,i)=>({
+    ...c,
+    name: document.getElementById('ob-cname-'+i).value.trim() || c.name,
+    description: document.getElementById('ob-cdesc-'+i).value.trim(),
+  }));
+  p.voice_suggestions = p.characters.map((c,i)=>({ character_id: c.id, voice: document.getElementById('ob-voice-'+i).value }));
+  return p;
+}
+async function runDecompose(){
+  const story = document.getElementById('ob-story-text').value.trim();
+  if (!story){ toast('请先粘贴故事文本', true); return; }
+  const btn = document.getElementById('ob-decompose'); btn.disabled = true;
+  const brief = { story_text: story, image_paths: obImages.map(i=>i.path), hints: [...obHints] };
+  showThinking();
   try {
-    const s = await api('/api/onboarding');
-    obRevision = s.revision || 0;
-    const refs = (s.steps.references.data||{}).items || [];
-    const story = (s.steps.story.data||{}).text || '';
-    const chars = (s.steps.characters.data||{}).items || [];
-    if (refs.length) obRefs = refs.map(r => ({url: r.url||r.path||'', note: r.note||''}));
-    if (story) document.getElementById('ob-story').value = story;
-    if (chars.length) obChars = chars.map(c => ({
-      id: c.id, name: c.name,
-      description: c.description || ((c.visual_features && (c.visual_features.identity||[]))||[]).join(' '),
-      reference_image: (c.reference_image && c.reference_image.path) || '',
-    }));
-    renderRefs(); renderChars(); renderStepper(s); updateGo(s);
-  } catch(e){ toast('载入起步状态失败：'+e.message, true); }
+    const res = await api('/api/onboarding/decompose', { method:'POST', headers:{'Content-Type':'application/json', Origin:location.origin}, body: JSON.stringify({ brief, expected_revision: obRevision }) });
+    obRevision = res.revision;
+    markThinkingDone();
+    renderPlan(res.plan, res.plan_source);
+    toast('拆解完成');
+  } catch(err){
+    btn.disabled = false;
+    document.getElementById('ob-thinking').style.display='none';
+    if (/stale/i.test(err.message)) toast('版本冲突，请刷新后重试', true);
+    else toast('拆解失败：'+err.message, true);
+  }
+}
+async function confirmPlan(){
+  if (!obPlan || !obPlan.characters || !obPlan.characters.length){ toast('方案缺少角色，无法启动', true); return; }
+  const btn = document.getElementById('ob-confirm'); btn.disabled = true;
+  try {
+    const plan = collectPlan();
+    const saved = await api('/api/onboarding/plan', { method:'POST', headers:{'Content-Type':'application/json', Origin:location.origin}, body: JSON.stringify({ plan, expected_revision: obRevision }) });
+    obRevision = saved.revision;
+    const res = await api('/api/onboarding/go', { method:'POST', headers:{'Content-Type':'application/json', Origin:location.origin}, body: JSON.stringify({ expected_revision: obRevision }) });
+    obRevision = res.revision;
+    const banner = document.getElementById('ob-go-banner');
+    banner.style.display='block'; banner.className='banner clear';
+    banner.textContent = `🚀 已启动 — 落盘：${JSON.stringify(res.persisted)} · 图表：${res.graph_written?'已生成':'跳过'} · 推进：${res.advanced ? ('是 ('+res.advanced_detail+')') : ('否 ('+res.advanced_detail+')')}`;
+    toast('方案已确认并启动');
+  } catch(err){
+    btn.disabled = false;
+    if (/stale/i.test(err.message)) toast('版本冲突，请刷新后重试', true);
+    else toast('启动失败：'+err.message, true);
+  }
 }
 async function saveStep(step){
   let payload = {};
@@ -549,6 +765,59 @@ async function doGo(){
     else toast('Go 失败：'+err.message, true);
   }
 }
+async function loadOnboarding(){
+  try {
+    const s = await api('/api/onboarding');
+    obRevision = s.revision || 0;
+    const brief = s.brief || {};
+    if (brief.story_text) document.getElementById('ob-story-text').value = brief.story_text;
+    if (Array.isArray(brief.image_paths) && brief.image_paths.length){
+      obImages = brief.image_paths.map(p=>({ path: p, name: p.split('/').pop() || p, dataUrl: null }));
+      renderImages();
+    }
+    if (Array.isArray(brief.hints)){
+      obHints = new Set(brief.hints);
+      document.querySelectorAll('#ob-hints .hint').forEach(b => b.setAttribute('aria-pressed', obHints.has(b.dataset.h) ? 'true':'false'));
+    }
+    if (s.plan && s.plan.characters) renderPlan(s.plan, s.plan_source);
+    const refs = (s.steps.references.data||{}).items || [];
+    const story = (s.steps.story.data||{}).text || '';
+    const chars = (s.steps.characters.data||{}).items || [];
+    if (refs.length) obRefs = refs.map(r => ({url: r.url||r.path||'', note: r.note||''}));
+    if (story) document.getElementById('ob-story').value = story;
+    if (chars.length) obChars = chars.map(c => ({
+      id: c.id, name: c.name,
+      description: c.description || ((c.visual_features && (c.visual_features.identity||[]))||[]).join(' '),
+      reference_image: (c.reference_image && c.reference_image.path) || '',
+    }));
+    renderRefs(); renderChars(); renderStepper(s); updateGo(s);
+  } catch(e){ toast('载入起步状态失败：'+e.message, true); }
+}
+
+// ---- v2 event wiring ----
+const obDrop = document.getElementById('ob-drop');
+const obFile = document.getElementById('ob-file');
+obDrop.addEventListener('click', () => obFile.click());
+obDrop.addEventListener('keydown', e => { if (e.key==='Enter' || e.key===' '){ e.preventDefault(); obFile.click(); } });
+obFile.addEventListener('change', e => { addFiles(e.target.files); obFile.value=''; });
+['dragenter','dragover'].forEach(ev => obDrop.addEventListener(ev, e => { e.preventDefault(); obDrop.classList.add('drag'); }));
+['dragleave','drop'].forEach(ev => obDrop.addEventListener(ev, e => { e.preventDefault(); obDrop.classList.remove('drag'); }));
+obDrop.addEventListener('drop', e => { if (e.dataTransfer && e.dataTransfer.files) addFiles(e.dataTransfer.files); });
+document.getElementById('ob-images').addEventListener('click', e => {
+  if (e.target.dataset.rmimg !== undefined){ e.preventDefault(); obImages.splice(+e.target.dataset.rmimg, 1); renderImages(); }
+});
+document.querySelectorAll('#ob-hints .hint').forEach(b => b.addEventListener('click', () => toggleHint(b)));
+document.getElementById('ob-decompose').addEventListener('click', runDecompose);
+document.getElementById('ob-confirm').addEventListener('click', confirmPlan);
+document.getElementById('ob-plan').addEventListener('click', e => {
+  if (e.target.dataset.rmc !== undefined){
+    e.preventDefault();
+    const i = +e.target.dataset.rmc;
+    if (obPlan && obPlan.characters.length > 1){ obPlan.characters.splice(i, 1); renderPlan(obPlan, obPlanSource); }
+  }
+});
+
+// ---- legacy manual-entry wiring ----
 document.getElementById('ob-ref-add').onclick = () => {
   const url = document.getElementById('ob-ref-url').value.trim();
   const note = document.getElementById('ob-ref-note').value.trim();

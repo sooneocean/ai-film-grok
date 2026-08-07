@@ -1,5 +1,16 @@
 # Changelog
 
+## [2.40.86] - 2026-08-07
+
+### Added / Changed (Onboarding v2 · 贴故事+图 → 出方案)
+- **Onboarding 重做（agent 规划感）：** 从"填空格 3 步表单"改为「贴故事 + 主角图 → ✨让AI拆解 → 可编辑方案 → 确认启动」。故事为唯一必填项，主角图可选（仅存本地，不上云）。
+- **启发式兜底：** 无本地 LLM（`AIFILM_LOCAL_LLM_BASE_URL` 未设）时 `onboarding_planner.deterministic_decompose` 自动拆解（识别主角/配角、推断类型/热度、规划分镜、建议声线+BGM 氛围），确保 onboarding 永不阻塞；配 LLM 时走私有 `local_llm.decompose`（fail-soft 回退启发式）。
+- **新端点（双网关 FastAPI + stdlib 一致）：** `POST /api/upload`（字节校验 PNG/JPEG/WEBP，magic-byte 校验，0o600）、`POST /api/onboarding/brief`、`POST /api/onboarding/decompose`、`POST /api/onboarding/plan`、`GET /api/file`（只读工作区图片，path-escape 安全）。
+- **首写 genre/heat_scale：** `go` 现经 `_persist_canonical_v2` 写入 `film-spec.json` 的 genre/heat_scale，解除"门禁立刻 403"的体验痛点；并落 `style-bible.json` / `intake-manifest.json` + 尝试 `drama_graph.derive_graph`。
+- **控制台前端（console.html）：** Brief → thinking 步骤流（reduced-motion 友好）→ 可编辑角色/分镜/声线/BGM 方案卡片（llm/heuristic 来源徽章）→ 确认启动；保留「手动录入（高级）」折叠区向后兼容。
+- **测试：** 新增 `test_onboarding_planner.py`（启发式分解单测）；`test_web_api` / `test_review_ui` 扩 onboarding 上传/拆解/plan/go、409 冲突、跨域 403、坏 token 401、file path-escape 404。
+- **修复：** `review_ui.do_POST` 缩进错位（try 块越级）；`onboarding.handle_upload` 缺 `import os`；`onboarding` 多余 `import re`；`onboarding_planner` 未用 `LocalLLMError` 导入。刷新 `runtime-lock.json`。
+
 ## [2.40.83] - 2026-08-07
 
 ### Fixed / Changed (CTO C6.5 mypy incremental expand)

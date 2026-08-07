@@ -192,3 +192,39 @@ def test_review_ui_writes_hash_bound_final_review_input(tmp_path: Path) -> None:
     report = json.loads(payload)
     assert report["ok"] is True
     assert Path(report["path"]).is_file()
+
+
+def test_onboarding_upload_decompose_stdlib(tmp_path: Path) -> None:
+    """Stdlib server mirrors the FastAPI onboarding flow (upload -> decompose)."""
+    (tmp_path / "receipts").mkdir()
+    server = _server(tmp_path)
+    try:
+        png_b64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="
+        status, payload = _request(
+            server, "POST", "/api/upload",
+            body={"filename": "lead.png", "data_url": "data:image/png;base64," + png_b64},
+        )
+        assert status == 200, payload
+        path = json.loads(payload)["path"]
+        st, body = _request(server, "GET", "/api/file?path=" + path)
+        assert st == 200 and body[:4] == b"\x89PNG"
+
+        st2, body2 = _request(
+            server, "POST", "/api/onboarding/decompose",
+            body={"brief": {"story_text": "林晚说：你好。顾沉道：久仰。", "image_paths": [], "hints": []}},
+        )
+        assert st2 == 200, body2
+        assert json.loads(body2)["plan_source"] == "heuristic"
+
+        # cross-origin POST must be rejected at the stdlib layer too
+        connection = HTTPConnection("127.0.0.1", server.server_port)
+        connection.request(
+            "POST", "/api/upload",
+            body=json.dumps({"filename": "x.png", "data_url": "data:image/png;base64,xx"}),
+            headers={"X-Review-Token": "test-token", "Origin": "http://evil.example", "Content-Type": "application/json"},
+        )
+        assert connection.getresponse().status == 403
+        connection.close()
+    finally:
+        server.shutdown()
+        server.server_close()

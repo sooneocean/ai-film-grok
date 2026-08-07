@@ -2086,7 +2086,11 @@
     },
     {
       "path": "scripts/onboarding.py",
-      "sha256": "723df19ef88e4f5dad6d81af24a5638ceec6507278a87c1ef9a9bbe9b6113175"
+      "sha256": "24f8921f0eb595ea1d69a2f0e4fb878cb59730bb46aa43a4496c870ca48cd9a4"
+    },
+    {
+      "path": "scripts/onboarding_planner.py",
+      "sha256": "96a66611d084548a2e3854dde27f741788803a923ead9df8c95acc9739a16eb3"
     },
     {
       "path": "scripts/optimization_dashboard.py",
@@ -2258,7 +2262,7 @@
     },
     {
       "path": "scripts/plan/local_llm.py",
-      "sha256": "3de379180305d904f0687ab1c58b87d45ab49f22774e529e5990f9046e5ee68b"
+      "sha256": "baea4a736f71ef09332943c512dcf4a8fdd1b4f0e1eb9fc7e703e24de91d651d"
     },
     {
       "path": "scripts/plan/longform.py",
@@ -2602,7 +2606,7 @@
     },
     {
       "path": "scripts/post/review_ui.py",
-      "sha256": "1264ea66c4ec2635571e9f163fe2aa442a5183877da21d95dcadc33cfd3182a4"
+      "sha256": "896dcc701188599d345d1a169d45ddf32f46df8e58b2a4348d693a4435a921e2"
     },
     {
       "path": "scripts/post/show_package.py",
@@ -3186,7 +3190,7 @@
     },
     {
       "path": "scripts/web_api.py",
-      "sha256": "fdba95755cbd87c7bfd8d74645ee03d3992508a170ca21b2dcd75befa94026ba"
+      "sha256": "a61b526d3ed66f15cbac64265a0ca8f239ffbb9e0fa05a951ecebaff74bac842"
     },
     {
       "path": "scripts/web_core.py",

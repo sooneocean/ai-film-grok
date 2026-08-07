@@ -6,11 +6,13 @@ story truth, select providers, or approve production gates.
 
 from __future__ import annotations
 
+import base64
 import hashlib
 import ipaddress
 import json
 import urllib.error
 import urllib.request
+from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
 
@@ -25,6 +27,85 @@ ALLOWED_MODELS = frozenset(
         "nvidia/nemotron-3-nano-omni",
     }
 )
+# Models that accept an `image_url` content part in chat/completions.
+VISION_MODELS = frozenset({"zai-org/glm-4.6v-flash", "nvidia/nemotron-3-nano-omni"})
+
+# Decomposition schema: a full pre-production plan derived from a story (+ image).
+_DECOMPOSE_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "additionalProperties": False,
+    "required": [
+        "title",
+        "genre",
+        "heat_scale",
+        "characters",
+        "scenes",
+        "shot_hints",
+        "voice_suggestions",
+        "bgm_mood",
+    ],
+    "properties": {
+        "title": {"type": "string", "maxLength": 80},
+        "genre": {"type": "string", "maxLength": 40},
+        "heat_scale": {"type": "string", "maxLength": 20},
+        "theme": {"type": "string", "maxLength": 200},
+        "tone": {"type": "string", "maxLength": 200},
+        "characters": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "additionalProperties": False,
+                "required": ["id", "name", "role"],
+                "properties": {
+                    "id": {"type": "string", "maxLength": 40},
+                    "name": {"type": "string", "maxLength": 40},
+                    "role": {"type": "string", "maxLength": 40},
+                    "description": {"type": "string", "maxLength": 300},
+                    "is_lead": {"type": "boolean"},
+                },
+            },
+        },
+        "scenes": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "additionalProperties": False,
+                "required": ["title", "summary"],
+                "properties": {
+                    "title": {"type": "string", "maxLength": 80},
+                    "summary": {"type": "string", "maxLength": 300},
+                    "mood": {"type": "string", "maxLength": 60},
+                    "location": {"type": "string", "maxLength": 80},
+                },
+            },
+        },
+        "shot_hints": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "additionalProperties": False,
+                "required": ["action", "camera"],
+                "properties": {
+                    "action": {"type": "string", "maxLength": 120},
+                    "camera": {"type": "string", "maxLength": 60},
+                },
+            },
+        },
+        "voice_suggestions": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "additionalProperties": False,
+                "required": ["character_id", "voice"],
+                "properties": {
+                    "character_id": {"type": "string", "maxLength": 40},
+                    "voice": {"type": "string", "maxLength": 60},
+                },
+            },
+        },
+        "bgm_mood": {"type": "string", "maxLength": 120},
+    },
+}
 _MAX_RESPONSE_BYTES = 1_048_576
 _MAX_PROMPT_CHARS = 12_000
 _PRIVATE_NETWORKS = (
@@ -346,6 +427,138 @@ def shot_draft(
     return {
         "schema_version": 1,
         "kind": "local-llm-shot-draft",
+        "base_url": normalized,
+        "model": approved_model,
+        "candidate": candidate,
+        "input_sha256": hashlib.sha256(clean_prompt.encode()).hexdigest(),
+        "candidate_sha256": hashlib.sha256(canonical.encode()).hexdigest(),
+        "usage": usage,
+        "finish_reason": finish_reason,
+        "schema_valid": True,
+        "status": "candidate_only",
+        "human_apply_required": True,
+        "may_modify_story_truth": False,
+        "may_approve_production": False,
+        "fallback": "existing deterministic planning; no automatic retry",
+    }
+
+
+def _image_data_url(path: str | Path | None) -> str | None:
+    """Read an image file as a base64 data URL for a multimodal message, or None."""
+    if not path:
+        return None
+    p = Path(path)
+    if not p.is_file():
+        return None
+    ext = p.suffix.lower().lstrip(".")
+    mime = {
+        "png": "image/png",
+        "jpg": "image/jpeg",
+        "jpeg": "image/jpeg",
+        "webp": "image/webp",
+    }.get(ext)
+    if not mime:
+        return None
+    try:
+        raw = p.read_bytes()
+    except OSError:
+        return None
+    if not raw or len(raw) > _MAX_RESPONSE_BYTES:
+        return None
+    b64 = base64.b64encode(raw).decode("ascii")
+    return f"data:{mime};base64,{b64}"
+
+
+def decompose(
+    base_url: str,
+    *,
+    prompt: str,
+    image_path: str | Path | None = None,
+    model: str = DEFAULT_MODEL,
+    token: str | None = None,
+    timeout: int = 90,
+) -> dict[str, Any]:
+    """Return a structured pre-production plan (candidate-only, human-apply-required).
+
+    If ``image_path`` is provided and ``model`` is a vision model, the lead image
+    is attached as a multimodal part so the planner can use the protagonist visual.
+    """
+    normalized = normalize_base_url(base_url)
+    approved_model = _require_model(model)
+    clean_prompt = str(prompt).strip()
+    if not clean_prompt or len(clean_prompt) > _MAX_PROMPT_CHARS:
+        raise LocalLLMError(
+            "LOCAL_LLM_PROMPT_INVALID", f"prompt must contain 1-{_MAX_PROMPT_CHARS} characters"
+        )
+    if timeout < 1 or timeout > 120:
+        raise LocalLLMError(
+            "LOCAL_LLM_TIMEOUT_INVALID", "timeout must be between 1 and 120 seconds"
+        )
+
+    user_content: list[dict[str, Any]] = [{"type": "text", "content": clean_prompt}]
+    if image_path and approved_model in VISION_MODELS:
+        data_url = _image_data_url(image_path)
+        if data_url:
+            user_content.insert(0, {"type": "image_url", "image_url": {"url": data_url}})
+
+    response = _request_json(
+        normalized,
+        "/chat/completions",
+        token=token,
+        timeout=timeout,
+        body={
+            "model": approved_model,
+            "temperature": 0,
+            "max_tokens": 1200,
+            "response_format": {
+                "type": "json_schema",
+                "json_schema": {"name": "decompose", "strict": True, "schema": _DECOMPOSE_SCHEMA},
+            },
+            "messages": [
+                {
+                    "role": "system",
+                    "content": (
+                        "You are a film pre-production planner. Given a story (and optional "
+                        "protagonist image), return a structured decomposition: title, genre, "
+                        "heat_scale, theme, tone, characters (id/name/role/description/is_lead), "
+                        "scenes (title/summary/mood/location), shot_hints (action/camera), "
+                        "voice_suggestions (character_id/voice using zh-CN neural voices), and "
+                        "bgm_mood. Use safe, production-ready values. Do not claim approval or "
+                        "invent provenance."
+                    ),
+                },
+                {"role": "user", "content": user_content},
+            ],
+        },
+    )
+    choices = response.get("choices")
+    choice = (
+        choices[0] if isinstance(choices, list) and choices and isinstance(choices[0], dict) else {}
+    )
+    finish_reason = choice.get("finish_reason")
+    message = choice.get("message")
+    content = message.get("content") if isinstance(message, dict) else None
+    if finish_reason != "stop":
+        raise LocalLLMError(
+            "LOCAL_LLM_INCOMPLETE_OUTPUT", "local LLM decompose did not finish normally"
+        )
+    try:
+        candidate = json.loads(content) if isinstance(content, str) else None
+    except json.JSONDecodeError as exc:
+        raise LocalLLMError(
+            "LOCAL_LLM_INVALID_DECOMPOSE_JSON", "local LLM returned invalid decompose JSON"
+        ) from exc
+    try:
+        Draft202012Validator(_DECOMPOSE_SCHEMA).validate(candidate)
+    except ValidationError as exc:
+        raise LocalLLMError(
+            "LOCAL_LLM_INVALID_DECOMPOSE_JSON", "local LLM returned an invalid decomposition"
+        ) from exc
+    canonical = json.dumps(candidate, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    usage = _safe_usage(response.get("usage"))
+    return {
+        "schema_version": 1,
+        "kind": "local-llm-decompose",
         "base_url": normalized,
         "model": approved_model,
         "candidate": candidate,

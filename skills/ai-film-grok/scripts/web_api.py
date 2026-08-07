@@ -157,6 +157,17 @@ def create_app(root: str | Path, token: str, port: int) -> FastAPI:
 
         return asset_picker.console_state(base)
 
+    # ---- workspace file (read-only: auth only; path-escape safe) ----
+    @app.get("/api/file", dependencies=[Depends(require_auth)])
+    def api_file(path: str = "", request: Request = None) -> Response:
+        if not path or path.startswith("/"):
+            raise HTTPException(status_code=400, detail="invalid file path")
+        try:
+            candidate = safe_media_path(base, path)
+        except WebConsoleError:
+            raise HTTPException(status_code=404, detail="file not found")
+        return _media_response(candidate, request)
+
     # ---- selection (state-changing: auth + loopback) ----
     @app.post("/api/select", dependencies=[Depends(require_auth), Depends(require_loopback)])
     async def api_select(request: Request) -> dict[str, Any]:
@@ -244,6 +255,119 @@ def create_app(root: str | Path, token: str, port: int) -> FastAPI:
             raise HTTPException(status_code=409, detail=str(exc))
         except WebConsoleError as exc:
             raise HTTPException(status_code=400, detail=str(exc))
+
+    # ---- onboarding: image upload (base64 data URL; loopback + auth) ----
+    @app.post("/api/upload", dependencies=[Depends(require_auth), Depends(require_loopback)])
+    async def api_upload(request: Request) -> dict[str, Any]:
+        import onboarding
+
+        try:
+            length = int(request.headers.get("Content-Length", "0") or "0")
+        except ValueError:
+            length = 0
+        if length < 0 or length > 20 * 1024 * 1024:
+            raise HTTPException(status_code=400, detail="upload body too large")
+        try:
+            payload = await request.json()
+        except Exception:  # noqa: BLE001
+            raise HTTPException(status_code=400, detail="request body must be JSON")
+        if not isinstance(payload, dict):
+            raise HTTPException(status_code=400, detail="request body must be a JSON object")
+        try:
+            return onboarding.handle_upload(
+                base, filename=str(payload.get("filename") or ""), data_url=str(payload.get("data_url") or "")
+            )
+        except WebConsoleError as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
+
+    @app.post("/api/onboarding/brief", dependencies=[Depends(require_auth), Depends(require_loopback)])
+    async def api_onboarding_brief(request: Request) -> dict[str, Any]:
+        import onboarding
+
+        try:
+            length = int(request.headers.get("Content-Length", "0") or "0")
+        except ValueError:
+            length = 0
+        if length < 0 or length > MAX_BODY:
+            raise HTTPException(status_code=400, detail="invalid request body size")
+        try:
+            payload = await request.json()
+        except Exception:  # noqa: BLE001
+            raise HTTPException(status_code=400, detail="request body must be JSON")
+        if not isinstance(payload, dict):
+            raise HTTPException(status_code=400, detail="request body must be a JSON object")
+        try:
+            return onboarding.submit_brief(
+                base,
+                story_text=str(payload.get("story_text") or ""),
+                image_paths=payload.get("image_paths"),
+                hints=payload.get("hints"),
+                expected_revision=payload.get("expected_revision"),
+            )
+        except WebConsoleConflict as exc:
+            raise HTTPException(status_code=409, detail=str(exc))
+        except WebConsoleError as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
+        except (KeyError, TypeError) as exc:
+            raise HTTPException(status_code=400, detail=f"invalid brief fields: {exc}")
+
+    @app.post("/api/onboarding/decompose", dependencies=[Depends(require_auth), Depends(require_loopback)])
+    async def api_onboarding_decompose(request: Request) -> dict[str, Any]:
+        import onboarding
+
+        try:
+            length = int(request.headers.get("Content-Length", "0") or "0")
+        except ValueError:
+            length = 0
+        if length < 0 or length > MAX_BODY:
+            raise HTTPException(status_code=400, detail="invalid request body size")
+        try:
+            payload = await request.json()
+        except Exception:  # noqa: BLE001
+            raise HTTPException(status_code=400, detail="request body must be JSON")
+        if not isinstance(payload, dict):
+            raise HTTPException(status_code=400, detail="request body must be a JSON object")
+        try:
+            return onboarding.decompose(
+                base,
+                expected_revision=payload.get("expected_revision"),
+                brief=payload.get("brief"),
+            )
+        except WebConsoleConflict as exc:
+            raise HTTPException(status_code=409, detail=str(exc))
+        except WebConsoleError as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
+        except (KeyError, TypeError) as exc:
+            raise HTTPException(status_code=400, detail=f"invalid decompose fields: {exc}")
+
+    @app.post("/api/onboarding/plan", dependencies=[Depends(require_auth), Depends(require_loopback)])
+    async def api_onboarding_plan(request: Request) -> dict[str, Any]:
+        import onboarding
+
+        try:
+            length = int(request.headers.get("Content-Length", "0") or "0")
+        except ValueError:
+            length = 0
+        if length < 0 or length > MAX_BODY:
+            raise HTTPException(status_code=400, detail="invalid request body size")
+        try:
+            payload = await request.json()
+        except Exception:  # noqa: BLE001
+            raise HTTPException(status_code=400, detail="request body must be JSON")
+        if not isinstance(payload, dict):
+            raise HTTPException(status_code=400, detail="request body must be a JSON object")
+        try:
+            return onboarding.save_plan(
+                base,
+                payload.get("plan", {}),
+                expected_revision=payload.get("expected_revision"),
+            )
+        except WebConsoleConflict as exc:
+            raise HTTPException(status_code=409, detail=str(exc))
+        except WebConsoleError as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
+        except (KeyError, TypeError) as exc:
+            raise HTTPException(status_code=400, detail=f"invalid plan fields: {exc}")
 
     return app
 

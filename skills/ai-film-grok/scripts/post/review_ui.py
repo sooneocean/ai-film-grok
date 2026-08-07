@@ -31,6 +31,7 @@ from util import exclusive_file_lock, write_json
 from web_core import WebConsoleConflict, WebConsoleError, WebConsoleForbidden
 
 MAX_BODY = 128 * 1024
+MAX_UPLOAD = 20 * 1024 * 1024
 MEDIA_SUFFIXES = frozenset(
     {".mp4", ".mov", ".m4v", ".webm", ".wav", ".mp3", ".m4a", ".png", ".jpg", ".jpeg", ".webp"}
 )
@@ -166,9 +167,9 @@ def make_handler(root: Path, token: str):
                 cookie_token, token
             )
 
-        def _payload(self) -> dict[str, Any]:
+        def _payload(self, max_size: int = MAX_BODY) -> dict[str, Any]:
             length = int(self.headers.get("Content-Length", "0"))
-            if length < 1 or length > MAX_BODY:
+            if length < 1 or length > max_size:
                 raise ReviewUIError("invalid request body size")
             value = json.loads(self.rfile.read(length))
             if not isinstance(value, dict):
@@ -289,6 +290,16 @@ def make_handler(root: Path, token: str):
                 except ReviewUIError as exc:
                     self._json(HTTPStatus.NOT_FOUND, {"error": str(exc)})
                 return
+            if parsed.path == "/api/file":
+                rel = (parse_qs(parsed.query).get("path") or [""])[0]
+                if not rel or rel.startswith("/") or "/../" in rel:
+                    self._json(HTTPStatus.BAD_REQUEST, {"error": "invalid file path"})
+                    return
+                try:
+                    self._media(_safe_media(root, unquote(rel)))
+                except ReviewUIError as exc:
+                    self._json(HTTPStatus.NOT_FOUND, {"error": str(exc)})
+                return
             self._json(HTTPStatus.NOT_FOUND, {"error": "not found"})
 
         def _media(self, path: Path) -> None:
@@ -335,7 +346,7 @@ def make_handler(root: Path, token: str):
                 self._json(HTTPStatus.FORBIDDEN, {"error": "cross-origin request rejected"})
                 return
             try:
-                body = self._payload()
+                body = self._payload(max_size=MAX_UPLOAD if self.path == "/api/upload" else MAX_BODY)
                 if self.path == "/api/action":
                     report = record_action(root, **body)
                 elif self.path == "/api/settings":
@@ -361,6 +372,38 @@ def make_handler(root: Path, token: str):
                     import onboarding
 
                     report = onboarding.go(root, expected_revision=body.get("expected_revision"))
+                elif self.path == "/api/upload":
+                    import onboarding
+
+                    report = onboarding.handle_upload(
+                        root, filename=body.get("filename", ""), data_url=body.get("data_url", "")
+                    )
+                elif self.path == "/api/onboarding/brief":
+                    import onboarding
+
+                    report = onboarding.submit_brief(
+                        root,
+                        story_text=body.get("story_text", ""),
+                        image_paths=body.get("image_paths"),
+                        hints=body.get("hints"),
+                        expected_revision=body.get("expected_revision"),
+                    )
+                elif self.path == "/api/onboarding/decompose":
+                    import onboarding
+
+                    report = onboarding.decompose(
+                        root,
+                        expected_revision=body.get("expected_revision"),
+                        brief=body.get("brief"),
+                    )
+                elif self.path == "/api/onboarding/plan":
+                    import onboarding
+
+                    report = onboarding.save_plan(
+                        root,
+                        body.get("plan", {}),
+                        expected_revision=body.get("expected_revision"),
+                    )
                 elif self.path == "/api/stop":
                     report = {"ok": True, "stopping": True}
                     threading.Thread(target=self.server.shutdown, daemon=True).start()
