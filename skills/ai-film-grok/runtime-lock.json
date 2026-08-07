@@ -2394,7 +2394,7 @@
     },
     {
       "path": "scripts/plan/director_cli.py",
-      "sha256": "097bf5b935980a9a8209c01b9b5b883a355b8c44bc70b638d52b5d32d7fba00c"
+      "sha256": "3442ab69034788e56dd5a9ff17bd354c8b29b06a99bb886ab045973833a6f0a8"
     },
     {
       "path": "scripts/plan/director_interpretation.py",
