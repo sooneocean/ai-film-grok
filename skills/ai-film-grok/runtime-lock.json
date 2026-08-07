@@ -1862,7 +1862,7 @@
     },
     {
       "path": "scripts/media/h3_workflow.py",
-      "sha256": "1639455881cb52b6dd5f63054c6e55c9e6298441b86f5fb2aa59e79e8b4a7186"
+      "sha256": "ed90480e62f308e9a97749b8b447583acf165df8ed26c4e60724fe75f34e017b"
     },
     {
       "path": "scripts/media/i2v_motion_gate.py",
@@ -3194,7 +3194,7 @@
     },
     {
       "path": "scripts/spine/next_actions.py",
-      "sha256": "3ee99546a8adc991a3d20109392d7675ad9278c05d71868a38b887f4c194b5b9"
+      "sha256": "0228dc87bfa3bad33b8bd50c1da28d41d3773450598ee89f170eb1a72fee9683"
     },
     {
       "path": "scripts/spine/pipeline_events.py",
@@ -3478,7 +3478,7 @@
     },
     {
       "path": "scripts/workflow_pack.py",
-      "sha256": "b4e089e6bc6f12703359f690543908b77a8d66786b5ea1ca728132e0d8d1cf7e"
+      "sha256": "94b1488d3d791000899148e69160880e6435c55cec43c80964e8c00fc1da8db6"
     },
     {
       "path": "scripts/workflow_spine.py",

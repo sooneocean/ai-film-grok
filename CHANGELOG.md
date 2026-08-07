@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.41.18] - 2026-08-07
+
+### Added / Closed (H3 native chain · go to end)
+- **True-film:** e-virus-ch06 `ship-native --light-process` → `film_native_stable.mp4` (19 clips, ~16MB, mean≈−19.6 dB, light ok). Evidence: `docs/reports/2026-08-07-h3-native-ship-light-evidence.md`.
+- **Music Director:** re-exports `NATIVE_LIGHT_AF_FILTER` (same IRON as final.native_audio).
+- **Orchestrator plan:** core SHIPPED; residual mega-fn bug-driven only.
+
 ## [2.41.17] - 2026-08-07
 
 ### Changed (monolith orchestrator relief · W2 validate sections)

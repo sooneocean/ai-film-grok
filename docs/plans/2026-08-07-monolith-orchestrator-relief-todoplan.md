@@ -1,7 +1,7 @@
 # 巨石模组舒缓 Todo Plan（2026-08-07 · 现状诊断 + 分步队列）
 
 **Status:** **SHIPPED core · residual bug-driven only**（2026-08-07 close）  
-**Plugin:** **2.41.17** · checkout `plugins/ai-film-grok`  
+**Plugin:** **2.41.18** · checkout `plugins/ai-film-grok`  
 **历史主档（勿重开已 ship 波）：**  
 - [project-module-refactor](docs/plans/2026-08-05-project-module-refactor.md) · W0–W7 **DONE**  
 - [residual-monolith-w4](docs/plans/2026-08-05-residual-monolith-w4-todo.md) · 包边界 + pure leaf **DONE**  
