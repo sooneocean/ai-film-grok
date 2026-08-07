@@ -22,11 +22,13 @@
 
 ### H3 原声 · 音乐总监（2026-08-07）
 
+批改：`batch --file edits.json` · 抽听：`checklist` · 爆音：`audit --apply-peak-auto`
+
 > 口白走 **prefer_native** 时：BGM / 爆音 / 错台词 mute **取决于总监 plan**，禁止各镜私拧旋钮。
 
 1. `aifilm music-director draft --root …` → `audio/music-director-plan.json`
 2. 导演改 plan：`mute_windows`（plate 内错句静音）· `mute_entire`/`lane=silence` · `peak_fix=auto` · BGM `duck_db`
-3. `aifilm music-director set …`（mute 窗）→ `audit` → `apply --root …` → `audio/native_directed/{shot}.wav` + apply 回执
+3. `set` / `batch` / `audit` / `checklist` → `apply` → final → `audio/native_directed/{shot}.wav` + apply 回执
 4. `aifilm music-director review --root …` → 抽听点 / mute 列表 / peak
 5. `aifilm final …` 自动优先 directed stem（仍 XOR 禁叠 Edge）
 

@@ -5,20 +5,18 @@
 ## 三句
 
 1. **prefer_native** 主链：错台词 v1 = **音频 mute**（时间窗或整镜 silence），画面不动。
-2. 单一真相：`audio/music-director-plan.json` → set/audit → apply → `audio/native_directed/` + final 自动读。
-3. 爆音：`peak_fix=auto` + true-peak；apply 默认 light 处理；非 wav（mp4/m4a）经 ffmpeg 解码。
+2. 单一真相：plan → **set/batch/audit/checklist** → apply → `native_directed/` → final。
+3. 爆音：`audit --apply-peak-auto`；非 wav 经 ffmpeg；apply 默认 light。
 
 ## 清单
 
-- [ ] draft plan
-- [ ] `set --mute-window` / duck / mute-entire
-- [ ] `audit` 看 hot 镜
-- [ ] apply
-- [ ] review 抽听
-- [ ] final
+- [ ] draft
+- [ ] set / batch（mute 窗 · duck）
+- [ ] audit（hot）
+- [ ] checklist 抽听
+- [ ] apply → final
 
 ## 链
 
-- stage：`references/stages/voice.md` · `post.md`
-- 代码：`audio/music_director.py` · CLI `aifilm music-director`
-- IRON：原声 XOR TTS · hard-defaults
+- `audio/music_director.py` · CLI `music-director`
+- stages/voice · hard-defaults

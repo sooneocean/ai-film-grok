@@ -514,6 +514,25 @@ def add_audio_parsers(sub: argparse._SubParsersAction[argparse.ArgumentParser]) 
         "audit", help="Probe native peaks for plan shots; list hot stems"
     )
     md_audit.add_argument("--root", required=True)
+    md_audit.add_argument(
+        "--apply-peak-auto",
+        action="store_true",
+        help="Write peak_fix=auto on hot shots into the plan",
+    )
+    md_batch = md_sub.add_parser(
+        "batch",
+        help="Apply many shot edits from JSON/JSONL (mute windows, duck, peak)",
+    )
+    md_batch.add_argument("--root", required=True)
+    md_batch.add_argument("--file", required=True, help="edits.json or edits.jsonl")
+    md_check = md_sub.add_parser(
+        "checklist",
+        help="Export human listen checklist (receipts/music-director-checklist.md)",
+    )
+    md_check.add_argument("--root", required=True)
+    md_check.add_argument(
+        "--no-write", action="store_true", help="Print only; do not write receipts"
+    )
 
 
 def cmd_audio_plan(args: argparse.Namespace) -> int:
@@ -685,12 +704,50 @@ def cmd_music_director(args: argparse.Namespace) -> int:
             _emit({"ok": True, "path": str(path), "shot": str(args.shot), "plan": plan})
             return 0
         if action == "audit":
-            from music_director import audit_native_peaks
+            from music_director import (
+                apply_audit_peak_suggestions,
+                audit_native_peaks,
+            )
 
             plan = load_plan(root)
             report = audit_native_peaks(root, plan)
+            if bool(getattr(args, "apply_peak_auto", False)) and plan is not None:
+                plan = apply_audit_peak_suggestions(plan, report, force_auto=True)
+                path = save_plan(root, plan)
+                report = {**report, "plan_updated": True, "plan_path": str(path)}
             _emit(report)
             return 0 if report.get("ok") else 1
+        if action == "batch":
+            from music_director import apply_batch_edits, load_batch_edits
+
+            plan = load_plan(root)
+            if plan is None:
+                plan = draft_and_save(root)["plan"]
+            edits = load_batch_edits(Path(args.file).expanduser().resolve())
+            plan = apply_batch_edits(plan, edits)
+            path = save_plan(root, plan)
+            _emit(
+                {
+                    "ok": True,
+                    "path": str(path),
+                    "edit_count": len(edits),
+                    "source": "director",
+                }
+            )
+            return 0
+        if action == "checklist":
+            from music_director import export_listen_checklist
+
+            plan = load_plan(root)
+            report = export_listen_checklist(
+                root, plan, write=not bool(getattr(args, "no_write", False))
+            )
+            # keep stdout compact: drop long markdown body unless no-write
+            out = {k: v for k, v in report.items() if k != "markdown"}
+            if bool(getattr(args, "no_write", False)):
+                out["markdown"] = report.get("markdown")
+            _emit(out)
+            return 0
         raise FilmError(f"unknown music-director action: {action}")
     except MusicDirectorError as exc:
         raise FilmError(str(exc)) from exc

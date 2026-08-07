@@ -27,6 +27,10 @@ from music_director import (
     load_audio_samples,
     discover_native_source,
     audit_native_peaks,
+    apply_batch_edits,
+    load_batch_edits,
+    export_listen_checklist,
+    apply_audit_peak_suggestions,
 )
 
 
@@ -326,3 +330,84 @@ def test_audit_marks_hot_peak(tmp_path: Path) -> None:
     plan = draft_plan(root=root)
     rep = audit_native_peaks(root, plan)
     assert "h1" in rep["hot_shot_ids"]
+
+
+def test_batch_edits_and_jsonl(tmp_path: Path) -> None:
+    plan = draft_plan(
+        spec={
+            "shots": [
+                {"id": "a", "nar": "1", "dialogue_audio_lane": "native"},
+                {"id": "b", "nar": "2", "dialogue_audio_lane": "native"},
+            ]
+        }
+    )
+    plan = apply_batch_edits(
+        plan,
+        [
+            {"shot_id": "a", "mute_window": [0.1, 0.3], "reason": "wrong_line", "duck_db": -8},
+            {"shot_id": "b", "mute_entire": True},
+        ],
+    )
+    by = {r["shot_id"]: r for r in plan["native_voice"]["shots"]}
+    assert by["a"]["mute_windows"][0]["end_sec"] == 0.3
+    assert by["b"]["mute_entire"] is True
+    assert by["b"]["lane"] == "silence"
+    bgm = {r["shot_id"]: r for r in plan["bgm"]["shots"]}
+    assert bgm["a"]["duck_db"] == -8.0
+
+    jl = tmp_path / "e.jsonl"
+    jl.write_text(
+        '{"shot_id":"a","mute_window":"0.5:0.8","reason":"x"}\n',
+        encoding="utf-8",
+    )
+    edits = load_batch_edits(jl)
+    plan2 = apply_batch_edits(plan, edits)
+    wins = [w for w in plan2["native_voice"]["shots"] if w["shot_id"] == "a"][0]["mute_windows"]
+    assert any(abs(w["start_sec"] - 0.5) < 1e-6 for w in wins)
+
+
+def test_export_listen_checklist(tmp_path: Path) -> None:
+    import json
+    import numpy as np
+    import wave
+
+    root = tmp_path / "film"
+    native = root / "audio" / "native"
+    native.mkdir(parents=True)
+    sr = 4000
+    hot = (np.ones(sr, dtype=np.float32) * 0.99)
+    pcm = (hot * 32767).astype(np.int16)
+    with wave.open(str(native / "c1.wav"), "wb") as wf:
+        wf.setnchannels(1)
+        wf.setsampwidth(2)
+        wf.setframerate(sr)
+        wf.writeframes(pcm.tobytes())
+    (root / "film-spec.json").write_text(
+        json.dumps(
+            {
+                "audio_policy": "prefer_native",
+                "shots": [{"id": "c1", "nar": "hi", "dialogue_audio_lane": "native"}],
+            }
+        ),
+        encoding="utf-8",
+    )
+    plan = draft_plan(root=root)
+    plan = set_shot_controls(plan, "c1", mute_window=(0.1, 0.2), duck_db=-6)
+    save_plan(root, plan)
+    rep = export_listen_checklist(root, plan, write=True)
+    assert rep["counts"]["must_listen"] >= 1
+    assert (root / "receipts" / "music-director-checklist.md").is_file()
+    assert (root / "receipts" / "music-director-checklist.json").is_file()
+    assert "c1" in rep["markdown"]
+
+
+def test_apply_audit_peak_suggestions() -> None:
+    plan = draft_plan(
+        spec={"shots": [{"id": "z", "nar": "n", "dialogue_audio_lane": "native"}]}
+    )
+    # force off then suggestions set auto
+    plan = set_shot_controls(plan, "z", peak_fix="off")
+    audit = {"hot_shot_ids": ["z"]}
+    plan2 = apply_audit_peak_suggestions(plan, audit)
+    row = plan2["native_voice"]["shots"][0]
+    assert row["peak_fix"] == "auto"

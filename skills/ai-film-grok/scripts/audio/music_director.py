@@ -1088,6 +1088,234 @@ def audit_native_peaks(root: Path, plan: dict[str, Any] | None = None) -> dict[s
         "suggest_peak_fix_auto": hot_ids,
     }
 
+
+def apply_batch_edits(plan: dict[str, Any], edits: list[dict[str, Any]]) -> dict[str, Any]:
+    """Apply a list of director edit rows onto a plan."""
+    if not isinstance(edits, list):
+        raise MusicDirectorError("batch edits must be a list")
+    plan = normalize_plan(plan)
+    for raw in edits:
+        if not isinstance(raw, dict):
+            raise MusicDirectorError("each batch edit must be an object")
+        sid = str(raw.get("shot_id") or raw.get("shot") or "").strip()
+        if not sid:
+            raise MusicDirectorError("batch edit missing shot_id")
+        mute_window = None
+        if raw.get("mute_window") is not None:
+            mw = raw["mute_window"]
+            if isinstance(mw, (list, tuple)) and len(mw) == 2:
+                mute_window = (float(mw[0]), float(mw[1]))
+            elif isinstance(mw, str):
+                token = mw if ":" in mw else mw.replace("-", ":", 1)
+                a, b = token.split(":", 1)
+                mute_window = (float(a), float(b))
+            else:
+                raise MusicDirectorError(
+                    f"shot {sid}: mute_window must be [start,end] or START:END"
+                )
+        plan = set_shot_controls(
+            plan,
+            sid,
+            mute_window=mute_window,
+            mute_reason=str(raw.get("reason") or raw.get("mute_reason") or "wrong_line"),
+            mute_entire=raw.get("mute_entire"),
+            peak_fix=raw.get("peak_fix"),
+            gain=raw.get("gain"),
+            lane=raw.get("lane"),
+            duck_db=raw.get("duck_db"),
+            energy=raw.get("energy"),
+            mute_bed=raw.get("mute_bed"),
+        )
+        extra = raw.get("mute_windows")
+        if isinstance(extra, list):
+            for win in extra:
+                if not isinstance(win, dict):
+                    continue
+                plan = set_shot_controls(
+                    plan,
+                    sid,
+                    mute_window=(float(win["start_sec"]), float(win["end_sec"])),
+                    mute_reason=str(win.get("reason") or raw.get("reason") or "wrong_line"),
+                )
+    return normalize_plan(plan)
+
+
+def load_batch_edits(path: Path) -> list[dict[str, Any]]:
+    """Load edits from .json (list/object) or .jsonl (one object per line)."""
+    import json as _json
+
+    path = Path(path)
+    if not path.is_file():
+        raise MusicDirectorError(f"batch file missing: {path}")
+    raw = path.read_text(encoding="utf-8")
+    if path.suffix.lower() == ".jsonl":
+        edits: list[dict[str, Any]] = []
+        for i, line in enumerate(raw.splitlines(), start=1):
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            try:
+                obj = _json.loads(line)
+            except Exception as exc:  # noqa: BLE001
+                raise MusicDirectorError(f"jsonl line {i} invalid: {exc}") from exc
+            if not isinstance(obj, dict):
+                raise MusicDirectorError(f"jsonl line {i} must be an object")
+            edits.append(obj)
+        return edits
+    data = _json.loads(raw)
+    if isinstance(data, list):
+        return data
+    if isinstance(data, dict):
+        if isinstance(data.get("edits"), list):
+            return data["edits"]
+        if data.get("shot_id") or data.get("shot"):
+            return [data]
+    raise MusicDirectorError("batch JSON must be a list, {edits:[...]}, or one edit object")
+
+
+def export_listen_checklist(
+    root: Path,
+    plan: dict[str, Any] | None = None,
+    *,
+    audit: dict[str, Any] | None = None,
+    write: bool = True,
+) -> dict[str, Any]:
+    """Build a human listen checklist from plan + optional peak audit + apply receipt."""
+    root = Path(root).expanduser().resolve()
+    plan = normalize_plan(plan if plan is not None else (load_plan(root) or draft_plan(root=root)))
+    review = build_review(root, plan)
+    if audit is None:
+        try:
+            audit = audit_native_peaks(root, plan)
+        except MusicDirectorError:
+            audit = {"ok": False, "hot_shot_ids": [], "shots": []}
+
+    hot = {str(x) for x in (audit.get("hot_shot_ids") or [])}
+    audit_by = {
+        str(r.get("shot_id")): r
+        for r in (audit.get("shots") or [])
+        if isinstance(r, dict) and r.get("shot_id")
+    }
+    items: list[dict[str, Any]] = []
+    for vrow in plan["native_voice"]["shots"]:
+        sid = vrow["shot_id"]
+        bgm = next((b for b in plan["bgm"]["shots"] if b["shot_id"] == sid), None) or {}
+        arow = audit_by.get(sid) or {}
+        mutes = list(vrow.get("mute_windows") or [])
+        flags: list[str] = []
+        if vrow.get("mute_entire") or vrow.get("lane") == "silence":
+            flags.append("mute_entire")
+        if mutes:
+            flags.append(f"mute_windows={len(mutes)}")
+        if sid in hot:
+            flags.append("peak_hot")
+        if float(bgm.get("duck_db") or 0) < 0:
+            flags.append(f"duck={bgm.get('duck_db')}")
+        if bgm.get("mute_bed"):
+            flags.append("mute_bed")
+        priority = 0
+        if "peak_hot" in flags:
+            priority += 2
+        if mutes or "mute_entire" in flags:
+            priority += 2
+        if any(f.startswith("duck") for f in flags):
+            priority += 1
+        items.append(
+            {
+                "shot_id": sid,
+                "lane": vrow.get("lane"),
+                "priority": priority,
+                "flags": flags,
+                "mute_windows": mutes,
+                "mute_entire": bool(vrow.get("mute_entire")),
+                "peak_dbfs": arow.get("peak_dbfs"),
+                "hot": bool(arow.get("hot")),
+                "source": arow.get("source"),
+                "duration_sec": arow.get("duration_sec"),
+                "duck_db": bgm.get("duck_db"),
+                "listen_note": (
+                    "抽听 peak + mute 窗后"
+                    if priority >= 2
+                    else ("抽听 1 句" if vrow.get("lane") == "native" else "可跳过 silence")
+                ),
+                "done": False,
+            }
+        )
+    items.sort(key=lambda r: (-int(r["priority"]), str(r["shot_id"])))
+    must = [r for r in items if int(r["priority"]) >= 2]
+    lines = [
+        "# Music Director 抽听清单",
+        "",
+        f"- root: `{root}`",
+        f"- must_listen: **{len(must)}** / {len(items)}",
+        f"- hot_peaks: {len(hot)}",
+        f"- policy: audio mute v1（不改画面）",
+        "",
+        "| pri | shot | flags | peak | note | done |",
+        "|----:|------|-------|-----:|------|------|",
+    ]
+    for r in items:
+        flags = ",".join(r["flags"]) or "—"
+        peak = r["peak_dbfs"] if r["peak_dbfs"] is not None else "—"
+        lines.append(
+            f"| {r['priority']} | `{r['shot_id']}` | {flags} | {peak} | {r['listen_note']} | [ ] |"
+        )
+    lines.extend(
+        [
+            "",
+            "## 操作提示",
+            "1. 先听 priority≥2（mute / 爆音）",
+            "2. 改窗：`aifilm music-director set --shot … --mute-window a:b`",
+            "3. 批改：`aifilm music-director batch --file edits.json`",
+            "4. `apply` → `final`",
+            "",
+        ]
+    )
+    md_body = "\n".join(lines)
+    checklist = {
+        "schema": "aifilm-music-director-checklist-v1",
+        "created_at": utc_now(),
+        "root": str(root),
+        "plan_path": str(plan_path(root)),
+        "audio_policy": plan.get("audio_policy"),
+        "counts": {
+            "shots": len(items),
+            "must_listen": len(must),
+            "hot_peaks": len(hot),
+            "mute_actions": sum(1 for r in items if r["mute_windows"] or r["mute_entire"]),
+        },
+        "items": items,
+        "review_status": review.get("status"),
+        "audit_ok": audit.get("ok"),
+        "picture_timing_changed": False,
+        "wrong_line_policy": "audio_mute_v1",
+        "markdown": md_body,
+    }
+    if write:
+        out_json = root / "receipts" / "music-director-checklist.json"
+        out_md = root / "receipts" / "music-director-checklist.md"
+        out_json.parent.mkdir(parents=True, exist_ok=True)
+        payload = {k: v for k, v in checklist.items() if k != "markdown"}
+        write_json(out_json, payload)
+        out_md.write_text(md_body, encoding="utf-8")
+        checklist["path_json"] = str(out_json)
+        checklist["path_md"] = str(out_md)
+    return checklist
+
+
+def apply_audit_peak_suggestions(
+    plan: dict[str, Any],
+    audit: dict[str, Any],
+    *,
+    force_auto: bool = True,
+) -> dict[str, Any]:
+    """For hot peak shots, set peak_fix=auto (idempotent)."""
+    plan = normalize_plan(plan)
+    for sid in [str(x) for x in (audit.get("hot_shot_ids") or [])]:
+        plan = set_shot_controls(plan, sid, peak_fix="auto" if force_auto else None)
+    return normalize_plan(plan)
+
+
 def draft_and_save(root: Path) -> dict[str, Any]:
     plan = draft_plan(root=root)
     path = save_plan(root, plan)

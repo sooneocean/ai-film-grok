@@ -32,3 +32,13 @@
 | CLI set / audit | SHIPPED |
 | ASR 自动判错句 | residual |
 | 画面剪 | residual editor_cut |
+
+## R3（2026-08-07 next）
+
+| 项 | 状态 |
+|----|------|
+| batch JSON/JSONL | SHIPPED |
+| checklist md/json | SHIPPED |
+| audit --apply-peak-auto | SHIPPED |
+| ASR | residual |
+| 画面剪 | residual |
