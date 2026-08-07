@@ -159,7 +159,37 @@ class TestSkipAudit(unittest.TestCase):
                 ):
                     os.environ.pop(k, None)
 
+    def test_cli_residual_skips_ledger(self) -> None:
+        """Round: CLI face/mean/duration/cinematic + IRON residual via skip_flag."""
+        from core.skip_audit import skip_flag, load_skip_usage, is_iron_skip
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            flags = (
+                "AIFILM_SKIP_FACE_IDENTITY",
+                "AIFILM_SKIP_MOTION_MEAN",
+                "AIFILM_SKIP_DURATION_TARGET",
+                "AIFILM_SKIP_CINEMATIC",
+                "AIFILM_SKIP_CANONICAL_TRUTH",
+            )
+            for f in flags:
+                os.environ[f] = "1"
+            try:
+                for f in flags:
+                    self.assertTrue(is_iron_skip(f), msg=f"iron {f}")
+                    self.assertTrue(
+                        skip_flag(f, film_root=root, call_site=f"test.{f}"),
+                        msg=f,
+                    )
+                names = {e.get("name") for e in (load_skip_usage(root).get("entries") or [])}
+                for f in flags:
+                    self.assertIn(f, names)
+            finally:
+                for f in flags:
+                    os.environ.pop(f, None)
+
     def test_pilot_and_heat_queue_ledger(self) -> None:
+
         from production_gates import assert_pilot_user_approved, assert_heat_allows_media
         from core.skip_audit import load_skip_usage
 

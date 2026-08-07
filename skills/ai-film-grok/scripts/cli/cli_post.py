@@ -182,6 +182,18 @@ def cmd_final(args: argparse.Namespace) -> int:
         env=dict(_os.environ),
     )
     skip_truth = bool(skip_contract.get("skip"))
+    if skip_truth and skip_contract.get("via_env"):
+        try:
+            from core.skip_audit import skip_flag
+
+            skip_flag(
+                "AIFILM_SKIP_CANONICAL_TRUTH",
+                origin="env",
+                film_root=root,
+                call_site="cmd_final.skip_canonical_truth",
+            )
+        except Exception:
+            pass
     if not skip_truth:
         try:
             require_current_canonical_truth(root)
@@ -258,10 +270,24 @@ def cmd_final(args: argparse.Namespace) -> int:
     from cinematic_audit import write_audit
 
     cinematic = write_audit(root, require_authored_contract=True, require_clip_evidence=True)
-    skip_cinematic = bool(getattr(args, "skip_cinematic", False)) or (
-        str(_os.environ.get("AIFILM_SKIP_CINEMATIC") or "").strip().lower()
-        in {"1", "true", "yes", "on"}
-    )
+    skip_cinematic = bool(getattr(args, "skip_cinematic", False))
+    if not skip_cinematic:
+        try:
+            from core.skip_audit import skip_flag
+
+            skip_cinematic = skip_flag(
+                "AIFILM_SKIP_CINEMATIC",
+                origin="env",
+                film_root=root,
+                call_site="cmd_final.skip_cinematic",
+            )
+        except Exception:
+            skip_cinematic = str(_os.environ.get("AIFILM_SKIP_CINEMATIC") or "").strip().lower() in {
+                "1",
+                "true",
+                "yes",
+                "on",
+            }
     if not cinematic.get("ok"):
         if skip_cinematic:
             log(

@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "kind": "b3-ops-canary",
+  "at": "2026-08-07T12:45:00+08:00",
+  "version": "2.40.76",
+  "open_ops_status": "OPEN_OPS",
+  "open_ops_reason": "eng_day_no_film_drain",
+  "notes": [
+    "Engineering day: no exclusive 5090 drain requested",
+    "Honesty: OPEN_OPS is success for B3 when no GPU ownership",
+    "Code path: attach_open_ops_status + run-next soft-hog already ship",
+    "Round2: pairs with CLI skip residual + C5.1 logger expand commit"
+  ],
+  "checks": {
+    "comfy_tunnel_expected": "localhost:18188→8188",
+    "until_empty_requires": "--i-own-the-gpu",
+    "default_batch": "h3 run-next --max 5"
+  },
+  "ok": true,
+  "partial": true
+}

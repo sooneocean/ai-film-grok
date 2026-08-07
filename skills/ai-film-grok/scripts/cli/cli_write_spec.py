@@ -407,12 +407,22 @@ def cmd_write_spec(args: argparse.Namespace) -> int:
 
         duration_target_rep = check_duration_target(spec)
         write_duration_target_receipt(root, duration_target_rep)
-        skip_dt = os.environ.get("AIFILM_SKIP_DURATION_TARGET", "").strip().lower() in {
-            "1",
-            "true",
-            "yes",
-            "on",
-        }
+        try:
+            from core.skip_audit import skip_flag
+
+            skip_dt = skip_flag(
+                "AIFILM_SKIP_DURATION_TARGET",
+                origin="env",
+                film_root=root,
+                call_site="write_spec.duration_target",
+            )
+        except Exception:
+            skip_dt = os.environ.get("AIFILM_SKIP_DURATION_TARGET", "").strip().lower() in {
+                "1",
+                "true",
+                "yes",
+                "on",
+            }
         if (
             not skip_dt
             and duration_target_rep.get("severity") == "hard"

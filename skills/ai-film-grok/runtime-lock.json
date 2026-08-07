@@ -634,7 +634,7 @@
     },
     {
       "path": "scripts/cli/cli_media.py",
-      "sha256": "c208686c8d2f9da45c06280ad4cbc57fd9f67121985fa30e1b721ef3a7a47e8e"
+      "sha256": "684f42580ddd18e1a9859b51e7a3c132fa8985f677c0d36436c9aa7c48ffe5af"
     },
     {
       "path": "scripts/cli/cli_misc_ops.py",
@@ -690,7 +690,7 @@
     },
     {
       "path": "scripts/cli/cli_post.py",
-      "sha256": "c2adbd3e2490a6b8c384a84b2118fe482adf9b9b1ad6de30f4fabbfe4c1dc5ab"
+      "sha256": "a9ccddc1af2fe6bf92a613332591b9ef2103b5ea0739d1f9aee24b2f0fe3c3cc"
     },
     {
       "path": "scripts/cli/cli_quality.py",
@@ -750,7 +750,7 @@
     },
     {
       "path": "scripts/cli/cli_write_spec.py",
-      "sha256": "b42464cf1e6f38b59ff6e666c5ae7ffb9586f86707f965f78b3dbcf791338512"
+      "sha256": "e6749384a551b2026e03af82e6511d496f7026ab81d1ff1ebf470da71c5f8499"
     },
     {
       "path": "scripts/cli/review.py",
@@ -1042,7 +1042,7 @@
     },
     {
       "path": "scripts/core/skip_audit.py",
-      "sha256": "184ec6d27724ef41ecb0d25f9709073fb7e56f370b781a522d54d0b39b5e24f6"
+      "sha256": "0ff566f4c47287babbd5670dc668f8011d274b6b52c15ced53072606ea4cc1f2"
     },
     {
       "path": "scripts/craft_spine.py",
@@ -3194,7 +3194,7 @@
     },
     {
       "path": "scripts/workflow_pack.py",
-      "sha256": "911e9f1989535e95dc9822cce0678f884564f0ac2c565de29e6d19cb75300b0c"
+      "sha256": "daa392bbd75c9ad8635040ef0cace8a41cfde71b623c194281bb683ed0b7af44"
     },
     {
       "path": "scripts/workflow_spine.py",

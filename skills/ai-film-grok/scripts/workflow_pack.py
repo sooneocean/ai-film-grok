@@ -523,6 +523,12 @@ def bulk_preflight(
             "on",
         }
     if skip_variety:
+        try:
+            from util.logger import log
+
+            log.warning("bulk_preflight variety skipped via env root=%s", root)
+        except Exception:
+            pass
         add("variety", True, skipped=True, escape="AIFILM_SKIP_VARIETY_PREFLIGHT=1")
     else:
         try:
@@ -568,6 +574,12 @@ def bulk_preflight(
             "on",
         }
     if skip_dur:
+        try:
+            from util.logger import log
+
+            log.warning("bulk_preflight duration_target skipped via env root=%s", root)
+        except Exception:
+            pass
         add("duration_target", True, skipped=True, escape="AIFILM_SKIP_DURATION_TARGET=1")
     else:
         try:

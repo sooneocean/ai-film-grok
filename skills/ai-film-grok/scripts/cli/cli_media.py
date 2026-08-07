@@ -933,12 +933,22 @@ def cmd_register_still(args: argparse.Namespace) -> int:
                     "dhash_distance": face_id_result.get("dhash_distance"),
                 }
                 # v2.40: enrolled cast → default hard reject (escape AIFILM_SKIP_FACE_IDENTITY=1)
-                skip_face = os.environ.get("AIFILM_SKIP_FACE_IDENTITY", "").strip().lower() in {
-                    "1",
-                    "true",
-                    "yes",
-                    "on",
-                }
+                try:
+                    from core.skip_audit import skip_flag
+
+                    skip_face = skip_flag(
+                        "AIFILM_SKIP_FACE_IDENTITY",
+                        origin="env",
+                        film_root=root,
+                        call_site="register_still.face_identity",
+                    )
+                except Exception:
+                    skip_face = os.environ.get("AIFILM_SKIP_FACE_IDENTITY", "").strip().lower() in {
+                        "1",
+                        "true",
+                        "yes",
+                        "on",
+                    }
                 require_face = (not skip_face) or bool(
                     getattr(args, "require_face_identity", False)
                 )
@@ -1225,12 +1235,22 @@ def cmd_register_clip(args: argparse.Namespace) -> int:
     except Exception:
         pass
     if str(args.status or "") == "approved":
-        skip_mean = os.environ.get("AIFILM_SKIP_MOTION_MEAN", "").strip().lower() in {
-            "1",
-            "true",
-            "yes",
-            "on",
-        }
+        try:
+            from core.skip_audit import skip_flag
+
+            skip_mean = skip_flag(
+                "AIFILM_SKIP_MOTION_MEAN",
+                origin="env",
+                film_root=root,
+                call_site="register_clip.motion_mean",
+            )
+        except Exception:
+            skip_mean = os.environ.get("AIFILM_SKIP_MOTION_MEAN", "").strip().lower() in {
+                "1",
+                "true",
+                "yes",
+                "on",
+            }
         if not skip_mean:
             heat_phase = None
             dramatic_function = None
