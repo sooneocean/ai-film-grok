@@ -1505,10 +1505,6 @@
       "sha256": "101124905b67810f03f09c9b19b59398c25da62d24910144c5df2fa1e8aa915b"
     },
     {
-      "path": "scripts/h3_official_ab.py",
-      "sha256": "3bf017009cd28307ae429d237e5f0ec9e89334fadc2c7006131c20e5c7259b45"
-    },
-    {
       "path": "scripts/h3_ship_native.py",
       "sha256": "dcbca9863cfacc41239fd37d375babf7f6103329715a533249aa49b4bacd208e"
     },
@@ -1719,10 +1715,6 @@
     {
       "path": "scripts/media/h3_mode.py",
       "sha256": "f39c960dd4180ec85c042fceb04944dec5e2de2cb6aa8e116401dba0d4530794"
-    },
-    {
-      "path": "scripts/media/h3_official_ab.py",
-      "sha256": "923e9d062087687832f530e2581a338045372c7cf803b0255d3fd197136c6c38"
     },
     {
       "path": "scripts/media/h3_ship_native.py",
