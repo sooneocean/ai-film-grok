@@ -271,6 +271,26 @@
   @media (max-width: 420px) {
     .kpi-bento { grid-template-columns: 1fr; }
   }
+  /* ===== command center (CTO plan T2) ===== */
+  .cmd-row { display: flex; flex-wrap: wrap; gap: .6rem; margin: .4rem 0 .8rem; }
+  .cmd-btn {
+    border: 1px solid var(--panel-brd); background: var(--panel); color: var(--txt);
+    padding: .55rem 1rem; border-radius: 12px; cursor: pointer; font-size: .9rem; font-weight: 600;
+    transition: transform .2s var(--ease), background .2s, border-color .2s;
+  }
+  .cmd-btn:hover:not(:disabled) { background: var(--accent); color: #06121a; border-color: transparent; }
+  .cmd-btn.primary { background: var(--accent); color: #06121a; border-color: transparent; }
+  .cmd-btn.primary:hover:not(:disabled) { background: var(--accent-press); }
+  .cmd-log { font-size: .82rem; color: var(--muted); min-height: 1.2rem; margin-top: .2rem; }
+  .cmd-log.ok { color: var(--ok); }
+  .cmd-log.err { color: var(--danger); }
+  .cmd-next { margin-top: .6rem; font-size: .85rem; color: var(--muted); }
+  /* fatal JS error surface (CTO plan T0) — never let the page silently freeze */
+  .fatal {
+    display: none; position: fixed; left: 0; right: 0; bottom: 0; z-index: 9999;
+    background: var(--danger); color: #fff; padding: .8rem 1rem; font-size: .85rem;
+    box-shadow: 0 -4px 16px rgba(0,0,0,.4); max-height: 40vh; overflow: auto; line-height: 1.4;
+  }
 </style>
 </head>
 <body>
@@ -317,6 +337,19 @@
     <div class="panel">
       <h3 class="section-h"><span class="ico" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 4 5v6c0 5 3.5 8 8 11 4.5-3 8-6 8-11V5l-8-3z"/></svg></span>门禁健康</h3>
       <div id="dash-gates"></div>
+    </div>
+
+    <div class="panel" id="dash-command">
+      <h3 class="section-h"><span class="ico" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg></span>指挥台 · 一键驱动流水线</h3>
+      <p class="muted" style="font-size:.82rem;margin:.2rem 0 .9rem">上方是监控总览；下方按钮直接指挥——起步贴故事、启动流水线、推进审核队列。</p>
+      <div class="cmd-row">
+        <button class="cmd-btn magnetic" id="cmd-refresh">刷新状态</button>
+        <button class="cmd-btn magnetic" id="cmd-onboarding">开始 / 继续起步</button>
+        <button class="cmd-btn primary magnetic" id="cmd-go">启动流水线</button>
+        <button class="cmd-btn magnetic" id="cmd-advance">推进审核队列</button>
+      </div>
+      <div id="cmd-log" class="cmd-log" role="status" aria-live="polite"></div>
+      <div id="dash-next" class="cmd-next"></div>
     </div>
   </section>
 
@@ -488,6 +521,7 @@ function activateTab(b){
   if (b.dataset.tab === 'gates') loadGates();
   if (b.dataset.tab === 'overview') loadDashboard();
   if (b.dataset.tab === 'review') ensureReviewFrame();
+  if (b.dataset.tab === 'onboarding') loadOnboarding();   // T1: 起步 tab 必须加载状态，否则"点画面不会动"
 }
 tabButtons.forEach((b, i) => {
   b.onclick = () => activateTab(b);
@@ -915,6 +949,14 @@ function renderDashboard(s, g, libs){
       + `<div><div class="name">${esc(x.name)} ${x.required ? '· 硬' : ''}</div>`
       + `<div class="detail">${esc(x.detail)}</div></div></div>`
   ).join('');
+
+  // next-step guidance (CTO plan T3): tell the user exactly what to do next
+  const next = document.getElementById('dash-next');
+  if (next){
+    if (ob.completed) next.textContent = '起步已完成 —— 点「启动流水线」直接开跑。';
+    else if (g.blocking) next.textContent = '硬门禁阻断中 —— 先解决门禁再启动。';
+    else next.textContent = '还没起步？点「开始 / 继续起步」贴故事让 AI 拆解，确认后一键启动。';
+  }
 }
 
 // multi-tab sync (P8): poll console-state; if another tab/external changed the
@@ -1259,6 +1301,65 @@ document.getElementById('ct-clear').onclick = () => {
 document.getElementById('cmp-close').onclick = () => document.getElementById('cmp-modal').classList.remove('show');
 document.getElementById('cmp-modal').addEventListener('click', e => { if (e.target.id === 'cmp-modal') e.currentTarget.classList.remove('show'); });
 document.addEventListener('keydown', e => { if (e.key === 'Escape') document.getElementById('cmp-modal').classList.remove('show'); });
+
+// === command center (CTO plan T2): turn the dashboard into a real monitor + direct surface ===
+function cmdLog(msg, isErr=false){
+  const el = document.getElementById('cmd-log');
+  if (!el) return;
+  el.textContent = msg;
+  el.className = 'cmd-log' + (isErr ? ' err' : ' ok');
+}
+async function cmdGo(){
+  try {
+    const s = await api('/api/onboarding');
+    const obRevision = (s && s.revision) || 0;
+    const res = await api('/api/onboarding/go', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Origin: location.origin },
+      body: JSON.stringify({ expected_revision: obRevision })
+    });
+    cmdLog('已启动流水线：' + (res.advanced_detail || res.detail || 'ok'));
+    toast('Go 已执行');
+    loadDashboard(); loadOnboarding();
+  } catch(err){
+    const m = (err && err.message) || String(err);
+    if (/incomplete/i.test(m)) cmdLog('起步三步未完成 —— 先点「开始 / 继续起步」', true);
+    else if (/stale/i.test(m)) cmdLog('版本冲突，请刷新后重试', true);
+    else cmdLog('启动失败：' + m, true);
+  }
+}
+async function cmdAdvance(){
+  try {
+    const st = await api('/api/console-state');
+    const rev = (st && st.ledger_revision) || 0;
+    const res = await api('/api/advance', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Origin: location.origin },
+      body: JSON.stringify({ expected_ledger_revision: rev })
+    });
+    cmdLog('已推进审核队列：' + (res.advanced_detail || res.detail || 'ok'));
+    toast('已推进');
+    loadDashboard();
+  } catch(err){
+    cmdLog('推进失败：' + ((err && err.message) || String(err)), true);
+  }
+}
+function cmdOnboarding(){
+  const ob = tabButtons.find(x => x.dataset.tab === 'onboarding');
+  if (ob) activateTab(ob);
+}
+// fatal JS error surface (CTO plan T0) — never silently freeze the page again
+function showFatal(msg){
+  let n = document.getElementById('fatal');
+  if (!n){ n = document.createElement('div'); n.id = 'fatal'; n.className = 'fatal'; document.body.appendChild(n); }
+  n.textContent = '⚠ 控制台脚本错误：' + msg + '（详见浏览器控制台）';
+  n.style.display = 'block';
+}
+window.addEventListener('error', e => showFatal(e.message || String(e.error)));
+window.addEventListener('unhandledrejection', e => showFatal((e.reason && e.reason.message) || String(e.reason)));
+
+document.getElementById('cmd-refresh').onclick = () => { loadDashboard(); cmdLog('已刷新状态'); };
+document.getElementById('cmd-onboarding').onclick = cmdOnboarding;
+document.getElementById('cmd-go').onclick = cmdGo;
+document.getElementById('cmd-advance').onclick = cmdAdvance;
 
 loadDashboard();
 loadAssets('bgm');

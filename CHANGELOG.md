@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.41.5] - 2026-08-07
+
+### Fixed (Web 控制台 · 让"点画面会动" + 工作台指挥台)
+- **起步 tab 复活：** `activateTab` 现对 `onboarding` tab 调用 `loadOnboarding()`（此前函数已定义却从未在切 tab 时触发，导致"点画面不会动"）。
+- **工作台变指挥台：** 仪表盘新增「指挥台」面板——刷新状态 / 开始·继续起步 / 启动流水线(`POST /api/onboarding/go`) / 推进审核队列(`POST /api/advance`)，并给出下一步引导文案。
+- **致命错误不再静默冻结：** 全局 `error` / `unhandledrejection` 监听 → 底部红色浮条，脚本崩溃可直接看见原因。
+- **e2e 守护：** `smoke_console.py` 新增断言——指挥台 DOM(`dash-command`/`cmd-go`/`cmd-advance`)随页面下发、`onboarding` tab 懒加载、`/api/onboarding/go` 与 `/api/advance` 端点可达。
+
 ## [2.41.4] - 2026-08-07
 
 ### Added (Film Production OS · W7 full cross-cut · plan CLOSED)
