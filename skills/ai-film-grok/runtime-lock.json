@@ -1726,7 +1726,7 @@
     },
     {
       "path": "scripts/media/h3_workflow.py",
-      "sha256": "c1bf4dc223d66c5ac00d1380c5543a734c6b6a40df18b6b14de596db5e502c67"
+      "sha256": "0a38e6249599dfd3486ab31158436dd4eedf3c8b44625989d73828dccc6bdba6"
     },
     {
       "path": "scripts/media/i2v_motion_gate.py",
@@ -3094,7 +3094,7 @@
     },
     {
       "path": "scripts/util/json_io.py",
-      "sha256": "734da0b94655863374657b8e77c5d8107990b02e969a46a09289db5a87b46099"
+      "sha256": "9211a1cd5e239bafa9b1a4c63c589a9b16d673e4ece265851918ad4576cd30fd"
     },
     {
       "path": "scripts/util/logger.py",
@@ -3110,7 +3110,7 @@
     },
     {
       "path": "scripts/util/runtime_policy.py",
-      "sha256": "b25cbb2b91267570f3893c0c3819716eef4a80f3ba7a16701b787de5d0155299"
+      "sha256": "636aff48bfa6a49974cecf08166b0b755c3c8ccc6ac0f5732dc935ba73d44112"
     },
     {
       "path": "scripts/util/security_policy.py",
@@ -3126,7 +3126,7 @@
     },
     {
       "path": "scripts/util/subprocess.py",
-      "sha256": "18fd3aabaf4c7ab8e292f213bd9d6e9c805ec3af36d901f4a1c973dfe270b180"
+      "sha256": "209b42ba6f49207833faf3ee2062f6be46114522a32ba62066fcec4bff7d1488"
     },
     {
       "path": "scripts/util/time.py",
@@ -3134,7 +3134,7 @@
     },
     {
       "path": "scripts/util/validators.py",
-      "sha256": "736803332859f26b9579059ca0f3d84f8d07f5071d1f802688bf4f04d9e5eaf0"
+      "sha256": "dbdc9f33dc6e4fb364a9bfe7ba6dee04da2c7dfcae024510041508fd97ec050f"
     },
     {
       "path": "scripts/vibevoice_asr_review.py",
