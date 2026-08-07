@@ -245,7 +245,7 @@
 
 | ID | 主题 | 波次 | 优先级 |
 |----|------|------|--------|
-| 1 | gates 静默 except → fail-closed | A1 | **P0 · 2.40.57**（gate-auto + cinematic variety/five_track + preflight speaker/style/lane probe） |
+| 1 | gates 静默 except → fail-closed | A1 | **P0 · 2.40.61 r4** cinematic edit_rhythm/post bible；**2.40.62** hotpath queue honesty 隔离；残余 production_gates measured map soft |
 | 2 | final/hotpath + plate≠master 永不回退 | A1/A2 | **P0** |
 | 3 | 双 checkout + 单一执行板 | G0 | **P0** |
 | 4 | 真片 ship-prep 人链 / 诚实 PARTIAL | A2 | **P0** |

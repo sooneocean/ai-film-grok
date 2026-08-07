@@ -382,13 +382,32 @@ class PlateTimeoutFloorHotpathTests(unittest.TestCase):
 
 
 class QueueHonestyHotpathTests(unittest.TestCase):
+    """Deterministic: mock Comfy probe idle so live 5090 busy cannot flaky no_hog."""
+
+    @staticmethod
+    def _idle_capacity() -> dict:
+        return {
+            "ok": True,
+            "ready": True,
+            "status": "ready",
+            "blockers": [],
+            "base_url": "http://127.0.0.1:18188",
+            "source": "test_idle",
+        }
+
     def test_run_next_queue_empty_records_open_ops_and_decision_tree(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             write_json(root / "film-spec.json", {"title": "hotpath-queue-empty", "scenes": []})
-            with mock.patch(
-                "h3_fill_idle.next_fill_idle_job",
-                return_value={"ok": True, "next": None, "pending_count": 3},
+            with (
+                mock.patch(
+                    "h3_fill_idle.probe_comfy_capacity_soft",
+                    return_value=self._idle_capacity(),
+                ),
+                mock.patch(
+                    "h3_fill_idle.next_fill_idle_job",
+                    return_value={"ok": True, "next": None, "pending_count": 3},
+                ),
             ):
                 rep = run_next_fill_idle(root, execute=True, max_jobs=1)
             self.assertEqual(rep.get("skipped_reason"), "queue_empty")
@@ -430,21 +449,27 @@ class QueueHonestyHotpathTests(unittest.TestCase):
                     ],
                 },
             )
-            with mock.patch(
-                "h3_fill_idle.next_fill_idle_job",
-                return_value={
-                    "ok": True,
-                    "next": {
-                        "shot_id": "hero1",
-                        "mode": "i2v",
-                        "priority": "P0a",
-                        "lane": "primary_h3",
-                        "command": (
-                            "aifilm h3 run --root \"X\" --shot-id hero1 --mode i2v --register"
-                        ),
+            with (
+                mock.patch(
+                    "h3_fill_idle.probe_comfy_capacity_soft",
+                    return_value=self._idle_capacity(),
+                ),
+                mock.patch(
+                    "h3_fill_idle.next_fill_idle_job",
+                    return_value={
+                        "ok": True,
+                        "next": {
+                            "shot_id": "hero1",
+                            "mode": "i2v",
+                            "priority": "P0a",
+                            "lane": "primary_h3",
+                            "command": (
+                                "aifilm h3 run --root \"X\" --shot-id hero1 --mode i2v --register"
+                            ),
+                        },
+                        "capacity_ready": False,
                     },
-                    "capacity_ready": False,
-                },
+                ),
             ):
                 rep = run_next_fill_idle(root, execute=True, max_jobs=1)
             self.assertEqual(rep.get("skipped_reason"), "capacity_not_ready")

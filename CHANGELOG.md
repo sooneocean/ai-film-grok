@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.40.62] - 2026-08-07
+
+### Fixed (CTO A1.4 / hotpath · queue honesty isolation)
+- **test_final_hotpath_contracts QueueHonesty:** mock `probe_comfy_capacity_soft` idle so live 5090 `COMFY_QUEUE_BUSY` cannot flaky-flip expected `queue_empty` / `capacity_not_ready` into `no_hog_busy_hold`.
+- no_hog IRON still covered by `test_gpu_no_hog` (busy hold / idle pass / ownership override).
+
 ## [2.40.61] - 2026-08-07
 
 ### Fixed (CTO A1 silent-green · round 4)
