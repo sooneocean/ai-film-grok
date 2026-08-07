@@ -135,6 +135,10 @@ class ArgvPolicyTests(unittest.TestCase):
             "MINIMAX_API_KEY": "secret",
             "SSH_AUTH_SOCK": "/tmp/agent.sock",
             "HTTPS_PROXY": "http://proxy",
+            # control-plane flags must survive plate re-exec of render_final
+            "AIFILM_SKIP_DIALOGUE_PACKAGE_GATE": "1",
+            "AIFILM_SKIP_REASON": "plate hardburn honesty path",
+            "AIFILM_FFMPEG_TIMEOUT": "1800",
         }
         env = minimal_subprocess_env(source)
         self.assertEqual(env["PATH"], "/usr/bin")
@@ -142,6 +146,9 @@ class ArgvPolicyTests(unittest.TestCase):
         self.assertNotIn("MINIMAX_API_KEY", env)
         self.assertNotIn("SSH_AUTH_SOCK", env)
         self.assertNotIn("HTTPS_PROXY", env)
+        self.assertEqual(env.get("AIFILM_SKIP_DIALOGUE_PACKAGE_GATE"), "1")
+        self.assertEqual(env.get("AIFILM_SKIP_REASON"), "plate hardburn honesty path")
+        self.assertEqual(env.get("AIFILM_FFMPEG_TIMEOUT"), "1800")
 
     @pytest.mark.slow
     def test_pipeline_process_wrappers_strip_parent_secrets(self) -> None:

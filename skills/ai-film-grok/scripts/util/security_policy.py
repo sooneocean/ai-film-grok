@@ -207,9 +207,28 @@ def expand_argv(
 
 
 def minimal_subprocess_env(source: Mapping[str, str] | None = None) -> dict[str, str]:
+    """Minimal env for child processes.
+
+    Forwards ``AIFILM_*`` control-plane flags (SKIP / REASON / FINAL_* /
+    ffmpeg timeouts). Plate stage re-execs ``render_final`` via
+    ``util.subprocess.run``; without this, parent-armed IRON skips are
+    stripped and nested gates re-fail. Secrets, proxies, and agent
+    injectors stay excluded.
+    """
     values = os.environ if source is None else source
     env = {key: values[key] for key in SUBPROCESS_ENV_KEYS if key in values}
     env.setdefault("PATH", os.defpath)
+    for key, val in values.items():
+        if not str(key).startswith("AIFILM_"):
+            continue
+        if val is None:
+            continue
+        text = str(val)
+        if not text or len(text) > MAX_ARG_LENGTH:
+            continue
+        if _has_control_characters(text):
+            continue
+        env[str(key)] = text
     return env
 
 

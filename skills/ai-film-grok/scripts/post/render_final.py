@@ -652,8 +652,10 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
     )
 
     # 9b) Technical delivery report (leaf: final.stages_delivery_report)
+    # timeline_caption_bindings: module-level import only — a local re-import here
+    # made Python treat the name as function-local and raised UnboundLocalError at
+    # stages_subs (used earlier in the same function).
     from final.stages_delivery_report import write_technical_delivery
-    from audio_timeline import caption_bindings as timeline_caption_bindings
 
     _del = write_technical_delivery(
         root=root,
