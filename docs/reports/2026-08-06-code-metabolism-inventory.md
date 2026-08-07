@@ -1,29 +1,49 @@
-# Code metabolism inventory — 2026-08-07
+# Code metabolism inventory — TERMINAL residual freeze
 
-**Generated:** 2026-08-07T00:55:28Z
-**Latest batch:** 2.40.47
+**Generated:** 2026-08-07  
+**Latest batch:** 2.40.48 (residual freeze documentation)  
+**Structure status:** **SAFE QUEUE DONE** · only hub + thrash orchestrator left on purpose
 
-## Summary
+## Summary (post 2.40.47)
 
 | Metric | Value |
 |--------|------:|
-| Top-level modules | 348 |
-| Classified shims | 346 |
-| Non-shim residual | 2 |
+| Top-level modules | ~348 |
+| Classified shims | ~346 |
+| Non-shim residual (intentional) | **2** |
 
-## Batch 2.40.47 (round 6 · path-depth residual)
+## Intentional residual (IRON · do not vanity-move)
 
-| Package | Modules | Depth fix |
-|---------|---------|-----------|
-| `spine/` | automation_verify, route_catalog, skill_registry, skill_runner | parents[2] / scripts sibling launchers |
-| `util/` | config_loader, runtime_policy, security_policy, structured_logger (shim `logger`) | config.env parents[3] |
-| `plan/` | capability_report, motion_prompt_spine, optimization_metrics | skill_root parents[2]; metrics parent-walk OK |
-| `media/` | backend_lock, env_plate, interactive_orchestration | skill root / scripts sibling paths |
+| Module | Role | Rule |
+|--------|------|------|
+| `scripts/aifilm_grok.py` | **CLI hub / public entry** | **Keep top-level forever** as the control-plane entry. Further growth goes to `cli/*` packages (already extracted); do not bury hub under a package. Hub size budget remains ≤2500 LOC. |
+| `scripts/workflow_pack.py` | **Ship-prep / closeout orchestrator** (~2k LOC thrash surface) | **No whole-file package move or vanity peel.** Peel pure leaves **only when a real bug forces multi-section edit** (bug-driven). Prefer harness tests over structure churn. |
 
-## Still residual (intentionally)
+### Explicit non-goals (still binding)
 
-`aifilm_grok` hub · `workflow_pack` giant thrash orchestrator
+- “Everything under `scripts/` is a package path only”
+- Deleting hard-compat shims wholesale
+- Giant orchestrator rewrites without failure-mode tests
+- Silent heat / `i2v_provider` / pilot policy changes in structure commits
+
+## Completed waves (pointer)
+
+| Batch | Theme |
+|-------|--------|
+| W0–W7 | packages + hub extract + shims |
+| 2.40.38–46 | safe residual + expanded residual P3-1 |
+| 2.40.47 | path-depth residual + depth fixes |
+| **2.40.48** | **freeze documentation + structural guard tests** |
+
+## Four lanes (unchanged)
+
+| Lane | Status |
+|------|--------|
+| A DELETE | empty for whole files |
+| B TOMBSTONE | lipsync thin |
+| C MIGRATE | **safe queue emptied** |
+| D PEEL | bug-driven only on remaining thick bodies (`workflow_pack`, `render_final`, …) |
 
 ## Iron
 
-Public import names via shims · path depth adjusted · no heat/i2v/pilot retune.
+Public `aifilm` subcommand strings · hard-compat shims · dual-checkout discipline · no vanity LOC sprint.

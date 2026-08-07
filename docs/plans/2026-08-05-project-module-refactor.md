@@ -5,9 +5,10 @@
 **Metabolism batch 2.40.43:** P3-1×10 media/post/plan + spine_helpers/render_defaults tests
 **Metabolism batch 2.40.44:** safe residual closeout P3-1×29 · inventory
 **Metabolism batch 2.40.46:** P3-1×19 expanded residual
-**Metabolism batch 2.40.47:** path-depth residual ×14
-**Status:** ACTIVE · **W0–W7 packages SHIPPED** · pure-helper peels SHIPPED · residual = orchestrator/heat/export only
-**Evidence:** `scripts/{core,assets,spine,gates,plan,post,narrative,final,audio,media}/` · hub ≤2500 · shims · `tests/test_w3_package_shims.py`  
+**Metabolism batch 2.40.47:** path-depth residual ×14  
+**Metabolism batch 2.40.48:** **terminal residual freeze** — `aifilm_grok` hub stays top-level; `workflow_pack` bug-driven peel only ([inventory](../reports/2026-08-06-code-metabolism-inventory.md) · `tests/test_metabolism_terminal_residual.py`)  
+**Status:** **SAFE MIGRATE QUEUE DONE** · W0–W7 SHIPPED · intentional residual = hub + workflow_pack (+ bug-driven peels on thick bodies)  
+**Evidence:** `scripts/{core,assets,spine,gates,plan,post,narrative,final,audio,media,cli,util}/` · hub ≤2500 · shims · `tests/test_w3_package_shims.py` · terminal residual tests  
 **Residual internal-peel todo:** [2026-08-05-residual-monolith-w4-todo.md](2026-08-05-residual-monolith-w4-todo.md) · **diagnosis M-queue:** [2026-08-06-monolith-relief-todoplan.md](2026-08-06-monolith-relief-todoplan.md)
 
 ## Waves

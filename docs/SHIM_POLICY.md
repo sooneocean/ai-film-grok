@@ -29,6 +29,8 @@ _sys.modules[__name__] = _impl
 - Putting real logic in the shim (gates, I/O, CLI parsing).
 - Dual-maintaining algorithm in both shim and package.
 - Claiming “peel done” when only a shim was added.
+- **Vanity-moving the CLI hub** `aifilm_grok.py` into a package (public entry stays top-level).
+- **Vanity-moving `workflow_pack.py`** as a whole-file “cleanup”; peel only bug-driven (see metabolism inventory terminal freeze).
 
 ## Authority map (examples)
 
