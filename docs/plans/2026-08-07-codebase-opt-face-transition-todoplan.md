@@ -1,23 +1,14 @@
 # 代码库优化 + 模组拆分迭代 Todo Plan（含剪辑转场 · 锁脸 P0）
 
-**结论先行：** 仓库已是 **能力齐备的成熟片厂**（v**2.40.97**），包边界与安全迁移队列已收口；下一轮优化 **不是再贴标语 / 虚荣压行数**，而是三条真轴：
+**Status:** **CLOSED · STRUCTURE TRACK DONE（2.40.109）**  
+**结论先行：** F1–F3 锁脸链 + T1–T5 转场链 **已 ship**。本板 **不再开虚荣 peel**；后续只挡路 bug 或出片/运维日。挂 CTO 下，勿当绿地重开。
 
-1. **锁脸全链 hard-closed（用户点名：必要）** — enroll → register → promote → final，禁止「有片=脸对」。  
-2. **剪辑层转场观感与机读闭环（用户点名：仍要优化）** — 从「spec 政策 soft 绿」推进到「成片缝可验收 + 语法不粥」。  
-3. **巨石挡路才拆** — 优先把转场/锁脸触达的厚函数剥成可测叶子，其余保持 terminal residual freeze。
-
-| 项 | 本机探针（2026-08-07 · plugins checkout） |
+| 项 | 收口账实（plugins checkout · 2026-08-07） |
 |----|------------------------------------------|
-| 版本 | `plugin.json` **2.40.97** |
-| scripts | **~181k** LOC · 顶层约 **360** 文件（绝大多数 thin shim） |
-| 包体积 | plan≈32k · media≈32k · post≈19k · audio≈19k · cli≈17k · narrative≈16k · gates≈12k |
-| 巨石函数 ≥200 行 | **~87**；最大 `render_final` **~2483** / `validate_film_spec` **~2360** / `run_preflight` **~2120** / `build_dispatch` **~1249** |
-| 顶层 intentional residual | **`aifilm_grok.py` hub** + **`workflow_pack.py`**（代谢 inventory 已 freeze） |
-| 测试 | **~483** test 文件 / 测码 ~86k LOC |
-| 主执行板（历史） | [CTO plan](docs/plans/2026-08-06-cto-optimization-todoplan.md) · 结构 [metabolism inventory](docs/reports/2026-08-06-code-metabolism-inventory.md) |
-| 本 plan 角色 | **本会话单一执行板**（挂 CTO 下，不另起第三综合板）；**新增/抬升 F 锁脸 + T 转场** |
-| **执行进度** | **F1+T1+T2 SHIPPED 2.40.101** · **F2+T3 SHIPPED 2.40.105 · **F3+T4 SHIPPED 2.40.108 · **T5 SHIPPED 2.40.109** (edit_transition peel)****（closeout 三联 + 转场抽帧 status）；F3 still 绑 / T4 plate↔ops / T5 residual |
-| **执行进度** | **F1 + T1 + T2 SHIPPED 2.40.101**（默认 hard + soft-soup）；F0/T0 账实见代码注释；F2–F4 / T3–T5 residual |
+| 版本 | **2.40.109**（T5 tip） |
+| 主执行板 | [CTO plan](docs/plans/2026-08-06-cto-optimization-todoplan.md) |
+| **执行进度** | **F1+T1+T2 @ 2.40.101** · **F2+T3 @ 2.40.105** · **F3+T4 @ 2.40.108** · **T5 edit_transition peel @ 2.40.109** |
+| Residual 非目标 | hub / workflow_pack intentional freeze；render_final 编排体仅 bug 驱动 |
 
 **仓库类比：** 分车间门牌已贴好，总控台（final/preflight/edit）仍塞满旋钮；锁脸像「每镜必须刷脸进棚」，转场像「剪辑师的刀口语法」——门绿不等于观众不跳戏。
 
@@ -34,8 +25,8 @@
 | 工程纪律 C5 | **DONE** | logging pilot · FilmError 增量 · JSON util · subprocess timeout 触达补 |
 | 出片诚实 R0–R5 | **CLOSED** | skip 记账 · PARTIAL 字段 · plate≠master 契约 |
 | heat 结构 facade | **DONE** | packs 已拆；禁预防性再拆 wardrobe/coitus |
-| 转场 **策略门** | **部分 DONE** | `transition_policy_report` + `transition_export_readback` + preflight（**默认 soft**；`transition_policy_strict` / adult max 才 hard） |
-| 锁脸 **子系统** | **部分 DONE** | `face_identity` / `style_lock` / `identity_generation_lock` / `partner_cast_gate` / `assert_face_identity_passed` 已接线；**多处仍 soft 或 strict 开关** |
+| 转场 **策略门** | **DONE（默认 hard · 2.40.101+）** | continue 永远 hard；soft 粥 / export read-back；`transition_policy_soft` 逃生；T3 抽帧 · T4 plate 对齐 · T5 peel |
+| 锁脸 **全链** | **DONE（必要 hard · 2.40.101–108）** | enroll 缺口 hard · F2 三联 · F3 still 绑；软逃生 `face_identity_soft` / skip env |
 
 ### 0.2 真痛（本轮要解）
 
