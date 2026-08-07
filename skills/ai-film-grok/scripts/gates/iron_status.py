@@ -28,6 +28,12 @@ _IRON_GATES: list[tuple[str, str, str, str]] = [
     ("heat_queue", "adult max queue hard", "AIFILM_SKIP_HEAT_QUEUE_GATE", "media-queue add"),
     ("heat_final", "adult max final hard", "AIFILM_SKIP_HEAT_FINAL_GATE", "final / export"),
     ("mix_acrossover", "legacy multiband mix", "AIFILM_ALLOW_ACROSSOVER_MIX", "default=broadband"),
+    (
+        "gpu_no_hog",
+        "multi-agent 5090 no-hog / dual-film lease",
+        "AIFILM_I_OWN_THE_GPU",
+        "until-empty needs --i-own-the-gpu; foreign LEASE_HELD blocks; unowned run-next max 5",
+    ),
 ]
 
 

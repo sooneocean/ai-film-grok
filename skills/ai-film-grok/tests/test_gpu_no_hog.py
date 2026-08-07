@@ -103,7 +103,7 @@ class TestNoHogWiredGuard:
     ready. It must NOT fire when idle. Deterministic via mocked probe + planner."""
 
     @staticmethod
-    def _patch(monkeypatch, *, busy, owned_env=False):
+    def _patch(monkeypatch, *, busy, owned_env=False, foreign_lease=None):
         import h3_fill_idle
 
         def fake_probe():
@@ -118,6 +118,12 @@ class TestNoHogWiredGuard:
             }
 
         monkeypatch.setattr(h3_fill_idle, "probe_comfy_capacity_soft", fake_probe)
+        # I5: isolate dual-film lease from host ~/.grok/run
+        monkeypatch.setattr(
+            h3_fill_idle,
+            "_foreign_gpu_lease",
+            lambda *_a, **_k: foreign_lease,
+        )
         # Keep the planner benign: no next job -> caller returns queue_empty
         # without touching run_h3_shot / filesystem.
         monkeypatch.setattr(
@@ -139,7 +145,10 @@ class TestNoHogWiredGuard:
         )
         assert out.get("skipped_reason") == "no_hog_busy_hold"
         assert out.get("ok") is True
+        assert out.get("partial") is True
+        assert out.get("halt_reason_code") == "RUN_NO_HOG_BUSY_HOLD"
         assert out.get("no_hog") is not None
+        assert out.get("open_ops")
 
     def test_guard_passes_when_idle(self, monkeypatch):
         self._patch(monkeypatch, busy=False)
@@ -162,6 +171,49 @@ class TestNoHogWiredGuard:
         # Ownership bypasses the hold even when busy.
         assert out.get("skipped_reason") != "no_hog_busy_hold"
         assert out.get("skipped_reason") == "queue_empty"
+
+    def test_foreign_lease_blocks_run_next(self, monkeypatch):
+        foreign = {
+            "ok": False,
+            "free": False,
+            "owned_by_self": False,
+            "owner": "/other/film",
+            "code": "LEASE_HELD",
+        }
+        self._patch(monkeypatch, busy=False, foreign_lease=foreign)
+        import h3_fill_idle
+
+        out = h3_fill_idle.run_next_fill_idle(
+            Path("/tmp"), execute=True, max_jobs=3, register=False
+        )
+        assert out.get("skipped_reason") == "lease_held_foreign"
+        assert out.get("partial") is True
+        assert out.get("halt_reason_code") == "RUN_LEASE_HELD_FOREIGN"
+        assert out.get("jobs_ran") == 0
+
+    def test_unowned_max_jobs_soft_cap_five(self, monkeypatch):
+        self._patch(monkeypatch, busy=False)
+        import h3_fill_idle
+
+        monkeypatch.delenv("AIFILM_I_OWN_THE_GPU", raising=False)
+        out = h3_fill_idle.run_next_fill_idle(
+            Path("/tmp"), execute=True, max_jobs=20, register=False
+        )
+        assert out.get("max_jobs") == 5
+        assert out.get("skipped_reason") == "queue_empty"
+
+    def test_owned_allows_higher_max_jobs(self, monkeypatch):
+        self._patch(monkeypatch, busy=False, owned_env=True)
+        import h3_fill_idle
+
+        out = h3_fill_idle.run_next_fill_idle(
+            Path("/tmp"),
+            execute=True,
+            max_jobs=12,
+            register=False,
+            i_own_the_gpu=True,
+        )
+        assert out.get("max_jobs") == 12
 
 
 if __name__ == "__main__":

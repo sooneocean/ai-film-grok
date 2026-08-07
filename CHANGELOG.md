@@ -1,5 +1,16 @@
 # Changelog
 
+## [2.40.63] - 2026-08-07
+
+### Added (iron I5 GPU/ops · multi-agent + dual-film)
+- **run-next soft-hog honesty:** busy hold → `partial=true` + `halt_reason_code=RUN_NO_HOG_BUSY_HOLD` + open_ops (no bare ok without machine reason).
+- **Unowned batch cap:** execute without ownership soft-caps `--max` to **5**.
+- **Dual-film lease:** foreign `LEASE_HELD` blocks `run-next --execute` and `until-empty --execute` (`lease_held_foreign` / `RUN_LEASE_HELD_FOREIGN`) even with `--i-own-the-gpu` (must acquire/release).
+- **CLI:** `h3 run-next --i-own-the-gpu`; iron-status lists `gpu_no_hog` gate.
+- **Canary:** `artifacts/2026-08-07-i5-ops-canary.json` — CODE_CLOSED_OPS_PARTIAL (Comfy up but queue_busy + foreign lease; no overnight drain).
+- **Tests:** `test_gpu_no_hog` + `test_h3_until_empty` foreign-lease / soft-cap.
+- **Plan:** iron I5 code path closed; true exclusive overnight drain remains user-named OPEN_OPS.
+
 ## [2.40.62] - 2026-08-07
 
 ### Fixed (CTO A1.4 / hotpath · queue honesty isolation)

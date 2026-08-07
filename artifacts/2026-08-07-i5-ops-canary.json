@@ -1,0 +1,101 @@
+{
+  "schema_version": 1,
+  "kind": "i5-ops-canary",
+  "at": "2026-08-07T03:06:28+00:00",
+  "version_target": "2.40.62",
+  "comfy": {
+    "ready": false,
+    "status": "blocked",
+    "base_url": "http://127.0.0.1:18188",
+    "blocker_codes": [
+      "COMFY_QUEUE_BUSY"
+    ],
+    "queue_busy": true,
+    "ok": true
+  },
+  "no_hog": {
+    "idle_execute": {
+      "decision": "proceed",
+      "reason_code": "no_hog_ok",
+      "owned": false,
+      "queue_busy": false,
+      "mode": "run_next"
+    },
+    "busy_execute": {
+      "decision": "hold",
+      "reason_code": "no_hog_busy_hold",
+      "owned": false,
+      "queue_busy": true,
+      "mode": "run_next"
+    },
+    "until_empty_unowned": {
+      "decision": "refused",
+      "reason_code": "until_empty_requires_ownership",
+      "owned": false,
+      "queue_busy": false,
+      "mode": "until_empty"
+    }
+  },
+  "until_empty_gates": {
+    "refuse_without_own": {
+      "ok": false,
+      "stop_reason": "lease_held_foreign",
+      "halt_reason_code": "RUN_LEASE_HELD_FOREIGN"
+    },
+    "dry_run": {
+      "ok": true,
+      "stop_reason": "dry_run_pass_execute"
+    }
+  },
+  "dual_film_lease": {
+    "canary_root_foreign": {
+      "ok": false,
+      "free": false,
+      "owned_by_self": false,
+      "owner": "/Users/dex/AI FILM SPACE/0806/abroad-slut-manhua-h3",
+      "pid": 24135,
+      "age_sec": 525.969377040863,
+      "heartbeat_unix": 1786071462.7562509,
+      "path": "/Users/dex/.grok/run/gpu-lease.json",
+      "code": "LEASE_HELD",
+      "lease": {
+        "schema_version": 1,
+        "kind": "gpu-lease",
+        "owner_root": "/Users/dex/AI FILM SPACE/0806/abroad-slut-manhua-h3",
+        "pid": 24135,
+        "started_unix": 1786071462.7562509,
+        "heartbeat_unix": 1786071462.7562509,
+        "at": "2026-08-07T02:57:42+00:00"
+      }
+    },
+    "host_global_lease": {
+      "ok": false,
+      "free": false,
+      "owned_by_self": false,
+      "owner": "/Users/dex/AI FILM SPACE/0806/abroad-slut-manhua-h3",
+      "pid": 24135,
+      "age_sec": 526.0895342826843,
+      "heartbeat_unix": 1786071462.7562509,
+      "path": "/Users/dex/.grok/run/gpu-lease.json",
+      "code": "LEASE_HELD",
+      "lease": {
+        "schema_version": 1,
+        "kind": "gpu-lease",
+        "owner_root": "/Users/dex/AI FILM SPACE/0806/abroad-slut-manhua-h3",
+        "pid": 24135,
+        "started_unix": 1786071462.7562509,
+        "heartbeat_unix": 1786071462.7562509,
+        "at": "2026-08-07T02:57:42+00:00"
+      }
+    }
+  },
+  "honesty": {
+    "true_until_empty_execute": "OPEN_OPS_DEFERRED",
+    "reason": "multi-agent IRON: no overnight until-empty --execute without user exclusive; live host may hold foreign lease (abroad-slut). Code gates + dry canary only.",
+    "gpu_present": true,
+    "comfy_tunnel_18188": true
+  },
+  "ok": true,
+  "partial": true,
+  "status": "CODE_CLOSED_OPS_PARTIAL"
+}

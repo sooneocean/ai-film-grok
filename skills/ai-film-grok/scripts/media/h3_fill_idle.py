@@ -49,6 +49,8 @@ _H3_FILL_IDLE_HALT_REASON_MAP = {
     "queue_empty": ("RUN_QUEUE_EMPTY", "queue"),
     "queue_empty_after_runs": ("RUN_QUEUE_EMPTY", "queue"),
     "exclusive_gpu_required": ("RUN_EXCLUSIVE_GPU_REQUIRED", "ownership"),
+    "no_hog_busy_hold": ("RUN_NO_HOG_BUSY_HOLD", "ownership"),
+    "lease_held_foreign": ("RUN_LEASE_HELD_FOREIGN", "ownership"),
     "run_failed": ("RUN_EXECUTION_FAILED", "execution"),
     "no_progress": ("RUN_NO_PROGRESS", "scheduler"),
     "run_next_missing": ("RUN_DECISION_MISSING", "scheduler"),
@@ -56,6 +58,9 @@ _H3_FILL_IDLE_HALT_REASON_MAP = {
     "": ("RUN_EXECUTED", "executed"),
     None: ("RUN_EXECUTED", "executed"),
 }
+
+# I5 · multi-agent: unowned run-next batch soft-cap (default safe batch)
+_RUN_NEXT_MAX_JOBS_UNOWNED = 5
 
 
 def _halt_reason_code_and_group(reason: str | None) -> tuple[str, str]:
@@ -1920,6 +1925,34 @@ def _env_i_own_the_gpu() -> bool:
     return raw in {"1", "true", "yes", "on"}
 
 
+def _foreign_gpu_lease(root: Path) -> dict[str, Any] | None:
+    """Return lease status when another film holds the global 5090 lease.
+
+    I5 dual-film: do not steal slots while LEASE_HELD by others.
+    """
+    try:
+        from workflow_pack import gpu_lease_status
+
+        st = gpu_lease_status(root)
+    except Exception as exc:  # noqa: BLE001
+        return {
+            "ok": False,
+            "probe_error": str(exc)[:160],
+            "free": True,
+            "owned_by_self": False,
+            "code": "LEASE_PROBE_ERROR",
+        }
+    if not isinstance(st, dict):
+        return None
+    if st.get("free") or st.get("owned_by_self"):
+        return None
+    if str(st.get("code") or "") == "LEASE_HELD" or (
+        not st.get("free") and st.get("owner") and not st.get("owned_by_self")
+    ):
+        return st
+    return None
+
+
 # Multi-agent 5090 no-hog policy (2026-08-06 IRON, user: '不准再犯').
 # Pure decision — no GPU/network — so the rule is machine-checkable and
 # unit-testable independently of the Comfy `submission_capacity` API. This is
@@ -2054,6 +2087,7 @@ def fill_idle_cycle(
         execute=bool(execute),
         max_jobs=int(max_jobs or 5),
         free_memory_on_mode_switch=True,
+        i_own_the_gpu=bool(i_own_the_gpu),
     )
     capacity_recovery = None
     if (
@@ -2072,6 +2106,7 @@ def fill_idle_cycle(
                 execute=True,
                 max_jobs=int(max_jobs or 5),
                 free_memory_on_mode_switch=True,
+                i_own_the_gpu=bool(i_own_the_gpu),
             )
     after = write_fill_idle_evidence(base, notes=f"cycle-after {notes}".strip())
     pk = pk_compare(base, measure_missing=False, write_dailies=True)
@@ -2151,6 +2186,51 @@ def fill_idle_until_empty(
     pending_breakdown_before = _pending_reason_breakdown(
         base, include_challenge=include_challenge
     )
+    # I5 dual-film: foreign lease blocks until-empty execute (must acquire/release)
+    if bool(execute):
+        foreign = _foreign_gpu_lease(base)
+        if foreign is not None and not foreign.get("owned_by_self"):
+            plan_before = capacity_plan(base, include_challenge=include_challenge)
+            halt_code, halt_group = _halt_reason_code_and_group("lease_held_foreign")
+            open_op = {
+                "schema_version": 1,
+                "kind": "ai-film-h3-run-next-open-op",
+                "at": utc_now(),
+                "reason": "lease_held_foreign",
+                "halt_reason_code": halt_code,
+                "halt_reason_group": halt_group,
+                "command": None,
+                "next_after": None,
+                "pending_after": plan_before.get("pending_jobs"),
+                "gpu_lease": foreign,
+            }
+            return {
+                "schema_version": 1,
+                "kind": "ai-film-fill-idle-until-empty",
+                "ok": False,
+                "partial": True,
+                "root": str(base),
+                "execute": True,
+                "until_empty": True,
+                "i_own_the_gpu": bool(own),
+                "stop_reason": "lease_held_foreign",
+                "halt_reason_code": halt_code,
+                "halt_reason_group": halt_group,
+                "skipped_reason": "lease_held_foreign",
+                "gpu_lease": foreign,
+                "open_ops": [open_op],
+                "cycles_run": 0,
+                "jobs_ran_total": 0,
+                "takes_count_before": takes_before,
+                "takes_count_after": takes_before,
+                "takes_count_delta": 0,
+                "pending_reason_breakdown": pending_breakdown_before,
+                "cycles": [],
+                "next_cmd": (
+                    f'aifilm gpu-lease status --root "{base}" && '
+                    f'aifilm gpu-lease acquire --root "{base}"  # or release foreign owner'
+                ),
+            }
     if bool(execute) and not own:
         plan_before = capacity_plan(base, include_challenge=include_challenge)
         halt_code = "RUN_EXCLUSIVE_GPU_REQUIRED"
@@ -2555,14 +2635,19 @@ def run_next_fill_idle(
     timeout_sec: int = 1800,
     max_jobs: int = 1,
     free_memory_on_mode_switch: bool = True,
+    i_own_the_gpu: bool = False,
 ) -> dict[str, Any]:
     """Fill-Idle worker: plan next job; optionally run when capacity ready.
 
     Not a daemon — ``max_jobs`` caps how many runs in one call (default 1, hard max 20).
-    Never auto-promotes PK winners. P2 soft challenges use pilot stage.
+    Unowned execute soft-caps at 5 (I5 multi-agent). Never auto-promotes PK winners.
     """
     base = _root(root)
+    own = bool(i_own_the_gpu) or _env_i_own_the_gpu()
     max_jobs = max(1, min(int(max_jobs or 1), 20))
+    # I5 · soft-hog: without ownership, never batch more than safe default 5
+    if bool(execute) and not own and max_jobs > _RUN_NEXT_MAX_JOBS_UNOWNED:
+        max_jobs = _RUN_NEXT_MAX_JOBS_UNOWNED
     runs: list[dict[str, Any]] = []
     last_out: dict[str, Any] = {
         "schema_version": 1,
@@ -2571,6 +2656,7 @@ def run_next_fill_idle(
         "root": str(base),
         "execute": bool(execute),
         "max_jobs": max_jobs,
+        "i_own_the_gpu": bool(own),
         "jobs_attempted": 0,
         "jobs_ran": 0,
         "runs": runs,
@@ -2584,22 +2670,71 @@ def run_next_fill_idle(
         "decision_tree": None,
         "decision_trees": [],
         "open_ops": [],
+        "partial": False,
     }
     prev_mode: str | None = None
 
-    # Multi-agent 5090 no-hog guard (2026-08-06 IRON, user: '不准再犯'):
-    # a busy queue holding foreign/other agents' jobs must not be submitted to.
-    # The capacity probe can report status=="ready" while still carrying the
-    # COMFY_QUEUE_BUSY blocker — this explicit check closes that gap. Dry-run is
-    # always allowed; GPU ownership (AIFILM_I_OWN_THE_GPU) overrides the hold.
+    # Multi-agent 5090 no-hog guard (2026-08-06 + I5 dual-film):
+    # busy queue OR foreign gpu-lease → zero submit unless this root owns lease /
+    # AIFILM_I_OWN_THE_GPU. Dry-run always allowed. Holds are PARTIAL + open_ops.
     if execute:
+        foreign = _foreign_gpu_lease(base)
+        if foreign is not None:
+            code, group = _halt_reason_code_and_group("lease_held_foreign")
+            last_out["skipped_reason"] = "lease_held_foreign"
+            last_out["ok"] = True  # correct hold, not a crash
+            last_out["partial"] = True
+            last_out["halt_reason_code"] = code
+            last_out["halt_reason_group"] = group
+            last_out["gpu_lease"] = foreign
+            last_out["no_hog"] = gpu_no_hog_report(
+                queue_busy=True, i_own_gpu=own, mode="run_next", execute=True
+            )
+            last_out["open_ops"].append(
+                _run_next_open_ops_record(
+                    "lease_held_foreign",
+                    decision_tree={
+                        "kind": "ai-film-h3-run-next-decision-tree",
+                        "at": utc_now(),
+                        "skipped_reason": "lease_held_foreign",
+                        "gpu_lease": foreign,
+                    },
+                    command=None,
+                    next_after=None,
+                    pending_after=None,
+                )
+            )
+            return last_out
+
         _cap = probe_comfy_capacity_soft()
         _busy = _QUEUE_BUSY_CODE in _capacity_blocker_codes(_cap)
-        if _busy and not _env_i_own_the_gpu():
-            last_out["skipped_reason"] = "no_hog_busy_hold"
-            last_out["ok"] = True
+        dec = gpu_no_hog_decision(
+            queue_busy=_busy, i_own_gpu=own, mode="run_next", execute=True
+        )
+        if dec["decision"] in {"hold", "refused"}:
+            reason = str(dec.get("reason_code") or "no_hog_busy_hold")
+            code, group = _halt_reason_code_and_group(reason)
+            last_out["skipped_reason"] = reason
+            last_out["ok"] = True  # correct multi-agent hold
+            last_out["partial"] = True
+            last_out["halt_reason_code"] = code
+            last_out["halt_reason_group"] = group
             last_out["no_hog"] = gpu_no_hog_report(
-                queue_busy=True, i_own_gpu=False, mode="run_next", execute=True
+                queue_busy=_busy, i_own_gpu=own, mode="run_next", execute=True
+            )
+            last_out["open_ops"].append(
+                _run_next_open_ops_record(
+                    reason,
+                    decision_tree={
+                        "kind": "ai-film-h3-run-next-decision-tree",
+                        "at": utc_now(),
+                        "skipped_reason": reason,
+                        "no_hog": last_out["no_hog"],
+                    },
+                    command=None,
+                    next_after=None,
+                    pending_after=None,
+                )
             )
             return last_out
 

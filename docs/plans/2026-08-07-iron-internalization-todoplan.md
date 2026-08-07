@@ -1,11 +1,11 @@
 # 铁律 / 记忆 → 系统内化 Todo Plan（2026-08-07）
 
-**结论：** I0–I4 **产品内化路径 SHIPPED（2.40.51）**。剩余 I5 为运维/GPU 真片 OPEN_OPS，不挡工程结案。
+**结论：** I0–I4 **产品内化路径 SHIPPED（2.40.51）**。**I5 机读门禁 SHIPPED（2.40.63）**；真片 overnight drain 仍须用户点名独占 + OPEN_OPS 诚实。
 
 | 项 | 值 |
 |----|-----|
-| Status | **CLOSED 产品链** · I5 ops deferred |
-| Version | plugin.json **2.40.51** |
+| Status | **CLOSED 产品链 + I5 机读** · overnight drain OPEN_OPS |
+| Version | plugin.json **2.40.63** |
 | 主执行板 | [CTO](2026-08-06-cto-optimization-todoplan.md) |
 | 养分对账 | [nutrient-matrix](2026-08-06-nutrient-matrix.md) |
 | 治理 | [MEMORY_GOVERNANCE](../MEMORY_GOVERNANCE.md) |
@@ -30,7 +30,7 @@
 |----|-----|------|
 | ~~I1.5~~ | scale promote 全入口 | ✅ 2.40.54 assert shared still+clip |
 | ~~I4.2~~ | `aifilm iron-status` CLI | ✅ 2.40.54 |
-| I5.* | run-next 软 hog / dual-film / 真片 canary | OPEN_OPS · 有 GPU 再做 |
+| ~~I5.*~~ | run-next 软 hog / dual-film / canary | ✅ **2.40.63** 机读；overnight `--until-empty --execute --i-own-the-gpu` 仍用户点名 |
 
 ## 新 IRON 入口（永久）
 

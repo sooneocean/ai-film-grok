@@ -164,6 +164,12 @@ def add_h3_parsers(sub: argparse._SubParsersAction[argparse.ArgumentParser]) -> 
     run_next.add_argument("--seed", type=int, default=20260804)
     run_next.add_argument("--timeout", type=int, default=1800)
     run_next.add_argument("--receipt", type=Path, default=None)
+    run_next.add_argument(
+        "--i-own-the-gpu",
+        action="store_true",
+        dest="i_own_the_gpu",
+        help="I5: claim exclusive ownership (bypass busy hold; foreign lease still blocks)",
+    )
 
     pk = actions.add_parser(
         "pk-compare",
@@ -394,6 +400,7 @@ def run_h3(args: argparse.Namespace) -> dict[str, Any]:
                 timeout_sec=int(getattr(args, "timeout", 1800) or 1800),
                 max_jobs=int(getattr(args, "max_jobs", 1) or 1),
                 free_memory_on_mode_switch=not bool(getattr(args, "no_free_memory", False)),
+                i_own_the_gpu=bool(getattr(args, "i_own_the_gpu", False)),
             )
         elif action == "pk-ledger":
             from h3_fill_idle import append_pk_ledger, load_pk_ledger

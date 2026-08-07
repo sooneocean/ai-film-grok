@@ -614,7 +614,7 @@
     },
     {
       "path": "scripts/cli/cli_h3.py",
-      "sha256": "14bcb9e0809b1ef54baaee55e62dabe711488a7a00094e2d1d916adb49bcc627"
+      "sha256": "f332ccb3f27f738ba6ce8c74416efe3b290183608c598dae5d036780dc4725c2"
     },
     {
       "path": "scripts/cli/cli_hub_residual.py",
@@ -1410,7 +1410,7 @@
     },
     {
       "path": "scripts/gates/iron_status.py",
-      "sha256": "46eb8b8b4fae1db7bfd33c42d4a17007f8db0a4cfeebf64bca4e7326f507ad87"
+      "sha256": "97727ad7028eb53c179b7023c8b08da6d9ff6349e4f92ec7446132901f13538d"
     },
     {
       "path": "scripts/gates/manifest_truth.py",
@@ -1686,7 +1686,7 @@
     },
     {
       "path": "scripts/media/h3_fill_idle.py",
-      "sha256": "a1df7f8b7a1d90674d9130a25a4b7cffac7628fa43a4539cc3ebefc3bbb23755"
+      "sha256": "6824cfaa198b8521abc380f98f5de264a811cfc9132ec9a2613d7af307e0cdc1"
     },
     {
       "path": "scripts/media/h3_media_pack.py",

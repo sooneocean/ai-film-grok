@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import sys
 import tempfile
 import unittest
@@ -23,6 +24,10 @@ from h3_fill_idle import (  # noqa: E402
     wait_for_comfy_capacity,
 )
 from util import write_json  # noqa: E402
+
+# I5: isolate dual-film lease from host ~/.grok/run (live LEASE_HELD must not pollute tests)
+_LEASE_ISO = tempfile.mkdtemp(prefix="aifilm-lease-iso-")
+os.environ["AIFILM_GPU_LEASE_DIR"] = _LEASE_ISO
 
 
 def _film(root: Path) -> None:
@@ -142,12 +147,36 @@ class UntilEmptyTests(unittest.TestCase):
             self.assertIn("decision_tree", rep)
             self.assertEqual(int(rep.get("jobs_ran_total") or 0), 0)
             self.assertTrue((root / "receipts" / "fill-idle-until-empty.json").is_file())
+
+    def test_until_empty_foreign_lease_blocks_even_with_own_flag(self) -> None:
+        """I5 dual-film: foreign LEASE_HELD blocks until-empty (must acquire/release)."""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _film(root)
+            foreign = {
+                "ok": False,
+                "free": False,
+                "owned_by_self": False,
+                "owner": "/other/film",
+                "code": "LEASE_HELD",
+            }
+            with mock.patch("h3_fill_idle._foreign_gpu_lease", return_value=foreign):
+                rep = fill_idle_until_empty(
+                    root,
+                    execute=True,
+                    i_own_the_gpu=True,
+                    max_cycles=2,
+                )
+            self.assertFalse(rep.get("ok"))
+            self.assertEqual(rep.get("stop_reason"), "lease_held_foreign")
+            self.assertEqual(rep.get("halt_reason_code"), "RUN_LEASE_HELD_FOREIGN")
+            self.assertEqual(int(rep.get("jobs_ran_total") or 0), 0)
             self.assertIn("takes_count_delta", rep)
             self.assertIn("pending_reason_breakdown", rep)
             self.assertIn("open_ops", rep)
             self.assertTrue(rep["open_ops"])
-            self.assertEqual(rep["open_ops"][0].get("reason"), "exclusive_gpu_required")
-            self.assertEqual(rep["open_ops"][0].get("halt_reason_code"), "RUN_EXCLUSIVE_GPU_REQUIRED")
+            self.assertEqual(rep["open_ops"][0].get("reason"), "lease_held_foreign")
+            self.assertEqual(rep["open_ops"][0].get("halt_reason_code"), "RUN_LEASE_HELD_FOREIGN")
             self.assertEqual(rep["open_ops"][0].get("halt_reason_group"), "ownership")
 
     def test_until_empty_execute_queue_empty(self) -> None:
