@@ -339,7 +339,16 @@ def build_dispatch(
             }
         )
 
+    # C4: read film-spec / manifest once on this hot path (reuse below).
     spec_for_routing = read_json(root / "film-spec.json") or {}
+    manifest_cache: dict[str, Any] | None = None
+
+    def _manifest() -> dict[str, Any]:
+        nonlocal manifest_cache
+        if manifest_cache is None:
+            raw = read_json(root / "manifest.json") or {}
+            manifest_cache = raw if isinstance(raw, dict) else {}
+        return manifest_cache
     routed_shots = (
         spec_for_routing.get("shots") if isinstance(spec_for_routing.get("shots"), list) else []
     )
@@ -488,7 +497,7 @@ def build_dispatch(
             )
         )
         if not has_plate_early:
-            man_early = read_json(root / "manifest.json") or {}
+            man_early = _manifest()
             ff_early = (
                 ((man_early.get("outputs") or {}).get("final_film") or {})
                 if isinstance(man_early, dict)
@@ -611,7 +620,7 @@ def build_dispatch(
         )
     )
     if not plate_exists:
-        man_out = read_json(root / "manifest.json") or {}
+        man_out = _manifest()
         ff = (
             ((man_out.get("outputs") or {}).get("final_film") or {})
             if isinstance(man_out, dict)
@@ -686,12 +695,12 @@ def build_dispatch(
         try:
             from film_spec import resolve_h3_config
 
-            h3_cfg = resolve_h3_config(read_json(root / "film-spec.json") or {})
+            h3_cfg = resolve_h3_config(spec_for_routing if isinstance(spec_for_routing, dict) else {})
             h3_on = bool(h3_cfg.get("enabled")) if isinstance(h3_cfg, dict) else False
         except Exception:
             h3_on = False
             try:
-                sp = read_json(root / "film-spec.json") or {}
+                sp = spec_for_routing if isinstance(spec_for_routing, dict) else {}
                 h3_on = bool(
                     isinstance(sp, dict)
                     and (

@@ -1213,6 +1213,51 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
         )
     except PolicyError as exc:
         raise RenderError(str(exc)) from exc
+    # T4 · align plate between-shot styles to transition_ops.picture (no silent fade drift)
+    ops_for_align = spec.get("transition_ops")
+    if isinstance(ops_for_align, list) and ops_for_align and len(full_join_styles) >= 2:
+        try:
+            try:
+                from plan.plate_transition_align import (
+                    align_story_styles_to_transition_ops,
+                    plate_transition_ops_alignment_report,
+                )
+            except ImportError:  # pragma: no cover
+                from plate_transition_align import (  # type: ignore
+                    align_story_styles_to_transition_ops,
+                    plate_transition_ops_alignment_report,
+                )
+
+            between = list(full_join_styles[1:-1])
+            align_rep = plate_transition_ops_alignment_report(
+                transition_ops=ops_for_align,
+                story_styles=between
+                if between
+                else [str(x) for x in (story_styles or [])],
+                story_intents=(
+                    list(story_intents) if isinstance(story_intents, list) else None
+                ),
+            )
+            if not align_rep.get("ok"):
+                soft_t = bool(spec.get("transition_policy_soft") is True)
+                if not soft_t:
+                    msg = "; ".join(
+                        f"[{i.get('code')}] {i.get('message')}"
+                        for i in (align_rep.get("issues") or [])[:4]
+                        if i.get("code") in (align_rep.get("hard_codes") or [])
+                    )
+                    raise RenderError(
+                        f"plate transition_ops alignment: {msg or align_rep.get('hard_codes')}"
+                    )
+            if between:
+                aligned, _iss = align_story_styles_to_transition_ops(
+                    ops_for_align, between
+                )
+                full_join_styles = [full_join_styles[0], *aligned, full_join_styles[-1]]
+        except RenderError:
+            raise
+        except Exception as exc:
+            log(f"plate transition_ops align skipped: {exc}"[:160])
     # Per-join transition duration from edit_strategy (voice-coupled rhythm)
     full_join_use_ts = resolve_join_transition_secs(
         spec.get("join_transition_secs"),

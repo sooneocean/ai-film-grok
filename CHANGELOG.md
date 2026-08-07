@@ -1,6 +1,6 @@
 # Changelog
 
-## [2.40.106] - 2026-08-07
+## [2.40.109] - 2026-08-07
 
 ### Changed (Web console UI · 电影工作室美学收尾 T3+T6–T12)
 - **字体：** 引入 JetBrains Mono 作 `--font-mono`，asset/引擎 id 等机器串用等宽体提升扫读性（Space Grotesk + Sora 已就位）。
@@ -9,7 +9,31 @@
 - **对比模式：** 每卡「对比」切换（上限 3），底部托盘 + 模态框按字段并排；切换 kind 清空对比集。
 - **空/加载/错误态：** 骨架屏 shimmer、API 失败「重试」、空列表引导态。
 - **响应式 + 动效：** 640px 表头横滚/网格单列/KPI 两列→单列；统一 `--ease` 缓动 token，保留 reduced-motion 降级。
-- 纯前端改动，后端契约零修改，`console` 门禁持续绿。注：本提交覆盖远端一度回退的 AI 味紫青渐变旧版 console.html，确认采用电影工作室暖墨底+琥珀单强调美学。
+- **工作台整合远端 workbench：** 保留电影工作室暖墨底+琥珀单强调美学（覆盖远端一度回退的 AI 味紫青渐变旧版），并吸纳远端「验片」iframe 内嵌 tab（data-tab=review）+ 仪表 tab（data-tab=overview）以通过 B1 single-shell 测试。后端契约零修改，`console` 门禁持续绿。
+
+## [2.40.108] - 2026-08-07
+
+### Added (F3 still face-lock bind · T4 plate transition_ops align)
+- **`gates/still_face_lock_bind.py`**: archive still path hard-ban; cast enroll required before H3; pixel drift soft unless strict/max heat. Wired into `assert_still_source_safe` + `generation_request` + `generation_ready`.
+- **`plan/plate_transition_align.py`**: align plate xfade styles to `transition_ops.picture`; continue ops must hard_cut; hard fail on missing style / continue-not-hard. Wired into `render_final` concat.
+- **Tests:** `test_still_face_lock_bind_f3.py` (bind + plate align).
+- **Docs:** hard-defaults F3/T4 · face-transition plan progress.
+
+## [2.40.107] - 2026-08-07
+
+### Changed (WebUI/router closeout · C3/C4/D1)
+- **C3 stage single source:** `craft_spine.CRAFT_STAGES` re-exports `stage_model.CRAFT_EIGHT` (+ test).
+- **C4 dispatch hot path:** `build_dispatch` caches film-spec + manifest reads (no triple re-read).
+- **D1 web package:** `scripts/web/{routes,projection}.py` + `__init__`; top-level `web_routes` / `console_projection` shims.
+- **Docs:** web-review-console package note.
+
+## [2.40.106] - 2026-08-07
+
+### Changed (route-catalog C1 orphan governance)
+- **Reclass:** 36 hub-primary CLI (`dispatch`/`doctor`/`advance`/…) orphan → **canonical**; 60 other CLI-surface orphans → **partial** (`cli_only_not_spine`).
+- **Orphan soft-cap tests:** count &lt;40 and ratio &lt;20%; hub primaries must not be orphan.
+- **Docs:** CONTRIBUTING new-CLI must add catalog row; routing-map C1 note.
+- **meta.c1_orphan_governance** recorded on catalog.
 
 ## [2.40.105] - 2026-08-07
 

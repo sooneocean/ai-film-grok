@@ -389,11 +389,19 @@ def resolve_still_source(
     )
 
 
-def assert_still_source_safe(entry: dict[str, Any], *, shot_id: str = "") -> dict[str, Any]:
+def assert_still_source_safe(
+    entry: dict[str, Any],
+    *,
+    shot_id: str = "",
+    root: Path | str | None = None,
+    shot: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     """Fail-closed when peak wardrobe would use cast master or is blocked.
 
     Also enforces I2V composition-fill on resolved pixel path (P0 2026-08-07 EP02):
     cast fullbody masters and postage-stamp subjects cannot feed motion.
+
+    F3 · when ``root`` given, still must bind current face-lock enroll (no archive path).
     """
     if entry.get("blocked"):
         raise StillSourceError(
@@ -432,6 +440,30 @@ def assert_still_source_safe(entry: dict[str, Any], *, shot_id: str = "") -> dic
         raise
     except Exception:
         pass  # soft if gate import/deps missing
+
+    # F3 · face-lock generation bind (enroll + no archive still as H3 source)
+    if root is not None:
+        try:
+            from gates.still_face_lock_bind import (
+                StillFaceLockBindError,
+                assert_still_face_lock_bound,
+            )
+
+            bind = assert_still_face_lock_bound(
+                root, entry.get("path"), shot, force=False
+            )
+            entry["face_lock_bind"] = {
+                "ok": bind.get("ok"),
+                "codes": bind.get("codes"),
+                "char_id": bind.get("char_id"),
+                "soft": bind.get("soft"),
+            }
+        except StillFaceLockBindError as exc:
+            raise StillSourceError(
+                f"still face-lock bind failed for {shot_id or '?'}: {exc}"
+            ) from exc
+        except Exception:
+            pass  # soft if face stack unavailable
     return entry
 
 

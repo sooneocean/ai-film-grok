@@ -177,6 +177,16 @@ def build_generation_request(
         wants_continue=wants_cont,
         kind=k if k == KIND_STILL else KIND_I2V,
     )
+    # F3 · face-lock bind + composition-fill fail-closed before H3/I2V pack
+    if k != KIND_STILL and still_entry.get("path"):
+        try:
+            from still_source import assert_still_source_safe
+
+            still_entry = assert_still_source_safe(
+                still_entry, shot_id=str(shot_id), root=base, shot=shot
+            )
+        except Exception as exc:
+            raise GenerationRequestError(str(exc)[:240]) from exc
 
     media_pack: dict[str, Any] = {}
     if k != KIND_STILL:

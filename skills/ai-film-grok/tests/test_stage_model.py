@@ -33,3 +33,10 @@ def test_project_stages_packet_keys():
     assert p["pipeline_stage"] == "visual"
     assert p["stage_public"] == "visual"
     assert p["pipeline_stage"] in INTERNAL_PIPELINE
+
+
+def test_craft_spine_rings_are_stage_model_single_source():
+    """C3: craft_spine must not fork CRAFT_EIGHT."""
+    from craft_spine import CRAFT_STAGES
+
+    assert CRAFT_STAGES is CRAFT_EIGHT or tuple(CRAFT_STAGES) == tuple(CRAFT_EIGHT)

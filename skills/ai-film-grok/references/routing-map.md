@@ -63,3 +63,6 @@ aifilm dispatch --root <film>
 - 新 CLI：加 `cli/*` parser + handler，**并**在 route-catalog 加一行（R1+）
 - 改选路 lane：先 `weapon-lane-matrix.md` + `production_router` 测，勿只改文档
 - 盘点：`python scripts/tools/route_inventory.py`
+- **C1 orphan 治理（2026-08-07）：** hub 主路径 CLI（dispatch/doctor/advance/…）→ `canonical`；
+  其余仅 CLI 面、不进 next_action 主脊的 → `partial` + tag `cli_only_not_spine`；
+  orphan 软顶 **&lt;40 条且 &lt;20%**（`test_route_catalog`）。勿把「没挂 skill」的真实 CLI 长期留 orphan。

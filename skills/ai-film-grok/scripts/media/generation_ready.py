@@ -58,6 +58,13 @@ def generation_ready_report(root: Path | str) -> dict[str, Any]:
         ssa = audit_film_still_sources(base)
     except Exception as exc:
         ssa = {"ok": True, "hard": [], "peak_missing": [], "error": str(exc)[:120]}
+    # F3 · still ↔ current face-lock enroll bind
+    try:
+        from gates.still_face_lock_bind import audit_film_still_face_lock_bind
+
+        flb = audit_film_still_face_lock_bind(base, write_receipt=True, max_shots=40)
+    except Exception as exc:
+        flb = {"ok": True, "hard": [], "error": str(exc)[:120]}
     # P0 2026-08-07: keyframe subject-fill audit (postage-stamp / cast fullbody)
     try:
         from composition_fill_gate import audit_film_composition_fill
@@ -94,9 +101,13 @@ def generation_ready_report(root: Path | str) -> dict[str, Any]:
     peak_missing = list(ssa.get("peak_missing") or [])
     hard = list(ssa.get("hard") or [])
     fill_hard = list(cfa.get("hard") or [])
+    face_hard = list(flb.get("hard") or [])
     blockers: list[str] = []
     if hard:
         blockers.extend(str(x) for x in hard[:5])
+    if face_hard:
+        blockers.append(f"STILL_FACE_LOCK:{len(face_hard)}")
+        blockers.extend(str(x) for x in face_hard[:3])
     if fill_hard:
         blockers.append(f"COMPOSITION_FILL:{len(fill_hard)}")
         blockers.extend(str(x) for x in fill_hard[:3])
@@ -107,6 +118,7 @@ def generation_ready_report(root: Path | str) -> dict[str, Any]:
     line_parts = [
         f"style={'lock' if style_locked else 'open'}",
         f"still_src={'ok' if ssa.get('ok') else 'hard'}",
+        f"face_bind={'ok' if flb.get('ok') else 'hard'}",
         f"fill={'ok' if cfa.get('ok') else f'hard{len(fill_hard)}'}",
         f"flf={flf_eligible}/{len(shots) or 0}",
         f"reg={'yes' if isinstance(reg, dict) and reg else 'no'}",
@@ -123,6 +135,11 @@ def generation_ready_report(root: Path | str) -> dict[str, Any]:
         hints.append("lock style-bible before bulk")
     if peak_missing:
         hints.append("peak wardrobe still missing — use state photo / Qwen edit primary")
+    if face_hard:
+        hints.append(
+            "still not bound to current face-lock enroll — enroll-bible / reseed still "
+            "(ban _archive still as H3 source)"
+        )
     if fill_hard:
         hints.append(
             "keyframe subject fill too small — ensure_fill_frame / CU reseed "
@@ -142,9 +159,14 @@ def generation_ready_report(root: Path | str) -> dict[str, Any]:
     return {
         "schema_version": 1,
         "kind": "generation-ready",
-        "ok": bool(style_locked or not shots) and not peak_missing and bool(cfa.get("ok", True)),
+        "ok": bool(style_locked or not shots)
+        and not peak_missing
+        and bool(cfa.get("ok", True))
+        and bool(flb.get("ok", True)),
         "style_locked": style_locked,
         "still_source_ok": bool(ssa.get("ok")),
+        "still_face_lock_ok": bool(flb.get("ok", True)),
+        "still_face_lock_hard": face_hard[:12],
         "composition_fill_ok": bool(cfa.get("ok", True)),
         "composition_fill_hard": fill_hard[:12],
         "composition_fill_checked": int(cfa.get("checked") or 0),
