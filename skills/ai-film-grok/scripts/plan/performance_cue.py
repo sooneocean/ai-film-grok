@@ -103,6 +103,22 @@ def normalize_performance_cue(raw: object = None, *, tone_tags: object = None) -
         seed = int(seed)
     except (TypeError, ValueError) as exc:
         raise PerformanceCueError("performance_cue.take_seed must be an integer") from exc
+    # Film Production OS W7 · optional acting-layer fields (director language)
+    def _opt_str(key: str) -> str | None:
+        val = str(source.get(key) or "").strip()
+        return val or None
+
+    tempo_raw = source.get("tempo")
+    tempo: str | None
+    if tempo_raw is None or str(tempo_raw).strip() == "":
+        tempo = None
+    else:
+        tempo = str(tempo_raw).strip().lower()
+        if tempo not in {"slow", "medium", "fast", "held", "rush"}:
+            raise PerformanceCueError(
+                "performance_cue.tempo must be one of slow|medium|fast|held|rush"
+            )
+
     return {
         "emotion": emotion,
         "intensity": round(
@@ -117,6 +133,12 @@ def normalize_performance_cue(raw: object = None, *, tone_tags: object = None) -
         "language": str(source.get("language") or "").strip().lower() or None,
         "take_seed": seed,
         "source": str(source.get("source") or "shot/default"),
+        # W7 acting layer (optional; providers may ignore)
+        "objective": _opt_str("objective"),
+        "subtext": _opt_str("subtext"),
+        "eye": _opt_str("eye"),
+        "breath": _opt_str("breath"),
+        "tempo": tempo,
     }
 
 

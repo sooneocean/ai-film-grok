@@ -154,11 +154,18 @@ def compile_for_shot(
     scene_id: str = "",
 ) -> dict[str, Any]:
     spec = extract_shot_spec(shot, scene_id=scene_id)
+    try:
+        from plan.cine_rules import enrich_shot_spec_with_cine
+    except ImportError:  # pragma: no cover
+        from cine_rules import enrich_shot_spec_with_cine  # type: ignore
+
+    spec = enrich_shot_spec_with_cine(spec)
     leak = lint_provider_leak(shot)
     artifact = compile_prompt_artifact(
         spec, adapter=adapter, director_intent=director_intent
     )
     artifact["provider_leak"] = leak
+    artifact["cine_suggestion"] = spec.get("cine_suggestion")
     # Prove shot dict unchanged keys for tests
     artifact["project_keys_unchanged"] = True
     return artifact

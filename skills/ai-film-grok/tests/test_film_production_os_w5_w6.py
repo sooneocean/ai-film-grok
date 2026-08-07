@@ -140,3 +140,38 @@ def test_assembly_allows_selected():
     rep = check_assembly_takes(man, strict=True)
     assert rep["ok"] is True
     assert rep["rough_cut_allowed"] is True
+
+
+def test_w7_cine_rules_and_performance_acting_layer():
+    from cine_rules import enrich_shot_spec_with_cine, lookup_cine_rule
+    from performance_cue import normalize_performance_cue
+
+    look = lookup_cine_rule(purpose="create_tension")
+    assert look["matched"] is True
+    assert look["key"] == "tension"
+    assert look["shot_size"]
+    spec = enrich_shot_spec_with_cine(
+        {
+            "shot_purpose": "establish_location",
+            "framing": {},
+            "performance": {"emotion": "fearful"},
+        }
+    )
+    assert spec["cine_suggestion"]["matched"] is True
+    # fear emotion beats empty framing
+    assert spec["framing"].get("shot_size")
+
+    cue = normalize_performance_cue(
+        {
+            "emotion": "tender",
+            "intensity": 0.4,
+            "objective": "赢得信任",
+            "subtext": "其实害怕离开",
+            "eye": "avoid then meet",
+            "breath": "shallow then release",
+            "tempo": "slow",
+        }
+    )
+    assert cue["objective"] == "赢得信任"
+    assert cue["subtext"]
+    assert cue["tempo"] == "slow"
