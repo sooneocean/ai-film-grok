@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.41.34] - 2026-08-07
+
+### Added (director-center · Phase E4)
+- **`GET /api/shot-card`**: read-only Shot Card from film-spec (`?shot=` one · bare = index).
+- **console 选 Take**: Shot Card panel beside take compare (allSettled with takes).
+- **smoke**: CSP / X-Frame-Options + shot-card contract on live server.
+- **Tests:** shot_card_api + FastAPI endpoint.
+
 ## [2.41.33] - 2026-08-07
 
 ### Added (edit-director · Round 4 closeout)

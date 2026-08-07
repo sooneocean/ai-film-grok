@@ -428,6 +428,10 @@
         <button class="cmd-btn magnetic" id="dailies-refresh">刷新镜头列表</button>
       </div>
       <div id="dailies-shots" class="lanes" aria-live="polite"></div>
+      <div id="dailies-shot-card" class="panel" style="margin-top:1rem;display:none" aria-live="polite">
+        <h3 class="section-h" style="margin-top:0">Shot Card <span class="muted" style="font-weight:400;font-size:.8rem">只读 · 来自 film-spec</span></h3>
+        <div id="dailies-shot-card-body" class="muted" style="font-size:.88rem;line-height:1.45"></div>
+      </div>
       <div id="dailies-compare" class="grid" style="margin-top:1rem"></div>
     </div>
   </section>
@@ -1654,10 +1658,47 @@ async function loadDailies(){
     else if (shots.find(s => s.needs_pick)) openDailiesShot(shots.find(s => s.needs_pick).shot_id);
   } catch (e) { toast('载入 takes 失败：' + e.message, true); }
 }
+function renderShotCardPanel(payload){
+  const wrap = document.getElementById('dailies-shot-card');
+  const body = document.getElementById('dailies-shot-card-body');
+  if (!wrap || !body) return;
+  if (!payload || !payload.found || !payload.summary) {
+    wrap.style.display = 'block';
+    body.innerHTML = '<p class="muted">该镜暂无 Shot Card（无 film-spec 或不在表内）。CLI：<code>aifilm plan shot-cards</code></p>';
+    return;
+  }
+  const s = payload.summary;
+  const rows = [
+    ['镜头', s.id],
+    ['标题', s.title],
+    ['目的', s.shot_purpose],
+    ['叙事', s.narrative_function],
+    ['主体', s.subject],
+    ['景别', s.shot_size],
+    ['运镜', s.camera_motion],
+    ['动作', s.action],
+    ['对白', s.dialogue],
+    ['时长', s.duration_sec != null ? (s.duration_sec + 's') : ''],
+    ['资产', (s.asset_refs || []).join(', ')],
+  ].filter(r => r[1] != null && String(r[1]).trim() !== '');
+  wrap.style.display = 'block';
+  body.innerHTML = rows.length
+    ? '<dl style="display:grid;grid-template-columns:6rem 1fr;gap:.35rem .75rem;margin:0">' +
+      rows.map(([k,v]) => `<dt class="muted">${esc(k)}</dt><dd style="margin:0">${esc(String(v))}</dd>`).join('') +
+      '</dl>'
+    : '<p class="muted">Shot Card 字段为空</p>';
+}
 async function openDailiesShot(shotId){
   dailiesShot = shotId;
   try {
-    const cmp = await api('/api/takes?shot=' + encodeURIComponent(shotId));
+    const [cmpSettled, cardSettled] = await Promise.allSettled([
+      api('/api/takes?shot=' + encodeURIComponent(shotId)),
+      api('/api/shot-card?shot=' + encodeURIComponent(shotId)),
+    ]);
+    if (cardSettled.status === 'fulfilled') renderShotCardPanel(cardSettled.value);
+    else renderShotCardPanel(null);
+    if (cmpSettled.status !== 'fulfilled') throw cmpSettled.reason || new Error('takes failed');
+    const cmp = cmpSettled.value;
     const el = document.getElementById('dailies-compare');
     const cands = cmp.candidates || [];
     el.innerHTML = cands.length ? cands.map(c => {

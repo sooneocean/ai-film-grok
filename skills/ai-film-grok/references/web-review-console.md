@@ -25,6 +25,7 @@ aifilm takes select --root <film> --shot-id s01 --take-id <id>
 | `GET /api/live` | 人审收件箱 · queue · activity |
 | `GET /api/events` | pipeline-events 尾 |
 | `GET /api/takes` · `?shot=` | 多 take 索引 / 对比 |
+| `GET /api/shot-card` · `?shot=` | 只读 Shot Card（选 Take 面板；无 shot=索引） |
 | `POST /api/takes/review` | Select/Reject take |
 
 放行写 ledger/manifest；Web 不执行 H3/final。

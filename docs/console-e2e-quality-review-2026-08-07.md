@@ -10,7 +10,7 @@
 
 - ✅ **功能可上线**：扩展后的 `make smoke-console` 在真实 `aifilm review-ui serve` 进程上跑通了 **33 项检查**（原 10 + 新增 23），覆盖"打开→工作台并行加载 6 类素材→选声线→锁定角色并落盘规范文件→选道具→选 BGM→写路径边界"的完整浏览器操作流程。
 - ✅ **CI 门禁未破**：`ruff` 通过；`pytest -m console` 77 passed。
-- ⚠️ **仍有 4 项质量项待团队跟进**（见 §2），其中 2 项 Medium 建议本迭代修掉。
+- ⚠️ **S2/S4 仍可跟进**（见 §2）。**S1 allSettled · S3 CSP** 已在 director-center Phase E（2.41.32）落地；**E4 Shot Card** 在 2.41.34。
 
 ---
 

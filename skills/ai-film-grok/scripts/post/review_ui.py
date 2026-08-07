@@ -372,6 +372,26 @@ def make_handler(root: Path, token: str):
                 except Exception as exc:  # noqa: BLE001
                     self._json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
                 return
+            if parsed.path == "/api/shot-card":
+                try:
+                    from web import shot_card_api
+                    from web_core import WebConsoleError
+
+                    qs = parse_qs(parsed.query)
+                    shot = (qs.get("shot") or [None])[0]
+                    if shot:
+                        self._json(200, shot_card_api.get_shot_card(film_root, shot))
+                    else:
+                        try:
+                            limit = int((qs.get("limit") or ["80"])[0])
+                        except ValueError:
+                            limit = 80
+                        self._json(200, shot_card_api.list_shot_cards(film_root, limit=limit))
+                except WebConsoleError as exc:
+                    self._json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+                except Exception as exc:  # noqa: BLE001
+                    self._json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
+                return
             if parsed.path == "/api/onboarding":
                 try:
                     import onboarding

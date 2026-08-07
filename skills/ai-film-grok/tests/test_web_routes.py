@@ -61,6 +61,7 @@ def test_fastapi_covers_review_parity_apis():
         ("GET", "/api/stream"),
         ("GET", "/api/takes"),
         ("POST", "/api/takes/review"),
+        ("GET", "/api/shot-card"),
         ("POST", "/api/select"),
         ("GET", "/api/onboarding"),
     }

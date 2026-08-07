@@ -380,6 +380,19 @@ def create_app(root: str | Path, token: str, port: int) -> FastAPI:
         except WebConsoleError as exc:
             raise _http_error(400, str(exc)) from exc
 
+    @app.get("/api/shot-card", dependencies=[Depends(require_auth)])
+    def api_shot_card(
+        shot: str | None = None,
+        limit: int = 80,
+    ) -> dict[str, Any]:
+        from web import shot_card_api
+
+        try:
+            if shot:
+                return shot_card_api.get_shot_card(base, shot)
+            return shot_card_api.list_shot_cards(base, limit=limit)
+        except WebConsoleError as exc:
+            raise _http_error(400, str(exc)) from exc
 
     # ---- workspace file (read-only: auth only; path-escape safe) ----
     @app.get("/api/file", dependencies=[Depends(require_auth)])

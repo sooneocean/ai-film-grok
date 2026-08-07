@@ -407,7 +407,46 @@ def main() -> int:
         )
         check(
             "served console: director inbox + dailies",
-            'id="dash-inbox"' in text and "/api/live" in text and "EventSource" in text and "allSettled" in text and 'data-tab="dailies"' in text and "function loadDailies" in text,
+            'id="dash-inbox"' in text
+            and "/api/live" in text
+            and "EventSource" in text
+            and "allSettled" in text
+            and 'data-tab="dailies"' in text
+            and "function loadDailies" in text
+            and 'id="dailies-shot-card"' in text
+            and "/api/shot-card" in text
+            and "function renderShotCardPanel" in text,
+        )
+        # Phase E/E4: CSP + shot-card on live server
+        try:
+            raw = HTTPConnection("127.0.0.1", port, timeout=8)
+            raw.request("GET", "/console", headers={"X-Review-Token": token})
+            resp = raw.getresponse()
+            csp = resp.getheader("Content-Security-Policy") or ""
+            xfo = resp.getheader("X-Frame-Options") or ""
+            resp.read()
+            raw.close()
+            check(
+                "console CSP present",
+                "default-src" in csp and "script-src" in csp,
+                f"csp={csp[:80]!r}",
+            )
+            check(
+                "console X-Frame-Options SAMEORIGIN",
+                xfo.upper() == "SAMEORIGIN",
+                f"xfo={xfo!r}",
+            )
+        except Exception as exc:  # noqa: BLE001
+            check("console CSP present", False, str(exc))
+        st_sc, body_sc = req(conn, "GET", "/api/shot-card", token=token)
+        try:
+            sc = json.loads(body_sc) if st_sc == 200 else {}
+        except json.JSONDecodeError:
+            sc = {}
+        check(
+            "GET /api/shot-card index",
+            st_sc == 200 and sc.get("kind") == "shot-card-index",
+            f"status={st_sc} body={str(body_sc)[:120]!r}",
         )
         # 11c) Onboarding tab actually wires its loader (CTO plan T1): the tab
         #      switch must invoke loadOnboarding() so the "起步" screen is alive.

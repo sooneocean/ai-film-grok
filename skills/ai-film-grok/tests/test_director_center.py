@@ -306,3 +306,64 @@ def test_api_stream_endpoint(tmp_path):
         body = b"".join(resp.iter_bytes()).decode("utf-8", errors="replace")
     assert "event: hello" in body
     assert "event: live" in body
+
+
+def test_shot_card_api_from_film_spec(tmp_path):
+    from util import write_json
+    from web.shot_card_api import get_shot_card, list_shot_cards
+
+    write_json(
+        tmp_path / "film-spec.json",
+        {
+            "schema_version": 1,
+            "kind": "film-spec",
+            "shots": [
+                {
+                    "id": "s01",
+                    "title": "Door",
+                    "dramatic_function": "setup",
+                    "action": "opens door",
+                    "shot_size": "MCU",
+                    "duration_sec": 5,
+                }
+            ],
+        },
+    )
+    one = get_shot_card(tmp_path, "s01")
+    assert one["found"] is True
+    assert one["summary"]["id"] == "s01"
+    assert one["card"]["kind"] == "ai-film-shot-card"
+    missing = get_shot_card(tmp_path, "s99")
+    assert missing["found"] is False
+    idx = list_shot_cards(tmp_path)
+    assert idx["count"] >= 1
+    assert idx["items"][0]["id"] == "s01"
+
+
+@pytest.mark.skipif(
+    not __import__("importlib").util.find_spec("fastapi"),
+    reason="fastapi not installed",
+)
+def test_api_shot_card_endpoint(tmp_path):
+    from fastapi.testclient import TestClient
+    from util import write_json
+    from web_api import create_app
+
+    write_json(
+        tmp_path / "film-spec.json",
+        {
+            "schema_version": 1,
+            "kind": "film-spec",
+            "shots": [{"id": "s01", "title": "Hi", "dramatic_function": "setup"}],
+        },
+    )
+    app = create_app(tmp_path, token="t-card", port=8766)
+    client = TestClient(app)
+    r = client.get("/api/shot-card?shot=s01", headers={"X-Review-Token": "t-card"})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["found"] is True
+    assert body["summary"]["id"] == "s01"
+    r2 = client.get("/api/shot-card", headers={"X-Review-Token": "t-card"})
+    assert r2.status_code == 200
+    assert r2.json()["kind"] == "shot-card-index"

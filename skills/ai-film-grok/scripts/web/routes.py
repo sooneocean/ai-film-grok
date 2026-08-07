@@ -99,6 +99,13 @@ ROUTES: tuple[RouteSpec, ...] = (
     RouteSpec("GET", "/api/stream", "director.stream", "web.sse_stream", note="SSE live feed"),
     RouteSpec("GET", "/api/takes", "takes.list_or_compare", "web.takes_api"),
     RouteSpec("POST", "/api/takes/review", "takes.review", "web.takes_api", loopback=True),
+    RouteSpec(
+        "GET",
+        "/api/shot-card",
+        "shot_card.get_or_list",
+        "web.shot_card_api",
+        note="read-only Shot Card for dailies panel (E4)",
+    ),
     RouteSpec("GET", "/api/file", "media.workspace_file", "web_core"),
     RouteSpec(
         "POST",
