@@ -1,5 +1,10 @@
 # Changelog
 
+## [2.41.9] - 2026-08-07
+
+### Changed (monolith W2–W4 peels)
+- heat validate tail · preflight_premium · export_html
+
 ## [2.41.8] - 2026-08-07
 
 ### Changed (monolith orchestrator relief · W1.4 subs)
