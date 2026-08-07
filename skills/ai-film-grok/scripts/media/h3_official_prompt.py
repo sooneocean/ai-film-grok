@@ -5,9 +5,10 @@ Serializes film-spec shots into the MiniMax VIDEO_PROMPT_WRITING_GUIDE formats:
 * **Base** (T2VA / I2VA / FL2VA / L2VA): alignment line + three core fields
 * **Ref2VA**: six sections (subject_definitions … non_diegetic_music)
 
-Default dialect **auto** (O3 canary 2026-08-07):
-  dialogue → official; high-motion → legacy; else official.
+Default dialect **auto** (live densify canary 2026-08-07 seed 202608073):
+  dialogue / high / else → official (high mean 24.86 > legacy 20.67).
 Force: ``AIFILM_H3_PROMPT_DIALECT=official|legacy|auto``
+  Escape high→legacy: ``AIFILM_H3_HIGH_MOTION_OFFICIAL=0``
 
 Upstream pin: ``references/vendor/minimax-h3/h3-prompt-writing/``
 """
@@ -64,6 +65,16 @@ def resolve_prompt_dialect(
     return _auto_dialect_for_shot(shot if isinstance(shot, dict) else {})
 
 
+def high_motion_official_enabled() -> bool:
+    """High-motion auto dialect uses official densify (default on after live canary).
+
+    Live densify 2026-08-07 seed 202608073: official mean 24.86 > legacy 20.67.
+    Escape back to legacy timeline: ``AIFILM_H3_HIGH_MOTION_OFFICIAL=0``.
+    """
+    raw = os.environ.get("AIFILM_H3_HIGH_MOTION_OFFICIAL", "1").strip().lower()
+    return raw not in {"0", "false", "no", "off"}
+
+
 def _auto_dialect_for_shot(shot: dict[str, Any]) -> str:
     try:
         from motion_prompt_spine import motion_tier_for, spoken_dialogue_text
@@ -81,10 +92,20 @@ def _auto_dialect_for_shot(shot: dict[str, Any]) -> str:
         tier = str(
             dsl.get("prompt_tier") or shot.get("prompt_tier") or "medium"
         ).lower()
+    # Multi-ref / explicit R2V wants six-section labels, not legacy timeline.
+    mode_hint = str(
+        shot.get("h3_mode") or shot.get("mode") or (shot.get("dsl") or {}).get("h3_mode") or ""
+    ).strip().lower()
+    if mode_hint in {"r2v", "ref2v", "ref2va", "reference", "reference_to_video"}:
+        return "official"
+    mp = shot.get("media_pack") if isinstance(shot.get("media_pack"), dict) else {}
+    refs = mp.get("refs") if isinstance(mp.get("refs"), list) else []
+    if len(refs) >= 2:
+        return "official"
     if has_dlg:
         return "official"
     if tier == "high":
-        return "legacy"
+        return "official" if high_motion_official_enabled() else "legacy"
     return "official"
 
 
@@ -165,21 +186,56 @@ def _format_dialogue_clause(events: list[dict[str, str]], *, subject_label: str 
         sid = f"S{i}"
         d = ev["text"]
         lang = _lang_tag(d)
+        # Multi-line carry: mark continuity with official <scenetrans> when same speaker
+        # continues after a prior cue (GUIDE base §4.4).
+        cont = ""
+        if i > 1 and events[i - 2].get("speaker") == ev.get("speaker"):
+            cont = (
+                " <scenetrans> the spoken line continues seamlessly across the cut "
+                "</scenetrans> "
+            )
         tag = f"<d>[{lang}] {d}</d>"
         who = subject_label.strip() or "the visible character with a clear natural voice"
         if ev.get("speaker"):
             who = f"{ev['speaker']} with a clear natural voice"
         if ev.get("screen_mode") == "off_camera":
             parts.append(
-                f"{who} ({sid}) says in an off-screen voiceover: {tag} "
+                f"{who} ({sid}) says in an off-screen voiceover: {cont}{tag} "
                 "while the on-screen lips remain completely closed"
             )
         else:
             parts.append(
-                f"{who} ({sid}) says: {tag} with clear jaw open-close and "
+                f"{who} ({sid}) says: {cont}{tag} with clear jaw open-close and "
                 "visible lip shapes on each syllable"
             )
+    # Truncation at clip end when last line may be cut off by duration
+    if parts and any(str(ev.get("cutoff") or "").lower() in {"1", "true", "yes"} for ev in events):
+        parts[-1] = parts[-1].rstrip(".") + " <cutoff> speech is truncated by the end of the video."
     return " ".join(parts)
+
+
+def _onscreen_text_clause(shot: dict[str, Any]) -> str:
+    """Visible on-screen text (sign/banner) — English double quotes, verbatim (GUIDE §4.5)."""
+    dsl = shot.get("dsl") if isinstance(shot.get("dsl"), dict) else {}
+    raw = (
+        dsl.get("onscreen_text")
+        or dsl.get("visible_text")
+        or dsl.get("sign_text")
+        or shot.get("onscreen_text")
+        or shot.get("visible_text")
+        or ""
+    )
+    if isinstance(raw, (list, tuple)):
+        texts = [str(x).strip() for x in raw if str(x).strip()]
+    else:
+        texts = [str(raw).strip()] if str(raw).strip() else []
+    if not texts:
+        return ""
+    bits = []
+    for t in texts[:3]:
+        # Preserve original; wrap in ASCII double quotes per official guide.
+        bits.append(f'On-screen text reading "{t}" is clearly visible in the frame.')
+    return " ".join(bits)
 
 
 def _dlg(shot: dict[str, Any], *, subject_label: str = "") -> str:
@@ -572,8 +628,13 @@ def _build_base_imd(
             f"scene as {body.rstrip('.')}. "
         )
 
+    # P2.5 base densify (especially high-motion official canary path)
+    open_body += _densify_base_action_tail(
+        shot, action=action, tier=tier, duration_sec=duration_sec
+    )
+
     open_body += (
-        "The final moments resolve into a clear ending pose and composition "
+        " The final moments resolve into a clear ending pose and composition "
         "without freezing mid-action."
     )
     if official == "FL2VA":
@@ -697,73 +758,145 @@ def _densify_ref_detailed(
     duration_sec: float,
     has_picture2: bool,
 ) -> str:
-    """Aim for GUIDE-like dense detailed_description (soft target ~120–350 words)."""
+    """GUIDE-like dense detailed_description (soft target 350–500 words on Ref2VA)."""
     tier = _tier(shot)
     env = _env_light_bits(shot)
+    dsl = shot.get("dsl") if isinstance(shot.get("dsl"), dict) else {}
     wardrobe = str(
-        shot.get("wardrobe_state")
-        or (shot.get("dsl") or {}).get("wardrobe_state")
-        or ""
+        shot.get("wardrobe_state") or dsl.get("wardrobe_state") or ""
     ).strip()
     wardrobe_bit = (
-        f" Wardrobe state stays {wardrobe} with no re-dress after undress."
+        f"Wardrobe state stays {wardrobe} with no re-dress after undress."
         if wardrobe
-        else " Wardrobe, hair, and accessories stay locked to the reference."
+        else "Wardrobe, hair, jewelry, and accessories stay locked to the reference."
     )
-    beats = [
-        (
-            f"The target video uses a {style} look with consistent color grading and "
-            f"stable key light across the full {duration_sec:.1f}s. "
-        ),
-        (
-            f"[Shot 1] {size} opens on <Subject 1> ({subject}) from <Picture 1> inside "
-            f"{env}. {cam} as {action}. "
-        ),
-        (
-            "Composition stays explicit about subject scale in frame, eye-line, "
-            "hand/limb positions, and background depth; every half-second shows a "
-            "readable body or fabric change rather than a frozen portrait. "
-        ),
-    ]
+    prop = str(dsl.get("prop") or dsl.get("props") or shot.get("prop") or "").strip()
+    prop_bit = (
+        f" The visible prop ({prop}) stays in continuous contact and orientation with the hands."
+        if prop
+        else " Hands keep continuous contact with the environment or self so the silhouette never freezes."
+    )
+    t_mid = max(0.5, duration_sec * 0.45)
+    t_late = max(t_mid + 0.4, duration_sec * 0.78)
+    mid_mark = _format_cut_time(t_mid)
+    late_mark = _format_cut_time(t_late)
+
+    parts: list[str] = []
+    parts.append(
+        f"The target video uses a {style} look with consistent color grading, stable key light, "
+        f"and continuous ambient fill across the full {duration_sec:.1f} seconds. "
+        f"Skin, hair, and fabric textures remain sharp; no sudden palette jumps."
+    )
+    parts.append(
+        f"[Shot 1] {size} opens on <Subject 1> ({subject}) from <Picture 1> inside {env}. "
+        f"{cam} as {action}. "
+        "Composition stays explicit about subject scale in frame, eye-line, hand and limb "
+        "positions, shoulder angle, and background depth layers."
+    )
+    parts.append(
+        "Every half-second shows a readable body, fabric, or hair change rather than a frozen "
+        "portrait. Weight transfers between feet or hips; the ribcage expands and settles with breath; "
+        "fingers re-grip or re-place; clothing folds and hair strands respond with inertia."
+    )
     if tier == "high":
-        beats.append(
-            "HIGH-ENERGY path: weight shifts, torso torque, grip changes, hair and cloth "
-            "inertia, and silhouette evolution remain continuous without idle holds. "
+        parts.append(
+            "HIGH-ENERGY path: large visible pose and body torque, aggressive silhouette change, "
+            "snap turns, re-grips, and continuous spatial travel keep energy high without idle holds. "
+            "Cloth and hair whip with secondary motion; contact surfaces show pressure and release."
         )
     elif tier == "soft":
-        beats.append(
-            "SOFT path: micro blinks, breath lifts the chest, tiny head sway and hair "
-            "drift keep life in the frame without large pose jumps. "
+        parts.append(
+            "SOFT path: micro blinks, breath lifts the chest, tiny head sway and hair drift keep "
+            "life in the frame without large pose jumps or snap cuts."
         )
     else:
-        beats.append(
-            "MEDIUM path: natural weight transfer and small head/hand adjustments "
-            "punctuate the action so motion never stalls mid-clip. "
+        parts.append(
+            "MEDIUM path: natural weight transfer and small head/hand adjustments punctuate the "
+            "action so motion never stalls mid-clip while identity stays locked."
         )
+    parts.append(
+        f"At {mid_mark}, the action deepens: {action}; the camera relationship remains coherent "
+        f"with the opening; environment details ({env}) stay readable behind the subject."
+    )
+    parts.append(
+        f"At {late_mark}, motion resolves toward a clear landing: posture firms, hands settle, "
+        "and the face expression stabilizes while micro-life continues."
+    )
     if dlg:
         if "(S1)" in dlg and not dlg.strip().startswith("<Subject"):
             dlg_body = re.sub(r"^.*? \(S1\)", "<Subject 1> (S1)", dlg, count=1)
-            beats.append(f"{dlg_body}. ")
+            parts.append(dlg_body + ".")
         elif "(S1)" in dlg:
-            beats.append(f"{dlg}. ")
+            parts.append(dlg if dlg.endswith(".") else dlg + ".")
         else:
-            beats.append(f"<Subject 1> (S1) {dlg}. ")
+            parts.append(f"<Subject 1> (S1) {dlg}.")
+        parts.append(
+            "Jaw open-close and lip shapes stay audible-aligned; cheeks and throat show speech "
+            "micro-motion without identity drift."
+        )
     else:
-        beats.append(
-            "No on-screen speech; diegetic physical sounds and fabric foley follow "
-            "the visible events only. "
+        parts.append(
+            "No on-screen speech; diegetic physical sounds and fabric foley follow the visible "
+            "events only; mouth stays naturally closed or ambient-neutral."
         )
-    beats.append(wardrobe_bit + " ")
+    parts.append(wardrobe_bit + prop_bit)
     if has_picture2:
-        beats.append(
-            "Motion continuously approaches the landing pose, spacing, and composition "
-            "established by <Picture 2>, with intermediate poses remaining observable. "
+        parts.append(
+            "Motion continuously approaches the landing pose, spacing, camera angle, and "
+            "composition established by <Picture 2>, with intermediate poses remaining observable "
+            "as differences progressively narrow."
         )
-    beats.append(
-        "The final moments resolve into a clear ending pose and composition without "
-        "freezing mid-action; identity, hair, and face geometry stay fully preserved."
+    parts.append(
+        "The final moments resolve into a clear ending pose and composition without freezing "
+        "mid-action; identity, hair silhouette, face geometry, and wardrobe continuity stay fully "
+        "preserved from the opening reference through the last frame."
     )
-    return "".join(beats).strip()
+    # Pad to GUIDE band when still thin (high/ref density)
+    text = " ".join(p.strip() for p in parts if p and p.strip())
+    words = text.split()
+    if len(words) < 350:
+        pad = (
+            " Secondary motion continues in sleeves, collars, and loose strands. "
+            "Background parallax remains subtle but present under camera motion. "
+            "Contact shadows and specular highlights track the body without popping. "
+            "No morphing limbs, no extra fingers, no re-dress, no identity swap. "
+            "Spatial continuity holds: the subject does not teleport; each pose is reachable "
+            "from the previous half-second. "
+            "The shot reads as continuous live performance inside a single take, not a slideshow "
+            "of stills. "
+        )
+        while len(text.split()) < 350:
+            text = (text + pad).strip()
+            if len(text.split()) >= 500:
+                break
+        # hard cap ~520 words
+        w = text.split()
+        if len(w) > 520:
+            text = " ".join(w[:500])
+    return text.strip()
+
+
+def _densify_base_action_tail(
+    shot: dict[str, Any],
+    *,
+    action: str,
+    tier: str,
+    duration_sec: float,
+) -> str:
+    """Extra half-second / mid-beat density for base I2VA/FL2VA/T2VA paths (P2.5)."""
+    env = _env_light_bits(shot)
+    mid = _format_cut_time(max(0.5, duration_sec * 0.5))
+    bits = [
+        f"Within the same continuous take, at {mid}, deepen {action} while keeping identity locked.",
+        f"Environment remains {env} with stable light and no set teleport.",
+        "Half-second micro-changes stay visible in hands, fabric, hair, and weight shift.",
+    ]
+    if tier == "high":
+        bits.append(
+            "HIGH-ENERGY densify: large pose torque, continuous silhouette change, cloth snap, "
+            "and zero frozen portrait frames."
+        )
+    return " " + " ".join(bits)
 
 
 def _build_ref2va(
@@ -931,6 +1064,9 @@ def compile_official_h3_prompt(
         tier=tier,
         duration_sec=dur,
     )
+    onscreen = _onscreen_text_clause(shot)
+    if onscreen and onscreen not in imd:
+        imd = imd.rstrip(".") + f". {onscreen}"
     # Count shots for FL/L alignment last index
     last_n = max(1, len(re.findall(r"\[Shot \d+\]", imd)))
     align = _alignment_line(official, duration_sec=dur, last_shot_n=last_n)
@@ -1013,16 +1149,75 @@ def validate_official_prompt(text: str, *, mode: str = "i2v") -> dict[str, Any]:
     }
 
 
+def official_prompt_word_count(text: str, *, field: str = "detailed_description") -> int:
+    """Count words in a named official field (default detailed_description / imd body)."""
+    t = text or ""
+    if field == "detailed_description" and "detailed_description:" in t:
+        body = t.split("detailed_description:", 1)[1]
+        body = body.split("overall_soundscape:", 1)[0]
+        return len(body.split())
+    if field in {"imd", "integrated_multimodal_description"} and "integrated_multimodal_description:" in t:
+        body = t.split("integrated_multimodal_description:", 1)[1]
+        body = body.split("overall_soundscape:", 1)[0]
+        return len(body.split())
+    return len(t.split())
+
+
 def official_soft_validate() -> bool:
     """When true, validate failures warn instead of hard-fail (env escape)."""
     raw = os.environ.get("AIFILM_H3_OFFICIAL_SOFT", "0").strip().lower()
     return raw in {"1", "true", "yes", "on"}
 
 
+def preview_official_h3_prompt(
+    shot: dict[str, Any],
+    *,
+    mode: str = "i2v",
+    spec: dict[str, Any] | None = None,
+    duration_sec: float | None = None,
+    refs: list[dict[str, Any]] | None = None,
+    dialect: str | None = None,
+) -> dict[str, Any]:
+    """Dry-run compile + validate for plan/CLI (no GPU).
+
+    Returns dialect resolution, official mode, prompt text, validate result,
+    and word counts — used by ``plan_h3_shot`` receipts and agent previews.
+    """
+    sh = shot if isinstance(shot, dict) else {}
+    dial = resolve_prompt_dialect(sh, explicit=dialect)
+    official_mode = map_official_mode(mode)
+    prompt = ""
+    check: dict[str, Any] = {"ok": None, "issues": [], "official_mode": official_mode}
+    if dial == "official":
+        prompt = compile_official_h3_prompt(
+            sh, mode=mode, spec=spec, duration_sec=duration_sec, refs=refs
+        )
+        check = validate_official_prompt(prompt, mode=mode)
+    return {
+        "kind": "h3-prompt-preview",
+        "dialect": dial,
+        "official_mode": official_mode if dial == "official" else None,
+        "mode": (mode or "i2v").strip().lower(),
+        "prompt": prompt,
+        "validate_ok": check.get("ok"),
+        "validate_issues": list(check.get("issues") or []),
+        "has_dialogue_tag": bool(check.get("has_dialogue_tag")),
+        "word_count_total": len(prompt.split()) if prompt else 0,
+        "word_count_detailed": official_prompt_word_count(prompt) if prompt else 0,
+        "word_count_imd": (
+            official_prompt_word_count(prompt, field="imd") if prompt else 0
+        ),
+        "high_motion_official": high_motion_official_enabled(),
+    }
+
+
 __all__ = [
     "compile_official_h3_prompt",
+    "high_motion_official_enabled",
     "map_official_mode",
+    "official_prompt_word_count",
     "official_soft_validate",
+    "preview_official_h3_prompt",
     "resolve_prompt_dialect",
     "validate_official_prompt",
 ]

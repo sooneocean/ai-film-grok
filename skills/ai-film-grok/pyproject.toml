@@ -40,3 +40,12 @@ python_version = "3.11"
 warn_unused_ignores = true
 disallow_untyped_defs = false
 ignore_missing_imports = true
+follow_imports = "silent"
+# Top-level hard-compat shims dual-map as "X" and "scripts.X" under mypy_path=scripts.
+# Exclude only those top-level files (package impls live under assets/ etc.).
+exclude = [
+    '^style_lock\.py$',
+    '^face_identity\.py$',
+    '^scripts/style_lock\.py$',
+    '^scripts/face_identity\.py$',
+]

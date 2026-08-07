@@ -7,14 +7,14 @@ from typing import Any
 
 from core.film_io import director_notes_path, film_dirs, load_director_notes
 from core.paths import record_file_matches
-from director_review import (
+from plan.director_review import (
     SCORECARD_DIMENSIONS,
     open_reshoot_items,
     reshoots_clear,
     scorecard_is_complete_and_passing,
 )
-from film_spec import FilmSpecError, validate_film_spec
-from media_qa import approved_clip_record
+from plan.film_spec_validate import FilmSpecError, validate_film_spec
+from media.media_qa import approved_clip_record
 from util import require_json as read_json
 
 
@@ -44,7 +44,7 @@ def recompute_gates(root: Path, manifest: dict[str, Any]) -> dict[str, Any]:
     style_reference_ok = True
     if style_reference:
         try:
-            from scripts import style_lock as sl
+            from assets import style_lock as sl
 
             style_check = sl.validate_style_lock_bible(style)
             style_reference_ok = not any(
@@ -124,14 +124,14 @@ def recompute_gates(root: Path, manifest: dict[str, Any]) -> dict[str, Any]:
         and scorecard_is_complete_and_passing(review)
         and screening_evidence_ok
     )
-    from delivery_artifact import desktop_delivery_is_current
+    from gates.delivery_artifact import desktop_delivery_is_current
 
     desktop_exported = desktop_delivery_is_current(outputs, final_record)
     dnotes = load_director_notes(root)
     open_items = open_reshoot_items(dnotes)
-    from anatomy_safety import anatomy_safety_report, requires_anatomy_safety
-    from clip_uniqueness import active_clip_reuse_report
-    from still_uniqueness import active_still_reuse_report
+    from assets.anatomy_safety import anatomy_safety_report, requires_anatomy_safety
+    from assets.clip_uniqueness import active_clip_reuse_report
+    from assets.still_uniqueness import active_still_reuse_report
 
     uniqueness = active_clip_reuse_report(manifest, required_shot_ids=shot_ids)
     still_uniqueness = active_still_reuse_report(
@@ -142,7 +142,7 @@ def recompute_gates(root: Path, manifest: dict[str, Any]) -> dict[str, Any]:
     anatomy_required = requires_anatomy_safety(root)
     still_anatomy = anatomy_safety_report(manifest, required_shot_ids=shot_ids, kind="stills")
     clip_anatomy = anatomy_safety_report(manifest, required_shot_ids=shot_ids, kind="clips")
-    from manifest_truth import preflight_manifest
+    from gates.manifest_truth import preflight_manifest
 
     manifest_truth = preflight_manifest(root, manifest)
     clips_complete = (

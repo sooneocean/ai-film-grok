@@ -1,0 +1,42 @@
+{
+  "status": "PARTIAL",
+  "ok": false,
+  "kind": "h3-official-p25-p3-progress",
+  "plugin": "2.40.92",
+  "at": "2026-08-07T05:22:16Z",
+  "p25": {
+    "ref2va_detailed_word_band": "350-500 soft",
+    "base_i2va_half_second_densify": true,
+    "compile_rows": {
+      "dialogue_cu": {
+        "i2va_imd_words": 117,
+        "i2va_validate_ok": true,
+        "ref2va_detailed_words": 382,
+        "ref2va_validate_ok": true,
+        "i2va_has_half_second": true
+      },
+      "high_motion": {
+        "i2va_imd_words": 208,
+        "i2va_validate_ok": true,
+        "ref2va_detailed_words": 383,
+        "ref2va_validate_ok": true,
+        "i2va_has_half_second": true
+      },
+      "soft_portrait": {
+        "i2va_imd_words": 104,
+        "i2va_validate_ok": true,
+        "ref2va_detailed_words": 357,
+        "ref2va_validate_ok": true,
+        "i2va_has_half_second": true
+      }
+    }
+  },
+  "p3": {
+    "receipt_fields": "receipts/prompts/<shot>.h3.meta.json + .h3.official.txt",
+    "second_canary_burn": "OPEN_OPS",
+    "reason": "Comfy queue_running>0 at submit window — zero submit (multi-agent GPU no hog)",
+    "o3_baseline": "skills/ai-film-grok/artifacts/2026-08-07-h3-official-ab-canary.json",
+    "default_flip_ready": false,
+    "note": "machine densify shipped; high auto flip still needs idle reburn + human lip review"
+  }
+}

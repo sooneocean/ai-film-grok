@@ -1,5 +1,53 @@
 # Changelog
 
+## [2.40.95] - 2026-08-07
+
+### Changed (H3 official · live densify canary DONE → auto high official)
+- **Live burn DONE:** `s_high_motion_official` seed `202608073` LocalComfyH3Provider after unload_models free; mean **24.86** vs legacy **20.67** (+4.19) vs O3 official **18.58** (+6.28); ~68s.
+- **Auto high:** default official densify (`AIFILM_H3_HIGH_MOTION_OFFICIAL` default **1**); escape `=0` for legacy timeline.
+- **Evidence:** `skills/ai-film-grok/artifacts/2026-08-07-h3-official-live-canary.json`.
+- **Note:** soft-portrait not reburned (O3 soft official mean still low); human look still final.
+
+## [2.40.94] - 2026-08-07
+
+### Changed (H3 official prompt · R5 upgrade iteration)
+- **Combo families:** `dialogue_mouth_official` / `high_motion_official` / `soft_portrait_official` + `R5_OFFICIAL_COMBO_ORDER` (`build_combo_matrix(round=5)`); `compile_family_author_prompt` routes `prompt_format=official` through `h3_official_prompt`.
+- **Auto dialect:** R2V / multi-ref → official; high-motion stays legacy unless `AIFILM_H3_HIGH_MOTION_OFFICIAL=1`.
+- **GUIDE gaps:** on-screen text (`onscreen_text` → `"…"`); multi-cue `<scenetrans>` continuity.
+- **Plan dry-run:** `preview_official_h3_prompt` + `plan_h3_shot.prompt_preview` + `*.h3.preview.txt` receipt (no GPU).
+- **Tests:** official scenetrans/opt-in/preview + combo R5 compile (40 green with combo suite).
+
+## [2.40.93] - 2026-08-07
+
+### Fixed / Changed (C6.5 core package imports + CI coverage floors real impl)
+- **core/** imports real packages for mypy: `util.security_policy`/`runtime_policy`, `plan.director_review`/`film_spec_validate`, `media.*`, `assets.*`, `gates.*` (no top-level shim attr-defined).
+- **`core/media_ops.parse_volume_stats`:** return type includes `raw_text: str`.
+- **`make type` seed:** full core package (**21 modules** incl. film_io/media_ops/skip_audit/attestation/checkout_drift/gates).
+- **CI coverage floors:** point at real impls `media/media_qa.py` · `gates/quality_evidence.py` · `assets/continuity.py` (not 100% shims); guard tests in `test_ci_roi_contract`.
+
+## [2.40.92] - 2026-08-07
+
+### Changed (H3 official prompt · densify P2.5 + receipt P3)
+- **Base densify:** `_densify_base_action_tail` (half-second pose/fabric life on I2VA path).
+- **Ref2VA densify:** `detailed_description` soft 350–500 words; `official_prompt_word_count`.
+- **Receipt:** `run_h3_shot` writes `*.h3.meta.json` (+ `*.h3.official.txt` when official structure).
+- **P3 reburn:** OPEN_OPS when Comfy queue busy (zero submit); compile progress in `artifacts/2026-08-07-h3-official-p25-p3-progress.json`.
+- **Tests:** densify word-band + base half-second golden.
+
+## [2.40.91] - 2026-08-07
+
+### Changed (H3 official prompt · densify P2.5 + receipt P3)
+- **Base densify:** `_densify_base_action_tail` (half-second pose/fabric life on I2VA path).
+- **Ref2VA densify:** `detailed_description` toward GUIDE 350–500 words; `official_prompt_word_count`.
+- **Receipt:** `run_h3_shot` writes `*.h3.meta.json` (+ `*.h3.official.txt` when official structure).
+- **Tests:** densify word-band + base half-second golden.
+
+### Fixed / Changed (C6.5 mypy dual-module unblock + core seed)
+- **style_lock dual-module:** import real packages (`from assets import style_lock|face_identity`) in `core/gates` + `cli_media` (no `from scripts import …` / top-level shim).
+- **mypy config:** `follow_imports=silent`; exclude top-level hard-compat shims `style_lock.py` / `face_identity.py` (package impls under `assets/` remain typed when listed).
+- **`core/paths`:** import `util.security_policy` / `util.runtime_policy` (same pattern as C6.5 util fix).
+- **`make type` seed:** + `core/constants` · `core/emit` · `core/paths` (**15 modules**, zero errors).
+
 ## [2.40.90] - 2026-08-07
 
 ### Fixed (C6.1 residual guard · eng closeout honesty)

@@ -242,6 +242,34 @@ class Round2MatrixTests(unittest.TestCase):
         self.assertIn("MOUTH ENERGY", dlg)
         self.assertNotIn("HIGH MOTION", dlg)
 
+    def test_r5_official_families_compile(self) -> None:
+        from h3_combo_eval import (
+            PROMPT_FAMILIES,
+            build_combo_matrix,
+            compile_family_author_prompt,
+        )
+
+        for fam in (
+            "dialogue_mouth_official",
+            "high_motion_official",
+            "soft_portrait_official",
+        ):
+            self.assertIn(fam, PROMPT_FAMILIES)
+            self.assertEqual(PROMPT_FAMILIES[fam].get("prompt_format"), "official")
+        combos = build_combo_matrix(round=5, include_flf=False)
+        ids = {c.combo_id for c in combos}
+        self.assertIn("r5_dlg_official_i2v", ids)
+        self.assertIn("r5_high_official_r2v", ids)
+        off = compile_family_author_prompt("dialogue_mouth_official", duration_sec=5)
+        self.assertIn("integrated_multimodal_description:", off)
+        self.assertIn("<d>[Mandarin]", off)
+        self.assertNotIn("[0s-", off)
+        hi = compile_family_author_prompt("high_motion_official", duration_sec=5, mode="r2v")
+        self.assertIn("subject_definitions:", hi)
+        self.assertIn("detailed_description:", hi)
+        tl = compile_family_author_prompt("high_motion_max", duration_sec=5)
+        self.assertIn("[0s-", tl)
+
     def test_rank_lanes_best_of_merges_rounds(self) -> None:
         from h3_combo_eval import rank_lanes_best_of
         r1 = [{"ok": True, "combo_id": "soft_i2v", "mode": "i2v", "family": "soft_portrait",

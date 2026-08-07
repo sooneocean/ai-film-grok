@@ -167,8 +167,8 @@ def _prompt_for_shot(
 
     Dialects (``resolve_prompt_dialect``):
 
-    * **auto** (default after O3 canary 2026-08-07) — dialogue → official;
-      high-motion → legacy timeline energy; else official structure.
+    * **auto** (live densify canary 2026-08-07) — dialogue / high / else → official
+      (high escape: ``AIFILM_H3_HIGH_MOTION_OFFICIAL=0`` → legacy timeline).
     * **official** — always MiniMax three-field / Ref2VA six-section.
     * **legacy** — force temporal ``[Xs-Ys]`` (or flat when not 5090 profile).
       Env: ``AIFILM_H3_PROMPT_DIALECT=auto|official|legacy`` or ``dsl.prompt_format``.
@@ -584,6 +584,45 @@ def plan_h3_shot(
         }
     except Exception as exc:  # noqa: BLE001 — plan must not die on optional receipt
         plan["generation_request"] = {"ok": False, "error": str(exc)[:200]}
+    # P3/R5 · official dialect dry-run on plan (no GPU) — agent can read before submit
+    try:
+        from h3_official_prompt import preview_official_h3_prompt
+
+        pack_refs = [
+            r
+            for r in (media_pack.get("refs") or [])
+            if isinstance(r, dict)
+        ]
+        if last_path is not None:
+            pack_refs = list(pack_refs) + [
+                {"path": str(last_path), "role": "pose", "source": last_source or "last"}
+            ]
+        preview = preview_official_h3_prompt(
+            shot,
+            mode=mode,
+            spec=spec,
+            duration_sec=max_dur,
+            refs=pack_refs or None,
+        )
+        plan["prompt_preview"] = {
+            "dialect": preview.get("dialect"),
+            "official_mode": preview.get("official_mode"),
+            "validate_ok": preview.get("validate_ok"),
+            "validate_issues": preview.get("validate_issues") or [],
+            "word_count_total": preview.get("word_count_total"),
+            "word_count_detailed": preview.get("word_count_detailed"),
+            "high_motion_official": preview.get("high_motion_official"),
+            "has_prompt": bool(preview.get("prompt")),
+        }
+        if preview.get("prompt"):
+            pdir = base / "receipts" / "prompts"
+            pdir.mkdir(parents=True, exist_ok=True)
+            (pdir / f"{shot_id}.h3.preview.txt").write_text(
+                str(preview["prompt"]).rstrip() + "\n", encoding="utf-8"
+            )
+            plan["prompt_preview"]["receipt"] = f"receipts/prompts/{shot_id}.h3.preview.txt"
+    except Exception as exc:  # noqa: BLE001
+        plan["prompt_preview"] = {"ok": False, "error": str(exc)[:200]}
     return plan
 
 
@@ -1146,6 +1185,60 @@ def run_h3_shot(
     prompt_dir = base / "receipts" / "prompts"
     prompt_dir.mkdir(parents=True, exist_ok=True)
     (prompt_dir / f"{shot_id}.h3.spine.txt").write_text(prompt + "\n", encoding="utf-8")
+    # P3 receipt: dialect / official_mode / word counts / combo family
+    try:
+        from h3_official_prompt import (
+            map_official_mode,
+            official_prompt_word_count,
+            resolve_prompt_dialect,
+            validate_official_prompt,
+        )
+
+        shot_meta = shot if isinstance(shot, dict) else {}
+        dial = resolve_prompt_dialect(shot_meta)
+        mode_s = str(plan.get("mode") or "i2v")
+        is_official_structure = (
+            "integrated_multimodal_description:" in prompt
+            or (
+                "subject_definitions:" in prompt
+                and "detailed_description:" in prompt
+            )
+        )
+        val = (
+            validate_official_prompt(prompt, mode=mode_s)
+            if is_official_structure
+            else {"ok": None, "issues": []}
+        )
+        meta = {
+            "kind": "h3-prompt-dialect-receipt",
+            "shot_id": shot_id,
+            "dialect": dial,
+            "official_mode": map_official_mode(mode_s) if is_official_structure else None,
+            "validate_ok": val.get("ok"),
+            "validate_issues": val.get("issues") or [],
+            "word_count_detailed": official_prompt_word_count(prompt),
+            "word_count_imd": official_prompt_word_count(prompt, field="imd"),
+            "prompt_family": (
+                (shot_meta.get("dsl") or {}).get("prompt_family")
+                if isinstance(shot_meta.get("dsl"), dict)
+                else None
+            )
+            or shot_meta.get("_combo_prompt_family_applied")
+            or shot_meta.get("prompt_family"),
+            "is_official_structure": is_official_structure,
+        }
+        import json as _json
+
+        (prompt_dir / f"{shot_id}.h3.meta.json").write_text(
+            _json.dumps(meta, ensure_ascii=False, indent=2) + "\n",
+            encoding="utf-8",
+        )
+        if is_official_structure:
+            (prompt_dir / f"{shot_id}.h3.official.txt").write_text(
+                prompt + "\n", encoding="utf-8"
+            )
+    except Exception:
+        pass
     takes_dir = base / "takes" / shot_id
     takes_dir.mkdir(parents=True, exist_ok=True)
     raw_out = takes_dir / f"{shot_id}_h3_{plan['mode']}_{seed}.mp4"

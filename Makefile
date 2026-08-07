@@ -135,7 +135,16 @@ type:
 		scripts/util/security_policy.py \
 		scripts/util/config_loader.py \
 		scripts/util/film_spec.py \
-		scripts/util/structured_logger.py
+		scripts/util/structured_logger.py \
+		scripts/core/constants.py \
+		scripts/core/emit.py \
+		scripts/core/paths.py \
+		scripts/core/film_io.py \
+		scripts/core/media_ops.py \
+		scripts/core/skip_audit.py \
+		scripts/core/attestation_audit.py \
+		scripts/core/checkout_drift.py \
+		scripts/core/gates.py
 
 install-hooks:
 	@git -C "$(ROOT)" config core.hooksPath .githooks
