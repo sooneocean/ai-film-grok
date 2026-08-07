@@ -1,6 +1,6 @@
 # Changelog
 
-## [2.40.109] - 2026-08-07
+## [2.40.110] - 2026-08-07
 
 ### Changed (Web console UI · 电影工作室美学收尾 T3+T6–T12)
 - **字体：** 引入 JetBrains Mono 作 `--font-mono`，asset/引擎 id 等机器串用等宽体提升扫读性（Space Grotesk + Sora 已就位）。
@@ -10,6 +10,14 @@
 - **空/加载/错误态：** 骨架屏 shimmer、API 失败「重试」、空列表引导态。
 - **响应式 + 动效：** 640px 表头横滚/网格单列/KPI 两列→单列；统一 `--ease` 缓动 token，保留 reduced-motion 降级。
 - **工作台整合远端 workbench：** 保留电影工作室暖墨底+琥珀单强调美学（覆盖远端一度回退的 AI 味紫青渐变旧版），并吸纳远端「验片」iframe 内嵌 tab（data-tab=review）+ 仪表 tab（data-tab=overview）以通过 B1 single-shell 测试。后端契约零修改，`console` 门禁持续绿。
+
+## [2.40.109] - 2026-08-07
+
+### Changed (T5 edit_transition peel)
+- **Peel** join craft + xfade graphs from `narrative/edit_policy.py` → `narrative/edit_transition.py` (~963 LOC).
+- **Hard-compat:** `edit_policy` re-exports public + private craft symbols (`_CRAFT_WHY` etc.); top-level shim `edit_transition.py`.
+- **edit_policy** residual ~1695 LOC (stretch / stance / motion / heat hooks).
+- **Tests:** edit_policy + smooth_flow + transition suites green (106).
 
 ## [2.40.108] - 2026-08-07
 
