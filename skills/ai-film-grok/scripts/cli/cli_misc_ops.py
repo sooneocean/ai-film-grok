@@ -799,6 +799,94 @@ def cmd_plan(args: argparse.Namespace) -> int:
         )
         emit(report)
         return 0 if report.get("ok") else 1
+    if action == "cine-lookup":
+        root_s = getattr(args, "root", None)
+        intent = str(getattr(args, "intent", "") or "").strip()
+        if root_s:
+            from cinematography_rules import cinematography_at_root
+
+            report = cinematography_at_root(Path(root_s).expanduser().resolve())
+            emit(report)
+            return 0 if report.get("ok") else 1
+        if intent:
+            from cinematography_rules import list_cine_rules, map_intent_to_camera
+
+            mapped = map_intent_to_camera(intent)
+            report = {
+                "ok": mapped is not None,
+                "intent": intent,
+                "mapped": mapped,
+                "available": list_cine_rules().get("intents"),
+            }
+            emit(report)
+            return 0 if mapped else 1
+        from cine_rules import lookup_cine_rule
+
+        report = lookup_cine_rule(
+            emotion=str(getattr(args, "emotion", "") or ""),
+            purpose=str(getattr(args, "purpose", "") or ""),
+            dramatic_function=str(getattr(args, "dramatic_function", "") or ""),
+        )
+        emit(report)
+        return 0
+    if action == "performance-direction":
+        from performance_direction import performance_direction_at_root
+
+        root_s = getattr(args, "root", None)
+        if not root_s:
+            raise FilmError("plan performance-direction requires --root")
+        report = performance_direction_at_root(
+            Path(root_s).expanduser().resolve(),
+            strict=bool(getattr(args, "strict", False)),
+        )
+        emit(report)
+        return 0 if report.get("ok") else 1
+    if action == "sound-cues":
+        from sound_cue_model import sound_cues_at_root
+
+        root_s = getattr(args, "root", None)
+        if not root_s:
+            raise FilmError("plan sound-cues requires --root")
+        report = sound_cues_at_root(Path(root_s).expanduser().resolve())
+        emit(report)
+        return 0 if report.get("ok") else 1
+    if action == "asset-version":
+        from asset_version import (
+            load_version_ledger,
+            register_asset_version,
+            resolve_approved_version,
+        )
+
+        root_s = getattr(args, "root", None)
+        if not root_s:
+            raise FilmError("plan asset-version requires --root")
+        root = Path(root_s).expanduser().resolve()
+        av_action = str(getattr(args, "action", "approved") or "approved")
+        if av_action == "register":
+            aid = str(getattr(args, "asset_id", "") or "").strip()
+            if not aid:
+                raise FilmError("plan asset-version register requires --asset-id")
+            report = register_asset_version(
+                root,
+                asset_id=aid,
+                kind=str(getattr(args, "kind", "character") or "character"),
+                version=str(getattr(args, "version", "v01") or "v01"),
+                parent_version=getattr(args, "parent_version", None),
+                status=str(getattr(args, "status", "draft") or "draft"),
+                path=getattr(args, "path", None),
+                notes=str(getattr(args, "notes", "") or ""),
+            )
+        elif av_action in {"resolve", "approved"}:
+            aid = str(getattr(args, "asset_id", "") or "").strip()
+            if not aid:
+                raise FilmError("plan asset-version approved requires --asset-id")
+            report = resolve_approved_version(root, aid)
+        else:
+            report = load_version_ledger(root)
+            report["ok"] = True
+            report["root"] = str(root)
+        emit(report)
+        return 0 if report.get("ok") is not False else 1
     if action == "production-ready":
         from coverage_check import coverage_check_at_root
         from creative_pipeline import build_animatic_gate
@@ -849,6 +937,20 @@ def cmd_plan(args: argparse.Namespace) -> int:
         rec = root / "receipts" / "production-ready.json"
         write_json(rec, report)
         report["receipt"] = str(rec)
+        emit(report)
+        return 0 if report.get("ok") else 1
+    if action == "cine-rules":
+        from cinematography_rules import cinematography_at_root, list_cine_rules
+
+        act = str(getattr(args, "action", "list") or "list")
+        if act == "list":
+            report = list_cine_rules()
+            emit(report)
+            return 0
+        root_s = getattr(args, "root", None)
+        if not root_s:
+            raise FilmError("plan cine-rules resolve requires --root")
+        report = cinematography_at_root(Path(root_s).expanduser().resolve())
         emit(report)
         return 0 if report.get("ok") else 1
     if action == "debrief":

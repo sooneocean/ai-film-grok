@@ -227,6 +227,65 @@ def add_plan_parsers(subparsers: Any) -> None:
         action="store_true",
         help="All sub-gates hard (coverage + storyboard approved + animatic)",
     )
+    cine = plan_sub.add_parser(
+        "cine-lookup",
+        help="Cinematography rules lookup by emotion/purpose/intent (Film Production OS W7)",
+    )
+    cine.add_argument("--emotion", default="")
+    cine.add_argument("--purpose", default="")
+    cine.add_argument("--dramatic-function", default="")
+    cine.add_argument(
+        "--intent",
+        default="",
+        help="Story intent (isolation|tension|intimacy|…) via cinematography_rules",
+    )
+    cine.add_argument(
+        "--root",
+        default=None,
+        help="Resolve all shots → receipts/cinematography.json",
+    )
+    perf_dir = plan_sub.add_parser(
+        "performance-direction",
+        help="Acting direction lint beyond emotion labels (Film Production OS W7)",
+    )
+    perf_dir.add_argument("--root", required=True)
+    perf_dir.add_argument("--strict", action="store_true")
+    sound_cues = plan_sub.add_parser(
+        "sound-cues",
+        help="Collect/normalize SoundCue objects (Film Production OS W7)",
+    )
+    sound_cues.add_argument("--root", required=True)
+    cine_rules = plan_sub.add_parser(
+        "cine-rules",
+        help="Cinematography rules: list|resolve (Film Production OS W7)",
+    )
+    cine_rules.add_argument("--root", default=None, help="Required for resolve")
+    cine_rules.add_argument(
+        "--action",
+        choices=("list", "resolve"),
+        default="list",
+    )
+    asset_ver = plan_sub.add_parser(
+        "asset-version",
+        help="Asset version chain: register|approved (Film Production OS W7)",
+    )
+    asset_ver.add_argument("--root", required=True)
+    asset_ver.add_argument(
+        "--action",
+        choices=("register", "approved"),
+        default="approved",
+    )
+    asset_ver.add_argument("--asset-id", required=True)
+    asset_ver.add_argument("--kind", default="character")
+    asset_ver.add_argument("--version", default="v01")
+    asset_ver.add_argument("--parent-version", default=None)
+    asset_ver.add_argument(
+        "--status",
+        choices=("draft", "review", "approved", "archived"),
+        default="draft",
+    )
+    asset_ver.add_argument("--path", default=None)
+    asset_ver.add_argument("--notes", default="")
     edit = plan_sub.add_parser("edit", help="Edit one unlocked narrative node")
     edit.add_argument("--root", required=True)
     edit.add_argument("--node", required=True, help="Node id/ref, e.g. story or ep01_sc01_bt03")

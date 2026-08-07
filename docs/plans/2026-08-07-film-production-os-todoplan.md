@@ -6,8 +6,8 @@
 
 | 项 | 值 |
 |----|-----|
-| Status | **ACTIVE · W0–W6 SHIPPED**（W7 横切按 ROI；P2.7 animatic 已并入 production-ready） |
-| 基线版本 | `plugin.json` **2.41.2**（W5–W6 closeout；2.41.1 W3–W4；2.41.0 heat plot-driven） |
+| Status | **CLOSED · W0–W7 SHIPPED**（2026-08-07 收工；console Shot Card UI deferred） |
+| 基线版本 | `plugin.json` **2.41.4**（W7 performance/sound/cine/asset-version；2.41.2 W5–W6；2.41.1 W3–W4） |
 | 工作树 | `/Users/dex/.grok/plugins/ai-film-grok`（本会话真相） |
 | 战略约束 | CTO 板：禁止第二套导演系统 · 巨石挡路才拆 · 机读门禁 > 散文 IRON |
 | 北极星 | **剧本 → 可剪、可审、可接戏的 Shot Card**（用户 MVP §44）；生成质量是第二位 |
@@ -232,9 +232,9 @@ Assembly → Rough → Fine → Picture Lock → Master
 | **W4** | P1.3 + P5.1 + P3.1–3.2 | 接戏与资产 ID | W2 | ✅ 2.41.1（asset_refs 仍可加深） |
 | **W5** | P4.1–P4.5 | 编译器 + Take 审片 | W2 | ✅ **2.41.2** |
 | **W6** | P5.3–P5.4 + P6.* | 最小重生 + 粗剪导出 | W5 | ✅ **2.41.2** |
-| **W7** | P7.* 按 ROI | 表演/声音/摄影表 | 非阻断 | OPEN |
+| **W7** | P7.1–P7.4（P7.6 console UI deferred） | 表演 / SoundCue / 摄影表 / 版本链 | 非阻断 | ✅ **2.41.4** |
 
-**默认下一刀：** W7 横切（Performance 丰富度 / SoundCue / 摄影规则表）按 ROI；主产线可用 W0–W6 命令。
+**本板 CLOSED（2026-08-07）：** MVP §44 主链有 CLI+receipt+pytest。后续 ROI 另开短板，勿重开第二套导演系统。
 
 ---
 

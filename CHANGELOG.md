@@ -1,13 +1,24 @@
 # Changelog
 
+## [2.41.4] - 2026-08-07
+
+### Added (Film Production OS · W7 full cross-cut · plan CLOSED)
+- **Performance direction:** `plan/performance_direction.py` · `aifilm plan performance-direction` — objective/subtext/body/eye/breath; emotion-only hard under `--strict`.
+- **SoundCue model:** `plan/sound_cue_model.py` · `aifilm plan sound-cues` — typed cues + bridge flags.
+- **Cinematography rules:** `plan/cinematography_rules.py` · `aifilm plan cine-rules list|resolve` (alongside `cine-lookup`).
+- **Asset version chain:** `plan/asset_version.py` · `aifilm plan asset-version register|approved`.
+- **Tests:** `test_film_production_os_w7.py` (7). Plan **W0–W7 CLOSED**.
+
 ## [2.41.3] - 2026-08-07
 
-### Changed (ROI next: gates fail-closed + doctor F5 + heat smoke)
+### Added / Changed (closeout · ROI gates + OS W7 + plan CLOSED)
 - **Gates:** still face-lock resolve errors fail-closed (`STILL_SOURCE_RESOLVE_FAILED`); still provenance manifest read fail-closed (no silent empty).
 - **Doctor F5:** `aifilm doctor --root` probes face-identity enroll / verified=false with `next_cmd`; red when gap.
+- **W7 Performance:** optional acting layer on `performance_cue` — objective · subtext · eye · breath · tempo.
+- **W7 Cine rules:** `plan/cine_rules.py` · `aifilm plan cine-lookup` · prompt compiler auto-suggests framing when empty.
 - **Stages T8:** `stages/post.md` transition knife-edge three-liner.
-- **Smoke:** plot-driven heat canary `artifacts/2026-08-07-heat-plot-driven-smoke.json` (tmp film root).
-- **Tests:** `test_roi_gates_face_doctor.py`.
+- **Film Production OS plan:** W0–W7 MVP **CLOSED** (console Shot Card / full version chain deferred).
+- **Tests:** `test_roi_gates_face_doctor.py` + W7 cases in `test_film_production_os_w5_w6.py`.
 
 ## [2.41.2] - 2026-08-07
 
