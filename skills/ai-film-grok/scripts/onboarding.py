@@ -328,8 +328,22 @@ def _persist_canonical_v2(
         spec["title"] = str(plan["title"]).strip()
     if str(plan.get("theme") or "").strip():
         spec["theme"] = str(plan["theme"]).strip()
+    if str(plan.get("tone") or "").strip():
+        spec["tone"] = str(plan["tone"]).strip()
+    # cast_voices: merge plan voice suggestions keyed by character id (never clobber).
+    cast_voices = spec.get("cast_voices") if isinstance(spec.get("cast_voices"), dict) else {}
+    for v in plan.get("voice_suggestions") or []:
+        cid = str(v.get("character_id") or "").strip()
+        vid = str(v.get("voice") or "").strip()
+        if cid and vid:
+            cast_voices[cid] = vid
+    if cast_voices:
+        spec["cast_voices"] = cast_voices
+    # bgm_mood: persisted so the audio lane can read the planned atmosphere.
+    if str(plan.get("bgm_mood") or "").strip():
+        spec["bgm_mood"] = str(plan["bgm_mood"]).strip()
     write_json_locked(base / "film-spec.json", spec)
-    out["film-spec"] = "film-spec.json (genre/heat_scale)"
+    out["film-spec"] = "film-spec.json (genre/heat_scale/theme/tone/cast_voices/bgm_mood)"
 
     # story text
     text = str(brief.get("story_text") or "").strip()
@@ -399,6 +413,33 @@ def _persist_canonical_v2(
     (base / "intake").mkdir(parents=True, exist_ok=True)
     write_json_locked(base / "intake-manifest.json", manifest)
     out["characters"] = f"intake-manifest.json ({len(records)} characters)"
+
+    # scenes -> intake/scenes.json (new canonical file the pipeline can read)
+    scenes = plan.get("scenes") or []
+    if scenes:
+        write_json_locked(
+            base / "intake" / "scenes.json",
+            {
+                "schema_version": 1,
+                "kind": "ai-film-scenes",
+                "created_at": now_iso(),
+                "scenes": scenes,
+            },
+        )
+        out["scenes"] = f"intake/scenes.json ({len(scenes)} scenes)"
+    # shot_hints -> intake/shot-hints.json (new canonical file)
+    shot_hints = plan.get("shot_hints") or []
+    if shot_hints:
+        write_json_locked(
+            base / "intake" / "shot-hints.json",
+            {
+                "schema_version": 1,
+                "kind": "ai-film-shot-hints",
+                "created_at": now_iso(),
+                "shot_hints": shot_hints,
+            },
+        )
+        out["shot_hints"] = f"intake/shot-hints.json ({len(shot_hints)} hints)"
     return out
 
 

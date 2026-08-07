@@ -2094,11 +2094,11 @@
     },
     {
       "path": "scripts/onboarding.py",
-      "sha256": "24f8921f0eb595ea1d69a2f0e4fb878cb59730bb46aa43a4496c870ca48cd9a4"
+      "sha256": "4dc96625c59c6e86195f33c6f0cc0203625fbbecc22aaef623bd9c8fd7b5a183"
     },
     {
       "path": "scripts/onboarding_planner.py",
-      "sha256": "96a66611d084548a2e3854dde27f741788803a923ead9df8c95acc9739a16eb3"
+      "sha256": "c7d0bd6f164d55b3e3c8d287bf49bf9b660d56446fba128ffdd17de029ce5944"
     },
     {
       "path": "scripts/optimization_dashboard.py",

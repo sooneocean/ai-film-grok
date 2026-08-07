@@ -630,6 +630,8 @@ function renderPlan(plan, source){
   obPlan.scenes = obPlan.scenes || [];
   obPlan.voice_suggestions = obPlan.voice_suggestions || [];
   obPlan.shot_hints = obPlan.shot_hints || [];
+  obPlan.theme = obPlan.theme || '';
+  obPlan.tone = obPlan.tone || '';
 
   const srcEl = document.getElementById('ob-src');
   if (source === 'llm'){ srcEl.textContent='AI 拆解'; srcEl.className='src-badge llm'; }
@@ -643,8 +645,12 @@ function renderPlan(plan, source){
         <div><label>主题（可选）</label><input id="ob-theme" value="${esc(obPlan.theme||'')}"></div>
       </div>
       <div class="row2">
+        <div><label>基调（可选）</label><input id="ob-tone" value="${esc(obPlan.tone||'')}"></div>
         <div><label>类型</label><select id="ob-genre">${GENRE_OPTS.map(g=>`<option value="${g}" ${g===obPlan.genre?'selected':''}>${g}</option>`).join('')}</select></div>
+      </div>
+      <div class="row2">
         <div><label>热度</label><select id="ob-heat">${HEAT_OPTS.map(hh=>`<option value="${hh}" ${hh===obPlan.heat_scale?'selected':''}>${hh}</option>`).join('')}</select></div>
+        <div></div>
       </div>
     </div>`;
 
@@ -663,16 +669,20 @@ function renderPlan(plan, source){
     </div>`;
   }).join('');
 
-  const scenes = obPlan.scenes.map((sc,i)=>`<div class="scene-line"><div class="st">${i+1}. ${esc(sc.title||'')}</div>${sc.summary?`<div class="sm">${esc(sc.summary)}</div>`:''}</div>`).join('')
+  const scenes = obPlan.scenes.map((sc,i)=>`<div class="scene-line"><div class="st">${i+1}. ${esc(sc.title||'')}</div>${sc.summary?`<div class="sm">${esc(sc.summary)}</div>`:''}${sc.mood?`<div class="sm">基调：${esc(sc.mood)}</div>`:''}</div>`).join('')
     || '<p class="muted">未拆分出分镜段落。</p>';
-  const shots = (obPlan.shot_hints||[]).map(h=>`<span class="chip">${esc(typeof h==='string'?h:JSON.stringify(h))}</span>`).join('')
-    || '<span class="muted">（无）</span>';
+  const shots = (obPlan.shot_hints||[]).map((h,i)=>{
+      const action = (h && h.action) ? h.action : (typeof h==='string'?h:'');
+      const camera = (h && h.camera) ? h.camera : '';
+      return `<div class="card" style="padding:.6rem .8rem"><div style="font-weight:600">镜 ${i+1}</div><div class="meta">动作：${esc(action)}</div>${camera?`<div class="meta">机位：${esc(camera)}</div>`:''}</div>`;
+    }).join('')
+    || '<p class="muted">未生成镜头提示。</p>';
 
   document.getElementById('ob-plan').innerHTML = `
     ${meta}
     <div class="grp"><h4>角色（可编辑 / 移除）</h4><div class="grid">${chars}</div></div>
     <div class="grp"><h4>分镜段落</h4>${scenes}</div>
-    <div class="grp"><h4>镜头提示</h4><div class="hintrow">${shots}</div></div>
+    <div class="grp"><h4>镜头提示 <span class="muted" style="font-weight:400">（启发式建议，可改）</span></h4><div class="grid">${shots}</div></div>
     <div class="grp"><label>BGM 氛围</label><input id="ob-bgm" value="${esc(obPlan.bgm_mood||'')}"></div>`;
 
   document.getElementById('ob-brief-pane').style.display = 'none';
@@ -683,6 +693,7 @@ function collectPlan(){
   const p = obPlan;
   p.title = document.getElementById('ob-title').value.trim();
   p.theme = document.getElementById('ob-theme').value.trim();
+  p.tone = document.getElementById('ob-tone').value.trim();
   p.genre = document.getElementById('ob-genre').value;
   p.heat_scale = document.getElementById('ob-heat').value;
   p.bgm_mood = document.getElementById('ob-bgm').value.trim();

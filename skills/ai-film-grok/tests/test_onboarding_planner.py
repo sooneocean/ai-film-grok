@@ -57,3 +57,59 @@ def test_decompose_falls_back_to_heuristic_without_llm(tmp_path, monkeypatch):
     plan, source = onboarding_planner.decompose(tmp_path, brief)
     assert source == "heuristic"
     assert plan["characters"]
+
+
+def test_heuristic_emits_shot_hints_theme_tone(tmp_path):
+    """A usable plan must now carry real shot hints + theme + tone (not empty)."""
+    brief = {
+        "story_text": "雨夜里，林晚说：我们逃吧。顾沉道：好。两人在窗边靠近，手指交缠。",
+        "image_paths": [],
+        "hints": [],
+    }
+    plan = onboarding_planner.deterministic_decompose(brief)
+    assert plan["theme"]
+    assert plan["tone"]
+    assert plan["shot_hints"], "heuristic must derive shot hints from scenes"
+    for h in plan["shot_hints"]:
+        assert "action" in h and h["action"]
+        assert "camera" in h and h["camera"]
+
+
+def test_heuristic_dialogue_colon_detects_names(tmp_path):
+    """Script-style dialogue prefixes (name：) must be picked up as characters."""
+    brief = {"story_text": "林晚：今晚的雨真大。顾沉：进来避避吧。", "image_paths": [], "hints": []}
+    plan = onboarding_planner.deterministic_decompose(brief)
+    names = [c["name"] for c in plan["characters"]]
+    assert "林晚" in names and "顾沉" in names
+
+
+def test_heuristic_no_name_synthesizes_cast(tmp_path):
+    """When no explicit name is found, a sensible cast is derived from pronouns."""
+    # both 她/他 present -> 女主 + 男主
+    both = onboarding_planner.deterministic_decompose(
+        {"story_text": "她望着他，心跳漏了一拍。", "image_paths": [], "hints": []}
+    )
+    names = [c["name"] for c in both["characters"]]
+    assert "女主" in names and "男主" in names
+    assert both["voice_suggestions"] and all(v.get("voice") for v in both["voice_suggestions"])
+
+    # only 她 -> single 女主
+    she = onboarding_planner.deterministic_decompose(
+        {"story_text": "她独自坐在窗边。", "image_paths": [], "hints": []}
+    )
+    assert [c["name"] for c in she["characters"]] == ["女主"]
+
+    # no pronoun at all -> a single 主角 placeholder
+    none = onboarding_planner.deterministic_decompose(
+        {"story_text": "夜色温柔，海风轻拂。", "image_paths": [], "hints": []}
+    )
+    assert [c["name"] for c in none["characters"]] == ["主角"]
+
+
+def test_heuristic_hints_shape_theme_tone(tmp_path):
+    brief = {"story_text": "两人并肩看海。", "image_paths": [], "hints": ["治愈"]}
+    plan = onboarding_planner.deterministic_decompose(brief)
+    # 治愈 hint overrides the genre-default theme/tone to the healing variant.
+    assert plan["theme"] == "被生活温柔接住"
+    assert plan["tone"] == "温润舒缓"
+    assert plan["bgm_mood"]
