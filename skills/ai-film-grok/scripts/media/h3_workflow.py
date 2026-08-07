@@ -7,6 +7,8 @@ plan → generate on 5090 → optional silent plate → queue complete → regis
 
 from __future__ import annotations
 
+from util.errors import FilmError
+
 import subprocess
 from pathlib import Path
 from typing import Any
@@ -18,7 +20,7 @@ from util import read_json, sha256_file, write_json
 from util.film_spec import _iter_shots, _load_spec, _root
 
 
-class H3WorkflowError(RuntimeError):
+class H3WorkflowError(FilmError):
     pass
 
 

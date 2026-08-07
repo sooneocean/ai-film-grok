@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.40.76] - 2026-08-07
+
+### Added (CTO eng-day · C5.2 FilmError + CLI skip residual + C5.1 expand)
+- **FilmError inheritance wave (RuntimeError-safe):** `CloseoutError`, `QueueError`, `InputFidelityError`, `ComposeRenderError`, `ComposeExportError`, `H3WorkflowError`, `H3ShipNativeError`, `MediaQAError`, `RenderWorkspaceError` now inherit `util.errors.FilmError` (still `RuntimeError` via MRO).
+- **CLI skip_flag residual:** face identity · motion mean · duration target · cinematic → ledger when film root known.
+- **IRON_SKIP_FLAGS:** FACE_IDENTITY · MOTION_MEAN · DURATION_TARGET · CINEMATIC · CANONICAL_TRUTH.
+- **C5.1 logger expand:** bulk_preflight variety skip + media_queue bulk_preflight skip → WARNING stderr.
+- **B3 OPEN_OPS canary:** `artifacts/2026-08-07-b3-ops-canary-round2.json` (eng-day, no drain).
+- **Tests:** `test_error_hierarchy` expanded · `test_cli_residual_skips_ledger`.
+- **C5.4:** `docs/REVIEW_CHECKLIST.md` — `except Exception` must log+re-raise or explicit partial; new `*Error` must inherit FilmError.
+- ValueError-based subsystem errors left for touch-migrate (no `except ValueError` break).
+
 ## [2.40.75] - 2026-08-07
 
 ### Added (honesty-rail R5 + skip touch-migrate wave)

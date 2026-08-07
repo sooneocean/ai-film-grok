@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+from util.errors import FilmError
+
 import json
 import shutil
 import subprocess
@@ -106,7 +108,7 @@ STILL_ASPECT_9_16_MAX = 0.62
 STILL_BYTES_SOFT_MIN = 80_000  # soft warn only
 
 
-class MediaQAError(RuntimeError):
+class MediaQAError(FilmError):
     pass
 
 

@@ -31,6 +31,16 @@ def _load(name: str):
         ("delivery_artifact", "DeliveryArtifactError"),
         ("final.errors", "RenderError"),
         ("post.render_final_music", "RenderError"),
+        # C5.2 hotpath RuntimeError → FilmError (still RuntimeError via FilmError)
+        ("post.closeout", "CloseoutError"),
+        ("media_queue", "QueueError"),
+        ("input_fidelity", "InputFidelityError"),
+        ("compose_render", "ComposeRenderError"),
+        ("export_composition", "ComposeExportError"),
+        ("h3_workflow", "H3WorkflowError"),
+        ("h3_ship_native", "H3ShipNativeError"),
+        ("media_qa", "MediaQAError"),
+        ("render_workspace", "RenderWorkspaceError"),
     ],
 )
 def test_gate_errors_inherit_filmerror(module: str, cls: str) -> None:

@@ -10,6 +10,8 @@ and dialogue/caption fields. Does not rewrite story or approve pilot.
 
 from __future__ import annotations
 
+from util.errors import FilmError
+
 import os
 import re
 from pathlib import Path
@@ -122,7 +124,7 @@ def _lint_pollution(
     }
 
 
-class InputFidelityError(RuntimeError):
+class InputFidelityError(FilmError):
     """User-facing fidelity check failure."""
 
 

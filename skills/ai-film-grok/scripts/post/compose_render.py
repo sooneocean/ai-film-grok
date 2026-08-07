@@ -13,6 +13,8 @@ Optional --require-preview: need receipts/compose-preview.json from compose-prev
 
 from __future__ import annotations
 
+from util.errors import FilmError
+
 import argparse
 import json
 import os
@@ -39,7 +41,7 @@ from util import run_compose_env, utc_now, write_json
 SCHEMA_VERSION = 1
 
 
-class ComposeRenderError(RuntimeError):
+class ComposeRenderError(FilmError):
     """User-facing compose render error."""
 
 

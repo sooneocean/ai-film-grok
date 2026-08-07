@@ -14,6 +14,8 @@ Use before every non-trivial commit or PR. Goal: quality is a **habit + machine 
 - [ ] **No new promote path** that ranks seeds by mean motion / volume alone — use `composition_anti_hijack`
 - [ ] **No new ad-hoc JSON reader** — use `util.read_json` / `require_json` / `read_json_source`
 - [ ] **No silent** heat / pilot / `i2v_provider` policy flip
+- [ ] **`except Exception` discipline** — must log (or `util.log`) + re-raise, or return explicit partial/`{ok:false}`; bare swallow is a CR blocker (C5.4)
+- [ ] **New `*Error` classes** inherit `util.errors.FilmError` (C5.2); when touching old RuntimeError-based errors, prefer FilmError base
 
 ## Complexity budget (new code)
 

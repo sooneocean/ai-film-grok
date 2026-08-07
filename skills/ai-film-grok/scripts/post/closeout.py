@@ -6,6 +6,8 @@ Does **not** auto-approve review-final (human scorecard required).
 
 from __future__ import annotations
 
+from util.errors import FilmError
+
 from pathlib import Path
 from typing import Any
 
@@ -24,7 +26,7 @@ def _export_name(root: Path) -> str:
         return "GrokFilm"
 
 
-class CloseoutError(RuntimeError):
+class CloseoutError(FilmError):
     """Hard stop with a single next action for agents."""
 
     def __init__(

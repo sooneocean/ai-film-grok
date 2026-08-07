@@ -9,6 +9,8 @@ Does not replace gate-auto green master.
 
 from __future__ import annotations
 
+from util.errors import FilmError
+
 import os
 import shutil
 import subprocess
@@ -18,7 +20,7 @@ from typing import Any
 from util import read_json, utc_now, write_json
 
 
-class H3ShipNativeError(RuntimeError):
+class H3ShipNativeError(FilmError):
     pass
 
 

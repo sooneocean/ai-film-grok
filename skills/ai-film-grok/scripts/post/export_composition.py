@@ -7,6 +7,8 @@ This is the designed-post bridge: captions, title cards, overlays, preview Studi
 
 from __future__ import annotations
 
+from util.errors import FilmError
+
 import argparse
 import html
 import json
@@ -55,7 +57,7 @@ COMPOSE_PRESETS = ("auto", "ecchi-rnb", "minimal")
 COMPOSE_PRESET_RESOLVED = ("ecchi-rnb", "minimal")
 
 
-class ComposeExportError(RuntimeError):
+class ComposeExportError(FilmError):
     """User-facing composition export error."""
 
 

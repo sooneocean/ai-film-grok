@@ -36,6 +36,7 @@ from security_policy import (
     validate_identifier,
 )
 from util import read_json, utc_now, write_json
+from util.errors import FilmError
 
 OPERATIONS = frozenset({"image_gen", "image_edit", "image_to_video", "reference_to_video"})
 COMPLETION_ENDPOINTS = frozenset({*ALLOWED_VIDEO_ENDPOINTS, "image_gen", "image_edit"})
@@ -120,7 +121,7 @@ def scheduled_backoff_sec(reason: str) -> float:
     return float(REASON_BACKOFF_SEC[key])
 
 
-class QueueError(RuntimeError):
+class QueueError(FilmError):
     pass
 
 
@@ -782,6 +783,16 @@ class MediaQueue:
                     "yes",
                     "on",
                 }
+            if skip_pf:
+                try:
+                    from util.logger import log
+
+                    log.warning(
+                        "media_queue bulk_preflight skipped via env root=%s",
+                        self.root,
+                    )
+                except Exception:
+                    pass
             force_pf = require_preflight or os.environ.get(
                 "AIFILM_REQUIRE_BULK_PREFLIGHT", ""
             ).strip().lower() in {"1", "true", "yes", "on"}
