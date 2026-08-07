@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.40.96] - 2026-08-07
+
+### Added / Changed (Onboarding v2 · 闭环 + 启发式增强)
+- **后端闭环（go 真正落盘）：** `voice_suggestions` → `film-spec.json["cast_voices"]`（按角色 id 合并，不覆盖既有）；`bgm_mood` 写入 `film-spec.json`；`scenes` → 新 canonical `intake/scenes.json`；`shot_hints` → 新 canonical `intake/shot-hints.json`。
+- **启发式增强（无本地 LLM 兜底更聪明）：** 真实 `shot_hints`（按场景派生 action/camera）；`theme` / `tone` 推断（受氛围偏好 hint 覆盖）；多角色检测新增对白冒号前缀「名：」+ 更多言语动词；无名时也按 她/他 代词合成 女主/男主（或单 主角）占位卡司。
+- **前端：** 拆解方案中「镜头提示」渲染为卡片（动作 + 机位）；新增「基调」可编辑字段。
+- **测试：** 扩展 planner 启发式用例；新增 `_persist_canonical_v2` 落盘闭环测试（cast_voices / bgm / scenes / shot-hints / 合并既有）。
+
 ## [2.40.95] - 2026-08-07
 
 ### Changed (H3 official · live densify canary DONE → auto high official)
