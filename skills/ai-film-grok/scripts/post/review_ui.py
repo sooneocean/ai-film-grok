@@ -169,8 +169,17 @@ def make_handler(root: Path, token: str):
                 ),
                 "",
             )
-            return secrets.compare_digest(header, token) or secrets.compare_digest(
-                cookie_token, token
+            # Query token for EventSource (cannot set custom headers)
+            try:
+                from urllib.parse import parse_qs, urlparse
+
+                qtok = (parse_qs(urlparse(self.path).query).get("token") or [""])[0]
+            except Exception:
+                qtok = ""
+            return (
+                secrets.compare_digest(header, token)
+                or secrets.compare_digest(cookie_token, token)
+                or (bool(qtok) and secrets.compare_digest(qtok, token))
             )
 
         def _payload(self, max_size: int = MAX_BODY) -> dict[str, Any]:
@@ -188,6 +197,15 @@ def make_handler(root: Path, token: str):
             self.send_header("Content-Length", str(len(data)))
             self.send_header("Cache-Control", "no-store")
             self.send_header("X-Content-Type-Options", "nosniff")
+            # Phase E: loopback console CSP (inline scripts required by console.html)
+            self.send_header(
+                "Content-Security-Policy",
+                "default-src 'self'; script-src 'self' 'unsafe-inline'; "
+                "style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; "
+                "media-src 'self' blob:; connect-src 'self'; frame-ancestors 'self'; "
+                "base-uri 'self'; form-action 'self'",
+            )
+            self.send_header("X-Frame-Options", "SAMEORIGIN")
             self.end_headers()
             self.wfile.write(data)
 
@@ -305,6 +323,39 @@ def make_handler(root: Path, token: str):
                     self._json(200, project_events_tail(film_root, since=since, limit=limit))
                 except Exception as exc:  # noqa: BLE001
                     self._json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
+                return
+            if parsed.path == "/api/stream":
+                # SSE live feed (Phase E). Auth via header/cookie/?token=
+                try:
+                    from web.sse_stream import format_keepalive, iter_director_sse
+                except Exception as exc:  # noqa: BLE001
+                    self._json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
+                    return
+                qs = parse_qs(parsed.query)
+                try:
+                    interval = float((qs.get("interval") or ["1.5"])[0])
+                except ValueError:
+                    interval = 1.5
+                try:
+                    max_events = (qs.get("max") or [None])[0]
+                    max_events = int(max_events) if max_events is not None else None
+                except ValueError:
+                    max_events = None
+                self.send_response(200)
+                self.send_header("Content-Type", "text/event-stream; charset=utf-8")
+                self.send_header("Cache-Control", "no-store")
+                self.send_header("Connection", "keep-alive")
+                self.send_header("X-Accel-Buffering", "no")
+                self.send_header("X-Content-Type-Options", "nosniff")
+                self.end_headers()
+                try:
+                    for chunk in iter_director_sse(
+                        film_root, interval_sec=interval, max_events=max_events
+                    ):
+                        self.wfile.write(chunk)
+                        self.wfile.flush()
+                except (BrokenPipeError, ConnectionResetError):
+                    return
                 return
             if parsed.path == "/api/takes":
                 try:

@@ -271,3 +271,38 @@ def test_hard_boundary_clear_after_select(tmp_path):
     assert not any(b.get("kind") == "take_pick" for b in picks)
     report = assert_review_advance_allowed(tmp_path, boundary="final")
     assert report["ok"] is True
+
+
+def test_sse_frames_hello_and_live(tmp_path):
+    from web.sse_stream import format_sse, iter_director_sse
+
+    (tmp_path / "receipts").mkdir()
+    frames = list(iter_director_sse(tmp_path, interval_sec=0.3, max_events=1))
+    text = b"".join(frames).decode("utf-8")
+    assert "event: hello" in text
+    assert "event: live" in text
+    assert "director-center-live" in text or "director-center-sse" in text
+    assert format_sse("ping", {"ok": True}).startswith(b"event: ping")
+
+
+@pytest.mark.skipif(
+    not __import__("importlib").util.find_spec("fastapi"),
+    reason="fastapi not installed",
+)
+def test_api_stream_endpoint(tmp_path):
+    from fastapi.testclient import TestClient
+    from web_api import create_app
+
+    (tmp_path / "receipts").mkdir()
+    app = create_app(tmp_path, token="t-stream", port=8765)
+    client = TestClient(app)
+    with client.stream(
+        "GET",
+        "/api/stream?max=1&interval=0.3",
+        headers={"X-Review-Token": "t-stream"},
+    ) as resp:
+        assert resp.status_code == 200
+        assert "text/event-stream" in resp.headers.get("content-type", "")
+        body = b"".join(resp.iter_bytes()).decode("utf-8", errors="replace")
+    assert "event: hello" in body
+    assert "event: live" in body

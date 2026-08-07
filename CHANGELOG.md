@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.41.32] - 2026-08-07
+
+### Added (director-center · Phase E)
+- **SSE** `GET /api/stream`: near-realtime live+events (`?token=` for EventSource; `interval`/`max`).
+- **console**: EventSource + 15s poll fallback; `Promise.allSettled` partial degrade on dashboard load.
+- **CSP / X-Frame-Options**: loopback HTML (stdlib review_ui + FastAPI web_api).
+- **Tests:** SSE frames + `/api/stream` endpoint (26 director_center+web_routes).
+
 ## [2.41.31] - 2026-08-07
 
 ### Added (edit-director · Round 3)

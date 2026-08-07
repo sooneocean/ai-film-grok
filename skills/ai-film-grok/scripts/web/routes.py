@@ -96,6 +96,7 @@ ROUTES: tuple[RouteSpec, ...] = (
     RouteSpec("GET", "/api/console-state", "console.state", "asset_picker"),
     RouteSpec("GET", "/api/live", "director.live", "web.projection"),
     RouteSpec("GET", "/api/events", "director.events", "web.projection"),
+    RouteSpec("GET", "/api/stream", "director.stream", "web.sse_stream", note="SSE live feed"),
     RouteSpec("GET", "/api/takes", "takes.list_or_compare", "web.takes_api"),
     RouteSpec("POST", "/api/takes/review", "takes.review", "web.takes_api", loopback=True),
     RouteSpec("GET", "/api/file", "media.workspace_file", "web_core"),

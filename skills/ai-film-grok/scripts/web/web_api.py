@@ -26,8 +26,8 @@ import socket
 from pathlib import Path
 from typing import Any
 
-from fastapi import Depends, FastAPI, HTTPException, Request
-from fastapi.responses import HTMLResponse, JSONResponse, Response
+from fastapi import Depends, FastAPI, HTTPException, Query, Request
+from fastapi.responses import HTMLResponse, JSONResponse, Response, StreamingResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from web_core import (
     WebConsoleConflict,
@@ -150,14 +150,34 @@ def create_app(root: str | Path, token: str, port: int) -> FastAPI:
     def console_root() -> Response:
         return HTMLResponse(
             _console_html(),
-            headers={"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"},
+            headers={
+                "Cache-Control": "no-store",
+                "X-Content-Type-Options": "nosniff",
+                "X-Frame-Options": "SAMEORIGIN",
+                "Content-Security-Policy": (
+                    "default-src 'self'; script-src 'self' 'unsafe-inline'; "
+                    "style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; "
+                    "media-src 'self' blob:; connect-src 'self'; frame-ancestors 'self'; "
+                    "base-uri 'self'; form-action 'self'"
+                ),
+            },
         )
 
     @app.get("/console", dependencies=[Depends(require_auth)])
     def console_page() -> Response:
         return HTMLResponse(
             _console_html(),
-            headers={"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"},
+            headers={
+                "Cache-Control": "no-store",
+                "X-Content-Type-Options": "nosniff",
+                "X-Frame-Options": "SAMEORIGIN",
+                "Content-Security-Policy": (
+                    "default-src 'self'; script-src 'self' 'unsafe-inline'; "
+                    "style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; "
+                    "media-src 'self' blob:; connect-src 'self'; frame-ancestors 'self'; "
+                    "base-uri 'self'; form-action 'self'"
+                ),
+            },
         )
 
     @app.get("/review", dependencies=[Depends(require_auth)])
@@ -166,7 +186,17 @@ def create_app(root: str | Path, token: str, port: int) -> FastAPI:
 
         return HTMLResponse(
             _PAGE.encode("utf-8"),
-            headers={"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"},
+            headers={
+                "Cache-Control": "no-store",
+                "X-Content-Type-Options": "nosniff",
+                "X-Frame-Options": "SAMEORIGIN",
+                "Content-Security-Policy": (
+                    "default-src 'self'; script-src 'self' 'unsafe-inline'; "
+                    "style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; "
+                    "media-src 'self' blob:; connect-src 'self'; frame-ancestors 'self'; "
+                    "base-uri 'self'; form-action 'self'"
+                ),
+            },
         )
 
     # ---- media ----
@@ -292,6 +322,27 @@ def create_app(root: str | Path, token: str, port: int) -> FastAPI:
         from console_projection import project_events_tail
 
         return project_events_tail(base, since=since, limit=limit)
+
+    @app.get("/api/stream", dependencies=[Depends(require_auth)])
+    def api_stream(
+        interval: float = 1.5,
+        max_events: int | None = Query(default=None, alias="max"),
+    ) -> StreamingResponse:
+        from web.sse_stream import iter_director_sse
+
+        def gen():
+            yield from iter_director_sse(base, interval_sec=interval, max_events=max_events)
+
+        return StreamingResponse(
+            gen(),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-store",
+                "X-Accel-Buffering": "no",
+                "X-Content-Type-Options": "nosniff",
+            },
+        )
+
 
     @app.get("/api/takes", dependencies=[Depends(require_auth)])
     def api_takes(shot: str | None = None) -> dict[str, Any]:

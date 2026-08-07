@@ -944,11 +944,13 @@ document.getElementById('refresh-gates').onclick = loadGates;
 
 // ---- dashboard (macro workbench) ----
 async function loadDashboard(){
+  // Phase E: allSettled so one failing library does not white-screen the board
   try {
-    const [s, g, live, bgm, character, voice, shot, scene, prop] = await Promise.all([
+    const keys = ['state','gates','live','bgm','character','voice','shot','scene','prop'];
+    const settled = await Promise.allSettled([
       api('/api/console-state'),
       api('/api/gates'),
-      api('/api/live').catch(() => null),
+      api('/api/live'),
       api('/api/assets?kind=bgm'),
       api('/api/assets?kind=character'),
       api('/api/assets?kind=voice'),
@@ -956,9 +958,18 @@ async function loadDashboard(){
       api('/api/assets?kind=scene'),
       api('/api/assets?kind=prop'),
     ]);
+    const pick = (i, fallback) => settled[i].status === 'fulfilled' ? settled[i].value : fallback;
+    const s = pick(0, { selection_counts: {}, director_live: null, approved_clips: 0, recent_selections: [] });
+    const g = pick(1, { blocking: false, gates: [], hard_fail: [] });
+    const live = pick(2, null);
+    const lib = (i) => (pick(i, { items: [] }).items || []);
+    if (settled.some(x => x.status === 'rejected')) {
+      const failed = keys.filter((_, i) => settled[i].status === 'rejected');
+      toast('部分模块降级：' + failed.join(', '), true);
+    }
     renderDashboard(s, g, {
-      bgm: bgm.items || [], character: character.items || [], voice: voice.items || [],
-      shot: shot.items || [], scene: scene.items || [], prop: prop.items || []
+      bgm: lib(3), character: lib(4), voice: lib(5),
+      shot: lib(6), scene: lib(7), prop: lib(8)
     }, live || s.director_live || null);
   } catch (e) { toast('载入工作台失败：' + e.message, true); }
 }
@@ -1049,18 +1060,72 @@ function renderDashboard(s, g, libs, live){
 // multi-tab sync (P8): poll console-state; if another tab/external changed the
 // ledger revision, refresh our base + surface a toast so two reviewers don't clash.
 let syncTimer = null;
+let liveSource = null;
+let lastLiveSig = '';
 async function syncState(){
+  // Fallback poll when SSE unavailable
   try {
     const s = await api('/api/console-state');
+    const live = s.director_live || null;
+    const inboxSig = live && Array.isArray(live.human_inbox)
+      ? live.human_inbox.map(i => (i.id||'')+':'+(i.state||'')).join('|')
+      : '';
     if (s.ledger_revision > expectedRevision) {
       expectedRevision = s.ledger_revision;
       toast('选择状态已更新（来自其他标签页或外部）');
       const dash = document.getElementById('dashboard');
       if (dash && !dash.classList.contains('hidden')) loadDashboard();
+    } else if (inboxSig && inboxSig !== lastLiveSig) {
+      lastLiveSig = inboxSig;
+      const dash = document.getElementById('dashboard');
+      if (dash && !dash.classList.contains('hidden')) loadDashboard();
+    } else {
+      lastLiveSig = inboxSig;
     }
-  } catch (_) { /* silent: sync is best-effort */ }
+  } catch (_) { /* silent */ }
 }
-function startSync(){ if (!syncTimer) syncTimer = setInterval(syncState, 3000); }
+function startLiveStream(){
+  if (liveSource || typeof EventSource === 'undefined') return false;
+  try {
+    const q = token ? ('?token=' + encodeURIComponent(token) + '&interval=1.5') : '?interval=1.5';
+    liveSource = new EventSource('/api/stream' + q);
+    liveSource.addEventListener('hello', () => { /* stream open */ });
+    liveSource.addEventListener('live', (ev) => {
+      try {
+        const data = JSON.parse(ev.data || '{}');
+        const live = data.live || null;
+        if (!live) return;
+        const sig = String(live.revision||'') + '|' + String(live.inbox_count||'') + '|' +
+          ((live.human_inbox||[]).map(i => (i.id||'')+':'+(i.state||'')).join('|'));
+        if (sig === lastLiveSig) return;
+        lastLiveSig = sig;
+        if (typeof live.revision === 'number' && live.revision > expectedRevision) {
+          expectedRevision = live.revision;
+        }
+        const dash = document.getElementById('dashboard');
+        if (dash && !dash.classList.contains('hidden')) {
+          // Refresh board with new live block (keep last libs if any)
+          loadDashboard();
+        }
+      } catch (_) { /* ignore bad frame */ }
+    });
+    liveSource.addEventListener('error', () => {
+      // Fall back to poll; EventSource auto-retries, but we also poll as safety net
+      if (!syncTimer) syncTimer = setInterval(syncState, 3000);
+    });
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+function startSync(){
+  if (!startLiveStream()) {
+    if (!syncTimer) syncTimer = setInterval(syncState, 3000);
+  } else if (!syncTimer) {
+    // light poll backup every 15s even with SSE
+    syncTimer = setInterval(syncState, 15000);
+  }
+}
 
 // ---- onboarding wizard v2 (brief -> thinking -> plan) ----
 const STEP_LABEL = { references: '参考物', story: '故事', characters: '角色' };

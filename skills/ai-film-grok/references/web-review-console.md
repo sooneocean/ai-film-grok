@@ -21,6 +21,7 @@ aifilm takes select --root <film> --shot-id s01 --take-id <id>
 
 | API | 作用 |
 |-----|------|
+| `GET /api/stream` | SSE 近实时 live（`?token=`/`interval`/`max`） |
 | `GET /api/live` | 人审收件箱 · queue · activity |
 | `GET /api/events` | pipeline-events 尾 |
 | `GET /api/takes` · `?shot=` | 多 take 索引 / 对比 |
