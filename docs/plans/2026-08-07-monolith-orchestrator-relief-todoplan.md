@@ -194,9 +194,9 @@ python -m pytest tests/test_final_hotpath_contracts.py tests/test_render_core_he
 ### Wave 2 · `film_spec_validate` 节拆（P0 · 触达 write-spec / lock）
 
 - [x] **W2.1** 盘点 `validate_film_spec` 内自然段落（provider / heat floor / dialogue / audio / continuity / …）  
-- [x] **W2.2** (heat/cast/adult tail → film_spec_validate_heat) 每节 → `plan/validate_*.py` 或 `plan/film_spec_validate_*.py`，返回 issue 列表  
+- [x] **W2.2** heat/cast/adult → `film_spec_validate_heat`；provider/transition → `film_spec_validate_provider`；soft gates → `film_spec_validate_soft_gates`  
 - [x] **W2.3** 入口 `validate_film_spec` 只聚合 + 排序 + 兼容旧 schema  
-- [ ] **W2.4** 与已 peel 的 `film_spec_lints` **去重**（禁双实现）
+- [x] **W2.4** soft gates **只调** `film_spec_lints` / continuity / rhythm 等既有 lint（禁双实现）
 
 **Verify：** `test_cli_write_spec_extract` · director intent · 相关 story contract 测
 

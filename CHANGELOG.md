@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.41.17] - 2026-08-07
+
+### Changed (monolith orchestrator relief · W2 validate sections)
+- **`film_spec_validate_provider.py`:** I2V/H3/still/transition defaults (pre-shot).
+- **`film_spec_validate_soft_gates.py`:** continuity/stance/performance/meaning/composition soft gates (uses existing lints only).
+- **`validate_film_spec`:** ~1727 → ~1057 LOC; heat/provider/soft leaves assemble.
+- **Tests:** write-spec + story_plan + heat paths green.
+
 ## [2.41.16] - 2026-08-07
 
 ### Added (H3 native light re-encode)
