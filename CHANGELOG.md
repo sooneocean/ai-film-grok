@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.40.48] - 2026-08-07
+
+### Changed (code metabolism terminal residual freeze)
+- **Document freeze:** [inventory](docs/reports/2026-08-06-code-metabolism-inventory.md) marks safe migrate queue **DONE**. Intentional non-shim residual:
+  - `aifilm_grok.py` — **CLI hub stays top-level** (growth via `cli/*` only; hub ≤2500).
+  - `workflow_pack.py` — **no vanity package move**; peel pure leaves **only bug-driven**.
+- **Guard tests:** `tests/test_metabolism_terminal_residual.py` (layout + inventory text).
+- **SHIM_POLICY / module-refactor tracker** updated with the same iron.
+- No product/behavior change.
+
 ## [2.40.47] - 2026-08-07
 
 ### Changed (code metabolism round 6 · path-depth residual P3-1×14)
