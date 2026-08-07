@@ -270,59 +270,12 @@ def write_final_mix_partial_receipt(
     )
 
 
-def resolve_render_dimension(*sources: object, default: int) -> int:
-    """Resolve a render dimension with CLI > timeline > manifest > default fallback.
-
-    Pure helper extracted from ``render_final`` (P1, senior-dev quality plan):
-    previously the width/height/fps fallback chains were inlined three times.
-    Every source is coerced defensively so a non-numeric value degrades to the
-    next fallback instead of raising mid-render.
-    """
-    for src in sources:
-        if src in (None, "", 0):
-            continue
-        try:
-            return int(src)  # type: ignore[arg-type]
-        except (TypeError, ValueError):
-            continue
-    return default
-
-
-
-def resolve_plate_slot_sec(
-    shot: object,
-    *,
-    default: float = 1.0,
-    min_sec: float = 0.05,
-) -> float:
-    """Resolve a plate clock duration from shot.duration_sec (pure helper).
-
-    Used for silence / native caption-clock VO stems that must match the plate
-    slot. Invalid or missing values degrade to ``default`` rather than raising
-    mid-render. Values at or below ``min_sec`` are treated as unusable.
-    """
-    try:
-        if isinstance(shot, dict):
-            raw = shot.get("duration_sec")
-        else:
-            raw = None
-        plate_slot = float(raw or 0.0)
-    except (TypeError, ValueError):
-        plate_slot = 0.0
-    if plate_slot <= min_sec:
-        return float(default)
-    return float(plate_slot)
-
-
-
-def coerce_optional_float(value: object) -> float | None:
-    """Coerce a present value to float; None stays None (conversion errors raise).
-
-    Pure helper for optional timeline fields such as ``in_point_sec``.
-    """
-    if value is None:
-        return None
-    return float(value)  # type: ignore[arg-type]
+# W1 peel: pure helpers live in final.render_helpers; re-export for hard-compat.
+from final.render_helpers import (  # noqa: E402, F401
+    coerce_optional_float,
+    resolve_plate_slot_sec,
+    resolve_render_dimension,
+)
 
 
 def render_final(args: argparse.Namespace) -> dict[str, Any]:
@@ -1988,25 +1941,10 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
         sidechain["performance_duck_db"] = performance_bgm.get("duck_db")
     sc_frag = sidechain_filter_fragment(sidechain)
     filters_help = run(["ffmpeg", "-filters"], check=False).stdout
-    # I1.4 · default broadband duck (no acrossover) — multiband hang 30–60m+.
-    # AIFILM_FORCE_SIMPLE_AMIX=1 → plain amix (no duck).
-    # AIFILM_ALLOW_ACROSSOVER_MIX=1 → opt-in legacy sidechain+acrossover dynamic_eq.
-    # AIFILM_FORCE_BROADBAND_DUCK=1 → explicit broadband (same as default now).
-    _env_on = lambda k: os.environ.get(k, "").strip().lower() in {"1", "true", "yes", "on"}
-    if _env_on("AIFILM_FORCE_SIMPLE_AMIX"):
-        filters_help = ""
-        mix_spotting["force_simple_amix"] = True
-        mix_spotting["mix_path"] = "simple_amix"
-    elif _env_on("AIFILM_ALLOW_ACROSSOVER_MIX"):
-        mix_spotting["allow_acrossover_mix"] = True
-        mix_spotting["mix_path"] = "acrossover_multiband"
-    else:
-        # Default + FORCE_BROADBAND: strip acrossover so sidechaincompress-only path runs
-        filters_help = (filters_help or "").replace("acrossover", "___disabled_acrossover___")
-        mix_spotting["force_broadband_duck"] = True
-        mix_spotting["mix_path"] = "broadband_default"
-        if _env_on("AIFILM_FORCE_BROADBAND_DUCK"):
-            mix_spotting["force_broadband_duck_env"] = True
+    # I1.4 · default broadband duck (no acrossover) — leaf: final.stages_dual_mix
+    from final.stages_dual_mix import apply_mix_path_env_policy
+
+    filters_help = apply_mix_path_env_policy(filters_help, mix_spotting=mix_spotting)
 
     try:
         from acoustic_policy import resolve_acoustic_space
@@ -2137,23 +2075,13 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
         item["id"] for item in shot_audio if item.get("dialogue_audio_lane") == "post_tts"
     ]
     # Fail-closed bookkeeping: same shot must never keep native + audible TTS.
-    xor_violations = [
-        item["id"]
-        for item in shot_audio
-        if item.get("dialogue_audio_lane") == "native"
-        and float(item.get("tts_mix_gain") or 0.0) > 0.0
-    ] + [
-        item["id"]
-        for item in shot_audio
-        if item.get("dialogue_audio_lane") == "post_tts"
-        and item.get("native_audio")
-        and not item.get("native_audio_suppressed_for_tts")
-        and item.get("native_audio_audible") is not False
-    ]
+    from final.stages_dual_mix import dialogue_xor_violations
+
+    xor_violations = dialogue_xor_violations(shot_audio)
     if xor_violations:
         raise RenderError(
             "dialogue audio XOR violated (native + TTS both audible) for: "
-            + ", ".join(sorted({str(x) for x in xor_violations}))
+            + ", ".join(xor_violations)
         )
     mix_spotting["native_audio"] = {
         "role": (
@@ -2231,89 +2159,27 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
     )
     # Wave D · sidechain can hang or fail mid-plate → simple amix PARTIAL (not silent)
     _hb("audio_mix", "sidechain_or_amix")
-    try:
-        run(mix_cmd)
-    except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as mix_exc:
-        prior_sc = mix_spotting.get("sidechain_applied")
-        if not prior_sc:
-            raise RenderError(
-                f"audio mix failed (no sidechain to fall back from): {mix_exc}"
-            ) from mix_exc
-        log(
-            f"sidechain mix failed ({type(mix_exc).__name__}) → simple amix PARTIAL "
-            f"(was {prior_sc!r})"
-        )
-        # Remove partial output if any
-        with contextlib.suppress(OSError):
-            if mixed.is_file():
-                mixed.unlink()
-        color_in = "[6:a]" if use_color else ""
-        # Input order: 0 narr, 1 music, 2 native, 3 sfx, 4 scene, 5 ambience, [6 color]
-        n_in = 6 + (1 if use_color else 0)
-        simple_fc = (
-            f"[0:a][1:a][2:a][3:a][4:a][5:a]{color_in}"
-            f"amix=inputs={n_in}:duration=first:normalize=0,alimiter=limit=0.95[aout]"
-        )
-        simple_cmd = [
-            "ffmpeg",
-            "-y",
-            "-i",
-            str(voice_cat),
-            "-i",
-            str(music_path),
-            "-i",
-            str(native_track),
-            "-i",
-            str(sfx_stereo_path),
-            "-i",
-            str(scene_sound_path),
-            "-i",
-            str(ambience_path),
-        ]
-        if use_color:
-            simple_cmd.extend(["-i", str(color_track)])
-        simple_cmd.extend(
-            [
-                "-filter_complex",
-                simple_fc,
-                "-map",
-                "[aout]",
-                "-ar",
-                str(mix_sample_rate),
-                "-ac",
-                "2",
-                "-c:a",
-                "pcm_s16le",
-                str(mixed),
-            ]
-        )
-        try:
-            run(simple_cmd)
-        except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as amix_exc:
-            raise RenderError(
-                f"audio mix failed after sidechain→amix fallback: {amix_exc}"
-            ) from amix_exc
-        mix_spotting["sidechain_applied"] = False
-        mix_spotting["sidechain_fallback"] = {
-            "from": prior_sc,
-            "to": "amix_simple",
-            "partial": True,
-            "error": str(mix_exc)[:300],
-            "error_type": type(mix_exc).__name__,
-        }
-        mix_spotting["delivery_partial"] = True
-        mix_spotting["partial_reason"] = "sidechain_mix_failed_amix_fallback"
-        # Persist PARTIAL receipt for closeout / agents (not silent quality pass)
-        try:
-            partial_path = write_final_mix_partial_receipt(
-                root,
-                prior_sc=str(prior_sc),
-                error=str(mix_exc),
-                mixed=mixed,
-            )
-            mix_spotting["partial_receipt"] = str(partial_path)
-        except Exception as rec_exc:  # noqa: BLE001
-            mix_spotting["partial_receipt_error"] = str(rec_exc)[:160]
+    from final.stages_dual_mix import run_sidechain_mix_with_amix_fallback
+
+    run_sidechain_mix_with_amix_fallback(
+        mix_cmd=mix_cmd,
+        voice_cat=voice_cat,
+        music_path=music_path,
+        native_track=native_track,
+        sfx_stereo_path=sfx_stereo_path,
+        scene_sound_path=scene_sound_path,
+        ambience_path=ambience_path,
+        color_track=color_track if use_color else None,
+        use_color=use_color,
+        mixed=mixed,
+        mix_sample_rate=mix_sample_rate,
+        mix_spotting=mix_spotting,
+        root=root,
+        run=run,
+        log=log,
+        write_partial_receipt=write_final_mix_partial_receipt,
+        render_error_cls=RenderError,
+    )
 
     # Phase F/G: loudness probe + optional/auto loudnorm toward shortform target
     try:
@@ -2540,53 +2406,16 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
         else:
             shutil.copy2(silent, video_subbed)
 
-    # 9) Mux final
-    run(
-        [
-            "ffmpeg",
-            "-y",
-            "-i",
-            str(video_subbed),
-            "-i",
-            str(mixed),
-            "-c:v",
-            "copy",
-            "-c:a",
-            "aac",
-            "-b:a",
-            "256k",
-            "-movflags",
-            "+faststart",
-            "-shortest",
-            str(final_path),
-        ]
-    )
+    # 9) Mux final + verify streams (leaf: final.stages_mux_manifest)
+    from final.stages_mux_manifest import mux_final_mp4, verify_final_streams
 
-    # Verify streams
-    probe = run(
-        [
-            "ffprobe",
-            "-v",
-            "error",
-            "-show_entries",
-            "stream=codec_type,codec_name,sample_rate,channels,bit_rate",
-            "-of",
-            "json",
-            str(final_path),
-        ]
+    mux_final_mp4(video_subbed=video_subbed, mixed=mixed, final_path=final_path, run=run)
+    streams = verify_final_streams(
+        final_path=final_path,
+        audio_timeline_v1=bool(spec.get("audio_timeline_v1", False)),
+        run=run,
+        render_error_cls=RenderError,
     )
-    streams = json.loads(probe.stdout).get("streams") or []
-    has_v = any(s.get("codec_type") == "video" for s in streams)
-    has_a = any(s.get("codec_type") == "audio" for s in streams)
-    if not has_v or not has_a:
-        raise RenderError("Final MP4 missing video or audio stream")
-    audio_stream = next((stream for stream in streams if stream.get("codec_type") == "audio"), None)
-    if bool(spec.get("audio_timeline_v1", False)) and (
-        not audio_stream
-        or str(audio_stream.get("sample_rate")) != "48000"
-        or int(audio_stream.get("channels") or 0) != 2
-    ):
-        raise RenderError("audio_timeline_v1 final must be 48kHz stereo")
 
     timeline_path = root / "timeline.json"
     mix_report_path = root / "audio" / "mix_report.json"
@@ -2755,88 +2584,24 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
     manifest["updated_at"] = utc_now()
     write_json(root / "manifest.json", manifest)
 
-    # A5 · 2026-08-06: plate vs master — never auto master_lock
-    # B · scale-fallback wardrobe honesty (soft-max / hard-on ban)
-    official_final: dict[str, Any] | None = None
-    scale_fallback_receipt: dict[str, Any] | None = None
-    try:
-        from final.delivery_class import (
-            classify_official_final,
-            read_gate_auto_ok,
-            write_official_final_report,
-        )
+    # A5 · 2026-08-06: plate vs master — never auto master_lock (leaf)
+    from final.stages_official_finalize import apply_official_final_classification
 
-        gate_ok = read_gate_auto_ok(root)
-        official_final = classify_official_final(
-            skip_preflight=bool(getattr(args, "skip_preflight", False)),
-            skip_heat_gate=bool(getattr(args, "skip_heat_gate", False)),
-            allow_loop_risk=bool(getattr(args, "allow_loop_risk", False)),
-            force=bool(getattr(args, "force", False)),
-            gate_auto_ok=gate_ok,
-            cinematic_ok=None,
-            final_complete=False,
-            bgm_partial=bool((bgm_source_receipt or {}).get("partial")),
-            root=root,
-        )
-        try:
-            from final.delivery_class import write_plate_boring_receipt
-
-            write_plate_boring_receipt(root)
-        except Exception:  # noqa: BLE001
-            pass
-        try:
-            from narrative.scale_fallback import (
-                flatten_spec_shots,
-                report_scale_fallback_for_shots,
-                write_scale_fallback_receipt,
-            )
-
-            sf = report_scale_fallback_for_shots(
-                flatten_spec_shots(spec if isinstance(spec, dict) else {}),
-                heat_scale=str((spec or {}).get("heat_scale") or "max"),
-            )
-            scale_fallback_receipt = sf
-            write_scale_fallback_receipt(root, sf)
-            official_final["achieved_wardrobe_tier"] = sf.get("achieved_wardrobe_tier")
-            official_final["scale_fallback"] = {
-                "codes": sf.get("codes"),
-                "partial": sf.get("partial"),
-                "recommended_tier": sf.get("recommended_tier"),
-                "promote_ban": sf.get("promote_ban"),
-                "honest_limits": sf.get("honest_limits"),
-            }
-            if sf.get("partial"):
-                official_final["partial"] = True
-                limits = list(official_final.get("honest_limits") or [])
-                for h in sf.get("honest_limits") or []:
-                    if h not in limits:
-                        limits.append(h)
-                official_final["honest_limits"] = limits
-                if official_final.get("status") == "TECHNICAL_FINAL":
-                    official_final["status"] = "OFFICIAL_FINAL_PLATE"
-        except Exception as sf_exc:  # noqa: BLE001
-            log(f"scale-fallback receipt skip: {sf_exc}")
-        write_official_final_report(root, official_final)
-        report["official_final"] = official_final
-        report["scale_fallback"] = scale_fallback_receipt
-        write_json(report_path, report)
-
-        final_film = manifest.setdefault("outputs", {}).setdefault("final_film", {})
-        if isinstance(final_film, dict) and isinstance(official_final, dict):
-            final_film.update(
-                build_final_film_manifest_entry(
-                    final_path=final_path,
-                    output_sha256=report["output_sha256"],
-                    duration_sec=report["duration_sec"],
-                    report_path=report_path,
-                    technical_qa=technical_qa,
-                    official_final=official_final,
-                )
-            )
-            manifest["updated_at"] = utc_now()
-            write_json(root / "manifest.json", manifest)
-    except Exception as of_exc:  # noqa: BLE001
-        log(f"official-final-report skip: {of_exc}")
+    official_final = apply_official_final_classification(
+        root=root,
+        args=args,
+        spec=spec if isinstance(spec, dict) else {},
+        report=report,
+        report_path=report_path,
+        manifest=manifest,
+        final_path=final_path,
+        technical_qa=technical_qa,
+        bgm_source_receipt=bgm_source_receipt,
+        build_final_film_manifest_entry=build_final_film_manifest_entry,
+        write_json=write_json,
+        utc_now=utc_now,
+        log=log,
+    )
 
     return {
         "ok": True,

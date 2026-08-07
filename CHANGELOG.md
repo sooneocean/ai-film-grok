@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.41.5] - 2026-08-07
+
+### Changed (monolith orchestrator relief · W1 peels)
+- **`render_final` leaves:** `final/render_helpers.py` · `final/stages_dual_mix.py` · `final/stages_mux_manifest.py` · `final/stages_official_finalize.py` (structure-only; A5/PARTIAL/XOR semantics unchanged).
+- **Guard:** `tests/test_mega_fn_budget.py` · dual-mix unit tests.
+- **Plan:** `docs/plans/2026-08-07-monolith-orchestrator-relief-todoplan.md`.
+
 ## [2.41.4] - 2026-08-07
 
 ### Added (Film Production OS · W7 full cross-cut · plan CLOSED)

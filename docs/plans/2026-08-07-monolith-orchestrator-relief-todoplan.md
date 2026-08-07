@@ -1,7 +1,7 @@
 # 巨石模组舒缓 Todo Plan（2026-08-07 · 现状诊断 + 分步队列）
 
 **Status:** ACTIVE · 结构债单一执行板（2026-08-07）  
-**Plugin:** **2.41.4** · checkout `plugins/ai-film-grok`  
+**Plugin:** **2.41.5** · checkout `plugins/ai-film-grok`  
 **历史主档（勿重开已 ship 波）：**  
 - [project-module-refactor](docs/plans/2026-08-05-project-module-refactor.md) · W0–W7 **DONE**  
 - [residual-monolith-w4](docs/plans/2026-08-05-residual-monolith-w4-todo.md) · 包边界 + pure leaf **DONE**  
@@ -168,13 +168,13 @@ S3 Stage peel → 编排函数只剩：load ctx → stage1()…stageN() → rece
 | 9 | 2543–2855 | Mux · manifest · delivery_class | `final/stages_mux_manifest.py` | A5 plate≠master |
 
 - [x] **W1.0** stage 地图（上表）  
-- [ ] **W1.1** 引入 `final/render_context.py`（或 `post/render_context.py`）：装载路径/spec/vo_cfg；**行为零变**  
+- [x] **W1.1** (partial: helpers→render_helpers; full RenderContext deferred) 引入 `final/render_context.py`（或 `post/render_context.py`）：装载路径/spec/vo_cfg；**行为零变**  
 - [ ] **W1.2** peel **music/spotting 残留** 进既有 music leaf（最纯）  
-- [ ] **W1.3** peel **dual mix + partial receipt**（已有 `mix_partial` / sidechain 诚实语义 · 禁改 PARTIAL 语义）  
+- [x] **W1.3** peel **dual mix + partial receipt**（已有 `mix_partial` / sidechain 诚实语义 · 禁改 PARTIAL 语义）  
 - [ ] **W1.4** peel **subs burn / caption clock**  
 - [ ] **W1.5** peel **TTS stems + native XOR + 口白窗三角**（A2 IRON · 测锁死）  
 - [ ] **W1.6** peel **stretch/concat/join**  
-- [ ] **W1.7** peel **mux + delivery_class / master_lock 诚实字段**（A5 · plate≠master）  
+- [x] **W1.7** (mux leaf + official finalize leaf) peel **mux + delivery_class / master_lock 诚实字段**（A5 · plate≠master）  
 - [ ] **W1.8** `render_final()` 只编排；`main` 不变；shim `main()` 仍进真实现
 
 **Verify（每子波）：**
