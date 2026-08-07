@@ -269,8 +269,8 @@ def test_base_i2va_has_half_second_densify() -> None:
     assert validate_official_prompt(text, mode="i2v")["ok"] is True
 
 
-def test_high_motion_official_opt_in(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Default on after live densify; escape=0 restores legacy timeline."""
+def test_high_motion_official_default_on(monkeypatch: pytest.MonkeyPatch) -> None:
+    """P3.5: high auto defaults official densify; escape=0 restores legacy timeline."""
     monkeypatch.setenv("AIFILM_H3_PROMPT_DIALECT", "auto")
     monkeypatch.delenv("AIFILM_H3_HIGH_MOTION_OFFICIAL", raising=False)
     assert resolve_prompt_dialect(_hi_shot()) == "official"

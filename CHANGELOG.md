@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.40.100] - 2026-08-07
+
+### Added / Changed (H3 official P3.5 real-burn canary)
+- **P3.5 densify A/B reburn** seed `202608074` · 6/6 takes at `artifacts/5090-evaluation/h3-official-ab-20260807/`.
+- **Score (raw mean):** high official **28.92 >** legacy 26.92 (Δ+2); dialogue/soft mean still favor legacy.
+- **Policy:** high auto → **official** densify (escape `AIFILM_H3_HIGH_MOTION_OFFICIAL=0`); dialogue stays official for `<d>` structure.
+- **Evidence:** `artifacts/2026-08-07-h3-official-p35-canary.json` · `run_p35_reburn.py`.
+- **Harden:** dialogue gate import soft-path; canary register=False + skip existing + inter-burn free.
+
 ## [2.40.99] - 2026-08-07
 
 ### Added / Changed (error internalization · E5 + E6.3 + F5)

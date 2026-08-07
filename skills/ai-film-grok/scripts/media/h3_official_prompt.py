@@ -67,10 +67,11 @@ def resolve_prompt_dialect(
 
 
 def high_motion_official_enabled() -> bool:
-    """High-motion auto dialect uses official densify (default on after live canary).
+    """High-motion auto dialect uses official densify (default on after P3.5).
 
-    Live densify 2026-08-07 seed 202608073: official mean 24.86 > legacy 20.67.
-    Escape back to legacy timeline: ``AIFILM_H3_HIGH_MOTION_OFFICIAL=0``.
+    P3.5 densify reburn seed 202608074: official mean 28.92 > legacy 26.92 (Δ+2).
+    Earlier live densify seed 202608073 also beat O3 legacy. Escape:
+    ``AIFILM_H3_HIGH_MOTION_OFFICIAL=0`` restores high→legacy timeline.
     """
     raw = os.environ.get("AIFILM_H3_HIGH_MOTION_OFFICIAL", "1").strip().lower()
     return raw not in {"0", "false", "no", "off"}
