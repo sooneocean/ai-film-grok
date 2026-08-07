@@ -638,7 +638,7 @@
     },
     {
       "path": "scripts/cli/cli_h3.py",
-      "sha256": "af0cc5d727ce3395c1901940abfa199101a88a0eb4c55840554450da64c04b68"
+      "sha256": "d6637e799b5c76191f2cd6ed33d546b4d406b3095efb1cc5aed7fd132d51d2be"
     },
     {
       "path": "scripts/cli/cli_hub_residual.py",
@@ -710,7 +710,7 @@
     },
     {
       "path": "scripts/cli/cli_post.py",
-      "sha256": "1af0e7cca7e8d04ed3b99c0300c5c80d883cfa0e8ba1221e94d5a3172904870f"
+      "sha256": "b1a82baaa910b9bc7602fb4210a65c8f8d98f225d34e0610fec53f2033e0959a"
     },
     {
       "path": "scripts/cli/cli_quality.py",
@@ -1782,7 +1782,7 @@
     },
     {
       "path": "scripts/media/comfy_armory.py",
-      "sha256": "d25f29c47706785b30cb9a9250982a472dd464205ed47b46e42055b3716c0bdb"
+      "sha256": "f9ce95214b677928e5cf5a3a097a5c1f8a190d93efbd2e6dce363b44fad21430"
     },
     {
       "path": "scripts/media/comfy_broker_service.py",
@@ -1794,7 +1794,7 @@
     },
     {
       "path": "scripts/media/comfy_video.py",
-      "sha256": "c10607f8aa06112502bc35dd2e69408802b759113fce15e220e4a084c2088ae5"
+      "sha256": "b91a239771f80ce557201d11f6f4a0c644740739b98a318a12f40186d1d91cf5"
     },
     {
       "path": "scripts/media/env_plate.py",
@@ -1870,7 +1870,7 @@
     },
     {
       "path": "scripts/media/h3_workflow.py",
-      "sha256": "1d4e4232f7f53820a0fa0585b3734fa2e5b47adf657f908f247c0ab940a5cbeb"
+      "sha256": "0e5a63d19c1d2ea9b35d774782fea582f08fe5fc19461e599c632f82fe9177a1"
     },
     {
       "path": "scripts/media/i2v_motion_gate.py",
@@ -1878,7 +1878,7 @@
     },
     {
       "path": "scripts/media/i2v_provider.py",
-      "sha256": "33a233adb29530da1e205c9cbc7b5c05930c4cf1d46d2c11a5377c4ab6a7acf6"
+      "sha256": "6a09886b6cff0db986ac3a604be8173e2230babc032f3bbdc9f678c54edfe052"
     },
     {
       "path": "scripts/media/interactive_orchestration.py",
@@ -2394,7 +2394,7 @@
     },
     {
       "path": "scripts/plan/director_cli.py",
-      "sha256": "097bf5b935980a9a8209c01b9b5b883a355b8c44bc70b638d52b5d32d7fba00c"
+      "sha256": "8ceaf997b8c1b19cf7a945f7d1493bfe7ba2b07ea4632d304acb892eea0cf4af"
     },
     {
       "path": "scripts/plan/director_interpretation.py",
@@ -2762,7 +2762,7 @@
     },
     {
       "path": "scripts/post/edit_director.py",
-      "sha256": "4bbe4f826b14803ac84b81ac601c283a7c6d7ca62fb663d19f460b4914ebab8c"
+      "sha256": "6d2ff7b39904b049ca24777382fd1ce93577b05bd6cb9b06fc562668a7a59e7f"
     },
     {
       "path": "scripts/post/export_composition.py",
@@ -2854,7 +2854,11 @@
     },
     {
       "path": "scripts/post/review_control.py",
-      "sha256": "769824a9c6e155c5abbd06a54c8560a2339d39e33658ce80caf2e79c35468a06"
+      "sha256": "e70a4e59368e234eabdc1ff4693aaa72ab8c5e09ff65df32856223fa5fd63f2d"
+    },
+    {
+      "path": "scripts/post/review_mode_policy.py",
+      "sha256": "c36ad52b5e6c276879cbe17494c9f749002d6eca46ecd1b3497a97e58b2bf617"
     },
     {
       "path": "scripts/post/review_pack.py",
@@ -3033,6 +3037,10 @@
       "sha256": "e8b05fb124b9b4b9f8578974b2f11377a57369ba5d2415b4189e7bb2e9ebd4ef"
     },
     {
+      "path": "scripts/review_mode_policy.py",
+      "sha256": "2e837fd181a1e5565d60b2332a3eba1524a40bbe4547c0195c94c2c4359bb4c0"
+    },
+    {
       "path": "scripts/review_pack.py",
       "sha256": "a6ee0fa0a306ccd30de9b8f68067347ffda27eca4a44a87b1570a86d12f854a9"
     },
@@ -3178,7 +3186,7 @@
     },
     {
       "path": "scripts/spine/advance.py",
-      "sha256": "458088d93c8da84ab17a4028ab243a02eac76278a0c489a96342c8f260358893"
+      "sha256": "66d2df09739e3051b3b7eaa053e4cb6929c421f9ebb12be6dda699454a75dd28"
     },
     {
       "path": "scripts/spine/automation_verify.py",
@@ -3490,11 +3498,11 @@
     },
     {
       "path": "scripts/web/director_center.py",
-      "sha256": "1d05f2be06960a7ef8f30ed16b182e140403a87dfdc480848b1b4b91c71b6f19"
+      "sha256": "ae2875a4975eea6f4fdc7997d52b7f7cd74d6d15cd04f599eb5be24fcfeeff0b"
     },
     {
       "path": "scripts/web/director_live_ext.py",
-      "sha256": "51fc525cb4bd665c0671cf0c2e990638035cc467f8f922ec0f5c4228bfaf63a5"
+      "sha256": "bdeaa0b36d962c3a2e4695595064c650319b3c8b483b0164c8792fc21aad0f22"
     },
     {
       "path": "scripts/web/gate_panel.py",

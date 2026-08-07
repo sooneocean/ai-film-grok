@@ -35,12 +35,14 @@
 | E3 | join_policy · snapshot/activate · audit | ✅ |
 | E4 | stages 卡 · memory · tests · bump | ✅ |
 | **R2** | ship-prep 自动 draft · post-doctor 路由对账 · final 读 plan · closeout next_cmd | ✅ |
+| **R3** | apply↔post-plan 同步 · editorial EDL/trims · checklist | ✅ |
 
 ## CLI
 
 ```bash
-aifilm edit-director draft|normalize|status|set|apply|run --root <film>
+aifilm edit-director draft|normalize|status|set|apply|run|checklist --root <film>
 # run 默认 --dry-run 安全；真跑须 --execute
+# apply 会 ensure/对齐 post-plan.json owner = design
 ```
 
 ## 反模式

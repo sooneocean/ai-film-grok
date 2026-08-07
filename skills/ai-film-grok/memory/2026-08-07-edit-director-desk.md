@@ -24,3 +24,4 @@
 - stages/post 快卡 · [todoplan](../../../docs/plans/2026-08-07-edit-director-todoplan.md)
 - 姊妹桌：`music-director`（mute 不剪画面）
 - R2：`workflow_pack.ship_prep` · `post_doctor` · `cmd_final` · `closeout._final_next_cmd`
+- R3：`apply` 同步 post-plan · editorial EDL/trims · `checklist`

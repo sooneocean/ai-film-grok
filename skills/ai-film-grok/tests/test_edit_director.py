@@ -277,6 +277,86 @@ def test_snapshot_activate_and_audit(tmp_path: Path) -> None:
     assert (tmp_path / "receipts" / "edit-director-audit.json").is_file()
 
 
+def test_sync_post_plan_on_apply(tmp_path: Path) -> None:
+    from edit_director import apply_plan, draft_and_save
+
+    clip = tmp_path / "takes" / "sh01.mp4"
+    clip.parent.mkdir(parents=True)
+    clip.write_bytes(b"fake")
+    (tmp_path / "film-spec.json").write_text(
+        json.dumps(_mini_spec("sh01")), encoding="utf-8"
+    )
+    (tmp_path / "manifest.json").write_text(
+        json.dumps(
+            {
+                "clips": {
+                    "sh01": {
+                        "path": str(clip),
+                        "status": "approved",
+                        "state": "active",
+                        "duration_sec": 4.0,
+                    }
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    draft_and_save(tmp_path, force=True, design="hyperframes")
+    assert not (tmp_path / "post-plan.json").is_file()
+    receipt = apply_plan(tmp_path)
+    assert receipt.get("post_plan_sync", {}).get("ok") is True
+    assert (tmp_path / "post-plan.json").is_file()
+    pp = json.loads((tmp_path / "post-plan.json").read_text(encoding="utf-8"))
+    assert pp.get("post_owner") == "hyperframes"
+    # redesign → remotion realigns post-plan owner
+    from edit_director import set_plan_fields
+
+    set_plan_fields(tmp_path, design="remotion")
+    receipt2 = apply_plan(tmp_path)
+    assert receipt2.get("post_plan_sync", {}).get("ok") is True
+    pp2 = json.loads((tmp_path / "post-plan.json").read_text(encoding="utf-8"))
+    assert pp2.get("post_owner") == "remotion"
+
+
+def test_editorial_edl_and_trims(tmp_path: Path) -> None:
+    from edit_director import draft_plan, export_checklist, normalize_plan, save_plan
+
+    (tmp_path / "film-spec.json").write_text(
+        json.dumps(_mini_spec("sh01")), encoding="utf-8"
+    )
+    (tmp_path / "manifest.json").write_text("{}", encoding="utf-8")
+    edl_dir = tmp_path / "edit"
+    edl_dir.mkdir()
+    (edl_dir / "edl.json").write_text(
+        json.dumps(
+            {
+                "ranges": [
+                    {"shot_id": "sh01", "in": 0.5, "out": 3.2, "source_type": "real"}
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    plan = draft_plan(tmp_path)
+    assert plan["editorial"]["edl"] == "edit/edl.json"
+    assert "real_footage" in plan["editorial"]["source_types"]
+    assert plan["editorial"]["trims"]
+    assert plan["editorial"]["trims"][0]["in_sec"] == 0.5
+    # bad trim fails closed
+    bad = dict(plan)
+    bad["editorial"] = {
+        "edl": "edit/edl.json",
+        "source_types": ["generated_clip"],
+        "trims": [{"shot_id": "x", "in_sec": 5, "out_sec": 1}],
+    }
+    with pytest.raises(EditDirectorError, match="in_sec"):
+        normalize_plan(bad, root=tmp_path)
+    save_plan(tmp_path, plan, force=True)
+    cl = export_checklist(tmp_path, write=True)
+    assert (tmp_path / "receipts" / "edit-director-checklist.md").is_file()
+    assert cl.get("steps")
+
+
 def test_resolve_final_defaults_from_plan(tmp_path: Path) -> None:
     from edit_director import resolve_final_defaults
 

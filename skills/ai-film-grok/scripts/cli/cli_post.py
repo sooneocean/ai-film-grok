@@ -1668,6 +1668,7 @@ def cmd_edit_director(args: argparse.Namespace) -> int:
         audit_desk,
         build_run_plan,
         draft_and_save,
+        export_checklist,
         list_cuts,
         load_plan,
         normalize_plan,
@@ -1745,6 +1746,12 @@ def cmd_edit_director(args: argparse.Namespace) -> int:
             report = activate_cut(root, str(getattr(args, "name", "") or ""))
             emit(report)
             return 0
+        if action == "checklist":
+            report = export_checklist(
+                root, write=not bool(getattr(args, "no_write", False))
+            )
+            emit(report)
+            return 0 if report.get("ok") else 2
         raise FilmError(f"unknown edit-director action: {action}")
     except EditDirectorError as exc:
         raise FilmError(str(exc)) from exc
@@ -2721,6 +2728,12 @@ def add_post_parsers(sub: argparse._SubParsersAction[argparse.ArgumentParser]) -
     )
     ed_act.add_argument("--root", required=True)
     ed_act.add_argument("--name", required=True)
+    ed_check = ed_sub.add_parser(
+        "checklist",
+        help="Dry-run production checklist (receipts/edit-director-checklist.md)",
+    )
+    ed_check.add_argument("--root", required=True)
+    ed_check.add_argument("--no-write", action="store_true")
 
     rf = sub.add_parser(
         "register-final",

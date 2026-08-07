@@ -274,6 +274,8 @@ def draft_plan(
     if design_owner == "none":
         notes.append("design=none → ship_hardburn plate path")
 
+    editorial = _draft_editorial(base, post_plan if isinstance(post_plan, dict) else {})
+
     plan: dict[str, Any] = {
         "schema": SCHEMA,
         "kind": "edit-director-plan",
@@ -285,6 +287,7 @@ def draft_plan(
         "shot_ids": shot_ids,
         "engine_route": engine_route,
         "join_policy": _join_policy(spec),
+        "editorial": editorial,
         "recovery": {
             "caption_fallback": "pil_hardburn",
             "on_gate_red": "PARTIAL",
@@ -300,6 +303,166 @@ def draft_plan(
         },
     }
     return normalize_plan(plan, root=base)
+
+
+def _draft_editorial(root: Path, post_plan: dict[str, Any]) -> dict[str, Any]:
+    """EDL / source-type handoff for A-roll or generated clips."""
+    edl: str | None = None
+    source_types: list[str] = ["generated_clip"]
+    pp_ed = post_plan.get("editorial") if isinstance(post_plan.get("editorial"), dict) else {}
+    if isinstance(pp_ed.get("edl"), str) and str(pp_ed["edl"]).strip():
+        edl = str(pp_ed["edl"]).strip()
+    elif (root / "edit" / "edl.json").is_file():
+        edl = "edit/edl.json"
+    if isinstance(pp_ed.get("source_types"), list) and pp_ed["source_types"]:
+        source_types = [str(x) for x in pp_ed["source_types"] if str(x).strip()]
+    elif edl:
+        source_types = ["real_footage"]
+    trims: list[dict[str, Any]] = []
+    # Soft-load EDL ranges as optional trim hints (A-roll path)
+    if edl and (root / edl).is_file():
+        edl_data = read_json(root / edl) or {}
+        for item in edl_data.get("ranges") or []:
+            if not isinstance(item, dict):
+                continue
+            sid = str(item.get("shot_id") or item.get("id") or "").strip()
+            if not sid:
+                continue
+            try:
+                in_sec = float(item.get("in") if item.get("in") is not None else item.get("start") or 0)
+                out_sec = float(
+                    item.get("out") if item.get("out") is not None else item.get("end") or 0
+                )
+            except (TypeError, ValueError):
+                continue
+            if out_sec > in_sec >= 0:
+                trims.append(
+                    {
+                        "shot_id": sid,
+                        "in_sec": round(in_sec, 3),
+                        "out_sec": round(out_sec, 3),
+                        "source": "edl",
+                    }
+                )
+    return {
+        "edl": edl,
+        "source_types": source_types,
+        "trims": trims,
+        "rules": {
+            "subtitles_last": True,
+            "word_boundary_cuts": True,
+            "continue_join": "hard",
+        },
+    }
+
+
+def design_to_post_owner(design: str) -> str:
+    d = str(design or "hyperframes").strip().lower()
+    if d == "remotion":
+        return "remotion"
+    if d in {"none", "ffmpeg", "off"}:
+        return "ffmpeg"
+    return "hyperframes"
+
+
+def sync_post_plan(
+    root: Path | str,
+    plan: dict[str, Any],
+    *,
+    write: bool = True,
+) -> dict[str, Any]:
+    """Align post-plan.json owner with edit-director design (create if missing).
+
+    Does not invent a second design owner — edit-director design is source of truth
+    for post_owner when applying.
+    """
+    base = Path(root).expanduser().resolve()
+    er = plan.get("engine_route") if isinstance(plan.get("engine_route"), dict) else {}
+    design = str(er.get("design") or "hyperframes")
+    owner = design_to_post_owner(design)
+    editorial = plan.get("editorial") if isinstance(plan.get("editorial"), dict) else {}
+    edl = editorial.get("edl")
+    edl_path = str(edl).strip() if isinstance(edl, str) and str(edl).strip() else None
+
+    out: dict[str, Any] = {
+        "ok": True,
+        "owner": owner,
+        "created": False,
+        "updated": False,
+        "path": "post-plan.json",
+    }
+    try:
+        from post_plan import (
+            PostPlanError,
+            ensure_post_plan,
+            load_post_plan,
+            new_post_plan,
+            write_post_plan,
+        )
+    except ImportError as exc:
+        return {"ok": False, "error": f"import post_plan: {exc}"[:160]}
+
+    try:
+        existing = load_post_plan(base, required=False)
+    except PostPlanError as exc:
+        # Invalid existing plan — report, do not thrash overwrite without force
+        return {"ok": False, "error": f"post-plan invalid: {exc}"[:200], "owner": owner}
+
+    if existing is None:
+        if not write:
+            out["created"] = False
+            out["note"] = "would create post-plan"
+            return out
+        try:
+            pp, created = ensure_post_plan(base, owner=owner)
+            # ensure_post_plan won't overwrite; if created with wrong default owner via race, rewrite
+            if created and pp.get("post_owner") != owner:
+                plan_obj = new_post_plan(base, owner=owner, edl_path=edl_path)
+                write_post_plan(base, plan_obj, force=True)
+                pp = plan_obj
+            elif created and edl_path and not (pp.get("editorial") or {}).get("edl"):
+                plan_obj = new_post_plan(base, owner=owner, edl_path=edl_path)
+                write_post_plan(base, plan_obj, force=True)
+                pp = plan_obj
+            out["created"] = bool(created)
+            out["post_owner"] = (pp or {}).get("post_owner")
+        except PostPlanError as exc:
+            return {"ok": False, "error": str(exc)[:200], "owner": owner}
+        return out
+
+    # Existing plan: align owner if design changed
+    cur_owner = str(existing.get("post_owner") or "")
+    need_update = cur_owner != owner
+    cur_edl = None
+    ed_block = existing.get("editorial") if isinstance(existing.get("editorial"), dict) else {}
+    cur_edl = ed_block.get("edl")
+    if edl_path and cur_edl != edl_path:
+        need_update = True
+    if not need_update:
+        out["updated"] = False
+        out["post_owner"] = cur_owner
+        out["note"] = "post-plan already aligned"
+        return out
+    if not write:
+        out["updated"] = False
+        out["note"] = f"would set post_owner {cur_owner}→{owner}"
+        return out
+    try:
+        updated = new_post_plan(base, owner=owner, edl_path=edl_path or cur_edl)
+        # preserve acceptance / comparison if present
+        if isinstance(existing.get("acceptance"), dict):
+            updated["acceptance"] = existing["acceptance"]
+        if isinstance(existing.get("render"), dict) and existing["render"].get(
+            "comparison_engine"
+        ):
+            updated["render"]["comparison_engine"] = existing["render"]["comparison_engine"]
+        write_post_plan(base, updated, force=True)
+        out["updated"] = True
+        out["post_owner"] = owner
+        out["from_owner"] = cur_owner
+    except PostPlanError as exc:
+        return {"ok": False, "error": str(exc)[:200], "owner": owner, "from_owner": cur_owner}
+    return out
 
 
 def normalize_plan(plan: dict[str, Any], *, root: Path | str | None = None) -> dict[str, Any]:
@@ -424,6 +587,69 @@ def normalize_plan(plan: dict[str, Any], *, root: Path | str | None = None) -> d
         out["errors"] = []
     if not isinstance(out.get("notes"), list):
         out["notes"] = []
+
+    # R3 · editorial (EDL / trims / source types) — optional, fail-closed on bad trims
+    ed = out.get("editorial") if isinstance(out.get("editorial"), dict) else {}
+    edl_raw = ed.get("edl")
+    edl_norm: str | None = None
+    if edl_raw is not None and str(edl_raw).strip():
+        edl_norm = str(edl_raw).strip().replace("\\", "/")
+        if edl_norm.startswith("/") or ".." in Path(edl_norm).parts:
+            raise EditDirectorError(f"editorial.edl must be workspace-relative: {edl_norm!r}")
+    source_types: list[str] = []
+    for st in ed.get("source_types") or ["generated_clip"]:
+        s = str(st).strip().lower()
+        if s in {"generated", "generated_clip", "clip"}:
+            source_types.append("generated_clip")
+        elif s in {"real", "real_footage", "footage", "aroll", "a-roll"}:
+            source_types.append("real_footage")
+        else:
+            raise EditDirectorError(
+                f"editorial.source_types unknown {st!r} (generated_clip|real_footage)"
+            )
+    if not source_types:
+        source_types = ["generated_clip"]
+    # unique preserve order
+    seen_st: list[str] = []
+    for s in source_types:
+        if s not in seen_st:
+            seen_st.append(s)
+    trims_in = ed.get("trims") if isinstance(ed.get("trims"), list) else []
+    trims_out: list[dict[str, Any]] = []
+    for row in trims_in:
+        if not isinstance(row, dict):
+            raise EditDirectorError("editorial.trims entries must be objects")
+        sid = str(row.get("shot_id") or "").strip()
+        if not sid:
+            raise EditDirectorError("editorial.trims[].shot_id required")
+        try:
+            in_sec = float(row.get("in_sec") if row.get("in_sec") is not None else 0)
+            out_sec = float(row.get("out_sec") if row.get("out_sec") is not None else 0)
+        except (TypeError, ValueError) as exc:
+            raise EditDirectorError(f"trim times invalid for {sid}: {exc}") from exc
+        if in_sec < 0 or out_sec <= in_sec:
+            raise EditDirectorError(
+                f"trim for {sid}: require 0 <= in_sec < out_sec (got {in_sec}->{out_sec})"
+            )
+        trims_out.append(
+            {
+                "shot_id": sid,
+                "in_sec": round(in_sec, 3),
+                "out_sec": round(out_sec, 3),
+                "source": str(row.get("source") or "manual"),
+            }
+        )
+    rules = ed.get("rules") if isinstance(ed.get("rules"), dict) else {}
+    out["editorial"] = {
+        "edl": edl_norm,
+        "source_types": seen_st,
+        "trims": trims_out,
+        "rules": {
+            "subtitles_last": True,
+            "word_boundary_cuts": bool(rules.get("word_boundary_cuts", True)),
+            "continue_join": "hard",
+        },
+    }
     return out
 
 
@@ -537,11 +763,13 @@ def apply_plan(root: Path | str, *, write_route: bool = True) -> dict[str, Any]:
     else:
         # keep inferred from draft unless human set master etc. with no errors
         pass
-    # Keep human join/recovery overrides
+    # Keep human join/recovery/editorial overrides
     if isinstance(plan.get("join_policy"), dict):
         refreshed["join_policy"] = plan["join_policy"]
     if isinstance(plan.get("recovery"), dict):
         refreshed["recovery"] = plan["recovery"]
+    if isinstance(plan.get("editorial"), dict):
+        refreshed["editorial"] = plan["editorial"]
     # Preserve design if human set remotion
     human_design = str((plan.get("engine_route") or {}).get("design") or "")
     if human_design in DESIGN_OWNERS:
@@ -584,6 +812,8 @@ def apply_plan(root: Path | str, *, write_route: bool = True) -> dict[str, Any]:
         except Exception as exc:  # noqa: BLE001
             route_receipt = {"ok": False, "error": str(exc)[:200]}
 
+    post_plan_sync = sync_post_plan(base, refreshed, write=True)
+
     receipt = {
         "schema": "aifilm-edit-director-apply-v1",
         "kind": "edit-director-apply",
@@ -592,6 +822,7 @@ def apply_plan(root: Path | str, *, write_route: bool = True) -> dict[str, Any]:
         "shot_count": len(refreshed.get("shot_ids") or []),
         "errors": refreshed.get("errors") or [],
         "engine_route": refreshed.get("engine_route"),
+        "editorial": refreshed.get("editorial"),
         "editor_cut_ok": bool((editor_report or {}).get("ok")),
         "editor_cut": {
             "ok": (editor_report or {}).get("ok"),
@@ -599,10 +830,12 @@ def apply_plan(root: Path | str, *, write_route: bool = True) -> dict[str, Any]:
             "error": (editor_report or {}).get("error"),
         },
         "post_route": route_receipt,
+        "post_plan_sync": post_plan_sync,
         "plan_path": str(PLAN_REL),
         "ok": not bool(refreshed.get("errors"))
         and bool((editor_report or {}).get("ok"))
-        and (route_receipt is None or route_receipt.get("ok") is not False),
+        and (route_receipt is None or route_receipt.get("ok") is not False)
+        and bool(post_plan_sync.get("ok", True)),
     }
     # route write_json returns path dict without ok sometimes
     if isinstance(route_receipt, dict) and "path" in route_receipt and "error" not in route_receipt:
@@ -857,6 +1090,8 @@ def build_run_plan(
 
     final_cmd = build_final_cli_string(base, plan)
     final_argv = build_final_argv(base, plan)
+    editorial = plan.get("editorial") if isinstance(plan.get("editorial"), dict) else {}
+    checklist = build_checklist(base, plan, final_cmd=final_cmd, blocked_by=blocked_by)
 
     payload: dict[str, Any] = {
         "schema": "aifilm-edit-director-run-v1",
@@ -871,17 +1106,14 @@ def build_run_plan(
         "engine_route": er,
         "join_policy": plan.get("join_policy"),
         "recovery": plan.get("recovery"),
+        "editorial": editorial,
         "stages": stages,
+        "checklist": checklist,
         "final_argv": final_argv,
         "next_cmd": final_cmd if not blocked_by else None,
-        "next_steps": (
+        "next_steps": checklist.get("steps")
+        or (
             [
-                "1. aifilm edit-director apply --root …  # refresh editor_cut + post_route",
-                f"2. {final_cmd}",
-                "3. aifilm gate-auto --root … && aifilm review-final --root …",
-            ]
-            if not blocked_by
-            else [
                 "fix edit_plan_errors / assembly clips before run",
                 "aifilm edit-director status --root …",
             ]
@@ -1100,6 +1332,139 @@ def audit_desk(root: Path | str, *, write: bool = True) -> dict[str, Any]:
         path.parent.mkdir(parents=True, exist_ok=True)
         write_json(path, report)
         report["path"] = str(path)
+    return report
+
+
+def build_checklist(
+    root: Path | str,
+    plan: dict[str, Any] | None = None,
+    *,
+    final_cmd: str | None = None,
+    blocked_by: list[str] | None = None,
+) -> dict[str, Any]:
+    """Human + agent dry-run checklist (no media spend)."""
+    base = Path(root).expanduser().resolve()
+    if plan is None:
+        plan = load_plan(base, required=False)
+    if not plan:
+        return {
+            "ok": False,
+            "steps": [f'aifilm edit-director draft --root "{base}"'],
+            "items": [{"id": "plan", "ok": False, "detail": "missing plan"}],
+        }
+    er = plan.get("engine_route") or {}
+    ed = plan.get("editorial") if isinstance(plan.get("editorial"), dict) else {}
+    apply_rec = read_json(apply_receipt_path(base)) or {}
+    post_plan = read_json(base / "post-plan.json") or {}
+    post_route = read_json(base / "receipts" / "post-route.json") or {}
+    items: list[dict[str, Any]] = [
+        {
+            "id": "plan",
+            "ok": True,
+            "detail": f"cut_state={plan.get('cut_state')} design={er.get('design')}",
+        },
+        {
+            "id": "clips",
+            "ok": not bool(plan.get("errors")),
+            "detail": f"errors={len(plan.get('errors') or [])}",
+        },
+        {
+            "id": "apply",
+            "ok": bool(apply_rec),
+            "detail": "apply receipt present" if apply_rec else "run apply",
+        },
+        {
+            "id": "post_route",
+            "ok": bool(post_route.get("caption_path")),
+            "detail": f"caption_path={post_route.get('caption_path')}",
+        },
+        {
+            "id": "post_plan",
+            "ok": bool(post_plan.get("post_owner")),
+            "detail": f"post_owner={post_plan.get('post_owner')}",
+        },
+        {
+            "id": "editorial",
+            "ok": True,
+            "detail": (
+                f"edl={ed.get('edl')} types={ed.get('source_types')} "
+                f"trims={len(ed.get('trims') or [])}"
+            ),
+        },
+    ]
+    blocked = list(blocked_by or [])
+    if plan.get("errors"):
+        blocked.append("edit_plan_errors")
+    if plan.get("cut_state") == "assembly":
+        blocked.append("cut_state_assembly")
+    fc = final_cmd or build_final_cli_string(base, plan)
+    if blocked:
+        steps = [
+            f'aifilm edit-director status --root "{base}"',
+            "fix assembly / missing approved takes",
+        ]
+    else:
+        steps = [
+            f'aifilm edit-director apply --root "{base}"',
+            f'aifilm edit-director run --root "{base}"  # dry-run stages',
+            fc,
+            f'aifilm gate-auto --root "{base}"',
+            f'aifilm review-final --root "{base}"',
+        ]
+        if ed.get("edl"):
+            steps.insert(
+                1,
+                f"# A-roll EDL bound: {ed.get('edl')} "
+                f"(trims={len(ed.get('trims') or [])}; plate still full-take unless render honors trims)",
+            )
+    return {
+        "ok": not blocked,
+        "blocked_by": blocked or None,
+        "items": items,
+        "steps": steps,
+        "final_cmd": fc if not blocked else None,
+    }
+
+
+def export_checklist(
+    root: Path | str,
+    *,
+    write: bool = True,
+) -> dict[str, Any]:
+    """Write receipts/edit-director-checklist.md + json."""
+    base = Path(root).expanduser().resolve()
+    plan = load_plan(base, required=False)
+    report = build_checklist(base, plan)
+    report["schema"] = "aifilm-edit-director-checklist-v1"
+    report["kind"] = "edit-director-checklist"
+    report["at"] = utc_now()
+    lines = [
+        "# Edit Director checklist",
+        "",
+        f"- ok: {report.get('ok')}",
+        f"- blocked_by: {report.get('blocked_by')}",
+        "",
+        "## Items",
+    ]
+    for item in report.get("items") or []:
+        mark = "OK" if item.get("ok") else "WAIT"
+        lines.append(f"- [{mark}] `{item.get('id')}`: {item.get('detail')}")
+    lines.append("")
+    lines.append("## Next steps")
+    for step in report.get("steps") or []:
+        lines.append(f"1. {step}")
+    lines.append("")
+    md = "\n".join(lines)
+    if write:
+        rec = base / "receipts"
+        rec.mkdir(parents=True, exist_ok=True)
+        json_path = rec / "edit-director-checklist.json"
+        md_path = rec / "edit-director-checklist.md"
+        write_json(json_path, report)
+        md_path.write_text(md, encoding="utf-8")
+        report["path_json"] = str(json_path)
+        report["path_md"] = str(md_path)
+    report["markdown"] = md
     return report
 
 
