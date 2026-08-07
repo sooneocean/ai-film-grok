@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.40.109] - 2026-08-07
+
+### Changed (T5 edit_transition peel)
+- **Peel** join craft + xfade graphs from `narrative/edit_policy.py` → `narrative/edit_transition.py` (~963 LOC).
+- **Hard-compat:** `edit_policy` re-exports public + private craft symbols (`_CRAFT_WHY` etc.); top-level shim `edit_transition.py`.
+- **edit_policy** residual ~1695 LOC (stretch / stance / motion / heat hooks).
+- **Tests:** edit_policy + smooth_flow + transition suites green (106).
+
 ## [2.40.108] - 2026-08-07
 
 ### Added (F3 still face-lock bind · T4 plate transition_ops align)
