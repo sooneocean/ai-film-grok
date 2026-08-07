@@ -2842,7 +2842,7 @@
     },
     {
       "path": "scripts/post/render_final.py",
-      "sha256": "d98a74a8f33ae1218f4a6697e1fa64b96570a64170b141cf39b00dcee39974aa"
+      "sha256": "5c8092c4259e75973fc3731bb6bc3f234e8ca72d0aac85cd1f3f7e7571c21958"
     },
     {
       "path": "scripts/post/render_final_music.py",
@@ -3410,7 +3410,7 @@
     },
     {
       "path": "scripts/util/security_policy.py",
-      "sha256": "a25d5c352f263b2c5e8037309dc0cafec50e515f9277591f3b169993b49be1e8"
+      "sha256": "20df47f9035dc0972b539bfe7c2bf0a49aebc7046da21d73a15e7254863cdc48"
     },
     {
       "path": "scripts/util/spine_helpers.py",
