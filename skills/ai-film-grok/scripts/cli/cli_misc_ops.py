@@ -907,11 +907,8 @@ def cmd_plan(args: argparse.Namespace) -> int:
             "storyboard": bool(sb.get("ok")),
             "animatic": anim_ok,
         }
-        if strict:
-            ok = all(parts_ok.values())
-        else:
-            # Soft: coverage must not hard-error; storyboard/animatic warn only
-            ok = bool(cov.get("ok"))
+        # Soft: coverage must not hard-error; storyboard/animatic warn only
+        ok = all(parts_ok.values()) if strict else bool(cov.get("ok"))
         report = {
             "ok": ok,
             "kind": "production-ready",

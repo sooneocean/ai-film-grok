@@ -5,8 +5,9 @@ Structure-only peel of render_final stage 6 prefix (before music bed leaf).
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 import numpy as np
 from audio_cues import compile_audio_timeline

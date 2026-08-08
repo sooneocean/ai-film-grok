@@ -366,7 +366,7 @@ def make_handler(root: Path, token: str):
             if parsed.path == "/api/stream":
                 # SSE live feed (Phase E). Auth via header/cookie/?token=
                 try:
-                    from web.sse_stream import format_keepalive, iter_director_sse
+                    from web.sse_stream import iter_director_sse
                 except Exception as exc:  # noqa: BLE001
                     self._json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
                     return

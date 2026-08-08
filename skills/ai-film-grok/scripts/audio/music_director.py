@@ -9,15 +9,13 @@ Single source of truth: ``audio/music-director-plan.json``.
 
 from __future__ import annotations
 
-import json
-import tempfile
+import contextlib
 import wave
 from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
 import numpy as np
-
 from util import require_json as read_json
 from util import sha256_file, utc_now, write_json
 from util.errors import FilmError
@@ -579,10 +577,8 @@ def load_audio_samples(
     finally:
         # keep decoded temp only if work_dir provided for audit; else delete
         if work_dir is None and tmp.is_file():
-            try:
+            with contextlib.suppress(OSError):
                 tmp.unlink()
-            except OSError:
-                pass
 
 
 def apply_light_process_samples(samples: np.ndarray, sr: int) -> np.ndarray:
@@ -1268,7 +1264,7 @@ def export_listen_checklist(
         f"- root: `{root}`",
         f"- must_listen: **{len(must)}** / {len(items)}",
         f"- hot_peaks: {len(hot)}",
-        f"- policy: audio mute v1（不改画面）",
+        "- policy: audio mute v1（不改画面）",
         "",
         "| pri | shot | flags | peak | note | done |",
         "|----:|------|-------|-----:|------|------|",

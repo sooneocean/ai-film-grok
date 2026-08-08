@@ -356,7 +356,6 @@ def _build_studio_live_inner(
         films_out.append({"id": rid, "title": title, "live": live, "attention": attention})
         if live:
             q = live.get("queue") or {}
-            g = live.get("gates") or {}
             d = live.get("dispatch") or {}
             rollup["failed"] += int(q.get("failed") or 0)
             rollup["reviewable"] += int(q.get("reviewable") or 0)

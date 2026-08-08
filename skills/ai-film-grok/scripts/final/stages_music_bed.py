@@ -7,8 +7,9 @@ from __future__ import annotations
 
 import hashlib
 import wave
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 import numpy as np
 from logger import log

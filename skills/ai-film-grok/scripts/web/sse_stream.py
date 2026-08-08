@@ -58,7 +58,7 @@ def format_sse(event: str, data: dict[str, Any] | str) -> bytes:
         body = str(data)
     # SSE forbids bare newlines in data without multi-line encoding
     body = body.replace("\n", "")
-    return f"event: {event}\ndata: {body}\n\n".encode("utf-8")
+    return f"event: {event}\ndata: {body}\n\n".encode()
 
 
 def format_keepalive() -> bytes:

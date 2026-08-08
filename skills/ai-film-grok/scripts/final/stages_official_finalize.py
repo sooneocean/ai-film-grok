@@ -5,8 +5,9 @@ Preserves A5 plate≠master and scale-fallback honesty. Structure-only peel.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 
 def apply_official_final_classification(

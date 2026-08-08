@@ -7,9 +7,10 @@ Structure-only: no mix, heat, or provider policy retune.
 from __future__ import annotations
 
 import shutil
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from audio_cues import AudioCueError, primary_voice_cue
 from checkpoint import CheckpointManager

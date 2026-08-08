@@ -8,63 +8,25 @@ Post lipsync removed (v2.40): dialogue uses native clip audio (prefer_native).
 from __future__ import annotations
 
 import argparse
-import contextlib
-import hashlib
 import json
-import os
-import shutil
 import subprocess
 import sys
-import wave
 from pathlib import Path
 from typing import Any
 
-import numpy as np
-from audio_cues import AudioCueError, compile_audio_timeline, primary_voice_cue, strict_tts_text
-from audio_timeline import AudioTimelineError, build_mix_execution_plan, rebase_to_rendered_shots
 from audio_timeline import caption_bindings as timeline_caption_bindings
-from audio_timeline import compile_timeline as compile_audio_timeline_v1
-from audio_timeline import timeline_hash as audio_timeline_hash
-from checkpoint import CheckpointManager
 from dialogue_broll import validate_broll_visual_review, write_broll_edit_report
 from edit_policy import (
     DEFAULT_TRANSITION_SEC,
-    PolicyError,
-    expand_story_join_intents,
-    expand_story_join_styles,
-    film_segment_timeline,
-    normalize_transition_sec,
 )
-from event_voice_stem import EventVoiceStemError, render_event_voice_stem
 from logger import log
-from media_qa import MediaQAError, analyze_media, approved_clip_record
-from narrative_timeline import (
-    NarrativeTimelineError,
-    _is_non_vo_coverage_shot,
-    validate_sfx_scene_bindings,
-)
-from render_workspace import RenderWorkspaceError, prepare_render_workspace, resolve_render_paths
+from media_qa import approved_clip_record
 from runtime_policy import sha256
-from scene_sound import reconcile as reconcile_scene_sound
-from scene_sound_stems import SceneSoundError, render_scene_sound_stem
-from security_policy import (
-    SecurityPolicyError,
-    atomic_write_text,
-    safe_existing_file,
-    safe_output_path,
-)
 from sound_plan import (
     SoundPlanError,
     build_mood_timeline,
-    inject_auto_sfx_if_empty,
-    resolve_loudnorm,
     resolve_music_template,
-    resolve_sidechain,
-    should_apply_loudnorm,
-    sidechain_filter_fragment,
-    validate_audio_tracks_contract,
 )
-from transition_ops import TransitionOperationError, bind_transition_operations_to_timeline
 from util import utc_now, write_json
 from util.errors import FilmError
 
@@ -215,10 +177,6 @@ from final.tts_tracks import (  # noqa: E402, F401
     DEFAULT_VOCAL_COLOR_GAIN as _TTS_DEFAULT_VOCAL_COLOR_GAIN,
 )
 from final.tts_tracks import (
-    build_native_track,
-    build_vocal_color_track,
-)
-from final.tts_tracks import (
     tts_synthesize as _tts_synthesize_default,
 )
 from final.tts_tracks import (
@@ -298,13 +256,13 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
         lipsync_error_cls=LipSyncError,
     )
     root = ctx.root
-    paths = ctx.paths
+    _paths = ctx.paths
     out_dir = ctx.out_dir
     final_path = ctx.final_path
     manifest = ctx.manifest
     spec = ctx.spec
     scene_sound_report = ctx.scene_sound_report
-    timeline = ctx.timeline
+    _timeline = ctx.timeline
     width = ctx.width
     height = ctx.height
     fps = ctx.fps
@@ -322,7 +280,7 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
     native_audio_volume = ctx.native_audio_volume
     film_vocal_color_gain = ctx.film_vocal_color_gain
     mood = ctx.mood
-    lipsync_mode = ctx.lipsync_mode
+    _lipsync_mode = ctx.lipsync_mode
     tts_info = ctx.tts_info
     font_path = ctx.font_path
     shots = ctx.shots
@@ -398,14 +356,14 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
         write_broll_edit_report=write_broll_edit_report,
         heartbeat=_hb,
     )
-    stretched = _pic["stretched"]
+    _stretched = _pic["stretched"]
     lipsync_report = _pic["lipsync_report"]
     broll_edit_report = _pic["broll_edit_report"]
     broll_edit_report_sha256 = _pic["broll_edit_report_sha256"]
     title_text = _pic["title_text"]
-    end_text = _pic["end_text"]
-    title_mp4 = _pic["title_mp4"]
-    end_mp4 = _pic["end_mp4"]
+    _end_text = _pic["end_text"]
+    _title_mp4 = _pic["title_mp4"]
+    _end_mp4 = _pic["end_mp4"]
     title_dur = _pic["title_dur"]
     end_dur = _pic["end_dur"]
     silent = _pic["silent"]
@@ -413,9 +371,9 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
     story_intents = _pic["story_intents"]
     default_intent = _pic["default_intent"]
     full_join_intents = _pic["full_join_intents"]
-    full_join_styles = _pic["full_join_styles"]
-    full_join_use_ts = _pic["full_join_use_ts"]
-    transition_style = _pic["transition_style"]
+    _full_join_styles = _pic["full_join_styles"]
+    _full_join_use_ts = _pic["full_join_use_ts"]
+    _transition_style = _pic["transition_style"]
     xfade_plan = _pic["xfade_plan"]
 
     # 5) Narration + native tracks (leaf: final.stages_voice_timeline)
@@ -437,8 +395,8 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
     total_dur = _vo["total_dur"]
     native_track = _vo["native_track"]
     active_transition = _vo["active_transition"]
-    audio_join_intents = _vo["audio_join_intents"]
-    segs_durs = _vo["segs_durs"]
+    _audio_join_intents = _vo["audio_join_intents"]
+    _segs_durs = _vo["segs_durs"]
 
     # 6a) Audio prep: spotting / timeline / scene stems (leaf: final.stages_audio_prep)
     from final.stages_audio_prep import prepare_audio_mix_context
@@ -471,16 +429,16 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
     mix_spotting = _prep["mix_spotting"]
     shot_start_map = _prep["shot_start_map"]
     shot_end_map = _prep["shot_end_map"]
-    shot_duration_map = _prep["shot_duration_map"]
+    _shot_duration_map = _prep["shot_duration_map"]
     audio_timeline_path = _prep["audio_timeline_path"]
     formal_timeline = _prep["formal_timeline"]
     formal_silence_windows = _prep["formal_silence_windows"]
-    event_voice_stem = _prep["event_voice_stem"]
+    _event_voice_stem = _prep["event_voice_stem"]
     use_event_tts = _prep["use_event_tts"]
     voice_cat = _prep["voice_cat"]
     scene_sound_path = _prep["scene_sound_path"]
     ambience_path = _prep["ambience_path"]
-    scene_sound = _prep["scene_sound"]
+    _scene_sound = _prep["scene_sound"]
     ambience_volume = _prep["ambience_volume"]
     sound_plan = _prep["sound_plan"]
     shot_dicts = _prep["shot_dicts"]
@@ -559,7 +517,7 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
     sfx_stereo_path = bed["sfx_stereo_path"]
     license_note = bed["license_note"]
     mix_spotting = bed["mix_spotting"]
-    music_resolved = bed["music_resolved"]
+    _music_resolved = bed["music_resolved"]
     bgm_source_receipt = bed["bgm_source_receipt"]
     mood = bed["mood"]
 
@@ -603,8 +561,8 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
     filters_help = _mix["filters_help"]
     preserved_native_shots = _mix["preserved_native_shots"]
     suppressed_native_shots = _mix["suppressed_native_shots"]
-    use_color = _mix["use_color"]
-    mix_sample_rate = _mix["mix_sample_rate"]
+    _use_color = _mix["use_color"]
+    _mix_sample_rate = _mix["mix_sample_rate"]
 
     # 8) Subtitle cues + SRT + optional PIL burn (leaf: final.stages_subs)
     from final.stages_subs import materialize_subs_stage
@@ -634,7 +592,7 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
     )
     cues = _subs["cues"]
     film_tl = _subs["film_tl"]
-    event_caption_bindings = _subs["event_caption_bindings"]
+    _event_caption_bindings = _subs["event_caption_bindings"]
     srt_path = _subs["srt_path"]
     srt_stable = _subs["srt_stable"]
     video_subbed = _subs["video_subbed"]
@@ -644,7 +602,7 @@ def render_final(args: argparse.Namespace) -> dict[str, Any]:
     from final.stages_mux_manifest import mux_final_mp4, verify_final_streams
 
     mux_final_mp4(video_subbed=video_subbed, mixed=mixed, final_path=final_path, run=run)
-    streams = verify_final_streams(
+    _streams = verify_final_streams(
         final_path=final_path,
         audio_timeline_v1=bool(spec.get("audio_timeline_v1", False)),
         run=run,

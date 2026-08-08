@@ -514,11 +514,7 @@ def sync_post_plan(
         try:
             pp, created = ensure_post_plan(base, owner=owner)
             # ensure_post_plan won't overwrite; if created with wrong default owner via race, rewrite
-            if created and pp.get("post_owner") != owner:
-                plan_obj = new_post_plan(base, owner=owner, edl_path=edl_path)
-                write_post_plan(base, plan_obj, force=True)
-                pp = plan_obj
-            elif created and edl_path and not (pp.get("editorial") or {}).get("edl"):
+            if created and pp.get("post_owner") != owner or created and edl_path and not (pp.get("editorial") or {}).get("edl"):
                 plan_obj = new_post_plan(base, owner=owner, edl_path=edl_path)
                 write_post_plan(base, plan_obj, force=True)
                 pp = plan_obj

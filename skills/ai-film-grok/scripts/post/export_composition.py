@@ -10,11 +10,8 @@ from __future__ import annotations
 import argparse
 import html
 import json
-import math
 import os
-import struct
 import tempfile
-import wave
 from pathlib import Path
 from typing import Any
 
@@ -517,15 +514,17 @@ def resolve_layout(package: dict[str, Any], layout: str) -> str:
 
 # W4 peel: pure HTML builders live in export_html (re-export for hard-compat imports)
 from post.export_html import (  # noqa: E402, F401
+    _stage_hf_media,
     build_end_roll_html,
     build_platform_ending_html,
     build_platform_opening_html,
     build_suspense_audio_tags,
     build_title_sequence_html,
+    caption_theme_styles,
     derive_credits_from_spec,
     preset_hf_styles,
+    show_motion_profile,
 )
-
 
 
 def build_title_sequence_tsx(

@@ -6,8 +6,9 @@ Post lipsync remains off — stretch fits silent I2V plate to VO/native clock.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from edit_policy import (
     DEFAULT_TRANSITION_SEC,

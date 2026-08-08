@@ -9,8 +9,9 @@ from __future__ import annotations
 import contextlib
 import os
 import subprocess
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from final.native_audio import primary_native_shot_ids
 
@@ -212,7 +213,6 @@ def run_dual_track_mix_stage(
     from pathlib import Path
 
     from final.errors import RenderError
-    from final.render_defaults import SR
     from logger import log
     from security_policy import SecurityPolicyError, atomic_write_text, safe_output_path
     from sound_plan import (

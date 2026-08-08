@@ -218,9 +218,5 @@ def safe_project_live(root: Path | str, **kw: Any) -> dict[str, Any]:
 
 # Re-export director-live API (implementation in director_live_ext)
 from web.director_live_ext import (  # noqa: E402
-    attach_console_url_to_dispatch,
     project_director_live,
-    project_events_tail,
-    project_human_inbox,
-    session_meta,
 )

@@ -24,6 +24,7 @@ from film_spec_profile import (
     resolve_i2v_profile,
 )
 from plan.film_spec_lints import FilmSpecError
+
 try:
     from plan.film_spec_constants import *  # noqa: F403
 except ImportError:  # pragma: no cover
@@ -359,9 +360,6 @@ def apply_provider_and_transition_defaults(spec: dict[str, Any]) -> None:
     # the voice-coupled strategy cannot turn an implicit global default into an
     # authored 0.40s hold just because one join is a mood_hold.
     transition_sec_authored = "transition_sec" in spec and spec.get("transition_sec") is not None
-    edit_craft_authored = isinstance(spec.get("edit_craft"), list) or isinstance(
-        spec.get("edit_crafts"), list
-    )
     if not transition_sec_authored:
         spec["transition_sec"] = DEFAULT_TRANSITION_SEC
     try:

@@ -10,24 +10,20 @@ Structure-only peel of render_final stage 1. Preserves:
 from __future__ import annotations
 
 import os
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from audio_cues import AudioCueError, strict_tts_text
 from final.caption_text import caption_text_for_shot, split_units, spoken_text_for_shot
 from final.errors import RenderError
 from final.media_ops import run
 from final.native_audio import (
-    dialogue_lane_suppresses_native,
-    dialogue_lane_tts_mix_gain,
-    native_dialogue_replaced_by_post_tts,
-    resolve_dialogue_audio_lane,
     resolve_native_audio_gain,
 )
 from final.render_defaults import DEFAULT_SUB_MAX_CHARS, SR
 from final.render_helpers import coerce_optional_float, resolve_plate_slot_sec
 from final.voice import (
-    normalize_cast_tts_backends,
     tts_backend_for_shot,
     validate_voice_language_locks,
     voice_for_shot,

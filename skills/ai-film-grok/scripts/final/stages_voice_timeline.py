@@ -6,8 +6,9 @@ Structure-only; no mix policy retune.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from final.errors import RenderError
 from final.media_ops import concat_audio_segments, pdur, run

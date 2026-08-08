@@ -2391,7 +2391,8 @@ def _ship_prep_draft_plans(root: Path, steps: list[dict[str, Any]], write: bool)
         )
 
     try:
-        from edit_director import draft_and_save, plan_path as ed_plan_path
+        from edit_director import draft_and_save
+        from edit_director import plan_path as ed_plan_path
 
         ed_path = ed_plan_path(root)
         has_ed = ed_path.is_file()

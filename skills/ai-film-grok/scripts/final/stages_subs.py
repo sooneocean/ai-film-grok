@@ -7,8 +7,9 @@ visible captions); burn is explicit FFmpeg compatibility path.
 from __future__ import annotations
 
 import shutil
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from final.caption_text import build_subtitle_cues_for_shots, write_srt
 from final.cards import sub_png

@@ -6,13 +6,13 @@ Official plate/master classification remains stages_official_finalize.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from final.errors import RenderError
 from final.manifest import build_final_film_manifest_entry
 from final.media_ops import pdur
-from logger import log
 from media_qa import MediaQAError, analyze_media
 from security_policy import SecurityPolicyError, safe_output_path
 from transition_ops import TransitionOperationError, bind_transition_operations_to_timeline

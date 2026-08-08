@@ -86,6 +86,8 @@ def _stage_hf_media(
     """Copy media into compose/hyperframes/media/ (HF requires in-project root-relative paths)."""
     import shutil
 
+    from post.export_composition import ComposeExportError
+
     media_dir = hf_dir / "media"
     media_dir.mkdir(parents=True, exist_ok=True)
     src = (film_root / media_rel).resolve()

@@ -12,9 +12,10 @@ render_final as an escape hatch only — not expanded by this module.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from final.native_audio import (
     dialogue_lane_suppresses_native,

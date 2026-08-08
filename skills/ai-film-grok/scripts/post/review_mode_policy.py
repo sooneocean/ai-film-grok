@@ -223,7 +223,7 @@ def assert_review_advance_allowed(
         b = str(bid or "").lower()
         if not boundary_key:
             return False
-        if b == boundary_key or b.endswith(":" + boundary_token) or b == boundary_token:
+        if b in (boundary_key, boundary_token) or b.endswith(":" + boundary_token):
             return True
         if boundary_token in {"final", "review-final", "export", "export-desktop"} and b == "final":
             return True

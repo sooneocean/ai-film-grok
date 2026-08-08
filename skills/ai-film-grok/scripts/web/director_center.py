@@ -1,7 +1,7 @@
 """Director command center CLI: open/status/stop/wait."""
 from __future__ import annotations
 
-import argparse
+import contextlib
 import os
 import subprocess
 import time
@@ -97,10 +97,8 @@ def open_center(root, *, port=0, open_browser=True, wait_seconds=12.0):
         time.sleep(0.15)
     log_fh.close()
     if not meta:
-        try:
+        with contextlib.suppress(OSError):
             proc.kill()
-        except OSError:
-            pass
         raise DirectorCenterError(f"review-ui session not ready; see {log_path}")
     url = str(meta["url"])
     if open_browser:

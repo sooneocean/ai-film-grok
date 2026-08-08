@@ -19,29 +19,19 @@ from continuity import (
 )
 from continuity_chain import is_long_form
 from dialogue_contracts import summarize_dialogue_contracts
-from framing_lint import lint_composition_rules, lint_framing_iron, lint_vertical_safe_area
 from edit_policy import lint_character_stance
+from framing_lint import lint_composition_rules, lint_framing_iron, lint_vertical_safe_area
+from narrative_timeline import (
+    NarrativeTimelineError,
+    validate_linear_narration,
+    validate_sfx_scene_bindings,
+)
 from plan.film_spec_lints import (
     FilmSpecError,
     lint_director_board,
     lint_performance,
 )
 from rhythm import lint_rhythm
-from narrative_timeline import (
-    NarrativeTimelineError,
-    validate_linear_narration,
-    validate_sfx_scene_bindings,
-)
-
-try:
-    from dialogue_speaker_frame_gate import lint_dialogue_speaker_frame
-except ImportError:  # pragma: no cover
-    from narrative.dialogue_speaker_frame_gate import lint_dialogue_speaker_frame  # type: ignore
-
-try:
-    from dramatic_meaning import lint_dramatic_meaning
-except ImportError:  # pragma: no cover
-    from plan.dramatic_meaning import lint_dramatic_meaning  # type: ignore
 
 
 def apply_soft_production_gates(

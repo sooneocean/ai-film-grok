@@ -213,10 +213,8 @@ def cmd_final(args: argparse.Namespace) -> int:
             "final: skipping require_current_canonical_truth "
             "(--skip-canonical-truth or AIFILM_SKIP_CANONICAL_TRUTH)"
         )
-        try:
+        with contextlib.suppress(Exception):
             write_skip_canonical_truth_receipt(root, skip_contract)
-        except Exception:  # noqa: BLE001
-            pass
     post_engine = str(getattr(args, "post_engine", "hyperframes") or "hyperframes").strip().lower()
     # R2 · edit-director plan supplies defaults when CLI did not pin route
     # R5 · desk gate: auto draft/apply; hard on post_route_mismatch (skippable)
@@ -279,7 +277,7 @@ def cmd_final(args: argparse.Namespace) -> int:
     if (root / "post-plan.json").is_file():
         sys.path.insert(0, str(skill_dir / "scripts"))
         try:
-            from post_plan import PostPlanError, load_post_plan, record_render_evidence
+            from post_plan import PostPlanError, load_post_plan
 
             post_plan = load_post_plan(root, required=True)
             if post_engine != post_plan["post_owner"]:
@@ -590,8 +588,6 @@ def cmd_final(args: argparse.Namespace) -> int:
                     ],
                 }
             emit(_attach_edit_director_gate(out_obj))
-        elif proc.stdout:
-            print(proc.stdout)
         return 0
 
     if post_engine in {"hyperframes", "remotion"}:
@@ -640,8 +636,9 @@ def _dispatch_designed_post(
             patch_delivery_burned_in,
             write_stages_receipt,
         )
+        from post_plan import PostPlanError, record_render_evidence
     except ImportError as exc:
-        raise FilmError(f"Cannot import compose_render/final_stages: {exc}") from exc
+        raise FilmError(f"Cannot import compose_render/final_stages/post_plan: {exc}") from exc
 
     if post_engine == "hyperframes":
         tooling = probe_designed_post_tooling()
