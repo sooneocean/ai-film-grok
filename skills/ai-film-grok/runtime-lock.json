@@ -3218,7 +3218,7 @@
     },
     {
       "path": "scripts/spine/dispatch.py",
-      "sha256": "a3f5c551078cc0cd0e93af774e276c48089956dc35b017ac5c6ed06b21540a72"
+      "sha256": "65f254f3b64dc605dcb63d83b98d92924a9c7912f2b0dc54af5fb155157cd22b"
     },
     {
       "path": "scripts/spine/dispatch_compact.py",

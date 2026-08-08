@@ -260,107 +260,7 @@ def _cached_packet_is_reusable(
     return cached_at > 0 and time.time() - cached_at <= ttl_sec
 
 
-def build_dispatch(
-    root: Path,
-    *,
-    gates: dict[str, Any] | None = None,
-    open_reshoot_count: int = 0,
-    include_capability: bool = True,
-    write_receipt: bool = True,
-    refresh_capability: bool = False,
-    use_state_cache: bool = True,
-) -> dict[str, Any]:
-    """Assemble auto-dispatch packet for agent orchestration."""
-    started = time.perf_counter()
-    root = Path(root).expanduser().resolve()
-    scripts = skill_scripts()
-    if str(scripts) not in sys.path:
-        sys.path.insert(0, str(scripts))
-
-    from dispatch_compact import compute_state_hash
-    from scene_sound import reconcile as reconcile_scene_sound
-
-    gates = gates or {}
-    scene_sound = reconcile_scene_sound(root, write=write_receipt)
-    state_hash = compute_state_hash(
-        root,
-        gates=gates,
-        open_reshoot_count=open_reshoot_count,
-    )
-    receipt_path = root / "receipts" / "dispatch.json"
-    previous = read_json(receipt_path) if use_state_cache else None
-    if (
-        isinstance(previous, dict)
-        and _cached_packet_is_reusable(
-            previous,
-            state_hash=state_hash,
-            include_capability=include_capability,
-            refresh_capability=refresh_capability,
-        )
-        and "weapon_route" in previous
-    ):
-        packet = dict(previous)
-        packet["scene_sound"] = scene_sound
-        packet["at"] = datetime.now(UTC).replace(microsecond=0).isoformat()
-        packet["metrics"] = {
-            "build_elapsed_ms": round((time.perf_counter() - started) * 1000, 3),
-            "state_cache_hit": True,
-            "capability_cache_hit": bool((packet.get("capability_cache") or {}).get("hit", True)),
-        }
-        if write_receipt:
-            write_json(receipt_path, packet)
-            packet["receipt_path"] = str(receipt_path)
-        return packet
-
-    from craft_spine import craft_status_report, detect_craft_stage
-    from narrative_control import control_status
-    from next_actions import build_next_actions, detect_pipeline_stage
-    from production_evidence import build_evidence
-
-    craft_report = craft_status_report(root, gates=gates)
-    craft = craft_report.get("craft") or detect_craft_stage(root, gates=gates)
-    pipeline = detect_pipeline_stage(root, gates=gates, open_reshoot_count=open_reshoot_count)
-    actions = build_next_actions(root, gates=gates, open_reshoot_count=open_reshoot_count)
-
-    # Craft-first prepends (soft routing — before bulk tool steps)
-    r = str(root)
-    craft_stage = str(craft.get("craft_stage") or "idea")
-    prepend: list[dict[str, str]] = []
-
-    def pre(aid: str, cmd: str, why: str, stage: str = "agent") -> None:
-        prepend.append(
-            {
-                "id": aid,
-                "cmd": cmd,
-                "why": why,
-                "stage": stage,
-                "stage_label": stage,
-                "source": "craft_dispatch",
-            }
-        )
-
-    # C4: read film-spec / manifest once on this hot path (reuse below).
-    spec_for_routing = read_json(root / "film-spec.json") or {}
-    manifest_cache: dict[str, Any] | None = None
-
-    def _manifest() -> dict[str, Any]:
-        nonlocal manifest_cache
-        if manifest_cache is None:
-            raw = read_json(root / "manifest.json") or {}
-            manifest_cache = raw if isinstance(raw, dict) else {}
-        return manifest_cache
-    routed_shots = (
-        spec_for_routing.get("shots") if isinstance(spec_for_routing.get("shots"), list) else []
-    )
-    shots_are_timed = bool(routed_shots) and all(
-        isinstance(shot, dict)
-        and str(shot.get("id") or shot.get("shot_id") or "").strip()
-        and isinstance(shot.get("duration_sec"), (int, float))
-        and not isinstance(shot.get("duration_sec"), bool)
-        and float(shot["duration_sec"]) > 0
-        for shot in routed_shots
-    )
-    scene_sound_is_due = bool(shots_are_timed and spec_for_routing.get("audio_timeline_v1"))
+def _attach_craft_prepends(_manifest, actions, craft_stage, gates, pre, r, root, scene_sound, scene_sound_is_due) -> tuple[Any]:
     if scene_sound_is_due and scene_sound.get("status") != "ok":
         summary = scene_sound.get("summary") or {}
         pre(
@@ -524,8 +424,10 @@ def build_dispatch(
             "片頭片尾：final 會自動讀取 film-spec 的 title_sequence / end_roll（預設 minimal + 完）",
             "post",
         )
+    return i2v_profile
 
-    # Merge: prepend craft items not already covered by same id
+
+def _collect_narrative_workflow(control_status, gates, pre, r, root) -> tuple[Any, Any]:
     narrative = control_status(root)
     from workflow_spine import build_workflow_status
 
@@ -610,6 +512,10 @@ def build_dispatch(
                     "Professional 10/11：剪辑总监 status → apply/run 后再母版",
                     "post",
                 )
+    return narrative, workflow
+
+
+def _attach_plate_preflight(_manifest, build_evidence, craft_stage, gates, pre, r, root, spec_for_routing) -> tuple[Any, Any, Any, Any]:
     evidence = build_evidence(root)
     evidence_gate = bool(evidence.get("ready_for_bulk"))
     if craft_stage in {"media", "rough", "verified"} and not evidence_gate:
@@ -771,15 +677,10 @@ def build_dispatch(
                 "final 已齐但尚无 film-core-closeout — closeout status 会写 advisory 审计",
                 "post",
             )
-    quality = _quality_summary(root)
-    if quality["failed_count"]:
-        pre(
-            "quality-gate-repair",
-            f'aifilm preflight --root "{r}"',
-            quality["next_action"]
-            or "quality gate failed; inspect receipts/quality before regeneration",
-            "visual",
-        )
+    return evidence, freshness, post_audit, post_audit_gate
+
+
+def _collect_narrative_lock(narrative, pre, r, receipt_path, root) -> tuple[Any, Any]:
     narrative_action_id: str | None = None
     if narrative.get("canonical") and not narrative.get("ready_for_media"):
         semantic = narrative.get("semantic") or {}
@@ -836,23 +737,10 @@ def build_dispatch(
                 ),
                 "visual",
             )
-    existing_ids = {a.get("id") for a in actions}
-    merged: list[dict[str, str]] = []
-    for p in prepend:
-        if p["id"] not in existing_ids:
-            merged.append(p)
-    if narrative_action_id:
-        merged.sort(key=lambda item: 0 if item.get("id") == narrative_action_id else 1)
-    merged.extend(actions)
-    # de-dupe by id keep first
-    seen: set[str] = set()
-    unique: list[dict[str, str]] = []
-    for a in merged:
-        aid = str(a.get("id") or "")
-        if aid in seen:
-            continue
-        seen.add(aid)
-        unique.append(a)
+    return narrative_action_id, receipt_path
+
+
+def _select_priorities(i2v_profile, include_capability, r, refresh_capability, root, unique, workflow, write_receipt) -> tuple[Any, Any, Any, Any]:
     from workflow_spine import prioritize_actions, professional_stage_actions
 
     actions = prioritize_actions(workflow, unique)[:10]
@@ -939,20 +827,10 @@ def build_dispatch(
                 "cached_at_epoch": 0,
                 "error": str(exc)[:200],
             }
+    return actions, cap, capability_cache, heat_status
 
-    primary = (
-        actions[0]
-        if workflow.get("mode") == "professional" and actions
-        else next(
-            (action for action in actions if structured_next_action(action) is not None),
-            None,
-        )
-    )
-    next_cmd = (primary or {}).get("cmd")
-    next_id = (primary or {}).get("id")
-    next_why = (primary or {}).get("why")
 
-    # Agent playbook: what to do this turn
+def _build_agent_playbook(actions, cap, craft, craft_stage, gates, heat_status, i2v_profile, next_cmd, next_why, pipeline, quality, r, root) -> tuple[Any]:
     agent_do: list[str] = [
         f"当前工序环 craft={craft_stage}（{craft.get('label_zh')}）",
         f"当前工具层 stage={pipeline.get('stage')}（{pipeline.get('label_zh')}）",
@@ -1046,8 +924,10 @@ def build_dispatch(
         )
     agent_do.append("禁止：自批 pilot、静默改 i2v_provider、Ken Burns 当戏、说书默认 lipsync")
     agent_do.append("用户说「可以/ok/一路做完」才 pilot approve / run_to_completion")
+    return agent_do
 
-    # Fallback routing summary for media + Grok Build native tools
+
+def _build_routing(cap, i2v_profile) -> tuple[Any]:
     if i2v_profile == "ltx23_primary":
         i2v_line = (
             "ltx23_primary (legacy): still=image_edit(cast) · motion=FRW LTX 2.3 → "
@@ -1151,24 +1031,10 @@ def build_dispatch(
         )
         if cap.get("suggested_film_spec_patch"):
             routing["i2v_patch_available"] = cap.get("suggested_film_spec_patch")
+    return routing
 
-    # Collectors above may prepend a stricter action (notably state-index).
-    # Re-select after collection so next_action and weapon routing cannot keep
-    # pointing at a stale bulk action.
-    primary = (
-        actions[0]
-        if workflow.get("mode") == "professional" and actions
-        else next(
-            (action for action in actions if structured_next_action(action) is not None),
-            None,
-        )
-    )
-    next_cmd = (primary or {}).get("cmd")
-    next_id = (primary or {}).get("id")
-    next_why = (primary or {}).get("why")
-    agent_do.append(f"最终 next_action={next_id or 'none'}：{next_why or '—'}")
 
-    # Phase 1+2: Vertical Drama Graph + Execution jobs summary (non-breaking)
+def _collect_graph_jobs_context(agent_do, craft_stage, primary, root, workflow) -> tuple[Any, Any, Any, Any, Any, Any]:
     graph_digest: dict[str, Any] | None = None
     jobs_summary: dict[str, Any] | None = None
     try:
@@ -1266,6 +1132,10 @@ def build_dispatch(
         )
     except (FileNotFoundError, ValueError):
         pass
+    return context_digest, execution_plan_digest, graph_digest, jobs_summary, primary_job, weapon_route
+
+
+def _bind_next_action(agent_do, compute_state_hash, gates, open_reshoot_count, primary, primary_job, root) -> tuple[Any, Any, Any, Any, Any, Any]:
     action_context = {
         "node_refs": [primary_job.get("nodeRef")]
         if isinstance(primary_job, dict) and primary_job.get("nodeRef")
@@ -1346,7 +1216,10 @@ def build_dispatch(
             "error": str(exc)[:160],
             "line": "generation_ready skipped",
         }
+    return department_handoff, generation_ready, generation_usage, next_action, responsibility, state_hash
 
+
+def _stage_route_catalog(craft_stage, next_id, pipeline) -> tuple[Any, Any]:
     stage_proj = project_stages(
         craft_stage=craft_stage,
         pipeline_stage=str(pipeline.get("stage") or "agent"),
@@ -1361,7 +1234,10 @@ def build_dispatch(
                 route_catalog_id = f"cli:{route_catalog_id}"
     except Exception:
         pass
+    return route_catalog_id, stage_proj
 
+
+def _assemble_packet(actions, agent_do, cap, capability_cache, context_digest, craft, craft_report, craft_stage, department_handoff, evidence, execution_plan_digest, freshness, generation_ready, generation_usage, graph_digest, heat_status, jobs_summary, narrative, next_action, next_cmd, next_id, next_why, pipeline, post_audit, post_audit_gate, quality, receipt_path, responsibility, root, route_catalog_id, routing, scene_sound, stage_proj, started, state_hash, weapon_route, workflow, write_receipt) -> tuple[Any]:
     packet = {
         "ok": True,
         "kind": "ai-film-dispatch",
@@ -1540,5 +1416,214 @@ def build_dispatch(
             )
         except OSError:
             pass
+    return packet
+
+
+def build_dispatch(
+    root: Path,
+    *,
+    gates: dict[str, Any] | None = None,
+    open_reshoot_count: int = 0,
+    include_capability: bool = True,
+    write_receipt: bool = True,
+    refresh_capability: bool = False,
+    use_state_cache: bool = True,
+) -> dict[str, Any]:
+    """Assemble auto-dispatch packet for agent orchestration."""
+
+    started = time.perf_counter()
+
+    root = Path(root).expanduser().resolve()
+
+    scripts = skill_scripts()
+
+    if str(scripts) not in sys.path:
+        sys.path.insert(0, str(scripts))
+
+    from dispatch_compact import compute_state_hash
+    from scene_sound import reconcile as reconcile_scene_sound
+
+    gates = gates or {}
+
+    scene_sound = reconcile_scene_sound(root, write=write_receipt)
+
+    state_hash = compute_state_hash(
+        root,
+        gates=gates,
+        open_reshoot_count=open_reshoot_count,
+    )
+
+    receipt_path = root / "receipts" / "dispatch.json"
+
+    previous = read_json(receipt_path) if use_state_cache else None
+
+    if (
+        isinstance(previous, dict)
+        and _cached_packet_is_reusable(
+            previous,
+            state_hash=state_hash,
+            include_capability=include_capability,
+            refresh_capability=refresh_capability,
+        )
+        and "weapon_route" in previous
+    ):
+        packet = dict(previous)
+        packet["scene_sound"] = scene_sound
+        packet["at"] = datetime.now(UTC).replace(microsecond=0).isoformat()
+        packet["metrics"] = {
+            "build_elapsed_ms": round((time.perf_counter() - started) * 1000, 3),
+            "state_cache_hit": True,
+            "capability_cache_hit": bool((packet.get("capability_cache") or {}).get("hit", True)),
+        }
+        if write_receipt:
+            write_json(receipt_path, packet)
+            packet["receipt_path"] = str(receipt_path)
+        return packet
+
+    from craft_spine import craft_status_report, detect_craft_stage
+    from narrative_control import control_status
+    from next_actions import build_next_actions, detect_pipeline_stage
+    from production_evidence import build_evidence
+
+    craft_report = craft_status_report(root, gates=gates)
+
+    craft = craft_report.get("craft") or detect_craft_stage(root, gates=gates)
+
+    pipeline = detect_pipeline_stage(root, gates=gates, open_reshoot_count=open_reshoot_count)
+
+    actions = build_next_actions(root, gates=gates, open_reshoot_count=open_reshoot_count)
+
+    r = str(root)
+
+    craft_stage = str(craft.get("craft_stage") or "idea")
+
+    prepend: list[dict[str, str]] = []
+
+    def pre(aid: str, cmd: str, why: str, stage: str = "agent") -> None:
+        prepend.append(
+            {
+                "id": aid,
+                "cmd": cmd,
+                "why": why,
+                "stage": stage,
+                "stage_label": stage,
+                "source": "craft_dispatch",
+            }
+        )
+
+    spec_for_routing = read_json(root / "film-spec.json") or {}
+
+    manifest_cache: dict[str, Any] | None = None
+
+    def _manifest() -> dict[str, Any]:
+        nonlocal manifest_cache
+        if manifest_cache is None:
+            raw = read_json(root / "manifest.json") or {}
+            manifest_cache = raw if isinstance(raw, dict) else {}
+        return manifest_cache
+
+    routed_shots = (
+        spec_for_routing.get("shots") if isinstance(spec_for_routing.get("shots"), list) else []
+    )
+
+    shots_are_timed = bool(routed_shots) and all(
+        isinstance(shot, dict)
+        and str(shot.get("id") or shot.get("shot_id") or "").strip()
+        and isinstance(shot.get("duration_sec"), (int, float))
+        and not isinstance(shot.get("duration_sec"), bool)
+        and float(shot["duration_sec"]) > 0
+        for shot in routed_shots
+    )
+
+    scene_sound_is_due = bool(shots_are_timed and spec_for_routing.get("audio_timeline_v1"))
+
+    i2v_profile = _attach_craft_prepends(_manifest, actions, craft_stage, gates, pre, r, root, scene_sound, scene_sound_is_due)
+
+    narrative, workflow = _collect_narrative_workflow(control_status, gates, pre, r, root)
+
+    evidence, freshness, post_audit, post_audit_gate = _attach_plate_preflight(_manifest, build_evidence, craft_stage, gates, pre, r, root, spec_for_routing)
+
+    quality = _quality_summary(root)
+
+    if quality["failed_count"]:
+        pre(
+            "quality-gate-repair",
+            f'aifilm preflight --root "{r}"',
+            quality["next_action"]
+            or "quality gate failed; inspect receipts/quality before regeneration",
+            "visual",
+        )
+
+    narrative_action_id, receipt_path = _collect_narrative_lock(narrative, pre, r, receipt_path, root)
+
+    existing_ids = {a.get("id") for a in actions}
+
+    merged: list[dict[str, str]] = []
+
+    for p in prepend:
+        if p["id"] not in existing_ids:
+            merged.append(p)
+
+    if narrative_action_id:
+        merged.sort(key=lambda item: 0 if item.get("id") == narrative_action_id else 1)
+
+    merged.extend(actions)
+
+    seen: set[str] = set()
+
+    unique: list[dict[str, str]] = []
+
+    for a in merged:
+        aid = str(a.get("id") or "")
+        if aid in seen:
+            continue
+        seen.add(aid)
+        unique.append(a)
+
+    actions, cap, capability_cache, heat_status = _select_priorities(i2v_profile, include_capability, r, refresh_capability, root, unique, workflow, write_receipt)
+
+    primary = (
+        actions[0]
+        if workflow.get("mode") == "professional" and actions
+        else next(
+            (action for action in actions if structured_next_action(action) is not None),
+            None,
+        )
+    )
+
+    next_cmd = (primary or {}).get("cmd")
+
+    next_id = (primary or {}).get("id")
+
+    next_why = (primary or {}).get("why")
+
+    agent_do = _build_agent_playbook(actions, cap, craft, craft_stage, gates, heat_status, i2v_profile, next_cmd, next_why, pipeline, quality, r, root)
+
+    routing = _build_routing(cap, i2v_profile)
+
+    primary = (
+        actions[0]
+        if workflow.get("mode") == "professional" and actions
+        else next(
+            (action for action in actions if structured_next_action(action) is not None),
+            None,
+        )
+    )
+
+    next_cmd = (primary or {}).get("cmd")
+
+    next_id = (primary or {}).get("id")
+
+    next_why = (primary or {}).get("why")
+
+    agent_do.append(f"最终 next_action={next_id or 'none'}：{next_why or '—'}")
+
+    context_digest, execution_plan_digest, graph_digest, jobs_summary, primary_job, weapon_route = _collect_graph_jobs_context(agent_do, craft_stage, primary, root, workflow)
+
+    department_handoff, generation_ready, generation_usage, next_action, responsibility, state_hash = _bind_next_action(agent_do, compute_state_hash, gates, open_reshoot_count, primary, primary_job, root)
+
+    route_catalog_id, stage_proj = _stage_route_catalog(craft_stage, next_id, pipeline)
+
+    packet = _assemble_packet(actions, agent_do, cap, capability_cache, context_digest, craft, craft_report, craft_stage, department_handoff, evidence, execution_plan_digest, freshness, generation_ready, generation_usage, graph_digest, heat_status, jobs_summary, narrative, next_action, next_cmd, next_id, next_why, pipeline, post_audit, post_audit_gate, quality, receipt_path, responsibility, root, route_catalog_id, routing, scene_sound, stage_proj, started, state_hash, weapon_route, workflow, write_receipt)
 
     return packet
