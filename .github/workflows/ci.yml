@@ -239,6 +239,13 @@ jobs:
         working-directory: skills/ai-film-grok
         run: python -m pytest tests/ -q --tb=short -m console
 
+      # H3.4 · live console smoke = the H3.1 POST /api/select shape gate.
+      # Runs from repo root (make target resolves the skill path itself) and
+      # drives the real localhost server, so a backend key/type drift in the
+      # select response breaks this required job — not just the unit tests.
+      - name: Live console smoke (H3.1 shape gate)
+        run: make smoke-console
+
   # Full suite: hard gate once green on main
   test-full:
     runs-on: ubuntu-latest

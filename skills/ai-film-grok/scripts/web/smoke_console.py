@@ -45,6 +45,31 @@ ROOT = Path(__file__).resolve().parents[4]
 LAUNCHER = ROOT / "skills" / "ai-film-grok" / "scripts" / "aifilm"
 
 
+def _assert_select_shape(sel, label, check):
+    """H3.1: lock POST /api/select response shape (key + type only, never values).
+
+    console.html's pick() reads ``res.revision``, ``res.canonical_binding.bound``
+    and ``res.manifest_binding.bound``. If the backend renames/removes any of
+    those fields the gate goes red — preventing a silent UI break.
+
+    ``manifest_binding`` is ``None`` for non-shot kinds (asset_picker returns
+    ``None`` there), so it is allowed to be ``None``; for shot selects it must be
+    a dict carrying ``bound: bool``.
+    """
+    if not isinstance(sel, dict):
+        check(f"POST /api/select shape (H3.1) [{label}]", False, f"resp-not-dict:{type(sel).__name__}")
+        return
+    cb = sel.get("canonical_binding")
+    mb = sel.get("manifest_binding")
+    ok = (
+        isinstance(sel.get("revision"), int)
+        and isinstance(cb, dict)
+        and isinstance(cb.get("bound"), bool)
+        and (mb is None or (isinstance(mb, dict) and isinstance(mb.get("bound"), bool)))
+    )
+    check(f"POST /api/select shape (H3.1) [{label}]", ok, f"keys={sorted(sel.keys())}")
+
+
 def setup_film_root() -> Path:
     tmp = Path(tempfile.mkdtemp(prefix="aifilm-console-smoke-"))
     (tmp / "receipts").mkdir()
@@ -318,7 +343,10 @@ def main() -> int:
             token=token,
             body={"kind": "voice", "asset_id": "f", "expected_revision": 0},
         )
-        rev = json.loads(body).get("revision") if st == 200 else None
+        sel = json.loads(body) if st == 200 else {}
+        if st == 200:
+            _assert_select_shape(sel, "voice-f", check)
+        rev = sel.get("revision") if st == 200 else None
         check("POST /api/select (voice) 200", st == 200 and rev == 1, f"status={st} rev={rev}")
         st, body = req(
             conn,
@@ -515,23 +543,12 @@ def main() -> int:
             body={"kind": "voice", "asset_id": "male_lead", "expected_revision": r0},
         )
         sel = json.loads(body) if st == 200 else {}
-        # S2: permanent POST /api/select response shape (console.html reads these)
-        select_shape_ok = (
-            isinstance(sel.get("revision"), int)
-            and "canonical_binding" in sel
-            and isinstance(sel.get("canonical_binding"), dict)
-            and "bound" in sel["canonical_binding"]
-            and "manifest_binding" in sel
-        )
+        if st == 200:
+            _assert_select_shape(sel, "voice-male_lead", check)
         check(
             "UI-flow: voice select 200 + revision bump",
             st == 200 and sel.get("revision") == r0 + 1,
             f"status={st} rev={sel.get('revision')}",
-        )
-        check(
-            "POST /api/select response shape (revision+bindings)",
-            st == 200 and select_shape_ok,
-            f"keys={sorted(sel.keys()) if isinstance(sel, dict) else type(sel)}",
         )
         st1, r1, state1 = get_state()
         recent_voice = [
@@ -559,6 +576,8 @@ def main() -> int:
             body={"kind": "character", "asset_id": "c1", "expected_revision": r1},
         )
         sel = json.loads(body) if st == 200 else {}
+        if st == 200:
+            _assert_select_shape(sel, "character-c1", check)
         canon = sel.get("canonical_binding", {}) if isinstance(sel, dict) else {}
         reg = (
             json.loads((film_root / "assets.json").read_text(encoding="utf-8"))
@@ -590,6 +609,9 @@ def main() -> int:
             token=token,
             body={"kind": "prop", "asset_id": "p1", "expected_revision": r2},
         )
+        sel = json.loads(body) if st == 200 else {}
+        if st == 200:
+            _assert_select_shape(sel, "prop-p1", check)
         check("UI-flow: prop select 200", st == 200, f"status={st}")
         st3, r3, state3 = get_state()
         check(
@@ -612,6 +634,9 @@ def main() -> int:
                 token=token,
                 body={"kind": "bgm", "asset_id": bgm_id, "expected_revision": r3},
             )
+            sel = json.loads(body) if st == 200 else {}
+            if st == 200:
+                _assert_select_shape(sel, "bgm", check)
             check("UI-flow: bgm select 200 (global catalog)", st == 200, f"status={st} id={bgm_id}")
         else:
             print("[skip] GET /api/assets?kind=bgm empty (no global approved catalog) — bgm select not driven")

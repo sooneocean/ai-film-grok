@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.41.41] - 2026-08-08
+
+### Hardened (contract · H3 shape-parity CI gates)
+- **H3.1 `POST /api/select` response shape gate**: `scripts/web/smoke_console.py` now asserts every `pick()` response carries `revision`(int), `canonical_binding.bound`(bool), and `manifest_binding`(None for non-shot kinds, else dict with `bound`:bool) — the exact fields `console.html`'s `pick()` reads. Backend key/type drift → live smoke FAILS.
+- **H3.2 `rollup` + per-film `live` shape lock**: `tests/test_web_studio.py::test_studio_live_rollup_keys` asserts `rollup` == exactly `{blocked,failed,reviewable,running,multi_take,inbox}` and every film's `live` key set == `project_director_live` output.
+- **H3.3 `project_director_live` projection shape lock**: `tests/test_web_studio.py::test_projection_shape_parity` asserts the projection's top-level + `dispatch`/`queue`/`gates`/`session` sub-shapes, and that the H1 `safe_project_live` degraded shape keeps the identical key set (prevents silent projection drift).
+- **H3.4 CI wiring**: `make smoke-console` (carries H3.1) added as a step in the `console` job — already a required status check via `merge-gate`. H3.2/H3.3 ride the existing `pytest -m console` in that same job.
+- **Iron rule honored**: shape guards assert key-existence + type only, never business values (no brittleness).
+
 ## [2.41.40] - 2026-08-08
 
 ### Hardened (observability · H2 fail-closed gates + silent-except eradication)

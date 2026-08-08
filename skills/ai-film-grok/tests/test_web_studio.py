@@ -186,6 +186,23 @@ def test_studio_single_mode_shape_and_rejects_select(tmp_path):
 
 ROLLUP_KEYS = {"blocked", "failed", "reviewable", "running", "multi_take", "inbox"}
 
+# H3.2/H3.3: canonical projection shapes (Iron rule: assert key set + type,
+# never business values — so a backend key add/remove goes red in CI).
+PROJECT_LIVE_KEYS = {
+    "kind", "available", "revision", "review_mode",
+    "dispatch", "queue", "human_inbox", "inbox_count", "activity", "gates", "session",
+}
+DISPATCH_KEYS = {
+    "available", "stage_public", "craft_stage", "pipeline_stage",
+    "next_id", "next_cmd", "next_why", "approval_class", "console_url", "copy_cmd", "blocked_by",
+}
+QUEUE_KEYS = {
+    "available", "pending", "running", "reviewable", "failed",
+    "takes_count", "multi_take_shots", "job_counts", "unknown",
+}
+GATES_KEYS = {"blocking", "hard_fail"}
+SESSION_KEYS = {"active", "port", "pid", "url"}
+
 
 def test_build_studio_live_shape(studio_dir):
     d = studio.build_studio_live(studio_dir, active_id="film-a")
@@ -195,7 +212,10 @@ def test_build_studio_live_shape(studio_dir):
     for f in d["films"]:
         assert {"id", "title", "live", "attention"} <= set(f)
         assert isinstance(f["attention"], bool)
-    assert ROLLUP_KEYS <= set(d["rollup"])
+        # H3.2: per-film live shape must match project_director_live's key set
+        assert set(f["live"].keys()) == PROJECT_LIVE_KEYS, set(f["live"].keys()) ^ PROJECT_LIVE_KEYS
+    # H3.2: rollup must be EXACTLY the 6 keys (no drift, none missing)
+    assert set(d["rollup"]) == ROLLUP_KEYS, set(d["rollup"]) ^ ROLLUP_KEYS
     assert "generated_at" in d
 
 
@@ -212,7 +232,10 @@ def test_studio_live_endpoint_aggregates(studio_dir):
         for f in d["films"]:
             assert {"id", "title", "live", "attention"} <= set(f)
             assert isinstance(f["attention"], bool)
-        assert ROLLUP_KEYS <= set(d["rollup"])
+            # H3.2: per-film live shape parity
+            assert set(f["live"].keys()) == PROJECT_LIVE_KEYS, set(f["live"].keys()) ^ PROJECT_LIVE_KEYS
+        # H3.2: rollup exactly the 6 keys
+        assert set(d["rollup"]) == ROLLUP_KEYS, set(d["rollup"]) ^ ROLLUP_KEYS
     finally:
         server.shutdown()
         server.server_close()
@@ -282,3 +305,47 @@ def test_projection_safe_degrade_shape(tmp_path, monkeypatch):
     assert set(degraded.keys()) == set(normal.keys()), (set(degraded.keys()) ^ set(normal.keys()))
     for k in ("dispatch", "queue", "gates", "session"):
         assert set(degraded[k].keys()) == set(normal[k].keys()), k
+
+
+# ---- H3: shape parity (lock key sets so backend renames go red) ----
+
+
+def test_studio_live_rollup_keys(studio_dir):
+    """H3.2: rollup is exactly {blocked,failed,reviewable,running,multi_take,inbox}
+    (no extra, none missing) and every film's live matches project_director_live."""
+    d = studio.build_studio_live(studio_dir, active_id="film-a")
+    assert set(d["rollup"]) == ROLLUP_KEYS, set(d["rollup"]) ^ ROLLUP_KEYS
+    assert len(d["rollup"]) == len(ROLLUP_KEYS)
+    for f in d["films"]:
+        assert f["live"] is not None
+        assert set(f["live"].keys()) == PROJECT_LIVE_KEYS, set(f["live"].keys()) ^ PROJECT_LIVE_KEYS
+
+
+def test_projection_shape_parity(tmp_path, monkeypatch):
+    """H3.3: lock project_director_live output key set against a fixed contract
+    (Iron: add/remove a key => red). Degraded shape keeps the same key set."""
+    import web.projection as proj
+
+    live = proj.project_director_live(tmp_path)
+    assert set(live.keys()) == PROJECT_LIVE_KEYS, set(live.keys()) ^ PROJECT_LIVE_KEYS
+    assert live["kind"] == "director-center-live"
+    assert isinstance(live["available"], bool)
+    assert isinstance(live["revision"], int)
+    assert isinstance(live["human_inbox"], list)
+    assert isinstance(live["activity"], list)
+    assert set(live["dispatch"].keys()) == DISPATCH_KEYS, set(live["dispatch"].keys()) ^ DISPATCH_KEYS
+    assert set(live["queue"].keys()) == QUEUE_KEYS, set(live["queue"].keys()) ^ QUEUE_KEYS
+    assert set(live["gates"].keys()) == GATES_KEYS, set(live["gates"].keys()) ^ GATES_KEYS
+    assert set(live["session"].keys()) == SESSION_KEYS, set(live["session"].keys()) ^ SESSION_KEYS
+
+    def boom(*a, **k):
+        raise RuntimeError("forced projection failure")
+
+    monkeypatch.setattr(proj, "project_director_live", boom)
+    degraded = proj.safe_project_live(tmp_path)
+    assert degraded["available"] is False
+    assert set(degraded.keys()) == PROJECT_LIVE_KEYS
+    assert set(degraded["dispatch"].keys()) == DISPATCH_KEYS
+    assert set(degraded["queue"].keys()) == QUEUE_KEYS
+    assert set(degraded["gates"].keys()) == GATES_KEYS
+    assert set(degraded["session"].keys()) == SESSION_KEYS
