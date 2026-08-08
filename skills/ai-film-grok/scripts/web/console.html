@@ -417,6 +417,7 @@
       <span id="studio-mode-pill" class="pill"><span class="dot s-unknown"></span><span>检查中…</span></span>
     </div>
 
+    <div id="studio-degraded" class="studio-degraded" hidden role="status" aria-live="polite"></div>
     <div id="studio-stats" class="stats"></div>
 
     <div class="panel">
@@ -1674,6 +1675,18 @@ function mergeStudioLive(d, live){
 }
 // ---- W0: live rollup stats + breadcrumb (总控台 › 片名 › 工作台) ----
 function renderStudioLive(live){
+  // H1.4: degraded banner — amber, never blocks the rest of the UI
+  const banner = document.getElementById('studio-degraded');
+  if (banner){
+    if (live && live.degraded){
+      banner.hidden = false;
+      banner.textContent = '⚠ 总控台部分降级：实时聚合异常，已显示兜底空数据（' + esc(String(live.error || 'unknown error')) + '）。其余功能不受影响。';
+      banner.style.cssText = 'margin:0 0 12px;padding:.7rem .9rem;border-radius:10px;background:rgba(245,158,11,.16);border:1px solid rgba(245,158,11,.55);color:#92400e;font-size:.86rem;font-weight:600';
+    } else {
+      banner.hidden = true;
+      banner.textContent = '';
+    }
+  }
   const r = (live && live.rollup) || {};
   const stats = [
     { num: r.blocked || 0, lbl: '需关注(阻塞)', cls: r.blocked ? 'warn' : '' },

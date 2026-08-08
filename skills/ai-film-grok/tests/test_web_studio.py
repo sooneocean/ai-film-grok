@@ -235,3 +235,50 @@ def test_studio_live_single_mode_returns_empty(tmp_path):
     finally:
         server.shutdown()
         server.server_close()
+
+
+# ---- H1: reliability hardening (fail-soft top-level guard + safe_project_live) ----
+
+
+def test_studio_live_top_level_guard_degrades(studio_dir, monkeypatch):
+    # Force the aggregation layer (not per-film) to throw; the public wrapper
+    # must catch it and return a degraded payload instead of raising.
+    def boom(*a, **k):
+        raise RuntimeError("simulated aggregate failure")
+
+    # Server is created first (captures active_film) before we break discovery.
+    server = _server_studio(studio_dir)
+    try:
+        monkeypatch.setattr(studio, "discover_films", boom)
+        d = studio.build_studio_live(studio_dir, active_id="film-a")
+        assert d.get("degraded") is True
+        assert d["films"] == []
+        assert d["active_film_id"] == "film-a"
+        assert set(d["rollup"]) == ROLLUP_KEYS
+        assert isinstance(d["error"], str) and d["error"]
+        # endpoint must still respond 200 + degraded (never 500 the 总控台)
+        st, p = _request(server, "GET", "/api/studio/live")
+        assert st == 200, p
+        j = json.loads(p)
+        assert j.get("degraded") is True
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_projection_safe_degrade_shape(tmp_path, monkeypatch):
+    import web.projection as proj
+
+    # Normal shape from a real projection call (fail-soft internally, never raises).
+    normal = proj.project_director_live(tmp_path)
+    # Force the inner projection to fail -> safe_project_live must degrade with
+    # the EXACT same key set (Iron rule: degraded key set == normal key set).
+    def boom(*a, **k):
+        raise RuntimeError("forced projection failure")
+
+    monkeypatch.setattr(proj, "project_director_live", boom)
+    degraded = proj.safe_project_live(tmp_path)
+    assert degraded["available"] is False
+    assert set(degraded.keys()) == set(normal.keys()), (set(degraded.keys()) ^ set(normal.keys()))
+    for k in ("dispatch", "queue", "gates", "session"):
+        assert set(degraded[k].keys()) == set(normal[k].keys()), k

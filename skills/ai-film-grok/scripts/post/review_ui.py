@@ -343,9 +343,9 @@ def make_handler(root: Path, token: str):
                 return
             if parsed.path == "/api/live":
                 try:
-                    from console_projection import project_director_live
+                    from console_projection import safe_project_live
 
-                    self._json(200, project_director_live(film_root, include_token=False))
+                    self._json(200, safe_project_live(film_root, include_token=False))
                 except Exception as exc:  # noqa: BLE001
                     self._json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
                 return
@@ -497,7 +497,26 @@ def make_handler(root: Path, token: str):
                         payload["studio_mode"] = True
                         self._json(200, payload)
                 except Exception as exc:  # noqa: BLE001
-                    self._json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
+                    # Top-level fail-soft: even an unexpected studio error must
+                    # not 500 the 总控台 — return a degraded 200 instead.
+                    self._json(
+                        200,
+                        {
+                            "studio_mode": True,
+                            "active_film_id": None,
+                            "films": [],
+                            "rollup": {
+                                "blocked": 0,
+                                "failed": 0,
+                                "reviewable": 0,
+                                "running": 0,
+                                "multi_take": 0,
+                                "inbox": 0,
+                            },
+                            "degraded": True,
+                            "error": str(exc),
+                        },
+                    )
                 return
             if parsed.path.startswith("/api/studio/"):
                 self._studio_detail(parsed.path.removeprefix("/api/studio/").strip("/"))

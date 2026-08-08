@@ -23,6 +23,7 @@ media is not versioned.
 from __future__ import annotations
 
 import datetime
+import logging
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -262,17 +263,56 @@ def build_studio_live(
     active_id: str | None = None,
     ttl: float = _STUDIO_LIVE_TTL,
 ) -> dict[str, Any]:
-    """Aggregate live state for every film in the studio.
+    """Aggregate live state for every film in the studio (fail-soft).
 
     Reuses the single live projection (``project_director_live``) — never a
-    second source. Results are cached per-root with a short TTL so the 总控台
-    can poll without rescanning every film each time. Returns::
+    second source. A top-level guard ensures that even if aggregation throws
+    (ThreadPoolExecutor failure, rollup assembly error, bad film roots) the
+    caller gets a deterministic degraded payload (``degraded: True``) instead
+    of an unhandled 500. The degraded shape has the same key set as the normal
+    result so the UI never needs extra null checks.
+    """
+    try:
+        return _build_studio_live_inner(studio_dir, active_id, ttl)
+    except Exception as exc:  # noqa: BLE001 — top-level fail-soft guard for 总控台
+        logging.getLogger("studio.live").warning(
+            "build_studio_live degraded for %s: %s: %s", studio_dir, type(exc).__name__, exc
+        )
+        return {
+            "generated_at": datetime.datetime.fromtimestamp(time.time(), tz=datetime.UTC).isoformat(),
+            "active_film_id": active_id,
+            "films": [],
+            "rollup": {
+                "blocked": 0,
+                "failed": 0,
+                "reviewable": 0,
+                "running": 0,
+                "multi_take": 0,
+                "inbox": 0,
+            },
+            "degraded": True,
+            "error": f"{type(exc).__name__}: {exc}",
+        }
+
+
+def _build_studio_live_inner(
+    studio_dir: Path,
+    active_id: str | None = None,
+    ttl: float = _STUDIO_LIVE_TTL,
+) -> dict[str, Any]:
+    """Aggregate live state for every film in the studio (inner worker).
+
+    See :func:`build_studio_live` for the public contract — this function does
+    the real work while the public wrapper adds the fail-soft top-level guard.
+    Returns::
 
         {
           "generated_at": "<iso8601 utc>",
           "active_film_id": <id or None>,
           "films": [{"id", "title", "live", "attention"}],
           "rollup": {blocked, failed, reviewable, running, multi_take, inbox},
+          "degraded": False,
+          "error": None,
         }
     """
     studio_dir = Path(studio_dir)
@@ -335,6 +375,8 @@ def build_studio_live(
         "active_film_id": active_id,
         "films": films_out,
         "rollup": rollup,
+        "degraded": False,
+        "error": None,
     }
 
 

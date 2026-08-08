@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.41.39] - 2026-08-08
+
+### Hardened (reliability · H1 fail-soft projection + top-level guard)
+- **`web/projection.safe_project_live`**: shared fail-soft guard around `project_director_live` — on any exception returns a deterministic degraded shape with the **exact same key set** (values empty/zero, `available:False`) so UI never needs null checks and shape-parity CI stays green. Reused by single-mode `GET /api/live`.
+- **`studio.build_studio_live`**: wrapped the aggregation layer in a top-level `try/except`; on aggregate failure returns `{generated_at, active_film_id, films:[], rollup:{…0}, degraded:True, error}` instead of 500ing the 总控台. Normal result now also carries `degraded:False, error:None` (key-set parity).
+- **`GET /api/studio/live`** route: unexpected errors now return a degraded **200** (not 500).
+- **console 总控台**: `renderStudioLive` shows an amber "总控台部分降级" banner when `degraded:True`; never blocks the rest of the UI.
+- **Tests:** `test_studio_live_top_level_guard_degrades` (aggregate throw → 200 + `degraded:True` via endpoint), `test_projection_safe_degrade_shape` (degraded key set == normal key set).
+
 ## [2.41.38] - 2026-08-08
 
 ### Added (studio × Director-OS integration · W0 live source + terms, W1 card badges + sort/filter)

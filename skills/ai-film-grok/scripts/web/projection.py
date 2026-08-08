@@ -10,6 +10,7 @@ Never runs full ``build_dispatch`` on GET — too slow and side-effecty.
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from typing import Any
 
@@ -157,6 +158,62 @@ def enrich_console_state(root: Path | str, state: dict[str, Any]) -> dict[str, A
     except Exception:
         state["director_live"] = {"kind": "director-center-live", "available": False}
     return state
+
+
+def safe_project_live(root: Path | str, **kw: Any) -> dict[str, Any]:
+    """Fail-soft wrapper around :func:`project_director_live`.
+
+    On success returns the live projection unchanged. On *any* exception
+    returns a deterministic degraded shape whose key set is **identical** to
+    ``project_director_live``'s (values empty/zero, ``available=False``) so
+    downstream UI never needs null checks and shape-parity CI stays green.
+
+    This is the shared guard for single-film serve mode, SSE, and any other
+    caller that must never 500 on a malformed film root. (Studio aggregation
+    keeps its own top-level guard in ``studio.build_studio_live`` because it
+    needs a studio-scoped ``degraded`` flag.)
+    """
+    try:
+        return project_director_live(root, **kw)
+    except Exception as exc:  # noqa: BLE001 — top-level fail-soft guard
+        logging.getLogger("web.projection").warning(
+            "safe_project_live degraded for %s: %s: %s", root, type(exc).__name__, exc
+        )
+        return {
+            "kind": "director-center-live",
+            "available": False,
+            "revision": 0,
+            "review_mode": None,
+            "dispatch": {
+                "available": False,
+                "stage_public": None,
+                "craft_stage": None,
+                "pipeline_stage": None,
+                "next_id": None,
+                "next_cmd": None,
+                "next_why": None,
+                "approval_class": None,
+                "console_url": None,
+                "copy_cmd": None,
+                "blocked_by": [],
+            },
+            "queue": {
+                "available": False,
+                "pending": 0,
+                "running": 0,
+                "reviewable": 0,
+                "failed": 0,
+                "takes_count": None,
+                "multi_take_shots": 0,
+                "job_counts": {},
+                "unknown": 0,
+            },
+            "human_inbox": [],
+            "inbox_count": 0,
+            "activity": [],
+            "gates": {"blocking": False, "hard_fail": []},
+            "session": {"active": False, "port": None, "pid": None, "url": None},
+        }
 
 
 # Re-export director-live API (implementation in director_live_ext)
