@@ -1,5 +1,7 @@
 # 控制台功能 e2e 跑通 + 代码质量评审 + 团队技术拉升
 
+> ⚠️ **本板已收口（SUPERSEDED）**：硬化 / 可靠性 / 安全 / 可观测 / 契约缺口统一在 **[单一硬化执行板](./plans/2026-08-08-project-hardening-refactor-todoplan.md)** 跟踪（现状快照 §1.1 已硬化 / §1.2 仍缺口）。本板不再新增 TODO；旧逻辑由 H4–H6 波次退役。
+
 > 资深开发（吴八哥）交付。日期 2026-08-07。
 > 范围：`skills/ai-film-grok/scripts/web/console.html` + `scripts/post/review_ui.py` + `scripts/asset_picker.py` + `scripts/smoke_console.py`
 > 目标：用真实运行的服务器把"选素材控制台"功能端到端跑通，证明可上线；并据此给团队做代码质量把控与技术拉升。

@@ -239,6 +239,12 @@
   .lane .l-val { font-family: var(--font-display); font-size: .95rem; color: var(--accent); font-weight: 600; }
   .lane .l-bar { height: 6px; border-radius: 999px; background: var(--line); margin-top: .6rem; overflow: hidden; }
   .lane .l-fill { height: 100%; background: var(--accent); border-radius: 999px; transition: width .5s var(--ease); }
+  .lane.error { border-color: rgba(239,68,68,.5); background: rgba(239,68,68,.07); }
+  .lane.error .l-val { color: var(--danger); }
+  .lane.empty .l-val { color: var(--muted); }
+  .lane.skeleton { opacity: .7; }
+  .lane .l-note { font-size: .76rem; }
+  .lane-retry { margin-top:.5rem; font-size:.76rem; padding:.25rem .6rem; }
   .section-h { display: flex; align-items: center; gap: .5rem; margin: 0 0 .8rem; font-size: 1.05rem; font-weight: 600; }
   .section-h .ico { color: var(--accent); display: inline-flex; }
   .two-col { display: grid; grid-template-columns: 1.4fr 1fr; gap: 1.2rem; align-items: start; }
@@ -1013,6 +1019,11 @@ async function loadDashboard(){
       api('/api/assets?kind=scene'),
       api('/api/assets?kind=prop'),
     ]);
+    const laneKinds = ['bgm','character','voice','shot','scene','prop'];
+    const laneStatus = {};
+    laneKinds.forEach((k, i) => { laneStatus[k] = settled[3 + i].status; });
+    const lanesEl = document.getElementById('dash-lanes');
+    if (lanesEl && !lanesEl.dataset.loaded) lanesEl.innerHTML = skeletonLanes(laneKinds.length);
     const pick = (i, fallback) => settled[i].status === 'fulfilled' ? settled[i].value : fallback;
     const s = pick(0, { selection_counts: {}, director_live: null, approved_clips: 0, recent_selections: [] });
     const g = pick(1, { blocking: false, gates: [], hard_fail: [] });
@@ -1025,10 +1036,10 @@ async function loadDashboard(){
     renderDashboard(s, g, {
       bgm: lib(3), character: lib(4), voice: lib(5),
       shot: lib(6), scene: lib(7), prop: lib(8)
-    }, live || s.director_live || null);
+    }, live || s.director_live || null, laneStatus);
   } catch (e) { toast('载入工作台失败：' + e.message, true); }
 }
-function renderDashboard(s, g, libs, live){
+function renderDashboard(s, g, libs, live, laneStatus){
   const counts = s.selection_counts || {};
   const L = live || {};
   const Q = L.queue || {};
@@ -1080,16 +1091,26 @@ function renderDashboard(s, g, libs, live){
       ? rows.map(e => `<li><span class="r-kind">${esc(e.phase||'')}</span><span>${esc(e.stage||'')}${e.shot_id?(' · '+e.shot_id):''}</span><span class="r-time">${esc(String(e.at||'').slice(0,16).replace('T',' '))}</span></li>`).join('')
       : '<li class="muted">尚无 pipeline-events。</li>';
   }
-  // preserve lanes/recent/gates if elements exist — call partial legacy
+  // H4.1: per-lane tri-state (skeleton/empty/error) — retire the old "whole column empty" mask
   const kinds = ['bgm','character','voice','shot','scene','prop'];
+  window._laneCounts = counts;
   const lanes = document.getElementById('dash-lanes');
   if (lanes){
     lanes.innerHTML = kinds.map(k => {
       const sel = counts[k] || 0;
       const tot = (libs[k] || []).length;
       const pct = tot ? Math.min(100, Math.round(sel / tot * 100)) : 0;
-      return `<div class="lane"><div class="l-top"><span class="l-name">${KIND_LABEL[k]||k}</span><span class="l-val">${sel} / ${tot}</span></div><div class="l-bar"><div class="l-fill" style="width:${pct}%"></div></div></div>`;
+      const st = (laneStatus && laneStatus[k] === 'rejected') ? 'rejected' : 'ok';
+      return laneHtml(k, sel, tot, pct, st);
     }).join('');
+    lanes.dataset.loaded = '1';
+    if (!lanes.dataset.retryBound){
+      lanes.dataset.retryBound = '1';
+      lanes.addEventListener('click', (e) => {
+        const btn = e.target.closest('[data-retry-kind]');
+        if (btn) retryLane(btn.dataset.retryKind);
+      });
+    }
   }
   const recent = (s.recent_selections || []).slice().reverse();
   const recEl = document.getElementById('dash-recent');
@@ -1109,6 +1130,51 @@ function renderDashboard(s, g, libs, live){
     if (inbox.length) next.textContent = `有 ${inbox.length} 项代人审 —— 审片放行或选 Take。`;
     else if (D.next_cmd) next.textContent = '下一步（终端）：' + D.next_cmd;
     else next.textContent = '工作台就绪。';
+  }
+}
+
+// H4.1 helpers: per-lane tri-state (skeleton / empty / error + per-lane retry)
+function laneHtml(kind, sel, tot, pct, status){
+  const label = KIND_LABEL[kind] || kind;
+  if (status === 'rejected'){
+    return `<div class="lane error" data-lane="${kind}" role="alert">`
+      + `<div class="l-top"><span class="l-name">${label}</span><span class="l-val" style="color:var(--danger)">降级</span></div>`
+      + `<div class="l-bar"><div class="l-fill" style="width:0%;background:var(--danger)"></div></div>`
+      + `<button type="button" class="ghost-btn lane-retry" data-retry-kind="${kind}" style="margin-top:.5rem;font-size:.76rem">重试</button></div>`;
+  }
+  const empty = (sel === 0 && tot === 0);
+  return `<div class="lane ${empty ? 'empty' : ''}" data-lane="${kind}">`
+    + `<div class="l-top"><span class="l-name">${label}</span><span class="l-val">${sel} / ${tot}</span></div>`
+    + `<div class="l-bar"><div class="l-fill" style="width:${pct}%"></div></div>`
+    + (empty ? `<div class="l-note muted" style="margin-top:.4rem;font-size:.76rem">暂无</div>` : '')
+    + `</div>`;
+}
+function skeletonLanes(n){
+  let s = '';
+  for (let i = 0; i < n; i++){
+    s += `<div class="lane skeleton"><div class="l-top"><span class="l-name"><span class="skeleton" style="display:inline-block;width:54px;height:12px"></span></span>`
+      + `<span class="l-val"><span class="skeleton" style="display:inline-block;width:36px;height:12px"></span></span></div>`
+      + `<div class="l-bar"><div class="l-fill" style="width:28%"></div></div></div>`;
+  }
+  return s;
+}
+async function retryLane(kind){
+  const lanes = document.getElementById('dash-lanes');
+  const node = lanes && lanes.querySelector('[data-lane="' + kind + '"]');
+  if (node){
+    const val = node.querySelector('.l-val');
+    if (val) val.innerHTML = '<span class="skeleton" style="display:inline-block;width:40px;height:12px"></span>';
+    const btn = node.querySelector('.lane-retry'); if (btn) btn.disabled = true;
+  }
+  try {
+    const data = await api('/api/assets?kind=' + kind);
+    const items = (data.items || []);
+    const sel = (window._laneCounts && window._laneCounts[kind]) || 0;
+    const tot = items.length;
+    const pct = tot ? Math.min(100, Math.round(sel / tot * 100)) : 0;
+    if (node) node.outerHTML = laneHtml(kind, sel, tot, pct, 'ok');
+  } catch (e) {
+    if (node) node.outerHTML = laneHtml(kind, 0, 0, 0, 'rejected');
   }
 }
 
