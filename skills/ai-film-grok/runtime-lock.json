@@ -2738,7 +2738,7 @@
     },
     {
       "path": "scripts/post/closeout.py",
-      "sha256": "699b4f43d3956908c7fd426a3ed7d9fdc581538d01d98291786a67a15b515e6b"
+      "sha256": "da1d76fb95056b457f38344af2bb0ba0ad09abe4340ee8b130c4ae0a4c09c330"
     },
     {
       "path": "scripts/post/color_grade.py",

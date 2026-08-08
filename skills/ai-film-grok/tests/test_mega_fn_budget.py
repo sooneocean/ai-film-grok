@@ -20,7 +20,7 @@ ALLOWLIST: frozenset[tuple[str, str]] = frozenset(
         # P0 orchestrators (Wave 1–3 targets)
         # validate_film_spec peeled under budget (W2) — apply_bgm body leaf peeled (W5)
         # Secondary mega-fns discovered 2026-08-07 probe (Wave 6 watch)
-        ("post/closeout.py", "closeout_status"),
+        # closeout_status peeled under budget (ROCK 3) — only build_dispatch remains
         ("spine/dispatch.py", "build_dispatch"),
     }
 )
@@ -98,7 +98,6 @@ def test_no_new_mega_functions_without_allowlist() -> None:
     )
     # Known P0 mega-fns / peel targets must still be present (don't silently delete)
     for required in (
-        ("post/closeout.py", "closeout_status"),
         ("spine/dispatch.py", "build_dispatch"),
     ):
         assert required in ALLOWLIST

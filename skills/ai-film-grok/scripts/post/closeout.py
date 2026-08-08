@@ -170,11 +170,9 @@ def _post_audit_current(root: Path) -> dict[str, Any]:
         return {"ok": False, "error": str(exc)[:200]}
 
 
-def closeout_status(root: Path | str) -> dict[str, Any]:
-    """Read-only ladder: heat → plate → final_complete → post-audit → export."""
-    base = _root(root)
-    gates = _gates(base)
-    final_rec = _final_record(base)
+
+
+def _probe_heat(base: Path) -> dict[str, Any]:
     heat: dict[str, Any] = {}
     try:
         from heat_check import heat_agent_status
@@ -182,10 +180,10 @@ def closeout_status(root: Path | str) -> dict[str, Any]:
         heat = heat_agent_status(base) or {}
     except Exception as exc:  # noqa: BLE001
         heat = {"active": False, "error": str(exc)[:160]}
+    return heat
 
-    post = _post_audit_current(base)
-    plate = plate_delivery_honesty(base)
-    # S1.4: plate-only receipts can never satisfy final_complete
+
+def _init_steps(base: Path, gates: dict[str, Any], final_rec: dict[str, Any] | None, heat: dict[str, Any], post: dict[str, Any], plate: dict[str, Any]) -> tuple[list[dict[str, Any]], bool]:
     final_complete_ok = bool(gates.get("final_complete")) and not plate["is_official_plate"]
     if plate["is_official_plate"] and gates.get("final_complete"):
         final_complete_detail = (
@@ -267,14 +265,10 @@ def closeout_status(root: Path | str) -> dict[str, Any]:
             ),
         },
     ]
-    # Soft heat: if active hard_fail for final, mark heat not ok more clearly
-    if heat.get("active") and heat.get("hard_fail"):
-        steps[0]["ok"] = False
-        steps[0]["detail"] = heat.get("why") or "heat hard_fail"
-        steps[0]["next_cmd"] = heat.get("next_cmd") or f'aifilm heat boost --root "{base}" --apply'
-        steps[0]["required_proof"] = "heat_agent_status.hard_fail cleared"
+    return steps, final_complete_ok
 
-    # P0-B · caption pixel ink (SRT cues → bottom-band has soup). Soft until plate/final exists.
+
+def _probe_caption(base: Path, final_rec: dict[str, Any] | None, steps: list[dict[str, Any]]):
     caption_step: dict[str, Any] = {
         "id": "caption_pixel",
         "ok": False,
@@ -328,7 +322,8 @@ def closeout_status(root: Path | str) -> dict[str, Any]:
             }
     steps.append(caption_step)
 
-    # S1.4 · plate ≠ master: OFFICIAL_FINAL_PLATE must not pair with final_complete
+
+def _probe_plate_vs_master(base: Path, gates: dict[str, Any], steps: list[dict[str, Any]]):
     plate_step: dict[str, Any] = {
         "id": "plate_vs_master",
         "ok": True,
@@ -372,7 +367,8 @@ def closeout_status(root: Path | str) -> dict[str, Any]:
         }
     steps.append(plate_step)
 
-    # P0-C · evidence stale after final rewrite (quality-report / caption)
+
+def _probe_evidence_fresh(base: Path, final_rec: dict[str, Any] | None, steps: list[dict[str, Any]]):
     evidence_step: dict[str, Any] = {
         "id": "evidence_fresh",
         "ok": True,
@@ -423,7 +419,8 @@ def closeout_status(root: Path | str) -> dict[str, Any]:
         }
     steps.append(evidence_step)
 
-    # AF3 · post-doctor hard codes on the closeout ladder (MIX_PARTIAL stays soft inside doctor)
+
+def _probe_post_doctor(base: Path, final_rec: dict[str, Any] | None, steps: list[dict[str, Any]]):
     post_doctor_step: dict[str, Any] = {
         "id": "post_doctor",
         "ok": True,
@@ -477,7 +474,8 @@ def closeout_status(root: Path | str) -> dict[str, Any]:
             }
     steps.append(post_doctor_step)
 
-    # R5 · edit-director desk (prefer verify before bare final thrash)
+
+def _probe_edit_director(base: Path, final_rec: dict[str, Any] | None, steps: list[dict[str, Any]]):
     ed_step: dict[str, Any] = {
         "id": "edit_director",
         "ok": True,
@@ -574,7 +572,8 @@ def closeout_status(root: Path | str) -> dict[str, Any]:
         }
     steps.append(ed_step)
 
-    # Delivery Truth · i2v-final-gate must be green before delivery_ready
+
+def _probe_i2v_motion(base: Path, steps: list[dict[str, Any]]):
     motion_gate_step: dict[str, Any] = {
         "id": "i2v_motion",
         "ok": False,
@@ -614,7 +613,8 @@ def closeout_status(root: Path | str) -> dict[str, Any]:
         }
     steps.append(motion_gate_step)
 
-    # Wave ε · composite cinematic-gate (true-video / variety / five-track / inventory)
+
+def _probe_cinematic_gate(base: Path, steps: list[dict[str, Any]]):
     cin_step: dict[str, Any] = {
         "id": "cinematic_gate",
         "ok": False,
@@ -654,7 +654,8 @@ def closeout_status(root: Path | str) -> dict[str, Any]:
         }
     steps.append(cin_step)
 
-    # Narrative rebind + adult sex arc (P1 · 2026-08-06) — receipt always written
+
+def _probe_narrative_rebind(base: Path, steps: list[dict[str, Any]]):
     rebind_step: dict[str, Any] = {
         "id": "narrative_rebind",
         "ok": True,
@@ -693,7 +694,8 @@ def closeout_status(root: Path | str) -> dict[str, Any]:
         }
     steps.append(rebind_step)
 
-    # film-core audit: max/premium/strict → hard; else advisory
+
+def _probe_film_core(base: Path, steps: list[dict[str, Any]]) -> tuple[dict[str, Any], bool]:
     core_audit: dict[str, Any] = {}
     film_core_hard = False
     try:
@@ -737,8 +739,10 @@ def closeout_status(root: Path | str) -> dict[str, Any]:
                 "hard": film_core_hard,
             }
         )
+    return core_audit, film_core_hard
 
-    # F3 · input fidelity ladder step (soft unless strict mode / score hard floor)
+
+def _probe_input_fidelity(base: Path, steps: list[dict[str, Any]]) -> dict[str, Any]:
     fid_step: dict[str, Any] = {
         "id": "input_fidelity",
         "ok": True,
@@ -803,8 +807,10 @@ def closeout_status(root: Path | str) -> dict[str, Any]:
             "skipped": True,
         }
     steps.append(fid_step)
+    return fid_step
 
-    # AD A4/B · duration honesty canary + final report read-back (advisory soft)
+
+def _probe_duration_honesty(base: Path) -> dict[str, Any]:
     duration_honesty: dict[str, Any] = {
         "ok": True,
         "advisory": True,
@@ -873,7 +879,10 @@ def closeout_status(root: Path | str) -> dict[str, Any]:
     except Exception as exc:  # noqa: BLE001
         duration_honesty["ok"] = True
         duration_honesty["error"] = str(exc)[:160]
+    return duration_honesty
 
+
+def _probe_official_readback(base: Path, plate: dict[str, Any]) -> dict[str, Any]:
     official_final_readback: dict[str, Any] = {
         "required_fields": [
             "status/delivery_class",
@@ -897,45 +906,10 @@ def closeout_status(root: Path | str) -> dict[str, Any]:
             official_final_readback["plate_vs_master"] = str(
                 ofr.get("status") or ofr.get("delivery_class") or "present"
             )
+    return official_final_readback
 
-    steps.append(
-        {
-            "id": "duration_honesty",
-            "ok": True,  # advisory; hard path is bulk-preflight / duration_target
-            "advisory": True,
-            "detail": duration_honesty.get("message")
-            or (
-                f"planned={duration_honesty.get('planned_sec')} "
-                f"target={duration_honesty.get('target_sec')} "
-                f"shots={duration_honesty.get('shot_n')}"
-            ),
-            "codes": duration_honesty.get("codes") or [],
-            "next_cmd": (
-                None
-                if duration_honesty.get("ok")
-                else (
-                    (duration_honesty.get("next") or [None])[0]
-                    or f'aifilm bulk-preflight --root "{base}"'
-                )
-            ),
-        }
-    )
-    steps.append(
-        {
-            "id": "official_final_readback",
-            "ok": True,
-            "advisory": True,
-            "detail": official_final_readback.get("plate_vs_master"),
-            "readback": official_final_readback,
-            "next_cmd": (
-                None
-                if official_final_readback.get("present")
-                else 'cat receipts/official-final-report.json  # after final'
-            ),
-        }
-    )
 
-    # Honesty-rail R1 · IRON SKIP without reason → PARTIAL (not silent cert)
+def _probe_skip_audit(base: Path, steps: list[dict[str, Any]]) -> dict[str, Any]:
     skip_audit: dict[str, Any] = {
         "ok": True,
         "skips_used": [],
@@ -970,8 +944,10 @@ def closeout_status(root: Path | str) -> dict[str, Any]:
             "iron_unreasoned": skip_audit.get("iron_unreasoned") or [],
         }
     )
+    return skip_audit
 
-    # Honesty-rail R2 · human attestation provenance (advisory)
+
+def _probe_attestation(base: Path, steps: list[dict[str, Any]]) -> dict[str, Any]:
     attestation_audit: dict[str, Any] = {
         "ok": True,
         "advisory": True,
@@ -1003,8 +979,10 @@ def closeout_status(root: Path | str) -> dict[str, Any]:
             "next_cmd": None,
         }
     )
+    return attestation_audit
 
-    # E1 · identity generation lock (archive mix hard; unverified → PARTIAL honesty)
+
+def _probe_identity_generation(base: Path, steps: list[dict[str, Any]]) -> dict[str, Any]:
     identity_gen: dict[str, Any] = {
         "ok": True,
         "identity_partial": False,
@@ -1039,8 +1017,10 @@ def closeout_status(root: Path | str) -> dict[str, Any]:
             "partial": bool(identity_gen.get("identity_partial")),
         }
     )
+    return identity_gen
 
-    # E2 · partner cast masters (hard when multi-cast incomplete / false style.locked)
+
+def _probe_partner_cast(base: Path, steps: list[dict[str, Any]]):
     partner_cast: dict[str, Any] = {"ok": True, "codes": [], "checked": False}
     try:
         from gates.partner_cast_gate import audit_partner_cast
@@ -1066,7 +1046,8 @@ def closeout_status(root: Path | str) -> dict[str, Any]:
         }
     )
 
-    # F2 · face-lock triple (face_identity ∧ identity_gen ∧ partner) — master claim honesty
+
+def _probe_face_lock_triple(base: Path, steps: list[dict[str, Any]]) -> dict[str, Any]:
     face_lock_triple: dict[str, Any] = {
         "ok": True,
         "master_eligible": True,
@@ -1110,8 +1091,10 @@ def closeout_status(root: Path | str) -> dict[str, Any]:
             or not bool(face_lock_triple.get("master_eligible")),
         }
     )
+    return face_lock_triple
 
-    # T3 · transition frame audit when final exists
+
+def _probe_transition_frame(base: Path, steps: list[dict[str, Any]]) -> dict[str, Any]:
     transition_frame: dict[str, Any] = {
         "ok": True,
         "checked": False,
@@ -1146,8 +1129,10 @@ def closeout_status(root: Path | str) -> dict[str, Any]:
             ),
         }
     )
+    return transition_frame
 
-    # E4 · still provenance audit (composite / poison archive)
+
+def _probe_still_provenance(base: Path, steps: list[dict[str, Any]]):
     still_prov: dict[str, Any] = {"ok": True, "codes": [], "checked": 0}
     try:
         from gates.still_provenance import audit_film_still_provenance
@@ -1171,6 +1156,85 @@ def closeout_status(root: Path | str) -> dict[str, Any]:
         }
     )
 
+
+def closeout_status(root: Path | str) -> dict[str, Any]:
+    """Read-only ladder: heat → plate → final_complete → post-audit → export."""
+
+    base = _root(root)
+
+    gates = _gates(base)
+
+    final_rec = _final_record(base)
+
+    heat = _probe_heat(base)
+    post = _post_audit_current(base)
+
+    plate = plate_delivery_honesty(base)
+
+    steps, final_complete_ok = _init_steps(base, gates, final_rec, heat, post, plate)
+    if heat.get("active") and heat.get("hard_fail"):
+        steps[0]["ok"] = False
+        steps[0]["detail"] = heat.get("why") or "heat hard_fail"
+        steps[0]["next_cmd"] = heat.get("next_cmd") or f'aifilm heat boost --root "{base}" --apply'
+        steps[0]["required_proof"] = "heat_agent_status.hard_fail cleared"
+
+    _probe_caption(base, final_rec, steps)
+    _probe_plate_vs_master(base, gates, steps)
+    _probe_evidence_fresh(base, final_rec, steps)
+    _probe_post_doctor(base, final_rec, steps)
+    _probe_edit_director(base, final_rec, steps)
+    _probe_i2v_motion(base, steps)
+    _probe_cinematic_gate(base, steps)
+    _probe_narrative_rebind(base, steps)
+    core_audit, film_core_hard = _probe_film_core(base, steps)
+    fid_step = _probe_input_fidelity(base, steps)
+    duration_honesty = _probe_duration_honesty(base)
+    official_final_readback = _probe_official_readback(base, plate)
+    steps.append(
+        {
+            "id": "duration_honesty",
+            "ok": True,  # advisory; hard path is bulk-preflight / duration_target
+            "advisory": True,
+            "detail": duration_honesty.get("message")
+            or (
+                f"planned={duration_honesty.get('planned_sec')} "
+                f"target={duration_honesty.get('target_sec')} "
+                f"shots={duration_honesty.get('shot_n')}"
+            ),
+            "codes": duration_honesty.get("codes") or [],
+            "next_cmd": (
+                None
+                if duration_honesty.get("ok")
+                else (
+                    (duration_honesty.get("next") or [None])[0]
+                    or f'aifilm bulk-preflight --root "{base}"'
+                )
+            ),
+        }
+    )
+
+    steps.append(
+        {
+            "id": "official_final_readback",
+            "ok": True,
+            "advisory": True,
+            "detail": official_final_readback.get("plate_vs_master"),
+            "readback": official_final_readback,
+            "next_cmd": (
+                None
+                if official_final_readback.get("present")
+                else 'cat receipts/official-final-report.json  # after final'
+            ),
+        }
+    )
+
+    skip_audit = _probe_skip_audit(base, steps)
+    attestation_audit = _probe_attestation(base, steps)
+    identity_gen = _probe_identity_generation(base, steps)
+    _probe_partner_cast(base, steps)
+    face_lock_triple = _probe_face_lock_triple(base, steps)
+    transition_frame = _probe_transition_frame(base, steps)
+    _probe_still_provenance(base, steps)
     soft_ids = {
         "desktop_exported",
         "input_fidelity",
@@ -1178,19 +1242,22 @@ def closeout_status(root: Path | str) -> dict[str, Any]:
         "official_final_readback",
         "attestation_audit",
     }
-    # identity partial alone is honesty, not hard block (archive mix is hard via ok=False)
+
     if identity_gen.get("ok") and identity_gen.get("identity_partial"):
         soft_ids.add("identity_generation")
+
     if face_lock_triple.get("ok") and face_lock_triple.get("identity_partial"):
         soft_ids.add("face_lock_triple")
+
     if transition_frame.get("skipped") or transition_frame.get("soft"):
         soft_ids.add("transition_frame_audit")
+
     if not film_core_hard:
         soft_ids.add("film_core")
-    # hard fidelity when marked hard and not ok
+
     if fid_step.get("hard") and not fid_step.get("ok"):
         soft_ids.discard("input_fidelity")
-    # evidence honesty-only (mix partial) stays soft when ok+advisory
+
     for s in steps:
         if s.get("id") == "evidence_fresh" and s.get("ok") and s.get("advisory"):
             soft_ids.add("evidence_fresh")
@@ -1201,12 +1268,16 @@ def closeout_status(root: Path | str) -> dict[str, Any]:
             (s.get("ok") and s.get("advisory")) or film_core_hard
         ):
             soft_ids.add("post_doctor")
+
     blocked = next(
         (s for s in steps if not s["ok"] and s["id"] not in soft_ids),
         None,
     )
+
     delivery_ready = all(s["ok"] for s in steps if s["id"] not in soft_ids)
+
     export_cmd = f'aifilm export-desktop --root "{base}" --name "{_export_name(base)}"'
+
     return {
         "kind": "closeout-status",
         "schema_version": 1,
@@ -1261,7 +1332,6 @@ def closeout_status(root: Path | str) -> dict[str, Any]:
             "why": (blocked or {}).get("detail") or "closeout ladder clear",
         },
     }
-
 
 def closeout_run(
     root: Path | str,
