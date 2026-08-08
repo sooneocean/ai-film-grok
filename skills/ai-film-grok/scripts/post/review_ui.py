@@ -479,6 +479,26 @@ def make_handler(root: Path, token: str):
                 except Exception as exc:  # noqa: BLE001
                     self._json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
                 return
+            if parsed.path == "/api/studio/live":
+                try:
+                    import studio as studio_mod
+
+                    sd = self.server.studio_dir
+                    if sd is None:
+                        self._json(
+                            200,
+                            {"studio_mode": False, "films": [], "rollup": {}},
+                        )
+                    else:
+                        active = getattr(self.server, "active_film", None)
+                        payload = studio_mod.build_studio_live(
+                            sd, active_id=active.name if active else None
+                        )
+                        payload["studio_mode"] = True
+                        self._json(200, payload)
+                except Exception as exc:  # noqa: BLE001
+                    self._json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
+                return
             if parsed.path.startswith("/api/studio/"):
                 self._studio_detail(parsed.path.removeprefix("/api/studio/").strip("/"))
                 return

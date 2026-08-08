@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.41.38] - 2026-08-08
+
+### Added (studio × Director-OS integration · W0 live source + terms, W1 card badges + sort/filter)
+- **`GET /api/studio/live`**: single live projection source (`web.director_live_ext.project_director_live`) aggregated across all studio films with 5s TTL cache; returns per-film `live` + `attention` and rollup `{blocked,failed,reviewable,running,multi_take,inbox}`.
+- **studio registry `build_studio_live`**: concurrent per-film projection with per-film fail-soft (bad film → `null`, never 500s the studio).
+- **console 总控台**: breadcrumb + smart-jump (hard_fail→gates / reviewable→review / blocked→gates); card live badges (需关注 / 待审 / 失败 / 运行中) + attention-first sort; `st-attention` filter (全部/需关注/待审/失败/运行中).
+- **term rename**: 选 Take→Take, 验片→审片.
+- **Tests:** `test_build_studio_live_shape` / `test_studio_live_endpoint_aggregates` / `test_studio_live_single_mode_returns_empty`.
+
 ## [2.41.37] - 2026-08-07
 
 ### Added (director-center · Phase E5 design system)

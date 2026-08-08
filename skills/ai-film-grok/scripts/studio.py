@@ -23,6 +23,9 @@ media is not versioned.
 from __future__ import annotations
 
 import datetime
+import threading
+import time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any
 
@@ -214,6 +217,124 @@ def build_studio(
         "status_counts": status_counts,
         "active_film_id": active_id,
         "broken_film_roots": broken,
+    }
+
+
+# ---- live aggregation (reuses the single live projection; never a 2nd source) ----
+
+# Short-TTL per-root cache so the 总控台 can poll without rescanning every film
+# on each refresh. Keyed by resolved root string -> (timestamp, live-or-None).
+_STUDIO_LIVE_TTL = 5.0
+_STUDIO_LIVE_CACHE: dict[str, tuple[float, Any]] = {}
+_STUDIO_LIVE_CACHE_LOCK = threading.Lock()
+
+
+def _film_live(root: Path) -> dict | None:
+    """Best-effort live projection for one film root; None if unavailable."""
+    try:
+        from web.director_live_ext import project_director_live
+
+        return project_director_live(Path(root), include_token=False)
+    except Exception:
+        return None
+
+
+def _film_attention(live: dict | None) -> bool:
+    """True when the film needs the director's attention right now."""
+    if not live:
+        return False
+    disp = live.get("dispatch") or {}
+    gates = live.get("gates") or {}
+    q = live.get("queue") or {}
+    if disp.get("blocked_by"):
+        return True
+    if gates.get("hard_fail"):
+        return True
+    if int(q.get("failed") or 0) > 0:
+        return True
+    if int(q.get("reviewable") or 0) > 0:
+        return True
+    return False
+
+
+def build_studio_live(
+    studio_dir: Path,
+    active_id: str | None = None,
+    ttl: float = _STUDIO_LIVE_TTL,
+) -> dict[str, Any]:
+    """Aggregate live state for every film in the studio.
+
+    Reuses the single live projection (``project_director_live``) — never a
+    second source. Results are cached per-root with a short TTL so the 总控台
+    can poll without rescanning every film each time. Returns::
+
+        {
+          "generated_at": "<iso8601 utc>",
+          "active_film_id": <id or None>,
+          "films": [{"id", "title", "live", "attention"}],
+          "rollup": {blocked, failed, reviewable, running, multi_take, inbox},
+        }
+    """
+    studio_dir = Path(studio_dir)
+    roots = discover_films(studio_dir)
+    now = time.time()
+
+    def fetch(root: Path) -> tuple[str, Path, Any]:
+        rid = film_id(root)
+        key = str(root)
+        with _STUDIO_LIVE_CACHE_LOCK:
+            hit = _STUDIO_LIVE_CACHE.get(key)
+            if hit and (now - hit[0]) < ttl:
+                data = hit[1]
+            else:
+                data = _film_live(root)
+                _STUDIO_LIVE_CACHE[key] = (now, data)
+        return rid, root, data
+
+    entries: list[tuple[str, Path, Any]] = []
+    if roots:
+        with ThreadPoolExecutor(max_workers=min(8, len(roots))) as ex:
+            entries = list(ex.map(fetch, roots))
+    else:
+        entries = [fetch(r) for r in roots]
+
+    films_out: list[dict[str, Any]] = []
+    rollup = {
+        "blocked": 0,
+        "failed": 0,
+        "reviewable": 0,
+        "running": 0,
+        "multi_take": 0,
+        "inbox": 0,
+    }
+    for rid, root, live in entries:
+        try:
+            title = summarize_film(root).get("title", rid)
+        except Exception:
+            title = rid
+        attention = _film_attention(live)
+        films_out.append({"id": rid, "title": title, "live": live, "attention": attention})
+        if live:
+            q = live.get("queue") or {}
+            g = live.get("gates") or {}
+            d = live.get("dispatch") or {}
+            rollup["failed"] += int(q.get("failed") or 0)
+            rollup["reviewable"] += int(q.get("reviewable") or 0)
+            rollup["running"] += int(q.get("running") or 0)
+            rollup["inbox"] += int(live.get("inbox_count") or 0)
+            if d.get("blocked_by"):
+                rollup["blocked"] += 1
+            if int(q.get("reviewable") or 0) >= 2:
+                rollup["multi_take"] += 1
+
+    # attention films first, then alphabetical
+    films_out.sort(key=lambda f: (not f["attention"], f["id"]))
+
+    return {
+        "generated_at": datetime.datetime.fromtimestamp(now, tz=datetime.UTC).isoformat(),
+        "active_film_id": active_id,
+        "films": films_out,
+        "rollup": rollup,
     }
 
 

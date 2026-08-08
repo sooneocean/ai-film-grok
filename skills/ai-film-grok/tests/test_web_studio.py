@@ -180,3 +180,58 @@ def test_studio_single_mode_shape_and_rejects_select(tmp_path):
     finally:
         server.shutdown()
         server.server_close()
+
+
+# ---- W0: live aggregation endpoint (reuses project_director_live) ----
+
+ROLLUP_KEYS = {"blocked", "failed", "reviewable", "running", "multi_take", "inbox"}
+
+
+def test_build_studio_live_shape(studio_dir):
+    d = studio.build_studio_live(studio_dir, active_id="film-a")
+    assert d["active_film_id"] == "film-a"
+    assert len(d["films"]) == 2
+    assert {f["id"] for f in d["films"]} == {"film-a", "film-b"}
+    for f in d["films"]:
+        assert {"id", "title", "live", "attention"} <= set(f)
+        assert isinstance(f["attention"], bool)
+    assert ROLLUP_KEYS <= set(d["rollup"])
+    assert "generated_at" in d
+
+
+def test_studio_live_endpoint_aggregates(studio_dir):
+    server = _server_studio(studio_dir)
+    try:
+        st, p = _request(server, "GET", "/api/studio/live")
+        assert st == 200, p
+        d = json.loads(p)
+        assert d["studio_mode"] is True
+        assert d["active_film_id"] == "film-a"
+        assert "generated_at" in d
+        assert len(d["films"]) == 2
+        for f in d["films"]:
+            assert {"id", "title", "live", "attention"} <= set(f)
+            assert isinstance(f["attention"], bool)
+        assert ROLLUP_KEYS <= set(d["rollup"])
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_studio_live_single_mode_returns_empty(tmp_path):
+    _make_film(tmp_path, "独片", "剧情", {"s1": {"status": "approved"}}, {"brief": True})
+    server = ThreadingHTTPServer(("127.0.0.1", 0), make_handler(tmp_path, "t"))
+    server.studio_dir = None
+    server.active_film = tmp_path
+    t = __import__("threading").Thread(target=server.serve_forever, daemon=True)
+    t.start()
+    try:
+        st, p = _request(server, "GET", "/api/studio/live")
+        assert st == 200, p
+        d = json.loads(p)
+        assert d["studio_mode"] is False
+        assert d["films"] == []
+        assert d["rollup"] == {}
+    finally:
+        server.shutdown()
+        server.server_close()
