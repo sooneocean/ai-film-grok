@@ -74,75 +74,8 @@ from plan.film_spec_lints import (  # noqa: F401
 )
 
 
-def apply_bgm_shots_and_edit_body(
-    spec: dict[str, Any],
-    *,
-    mode: str,
-    assign_missing_ids: bool,
-    film_root: Any | None = None,
-) -> list[dict[str, Any]]:
-    """Mutate spec; return validated shots list for soft/heat leaves."""
-    # BGM: 色气/storyteller default rnb (R&B/Soul seductive). dark only for horror.
-    intent_for_sound = (
-        spec.get("director_intent") if isinstance(spec.get("director_intent"), dict) else {}
-    )
-    tone_txt = str((intent_for_sound or {}).get("tone") or "")
-    try:
-        if spec.get("sound_plan") is None:
-            # Auto-inject so agents don't forget and fall into dark by accident
-            sound = default_sound_plan_for_film(
-                vo_mode=str(spec.get("vo_mode") or "storyteller"),
-                tone=tone_txt,
-                title=str(spec.get("title") or ""),
-                description=str(spec.get("description") or ""),
-            )
-            sound["_notes"] = ["auto-injected default sound_plan (mood=rnb for 色气/storyteller)"]
-        else:
-            sound = validate_sound_plan(
-                spec.get("sound_plan"),
-                tone=tone_txt,
-                title=str(spec.get("title") or ""),
-                description=str(spec.get("description") or ""),
-                vo_mode=str(spec.get("vo_mode") or ""),
-            )
-    except SoundPlanError as exc:
-        raise FilmSpecError(str(exc)) from exc
-    if sound is not None:
-        # rnb family: pin sidechain so VO pauses breathe (Phase F; author can override)
-        mood_l = str(sound.get("mood") or "").lower()
-        if mood_l in {"rnb", "sensual", "soul", "seductive", "ecchi"} and not sound.get(
-            "sidechain"
-        ):
-            sc = resolve_sidechain(sound, mood=mood_l)
-            sound["sidechain"] = {
-                "threshold": sc["threshold"],
-                "ratio": sc["ratio"],
-                "attack_ms": sc["attack_ms"],
-                "release_ms": sc["release_ms"],
-            }
-            sn = list(sound.get("_notes") or [])
-            sn.append(
-                f"auto-injected rnb sidechain release_ms={sc['release_ms']:.0f} (VO pause breath)"
-            )
-            sound["_notes"] = sn
-        spec["sound_plan"] = sound
-        if sound.get("_notes"):
-            spec.setdefault("_sound_plan_notes", list(sound.get("_notes") or []))
-
-    scenes = spec.get("scenes")
-    if not isinstance(scenes, list) or not scenes:
-        raise FilmSpecError("film-spec requires non-empty scenes")
-
-    shots: list[dict[str, Any]] = []
-    seen: set[str] = set()
-    previous_axes: list[str] = []
-    previous_viewpoints: list[str] = []
-    previous_focal: str | None = None
-    previous_viewpoint: str | None = None
-    _vo_lint_violations: list[dict[str, Any]] = []  # P2-10: collected for vo_lint_strict
-    previous_look: str | None = None
-    previous_end_pose: str | None = None
-    # Cast ids for multi-stance (style-bible keys or director_intent.cast)
+def _resolve_cast_ids(spec: dict[str, Any]) -> list[str]:
+    """Cast ids for multi-stance (style-bible keys or director_intent.cast)."""
     cast_ids: list[str] = []
     di = spec.get("director_intent") if isinstance(spec.get("director_intent"), dict) else {}
     raw_cast = di.get("cast") or di.get("characters") or spec.get("cast_ids")
@@ -159,7 +92,27 @@ def apply_bgm_shots_and_edit_body(
     if not cast_ids:
         cast_ids = ["hero", "partner"]
 
-    for scene_index, scene in enumerate(scenes, start=1):
+    return cast_ids
+
+def _validate_shots_loop(
+    spec: dict[str, Any],
+    *,
+    mode: str,
+    assign_missing_ids: bool,
+    cast_ids: list[str],
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Validate every shot (id/vo/role/engine/coverage/motion/duration).
+    Returns (shots, vo_lint_violations)."""
+    shots: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    previous_axes: list[str] = []
+    previous_viewpoints: list[str] = []
+    previous_focal: str | None = None
+    previous_viewpoint: str | None = None
+    _vo_lint_violations: list[dict[str, Any]] = []  # P2-10: collected for vo_lint_strict
+    previous_look: str | None = None
+    previous_end_pose: str | None = None
+    for scene_index, scene in enumerate(spec.get("scenes") or [], start=1):
         if not isinstance(scene, dict):
             raise FilmSpecError(f"scene {scene_index} must be an object")
         scene_shots = scene.get("shots")
@@ -345,6 +298,301 @@ def apply_bgm_shots_and_edit_body(
                     f"set duration_sec to 10, or split into another shot — do not rely on stream_loop."
                 )
             shots.append(shot)
+    return shots, _vo_lint_violations
+
+def _attach_dialogue_drama_gates(
+    spec: dict[str, Any],
+    shots: list[dict[str, Any]],
+) -> None:
+    """Dialogue-drama coverage / zero-narration gates; mutates spec."""
+    on_camera = [s for s in shots if s.get("screen_mode") == "on_camera"]
+    coverage = [
+        s for s in shots if s.get("screen_mode") in {"reaction", "action_cover", "silence"}
+    ]
+    if len(on_camera) >= 2 and not coverage:
+        raise FilmSpecError(
+            "dialogue_drama requires a reaction/action_cover/silence shot; "
+            "do not cut consecutive speaking close-ups only"
+        )
+    coverage_beats = {
+        str(shot.get("beat_id") or "")
+        for shot in coverage
+        if str(shot.get("beat_id") or "").strip()
+    }
+    # Timed dialogue B-roll is coverage beneath its parent A-roll: it
+    # replaces picture while retaining that line's dialogue/caption clock.
+    # Treat it as beat coverage as well as legacy standalone cover shots.
+    coverage_beats.update(
+        str(shot.get("beat_id") or "")
+        for shot in on_camera
+        if shot.get("dialogue_broll") and str(shot.get("beat_id") or "").strip()
+    )
+    missing_beat_coverage = sorted(
+        {
+            str(shot.get("beat_id") or shot.get("dialogue_line_id") or shot.get("id") or "")
+            for shot in on_camera
+            if str(shot.get("beat_id") or shot.get("dialogue_line_id") or shot.get("id") or "")
+            not in coverage_beats
+        }
+    )
+    if missing_beat_coverage:
+        raise FilmSpecError(
+            "dialogue_drama requires reaction/action_cover/silence for every dialogue beat; "
+            "missing=" + ",".join(missing_beat_coverage)
+        )
+    # Dialogue-first scene contract: every scene must put a speaking character
+    # in frame at least once (on_camera or off_camera dialogue). Scenes made of
+    # pure silence/coverage plates or narration-VO-only pictures are rejected —
+    # narration is gap-only, never the primary voice of a scene.
+    # Escape: scene {"silent_scene": true, "narration_reason": "..."} or spec-level
+    # allow_silent_scenes:true.
+    allow_silent_scenes = spec.get("allow_silent_scenes") is True
+    has_scenes = isinstance(spec.get("scenes"), list) and bool(spec.get("scenes"))
+
+    def _scene_dialogue_shots(scene: dict[str, Any]) -> list[dict[str, Any]]:
+        scene_shots = scene.get("shots")
+        if not isinstance(scene_shots, list):
+            return []
+        talking: list[dict[str, Any]] = []
+        for scene_shot in scene_shots:
+            if not isinstance(scene_shot, dict):
+                continue
+            if str(scene_shot.get("screen_mode") or "") not in {"on_camera", "off_camera"}:
+                continue
+            cues = scene_shot.get("audio_cues")
+            if not isinstance(cues, list):
+                continue
+            if any(
+                isinstance(cue, dict)
+                and cue.get("kind") == "voice"
+                and cue.get("line_type") == "dialogue"
+                and str(cue.get("spoken_text") or "").strip()
+                for cue in cues
+            ):
+                talking.append(scene_shot)
+        return talking
+
+    scenes_without_dialogue: list[str] = []
+    if has_scenes and not allow_silent_scenes:
+        for scene_index, scene in enumerate(spec.get("scenes") or [], start=1):
+            if not isinstance(scene, dict):
+                continue
+            if scene.get("silent_scene") is True:
+                if str(scene.get("narration_reason") or "").strip():
+                    continue
+                scenes_without_dialogue.append(
+                    f"scene{scene_index}(id={scene.get('id') or scene_index}):"
+                    "silent_scene_requires_narration_reason"
+                )
+                continue
+            if not _scene_dialogue_shots(scene):
+                scenes_without_dialogue.append(
+                    f"scene{scene_index}(id={scene.get('id') or scene_index})"
+                )
+    consecutive = 0
+    prior_speaker = ""
+    for shot in shots:
+        if shot.get("screen_mode") == "on_camera":
+            speaker = str(shot.get("speaker") or "")
+            consecutive = consecutive + 1 if speaker and speaker == prior_speaker else 1
+            prior_speaker = speaker
+            if consecutive >= 3:
+                raise FilmSpecError(
+                    "dialogue_drama forbids three consecutive on_camera shots for the same speaker; "
+                    "insert reaction/action_cover/silence"
+                )
+        else:
+            consecutive = 0
+            prior_speaker = ""
+    dialogue_sec = sum(
+        float(cue.get("duration_sec") or 0)
+        for shot in shots
+        for cue in (shot.get("audio_cues") or [])
+        if isinstance(cue, dict)
+        and cue.get("kind") == "voice"
+        and cue.get("line_type") == "dialogue"
+    )
+    narration_sec = sum(
+        float(cue.get("duration_sec") or 0)
+        for shot in shots
+        for cue in (shot.get("audio_cues") or [])
+        if isinstance(cue, dict)
+        and cue.get("kind") == "voice"
+        and cue.get("line_type") == "narration"
+    )
+    narration_ratio = narration_sec / max(dialogue_sec + narration_sec, 1.0)
+    # Delivery Truth · zero_narration IRON (default on for dialogue_drama)
+    zn = zero_narration_gate(spec, shots=shots)
+    spec["_zero_narration"] = zn
+    zero_strict = bool(zn.get("zero_narration_strict"))
+    if zero_strict:
+        narration_budget = 0.0
+    else:
+        try:
+            narration_budget = float(spec.get("narration_budget_ratio") or 0.05)
+        except (TypeError, ValueError):
+            narration_budget = 0.05
+        narration_budget = max(0.0, min(0.15, narration_budget))
+    if not zn.get("ok"):
+        raise FilmSpecError(
+            f"NAR_BUDGET_VIOLATION: {zn.get('message') or 'zero narration strict failed'}"
+        )
+    # Legacy storyteller ban when IRON not escaped (zero_strict already covers)
+    if zero_strict and spec.get("allow_storyteller_nar") is not True:
+        for shot in shots:
+            if not isinstance(shot, dict):
+                continue
+            sid = str(shot.get("id") or "?")
+            nar = str(shot.get("nar") or "").strip()
+            if not nar:
+                continue
+            cues = shot.get("audio_cues") if isinstance(shot.get("audio_cues"), list) else []
+            has_dialogue_voice = any(
+                isinstance(c, dict)
+                and c.get("kind") == "voice"
+                and c.get("line_type") == "dialogue"
+                for c in cues
+            ) or bool(str(shot.get("spoken_text") or "").strip())
+            has_narration_voice = any(
+                isinstance(c, dict)
+                and c.get("kind") == "voice"
+                and c.get("line_type") == "narration"
+                for c in cues
+            )
+            if has_dialogue_voice:
+                continue
+            if has_narration_voice and str(shot.get("narration_reason") or "").strip():
+                continue
+            if (
+                str(shot.get("narration_reason") or "").strip()
+                and shot.get("silent_scene") is True
+            ):
+                continue
+            raise FilmSpecError(
+                f"NAR_BUDGET_VIOLATION: {sid}: dialogue_drama forbids third-person "
+                "storyteller nar as primary voice — use character dialogue, pure-visual "
+                "silence/action_cover, or escape zero_narration_strict:false / "
+                "allow_storyteller_nar:true"
+            )
+    spec["_dialogue_drama"] = {
+        "on_camera_shots": len(on_camera),
+        "coverage_shots": len(coverage),
+        "scenes_without_dialogue": scenes_without_dialogue,
+        "allow_silent_scenes": allow_silent_scenes,
+        "coverage_beats": sorted(coverage_beats),
+        "missing_beat_coverage": missing_beat_coverage,
+        "dialogue_sec": round(dialogue_sec, 3),
+        "narration_sec": round(narration_sec, 3),
+        "narration_ratio": round(float(zn.get("ratio") or narration_ratio), 4),
+        "narration_target_ratio": 0.0,
+        "narration_budget_ratio": narration_budget,
+        "zero_narration_strict": zero_strict,
+        "coverage_ratio": round(
+            sum(float(s.get("duration_sec") or 0) for s in coverage)
+            / max(sum(float(s.get("duration_sec") or 0) for s in shots), 1.0),
+            4,
+        ),
+        "coverage_targets": {
+            "on_camera": "35-45%",
+            "reaction": "20-25%",
+            "action_cover": "about 20%",
+            "space_or_silence": "10-15%",
+        },
+        "note": (
+            "Cinema dialogue primary: speech=character Chinese mouth; no speech=pure picture. "
+            + (
+                "Zero-narration IRON: nar hard cap 0%."
+                if zero_strict
+                else f"Narration gap-only; hard cap {narration_budget:.0%}."
+            )
+        ),
+    }
+    broll = iter_dialogue_broll(spec)
+    spec["_dialogue_broll"] = {
+        "enabled": bool(broll),
+        "count": len(broll),
+        "parent_shot_ids": [str(item.get("parent_shot_id") or "") for item in broll],
+        "audio_policy": "carry_parent_dialogue",
+        "note": "B-roll replaces only parent picture inside bounded cuts; dialogue/subtitle clocks stay on A-roll.",
+    }
+    if (
+        not zero_strict
+        and spec.get("narration_budget_strict") is not False
+        and narration_ratio > narration_budget + 1e-9
+    ):
+        raise FilmSpecError(
+            f"NAR_BUDGET_VIOLATION: dialogue_drama narration budget exceeded: "
+            f"{narration_ratio:.0%} > {narration_budget:.0%} "
+            f"(raise narration_budget_ratio or cut gap VO)"
+        )
+
+
+def apply_bgm_shots_and_edit_body(
+    spec: dict[str, Any],
+    *,
+    mode: str,
+    assign_missing_ids: bool,
+    film_root: Any | None = None,
+) -> list[dict[str, Any]]:
+    """Mutate spec; return validated shots list for soft/heat leaves."""
+    # BGM: 色气/storyteller default rnb (R&B/Soul seductive). dark only for horror.
+    intent_for_sound = (
+        spec.get("director_intent") if isinstance(spec.get("director_intent"), dict) else {}
+    )
+    tone_txt = str((intent_for_sound or {}).get("tone") or "")
+    try:
+        if spec.get("sound_plan") is None:
+            # Auto-inject so agents don't forget and fall into dark by accident
+            sound = default_sound_plan_for_film(
+                vo_mode=str(spec.get("vo_mode") or "storyteller"),
+                tone=tone_txt,
+                title=str(spec.get("title") or ""),
+                description=str(spec.get("description") or ""),
+            )
+            sound["_notes"] = ["auto-injected default sound_plan (mood=rnb for 色气/storyteller)"]
+        else:
+            sound = validate_sound_plan(
+                spec.get("sound_plan"),
+                tone=tone_txt,
+                title=str(spec.get("title") or ""),
+                description=str(spec.get("description") or ""),
+                vo_mode=str(spec.get("vo_mode") or ""),
+            )
+    except SoundPlanError as exc:
+        raise FilmSpecError(str(exc)) from exc
+    if sound is not None:
+        # rnb family: pin sidechain so VO pauses breathe (Phase F; author can override)
+        mood_l = str(sound.get("mood") or "").lower()
+        if mood_l in {"rnb", "sensual", "soul", "seductive", "ecchi"} and not sound.get(
+            "sidechain"
+        ):
+            sc = resolve_sidechain(sound, mood=mood_l)
+            sound["sidechain"] = {
+                "threshold": sc["threshold"],
+                "ratio": sc["ratio"],
+                "attack_ms": sc["attack_ms"],
+                "release_ms": sc["release_ms"],
+            }
+            sn = list(sound.get("_notes") or [])
+            sn.append(
+                f"auto-injected rnb sidechain release_ms={sc['release_ms']:.0f} (VO pause breath)"
+            )
+            sound["_notes"] = sn
+        spec["sound_plan"] = sound
+        if sound.get("_notes"):
+            spec.setdefault("_sound_plan_notes", list(sound.get("_notes") or []))
+
+    scenes = spec.get("scenes")
+    if not isinstance(scenes, list) or not scenes:
+        raise FilmSpecError("film-spec requires non-empty scenes")
+
+    shots, _vo_lint_violations = _validate_shots_loop(
+        spec,
+        mode=mode,
+        assign_missing_ids=assign_missing_ids,
+        cast_ids=_resolve_cast_ids(spec),
+    )
+
     if not shots:
         raise FilmSpecError("film-spec requires at least one shot")
 
@@ -360,227 +608,10 @@ def apply_bgm_shots_and_edit_body(
         "Soft by default; vo_lint_strict raises.",
     }
 
+
     if mode == "dialogue_drama":
-        on_camera = [s for s in shots if s.get("screen_mode") == "on_camera"]
-        coverage = [
-            s for s in shots if s.get("screen_mode") in {"reaction", "action_cover", "silence"}
-        ]
-        if len(on_camera) >= 2 and not coverage:
-            raise FilmSpecError(
-                "dialogue_drama requires a reaction/action_cover/silence shot; "
-                "do not cut consecutive speaking close-ups only"
-            )
-        coverage_beats = {
-            str(shot.get("beat_id") or "")
-            for shot in coverage
-            if str(shot.get("beat_id") or "").strip()
-        }
-        # Timed dialogue B-roll is coverage beneath its parent A-roll: it
-        # replaces picture while retaining that line's dialogue/caption clock.
-        # Treat it as beat coverage as well as legacy standalone cover shots.
-        coverage_beats.update(
-            str(shot.get("beat_id") or "")
-            for shot in on_camera
-            if shot.get("dialogue_broll") and str(shot.get("beat_id") or "").strip()
-        )
-        missing_beat_coverage = sorted(
-            {
-                str(shot.get("beat_id") or shot.get("dialogue_line_id") or shot.get("id") or "")
-                for shot in on_camera
-                if str(shot.get("beat_id") or shot.get("dialogue_line_id") or shot.get("id") or "")
-                not in coverage_beats
-            }
-        )
-        if missing_beat_coverage:
-            raise FilmSpecError(
-                "dialogue_drama requires reaction/action_cover/silence for every dialogue beat; "
-                "missing=" + ",".join(missing_beat_coverage)
-            )
-        # Dialogue-first scene contract: every scene must put a speaking character
-        # in frame at least once (on_camera or off_camera dialogue). Scenes made of
-        # pure silence/coverage plates or narration-VO-only pictures are rejected —
-        # narration is gap-only, never the primary voice of a scene.
-        # Escape: scene {"silent_scene": true, "narration_reason": "..."} or spec-level
-        # allow_silent_scenes:true.
-        allow_silent_scenes = spec.get("allow_silent_scenes") is True
-        has_scenes = isinstance(spec.get("scenes"), list) and bool(spec.get("scenes"))
+        _attach_dialogue_drama_gates(spec, shots)
 
-        def _scene_dialogue_shots(scene: dict[str, Any]) -> list[dict[str, Any]]:
-            scene_shots = scene.get("shots")
-            if not isinstance(scene_shots, list):
-                return []
-            talking: list[dict[str, Any]] = []
-            for scene_shot in scene_shots:
-                if not isinstance(scene_shot, dict):
-                    continue
-                if str(scene_shot.get("screen_mode") or "") not in {"on_camera", "off_camera"}:
-                    continue
-                cues = scene_shot.get("audio_cues")
-                if not isinstance(cues, list):
-                    continue
-                if any(
-                    isinstance(cue, dict)
-                    and cue.get("kind") == "voice"
-                    and cue.get("line_type") == "dialogue"
-                    and str(cue.get("spoken_text") or "").strip()
-                    for cue in cues
-                ):
-                    talking.append(scene_shot)
-            return talking
-
-        scenes_without_dialogue: list[str] = []
-        if has_scenes and not allow_silent_scenes:
-            for scene_index, scene in enumerate(spec.get("scenes") or [], start=1):
-                if not isinstance(scene, dict):
-                    continue
-                if scene.get("silent_scene") is True:
-                    if str(scene.get("narration_reason") or "").strip():
-                        continue
-                    scenes_without_dialogue.append(
-                        f"scene{scene_index}(id={scene.get('id') or scene_index}):"
-                        "silent_scene_requires_narration_reason"
-                    )
-                    continue
-                if not _scene_dialogue_shots(scene):
-                    scenes_without_dialogue.append(
-                        f"scene{scene_index}(id={scene.get('id') or scene_index})"
-                    )
-        consecutive = 0
-        prior_speaker = ""
-        for shot in shots:
-            if shot.get("screen_mode") == "on_camera":
-                speaker = str(shot.get("speaker") or "")
-                consecutive = consecutive + 1 if speaker and speaker == prior_speaker else 1
-                prior_speaker = speaker
-                if consecutive >= 3:
-                    raise FilmSpecError(
-                        "dialogue_drama forbids three consecutive on_camera shots for the same speaker; "
-                        "insert reaction/action_cover/silence"
-                    )
-            else:
-                consecutive = 0
-                prior_speaker = ""
-        dialogue_sec = sum(
-            float(cue.get("duration_sec") or 0)
-            for shot in shots
-            for cue in (shot.get("audio_cues") or [])
-            if isinstance(cue, dict)
-            and cue.get("kind") == "voice"
-            and cue.get("line_type") == "dialogue"
-        )
-        narration_sec = sum(
-            float(cue.get("duration_sec") or 0)
-            for shot in shots
-            for cue in (shot.get("audio_cues") or [])
-            if isinstance(cue, dict)
-            and cue.get("kind") == "voice"
-            and cue.get("line_type") == "narration"
-        )
-        narration_ratio = narration_sec / max(dialogue_sec + narration_sec, 1.0)
-        # Delivery Truth · zero_narration IRON (default on for dialogue_drama)
-        zn = zero_narration_gate(spec, shots=shots)
-        spec["_zero_narration"] = zn
-        zero_strict = bool(zn.get("zero_narration_strict"))
-        if zero_strict:
-            narration_budget = 0.0
-        else:
-            try:
-                narration_budget = float(spec.get("narration_budget_ratio") or 0.05)
-            except (TypeError, ValueError):
-                narration_budget = 0.05
-            narration_budget = max(0.0, min(0.15, narration_budget))
-        if not zn.get("ok"):
-            raise FilmSpecError(
-                f"NAR_BUDGET_VIOLATION: {zn.get('message') or 'zero narration strict failed'}"
-            )
-        # Legacy storyteller ban when IRON not escaped (zero_strict already covers)
-        if zero_strict and spec.get("allow_storyteller_nar") is not True:
-            for shot in shots:
-                if not isinstance(shot, dict):
-                    continue
-                sid = str(shot.get("id") or "?")
-                nar = str(shot.get("nar") or "").strip()
-                if not nar:
-                    continue
-                cues = shot.get("audio_cues") if isinstance(shot.get("audio_cues"), list) else []
-                has_dialogue_voice = any(
-                    isinstance(c, dict)
-                    and c.get("kind") == "voice"
-                    and c.get("line_type") == "dialogue"
-                    for c in cues
-                ) or bool(str(shot.get("spoken_text") or "").strip())
-                has_narration_voice = any(
-                    isinstance(c, dict)
-                    and c.get("kind") == "voice"
-                    and c.get("line_type") == "narration"
-                    for c in cues
-                )
-                if has_dialogue_voice:
-                    continue
-                if has_narration_voice and str(shot.get("narration_reason") or "").strip():
-                    continue
-                if (
-                    str(shot.get("narration_reason") or "").strip()
-                    and shot.get("silent_scene") is True
-                ):
-                    continue
-                raise FilmSpecError(
-                    f"NAR_BUDGET_VIOLATION: {sid}: dialogue_drama forbids third-person "
-                    "storyteller nar as primary voice — use character dialogue, pure-visual "
-                    "silence/action_cover, or escape zero_narration_strict:false / "
-                    "allow_storyteller_nar:true"
-                )
-        spec["_dialogue_drama"] = {
-            "on_camera_shots": len(on_camera),
-            "coverage_shots": len(coverage),
-            "scenes_without_dialogue": scenes_without_dialogue,
-            "allow_silent_scenes": allow_silent_scenes,
-            "coverage_beats": sorted(coverage_beats),
-            "missing_beat_coverage": missing_beat_coverage,
-            "dialogue_sec": round(dialogue_sec, 3),
-            "narration_sec": round(narration_sec, 3),
-            "narration_ratio": round(float(zn.get("ratio") or narration_ratio), 4),
-            "narration_target_ratio": 0.0,
-            "narration_budget_ratio": narration_budget,
-            "zero_narration_strict": zero_strict,
-            "coverage_ratio": round(
-                sum(float(s.get("duration_sec") or 0) for s in coverage)
-                / max(sum(float(s.get("duration_sec") or 0) for s in shots), 1.0),
-                4,
-            ),
-            "coverage_targets": {
-                "on_camera": "35-45%",
-                "reaction": "20-25%",
-                "action_cover": "about 20%",
-                "space_or_silence": "10-15%",
-            },
-            "note": (
-                "Cinema dialogue primary: speech=character Chinese mouth; no speech=pure picture. "
-                + (
-                    "Zero-narration IRON: nar hard cap 0%."
-                    if zero_strict
-                    else f"Narration gap-only; hard cap {narration_budget:.0%}."
-                )
-            ),
-        }
-        broll = iter_dialogue_broll(spec)
-        spec["_dialogue_broll"] = {
-            "enabled": bool(broll),
-            "count": len(broll),
-            "parent_shot_ids": [str(item.get("parent_shot_id") or "") for item in broll],
-            "audio_policy": "carry_parent_dialogue",
-            "note": "B-roll replaces only parent picture inside bounded cuts; dialogue/subtitle clocks stay on A-roll.",
-        }
-        if (
-            not zero_strict
-            and spec.get("narration_budget_strict") is not False
-            and narration_ratio > narration_budget + 1e-9
-        ):
-            raise FilmSpecError(
-                f"NAR_BUDGET_VIOLATION: dialogue_drama narration budget exceeded: "
-                f"{narration_ratio:.0%} > {narration_budget:.0%} "
-                f"(raise narration_budget_ratio or cut gap VO)"
-            )
 
     # Aggregate VO budget report (non-blocking summary for agents / status)
     total_est = sum(float(s.get("est_vo_sec") or 0) for s in shots)
