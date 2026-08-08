@@ -52,8 +52,9 @@ if [ -f "$SKILL_DIR/.python-version" ]; then
 fi
 
 for candidate in "$PYENV_CANDIDATE" "$PINNED_CANDIDATE" "$(command -v python3 2>/dev/null || true)"; do
+  status=0
   resolved=$(select_candidate "$candidate") || status=$?
-  if [ "${status:-0}" = 0 ]; then
+  if [ "$status" = 0 ]; then
     printf '%s\n' "$resolved"
     exit 0
   fi
