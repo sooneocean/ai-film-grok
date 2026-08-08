@@ -17,4 +17,5 @@
 
 ## 链
 - hard-defaults 表行 · dual-film-drain · c1-capacity-wait  
+- 外片 ACTIVE lock 时 Grok 逃逸（勿对杀 guardian）：[one-outfit-mouth-min60-gpu-escape](2026-08-07-one-outfit-mouth-min60-gpu-escape.md)  
 - 码：`h3_fill_idle.fill_idle_until_empty` · `cli_h3 --i-own-the-gpu` · `next_actions`
