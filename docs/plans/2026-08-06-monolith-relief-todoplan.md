@@ -1,5 +1,7 @@
 # 巨石舒缓 Todo Plan（2026-08-06 · 诊断 + 执行队列）
 
+> ⚠️ **本板已收口（SUPERSEDED）**：硬化 / 可靠性 / 安全 / 可观测 / 契约缺口统一在 **[单一硬化执行板](./2026-08-08-project-hardening-refactor-todoplan.md)** 跟踪（现状快照 §1.1 已硬化 / §1.2 仍缺口）。本板不再新增 TODO；旧逻辑由 H4–H6 波次退役。
+
 **Status:** **SUPERSEDED for structure** → [2026-08-07-monolith-orchestrator-relief-todoplan.md](2026-08-07-monolith-orchestrator-relief-todoplan.md) · **M0–M4 SHIPPED (2.40.12)** · M5 并入 08-07 Wave 6  
 **Plugin:** **2.40.12**（历史）· checkout `plugins/ai-film-grok`  
 **结构主档（历史 wave）：** [residual-monolith-w4-todo](2026-08-05-residual-monolith-w4-todo.md)  

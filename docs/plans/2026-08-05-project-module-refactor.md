@@ -1,5 +1,7 @@
 # Project module refactor — tracker (2026-08-05)
 
+> ⚠️ **本板已收口（SUPERSEDED）**：硬化 / 可靠性 / 安全 / 可观测 / 契约缺口统一在 **[单一硬化执行板](./2026-08-08-project-hardening-refactor-todoplan.md)** 跟踪（现状快照 §1.1 已硬化 / §1.2 仍缺口）。本板不再新增 TODO；旧逻辑由 H4–H6 波次退役。
+
 **Status:** **SUPERSEDED for new structure work** → [2026-08-07-code-slim-consolidation-todoplan.md](2026-08-07-code-slim-consolidation-todoplan.md) · W0–W7 + safe migrate queue DONE · do not reopen vanity moves
 
 **Metabolism batch 2.40.39:** 8 more P3-1 moves + plate-slot sites + `core.emit` tests · **2.40.38:** [inventory](../reports/2026-08-06-code-metabolism-inventory.md) · migrate+shim 5 modules + golden_suite/color_grade shims · peel `resolve_plate_slot_sec`
