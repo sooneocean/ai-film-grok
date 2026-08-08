@@ -213,7 +213,7 @@ def resolve_still_source(
                 from continue_handoff import find_shot
 
                 sh = find_shot(spec, shot_id) or {}
-            except Exception:
+            except Exception:  # noqa: BLE001
                 sh = {}
     wardrobe = wardrobe_of(sh)
     w_rank = wardrobe_rank(wardrobe)
@@ -250,7 +250,7 @@ def resolve_still_source(
             from continue_handoff import shot_wants_continue
 
             wants = shot_wants_continue(sh)
-        except Exception:
+        except Exception:  # noqa: BLE001
             wants = False
     if wants and cont_path is not None:
         return _entry(
@@ -333,7 +333,7 @@ def resolve_still_source(
                     wardrobe_rank_val=w_rank,
                     parents=parents,
                 )
-    except Exception:
+    except Exception:  # noqa: BLE001
         pass
 
     # 5) state photo (still gen or missing keyframe)
@@ -438,7 +438,7 @@ def assert_still_source_safe(
                 )
     except StillSourceError:
         raise
-    except Exception:
+    except Exception:  # noqa: BLE001
         pass  # soft if gate import/deps missing
 
     # F3 · face-lock generation bind (enroll + no archive still as H3 source)
@@ -462,7 +462,7 @@ def assert_still_source_safe(
             raise StillSourceError(
                 f"still face-lock bind failed for {shot_id or '?'}: {exc}"
             ) from exc
-        except Exception:
+        except Exception:  # noqa: BLE001
             pass  # soft if face stack unavailable
     return entry
 

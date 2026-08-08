@@ -396,7 +396,7 @@ def cmd_dispatch(args: argparse.Namespace) -> int:
             )
             if persisted.get("errors"):
                 packet["hud_sync_error"] = persisted["errors"]
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             packet["hud_sync_error"] = [str(exc)[:300]]
 
     if bool(getattr(args, "print_cmd_only", False)):

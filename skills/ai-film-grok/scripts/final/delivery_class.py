@@ -50,7 +50,7 @@ def assess_plate_boring_meat_mean(root: Path | str | None = None) -> dict[str, A
             film_root=root,
             call_site="assess_plate_boring_meat_mean",
         )
-    except Exception:
+    except Exception:  # noqa: BLE001
         _plate_skip = os.environ.get("AIFILM_SKIP_PLATE_BORING", "").strip().lower() in {
             "1",
             "true",
@@ -269,7 +269,7 @@ def write_official_final_report(root: Path | str, payload: dict[str, Any]) -> Pa
         from core.skip_audit import attach_skips_to_report
 
         body = attach_skips_to_report(body, root_p)
-    except Exception:
+    except Exception:  # noqa: BLE001
         body.setdefault("skips_used", [])
     out = root_p / "receipts" / "official-final-report.json"
     out.parent.mkdir(parents=True, exist_ok=True)

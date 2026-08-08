@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any
 
 from util import utc_now
+from util.logger import log
 
 RECEIPT_REL = Path("receipts/cast-generation.json")
 _ARCHIVE_RE = re.compile(r"(^|/)(_archive[^/]*|archive_pre_|_archive_pre_)", re.I)
@@ -33,7 +34,11 @@ def _env_skip(root: Path | None = None) -> bool:
                 call_site="env_skip",
             )
         )
-    except Exception:
+    except Exception as exc:  # noqa: BLE001
+        log.debug(
+            "skip_flag unavailable for AIFILM_SKIP_IDENTITY_GEN; fallback to direct env read: %s",
+            exc,
+        )
         return os.environ.get("AIFILM_SKIP_IDENTITY_GEN", "").strip().lower() in {
             "1",
             "true",
@@ -88,12 +93,13 @@ def _load_json(path: Path) -> dict[str, Any]:
 
         data = read_json(path)
         return data if isinstance(data, dict) else {}
-    except Exception:
+    except Exception:  # noqa: BLE001
         try:
             import json
 
             return json.loads(path.read_text(encoding="utf-8"))
-        except Exception:
+        except Exception as exc2:  # noqa: BLE001
+            log.warning("identity lock load failed at %s: %s", path, exc2)
             return {}
 
 
@@ -236,7 +242,7 @@ def audit_identity_generation(
             None
             if ok and not identity_partial
             else (
-                'aifilm face-identity enroll-bible && aifilm face-identity audit  # or re-I2V; '
+                "aifilm face-identity enroll-bible && aifilm face-identity audit  # or re-I2V; "
                 "never mix _archive_* into final"
             )
         ),
@@ -253,7 +259,8 @@ def _write_receipt(root: Path, rep: dict[str, Any]) -> Path:
         from util import write_json
 
         write_json(out, rep)
-    except Exception:
+    except Exception as exc:  # noqa: BLE001
+        log.warning("identity receipt write_json failed; raw fallback: %s", exc)
         import json
 
         out.write_text(json.dumps(rep, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
@@ -270,9 +277,8 @@ def assert_identity_generation_ok(
     rep = audit_identity_generation(root, write_receipt=True, force=force)
     if not rep.get("ok"):
         raise IdentityGenerationError(
-            "ARCHIVE_MIX_IN_TIMELINE: " + "; ".join(
-                i.get("message", "") for i in (rep.get("issues") or [])[:3]
-            )
+            "ARCHIVE_MIX_IN_TIMELINE: "
+            + "; ".join(i.get("message", "") for i in (rep.get("issues") or [])[:3])
         )
     if not allow_partial and rep.get("identity_partial"):
         raise IdentityGenerationError(

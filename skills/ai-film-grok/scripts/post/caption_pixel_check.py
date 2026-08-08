@@ -38,7 +38,7 @@ def _skip_enabled(root: Path | str | None = None) -> bool:
             film_root=root,
             call_site="caption_pixel_check._skip_enabled",
         )
-    except Exception:
+    except Exception:  # noqa: BLE001
         return str(os.environ.get("AIFILM_SKIP_CAPTION_PIXEL") or "").strip().lower() in {
             "1",
             "true",
@@ -164,7 +164,7 @@ def _cue_mid_timestamps(srt: Path, *, max_samples: int = 5) -> list[float]:
         from subtitle_dialogue_alignment import _cues
 
         cues = _cues(srt)
-    except Exception:
+    except Exception:  # noqa: BLE001
         cues = []
     if not cues:
         return [1.0, 3.0]

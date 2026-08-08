@@ -5,10 +5,10 @@ from typing import Any
 
 try:
     from final.caption_text import split_units
-except Exception:
+except Exception:  # noqa: BLE001
     try:
         from render_final import split_units
-    except Exception:
+    except Exception:  # noqa: BLE001
         split_units = None  # type: ignore
 HF_CAPTION_MAX_CHARS = 14
 def expand_cues_phrase_split(
@@ -24,11 +24,11 @@ def expand_cues_phrase_split(
     """
     try:
         from render_final import split_units
-    except Exception:  # pragma: no cover
+    except Exception:  # pragma: no cover  # noqa: BLE001
         split_units = None  # type: ignore
     try:
         from export_composition import format_caption_lines
-    except Exception:  # pragma: no cover
+    except Exception:  # pragma: no cover  # noqa: BLE001
         format_caption_lines = None  # type: ignore
 
     if not cues:

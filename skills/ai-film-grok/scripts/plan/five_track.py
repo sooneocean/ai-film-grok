@@ -55,7 +55,7 @@ def policy_skip_enabled(root: Path | str | None = None) -> bool:
             film_root=root,
             call_site="five_track.policy_skip_enabled",
         )
-    except Exception:
+    except Exception:  # noqa: BLE001
         return os.environ.get("AIFILM_SKIP_FIVE_TRACK", "").strip().lower() in {
             "1",
             "true",

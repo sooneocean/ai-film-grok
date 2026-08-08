@@ -124,7 +124,7 @@ def _bgm_row_from_shot(shot: dict[str, Any], *, default_mood: str) -> dict[str, 
         from music_cue import compile_music_cue
 
         cue = compile_music_cue(shot, default_mood=default_mood)
-    except Exception:
+    except Exception:  # noqa: BLE001
         cue = {
             "mood": default_mood,
             "energy": 0.55,

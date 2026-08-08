@@ -14,7 +14,7 @@ from typing import Any
 
 try:
     from util.logger import log
-except Exception:  # pragma: no cover - ultra-early import path
+except Exception:  # pragma: no cover - ultra-early import path  # noqa: BLE001
     log = None  # type: ignore[assignment]
 
 # IRON-class escapes: closeout refuses cert / forces PARTIAL when used without reason.
@@ -105,7 +105,7 @@ def load_skip_usage(root: Path | str | None) -> dict[str, Any]:
         from util import read_json
 
         data = read_json(path) or {}
-    except Exception:
+    except Exception:  # noqa: BLE001
         data = {}
     if not isinstance(data, dict):
         data = {}
@@ -146,7 +146,7 @@ def record_skip_usage(
             from util import utc_now
 
             at = utc_now()
-        except Exception:
+        except Exception:  # noqa: BLE001
             at = None
         entries.append(
             {

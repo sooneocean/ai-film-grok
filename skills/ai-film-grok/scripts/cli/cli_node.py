@@ -51,7 +51,7 @@ def _audio_status() -> dict[str, Any]:
         return {"status": "unavailable", "reason": "not_configured"}
     try:
         report = public_health_report(health(base, token), secret_values=(token,))
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         return {"status": "unavailable", "reason": _safe_reason(exc)}
     return {"status": "reachable" if report.get("ok") else "degraded", **report}
 
@@ -79,7 +79,7 @@ def node_status(base_url: str) -> dict[str, Any]:
             },
             "disk": {"status": "unavailable", "reason": "not_reported_by_comfyui"},
         }
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         comfy = {"status": "unavailable", "reason": _safe_reason(exc)}
     audio = _audio_status()
     statuses = {str(comfy["status"]), str(audio["status"])}
@@ -153,7 +153,7 @@ def run_node(args: argparse.Namespace, *, emit: Callable[[dict[str, Any]], None]
             if not bool(args.confirm):
                 raise ComfyVideoError("node recover requires --confirm")
             report = _recover(base_url)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         report = {
             "schema_version": 1,
             "kind": "rtx5090-node-error",

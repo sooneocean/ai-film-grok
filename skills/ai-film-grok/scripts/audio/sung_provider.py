@@ -85,7 +85,7 @@ def _detect_local_tts() -> tuple[str, Callable[..., Any]] | None:
             continue
         try:
             mod = importlib.import_module(mod_name)
-        except Exception:
+        except Exception:  # noqa: BLE001
             continue
         fn = getattr(mod, "synthesize", None)
         if callable(fn):

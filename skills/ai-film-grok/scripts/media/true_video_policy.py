@@ -137,7 +137,7 @@ def policy_skip_enabled(root: Path | str | None = None) -> bool:
             film_root=root,
             call_site="true_video_policy.policy_skip_enabled",
         )
-    except Exception:
+    except Exception:  # noqa: BLE001
         return os.environ.get("AIFILM_SKIP_TRUE_VIDEO_POLICY", "").strip().lower() in {
             "1",
             "true",
@@ -432,7 +432,7 @@ def scan_manifest_true_video(
             from quality_gates import shot_role
 
             role = shot_role(base, str(shot_id))
-        except Exception:
+        except Exception:  # noqa: BLE001
             role = "hero"
         try:
             assert_hero_clip_source(

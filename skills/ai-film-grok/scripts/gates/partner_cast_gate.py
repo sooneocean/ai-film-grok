@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from util import utc_now
+from util.logger import log
 
 RECEIPT_REL = Path("receipts/partner-cast-gate.json")
 _CHAR_LINE = re.compile(r"Character\s+([A-Za-z0-9_\-]+)\s*:", re.I)
@@ -29,7 +30,11 @@ def _env_skip(root: Path | None = None) -> bool:
                 call_site="env_skip",
             )
         )
-    except Exception:
+    except Exception as exc:  # noqa: BLE001
+        log.debug(
+            "skip_flag unavailable for AIFILM_SKIP_PARTNER_CAST; fallback to direct env read: %s",
+            exc,
+        )
         return os.environ.get("AIFILM_SKIP_PARTNER_CAST", "").strip().lower() in {
             "1",
             "true",
@@ -44,7 +49,8 @@ def _load_json(path: Path) -> dict[str, Any]:
 
         data = read_json(path)
         return data if isinstance(data, dict) else {}
-    except Exception:
+    except Exception as exc:  # noqa: BLE001
+        log.warning("partner cast lock load failed at %s: %s", path, exc)
         return {}
 
 
@@ -236,9 +242,7 @@ def audit_partner_cast(
         issues.extend(dual_prompt_issues[:12])
 
     # hard when style claims locked or adult-looking multi cast incomplete
-    hard = bool(missing_master or missing_face) and (
-        style_locked_flag or len(cast) >= 2
-    )
+    hard = bool(missing_master or missing_face) and (style_locked_flag or len(cast) >= 2)
     # dual prompt is advisory (soft codes only for ok)
     soft_only = set(codes) <= {"DUAL_CHAR_PROMPT_MISSING"}
     ok = (not hard) if not soft_only else True
@@ -276,7 +280,8 @@ def _write(root: Path, rep: dict[str, Any]) -> Path:
         from util import write_json
 
         write_json(out, rep)
-    except Exception:
+    except Exception as exc:  # noqa: BLE001
+        log.warning("partner cast receipt write_json failed; raw fallback: %s", exc)
         import json
 
         out.write_text(json.dumps(rep, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")

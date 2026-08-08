@@ -356,7 +356,7 @@ def approved_clip_record(record: object) -> bool:
             review_note=str(record.get("review_note") or "") or None,
         ):
             return False
-    except Exception:
+    except Exception:  # noqa: BLE001
         pass
     return True
 
@@ -458,14 +458,14 @@ def lint_still_not_character_sheet(source: str | Path) -> dict[str, Any]:
         import statistics
 
         from PIL import Image
-    except Exception as exc:  # pragma: no cover
+    except Exception as exc:  # pragma: no cover  # noqa: BLE001
         out["soft_codes"] = ["STILL_SHEET_LINT_UNAVAILABLE"]
         out["signals"] = {"import_error": str(exc)}
         return out
 
     try:
         im = Image.open(source).convert("RGB")
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         out["ok"] = False
         out["codes"] = ["KEYFRAME_UNREADABLE"]
         out["errors"] = [f"cannot open still: {exc}"]

@@ -134,7 +134,7 @@ def collect_pending_review_blockers(
             from review_control import review_queue
 
             items = review_queue(base).get("items") or []
-        except Exception:
+        except Exception:  # noqa: BLE001
             items = []
         if isinstance(items, list):
             for item in items:
@@ -173,7 +173,7 @@ def collect_pending_review_blockers(
                         "candidates": shot.get("candidate_count"),
                     }
                 )
-        except Exception:
+        except Exception:  # noqa: BLE001
             pass
     return blockers
 

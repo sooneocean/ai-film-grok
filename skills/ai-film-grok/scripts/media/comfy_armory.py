@@ -696,7 +696,7 @@ def probe_armory(base_url: str | None = None) -> dict[str, Any]:
                 for filename, expected_hash in expected.items():
                     try:
                         actual_hash = _model_sha256(url, group, filename)
-                    except Exception as exc:
+                    except Exception as exc:  # noqa: BLE001
                         hash_errors.setdefault(group, {})[filename] = str(exc)[:200]
                         continue
                     if actual_hash != expected_hash:

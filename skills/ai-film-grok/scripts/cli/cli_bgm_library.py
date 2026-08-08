@@ -335,7 +335,7 @@ def cmd_bgm_library(args: argparse.Namespace, *, emit) -> int:
         else:
             try:
                 node = _public_node_health(health(base, token), token=token)
-            except Exception:
+            except Exception:  # noqa: BLE001
                 node = {"ok": False, "error": "audio node health check failed"}
         from audio_armory import inspect_audio_armory, plan_audio_weapon
 

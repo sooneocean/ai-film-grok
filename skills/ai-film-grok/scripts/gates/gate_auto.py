@@ -23,6 +23,7 @@ from typing import Any
 
 from util import read_json, utc_now, write_json
 from util.errors import FilmError
+from util.logger import log
 
 RECEIPT = "gate-auto.json"
 I2V_RECEIPT = "i2v-final-gate.json"
@@ -52,7 +53,10 @@ def skip_enabled(root: Path | str | None = None) -> bool:
             film_root=root,
             call_site="gate_auto.skip_enabled",
         )
-    except Exception:
+    except Exception as exc:  # noqa: BLE001
+        log.debug(
+            "skip_flag unavailable for AIFILM_SKIP_GATE_AUTO; fallback to direct env read: %s", exc
+        )
         return os.environ.get("AIFILM_SKIP_GATE_AUTO", "").strip().lower() in {
             "1",
             "true",
@@ -156,16 +160,13 @@ def next_machine_lane_action(
             }
         if human_pk and ship.get("ok") is True:
             pager = (
-                ship.get("human_one_pager")
-                or ship.get("dailies_path")
-                or "receipts/pk-dailies.md"
+                ship.get("human_one_pager") or ship.get("dailies_path") or "receipts/pk-dailies.md"
             )
             return {
                 "id": "gate-auto",
                 "cmd": f'aifilm gate-auto --root "{r}"',
                 "why": (
-                    f"机读过闸；人审 PK 仍待 promote（{pager}）—"
-                    "gate 可先跑，export 前再 promote"
+                    f"机读过闸；人审 PK 仍待 promote（{pager}）—gate 可先跑，export 前再 promote"
                 ),
             }
     return {
@@ -399,13 +400,14 @@ def run_gate_auto(
 
     # 0) edit-director desk (advisory; hard only on post-route mismatch)
     try:
-        from edit_director import draft_and_save, plan_path, status as edit_director_status
+        from edit_director import draft_and_save, plan_path
+        from edit_director import status as edit_director_status
 
         if write and not plan_path(base).is_file():
             try:
                 draft_and_save(base, force=False)
-            except Exception:
-                pass
+            except Exception as exc:  # noqa: BLE001
+                log.warning("edit-director draft failed (advisory, ignored): %s", exc)
         ed_st = edit_director_status(base)
         blocked = ed_st.get("blocked_by") or []
         if isinstance(blocked, str):
@@ -421,11 +423,7 @@ def run_gate_auto(
                     f"blocked={blocked or None} "
                     f"route={((ed_st.get('engine_route') or {}).get('caption_path'))}"
                 )[:200],
-                next_cmd=(
-                    ed_st.get("next_cmd")
-                    if not ed_st.get("ok") or mismatch
-                    else None
-                ),
+                next_cmd=(ed_st.get("next_cmd") if not ed_st.get("ok") or mismatch else None),
                 codes=list(blocked) if mismatch else [],
             )
         )
@@ -590,9 +588,7 @@ def run_gate_auto(
                     hard=bool(meat_n >= 2) and not bool(vpx.get("skipped")),
                     next_cmd=vpx.get("next_cmd"),
                     codes=[
-                        str(i.get("code"))
-                        for i in (vpx.get("issues") or [])
-                        if isinstance(i, dict)
+                        str(i.get("code")) for i in (vpx.get("issues") or []) if isinstance(i, dict)
                     ],
                 )
             )

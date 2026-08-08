@@ -36,7 +36,7 @@ def _env_skip(root: Path | str | None = None) -> bool:
             film_root=root,
             call_site="anatomy_safety._env_skip",
         )
-    except Exception:
+    except Exception:  # noqa: BLE001
         return os.environ.get("AIFILM_SKIP_ANATOMY_SAFETY", "").strip().lower() in {
             "1",
             "true",
@@ -155,7 +155,7 @@ def require_anatomy_safe(
                     note=review_note,
                     source="require_anatomy_safe",
                 )
-            except Exception:
+            except Exception:  # noqa: BLE001
                 pass
         return
     raise AnatomySafetyError(
@@ -286,7 +286,7 @@ def assert_still_anatomy_for_i2v(
                 "provenance_complete": False,
                 "note": "anatomy_safe=true without attestation ledger row",
             }
-    except Exception:
+    except Exception:  # noqa: BLE001
         provenance = None
 
     out: dict[str, Any] = {

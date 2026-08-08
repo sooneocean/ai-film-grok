@@ -47,7 +47,7 @@ def _env_skip(root: Path | str | None = None) -> bool:
             film_root=root,
             call_site="composition_anti_hijack._env_skip",
         )
-    except Exception:
+    except Exception:  # noqa: BLE001
         return os.environ.get("AIFILM_SKIP_ANTI_HIJACK", "").strip() in {
             "1",
             "true",

@@ -735,7 +735,7 @@ def resolve_prompt_family_for_shot(
         if not still_flag and role in {"hero", "insert", ""}:
             still_flag = True
         lane = infer_combo_lane(shot, intent=intent, has_still=still_flag)
-    except Exception:
+    except Exception:  # noqa: BLE001
         lane = None
     if not lane:
         raw = (

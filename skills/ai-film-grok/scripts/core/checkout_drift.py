@@ -14,7 +14,7 @@ from typing import Any
 
 try:
     from util.logger import log
-except Exception:  # pragma: no cover
+except Exception:  # pragma: no cover  # noqa: BLE001
     log = None  # type: ignore[assignment]
 
 # Canonical paths from AGENTS.md (macOS dex layout; overridable via env later if needed)

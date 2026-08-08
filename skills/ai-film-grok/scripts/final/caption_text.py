@@ -525,7 +525,7 @@ def write_srt(path: Path, cues: list[dict[str, Any]], *, preserve_overlaps: bool
         return
     try:
         from caption_pixel_check import fix_chinese_caption_text
-    except Exception:  # pragma: no cover
+    except Exception:  # pragma: no cover  # noqa: BLE001
 
         def fix_chinese_caption_text(t: str) -> str:  # type: ignore
             return t

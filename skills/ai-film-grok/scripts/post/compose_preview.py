@@ -294,7 +294,7 @@ def compose_preview_remotion(
             from compose_render import copy_remotion_media
 
             copy_remotion_media(root)
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             log(f"warning: remotion media-copy before studio: {exc}")
 
     cmd = remotion_studio_cmd(rem_dir, port=port)

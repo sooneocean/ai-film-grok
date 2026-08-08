@@ -72,7 +72,7 @@ def project_events_tail(
         from pipeline_events import load_events
 
         events, invalid = load_events(base)
-    except Exception:
+    except Exception:  # noqa: BLE001
         return out
     if since:
         events = [
@@ -109,7 +109,7 @@ def project_human_inbox(root: Path | str) -> list[dict[str, Any]]:
         from review_control import review_queue
 
         items = review_queue(base).get("items") or []
-    except Exception:
+    except Exception:  # noqa: BLE001
         items = []
     if isinstance(items, list):
         for item in items:
@@ -141,7 +141,7 @@ def project_human_inbox(root: Path | str) -> list[dict[str, Any]]:
 
         ap = load_settings(base).get("autopilot") or {}
         sample_every = max(1, int(ap.get("sample_every") or 5))
-    except Exception:
+    except Exception:  # noqa: BLE001
         pass
     try:
         from web.takes_api import list_take_shots
@@ -166,7 +166,7 @@ def project_human_inbox(root: Path | str) -> list[dict[str, Any]]:
                     "approval_id": None,
                 }
             )
-    except Exception:
+    except Exception:  # noqa: BLE001
         pass
     return inbox[:40]
 
@@ -203,7 +203,7 @@ def project_director_live(root: Path | str, *, include_token: bool = False) -> d
         g = collect_gates(base)
         gates_blocking = bool(g.get("blocking"))
         hard_fail = list(g.get("hard_fail") or [])[:12]
-    except Exception:
+    except Exception:  # noqa: BLE001
         pass
     ledger_revision = 0
     try:
@@ -212,21 +212,21 @@ def project_director_live(root: Path | str, *, include_token: bool = False) -> d
         ledger = read_approval_ledger(base)
         if isinstance(ledger, dict):
             ledger_revision = int(ledger.get("revision") or 0)
-    except Exception:
+    except Exception:  # noqa: BLE001
         pass
     multi_take = 0
     try:
         from web.takes_api import list_take_shots
 
         multi_take = int(list_take_shots(base).get("multi_take_count") or 0)
-    except Exception:
+    except Exception:  # noqa: BLE001
         pass
     review_mode = "async_dailies"
     try:
         from review_mode_policy import get_review_mode
 
         review_mode = get_review_mode(base)
-    except Exception:
+    except Exception:  # noqa: BLE001
         pass
     return {
         "kind": "director-center-live",

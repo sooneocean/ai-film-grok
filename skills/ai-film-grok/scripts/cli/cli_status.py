@@ -36,7 +36,7 @@ def cmd_status(args: argparse.Namespace) -> int:
         from scene_sound import reconcile as reconcile_scene_sound
 
         scene_sound = reconcile_scene_sound(root, write=False)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         scene_sound = {"status": "error", "error": str(exc)[:200]}
     manifest = copy.deepcopy(load_manifest(root))
     summary = recompute_gates(root, manifest)
@@ -57,7 +57,7 @@ def cmd_status(args: argparse.Namespace) -> int:
         from production_gates import pilot_is_user_approved as _pilot_ok
 
         pilot_ok = _pilot_ok(pilot_data) if pilot_data else False
-    except Exception:
+    except Exception:  # noqa: BLE001
         pilot_ok = False
     gates = summary.get("gates") or {}
     open_n = int(summary.get("open_reshoot_count") or 0)
@@ -65,7 +65,7 @@ def cmd_status(args: argparse.Namespace) -> int:
         next_actions, pipeline_stage, next_cmd, _next_id = _pipeline_bundle(
             root, gates=gates, open_n=open_n, persist=False
         )
-    except Exception:
+    except Exception:  # noqa: BLE001
         next_actions = []
         pipeline_stage = {"stage": "unknown", "label_zh": "未知", "error": "detect_failed"}
         next_cmd = None
@@ -98,7 +98,7 @@ def cmd_status(args: argparse.Namespace) -> int:
             "final_state": promotion["final"]["state"],
             "highest_roi_actions": promotion["highest_roi_actions"],
         }
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         promotion_summary = {"error": str(exc)[:200], "report_only": True}
     emit(
         {
@@ -171,7 +171,7 @@ def _status_inventory(root: Path, summary: dict[str, Any]) -> dict[str, Any]:
             require_vo=bool(vo_ids),
         )
         return report
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         return {"ok": False, "error": str(exc)[:200]}
 
 
@@ -181,7 +181,7 @@ def _status_evidence(root: Path) -> dict[str, Any]:
         from evidence_status import classify_evidence
 
         return classify_evidence(root)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         return {"error": str(exc)[:200]}
 
 
@@ -210,7 +210,7 @@ def _status_audio_summary(root: Path) -> dict[str, Any]:
             out["sidechain"] = sp.get("sidechain")
             if spec.get("_tts_notes"):
                 out["tts_notes"] = spec.get("_tts_notes")
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             out["spec_error"] = str(exc)[:160]
     mix_path = root / "audio" / "mix_report.json"
     if mix_path.is_file():
@@ -228,7 +228,7 @@ def _status_audio_summary(root: Path) -> dict[str, Any]:
             out["loudnorm_policy"] = mix.get("loudnorm_policy")
             out["bed_source"] = mix.get("bed_source")
             out["music_template"] = mix.get("music_template")
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             out["mix_error"] = str(exc)[:160]
     # Also surface whether a local template file exists (pre-final)
     try:
@@ -244,7 +244,7 @@ def _status_audio_summary(root: Path) -> dict[str, Any]:
         out["local_music_available"] = bool(mt)
         if mt:
             out["local_music_path"] = mt.get("relative") or mt.get("path")
-    except Exception:
+    except Exception:  # noqa: BLE001
         out["local_music_available"] = False
     return out
 
@@ -261,7 +261,7 @@ def _status_remotion_probe(root: Path) -> dict[str, Any]:
             "package_json": bool(info.get("package_json")),
             "node_modules": bool(info.get("node_modules")),
         }
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         return {"ready": False, "error": str(exc)[:200]}
 
 
@@ -312,21 +312,21 @@ def cmd_doctor(args: argparse.Namespace) -> int:
         import edge_tts  # noqa: F401
 
         edge_ok = True
-    except Exception as exc:  # pragma: no cover
+    except Exception as exc:  # pragma: no cover  # noqa: BLE001
         edge_err = str(exc)
     numpy_ok = False
     try:
         import numpy  # noqa: F401
 
         numpy_ok = True
-    except Exception:
+    except Exception:  # noqa: BLE001
         pass
     pil_ok = False
     try:
         from PIL import Image  # noqa: F401
 
         pil_ok = True
-    except Exception:
+    except Exception:  # noqa: BLE001
         pass
     tts_info: dict[str, Any] = {}
     lipsync_info: dict[str, Any] = {}
@@ -335,13 +335,13 @@ def cmd_doctor(args: argparse.Namespace) -> int:
         from tts_backend import probe as tts_probe  # type: ignore
 
         tts_info = tts_probe()
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         tts_info = {"ok": False, "error": str(exc)}
     try:
         from lipsync_backend import probe as lipsync_probe  # type: ignore
 
         lipsync_info = lipsync_probe()
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         lipsync_info = {"ok": False, "error": str(exc)}
     requirements = verify_requirements_lock(skill_dir / "requirements.lock", skill_dir)
     runtime = verify_runtime_lock(skill_dir, skill_dir / "runtime-lock.json")
@@ -354,7 +354,7 @@ def cmd_doctor(args: argparse.Namespace) -> int:
         example = read_json(skill_dir / "templates" / "film-spec.example.json")
         jsonschema.validate(example, schema)
         schema_ok = True
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         schema_error = str(exc)
     config_env = skill_dir / "config.env"
     config_env_mode = stat.S_IMODE(config_env.stat().st_mode) if config_env.is_file() else None
@@ -450,7 +450,7 @@ def cmd_doctor(args: argparse.Namespace) -> int:
             "probe_fn": "probe_remotion_readiness(film_root)",
         }
         _ = probe_remotion_readiness  # keep import for doctor consumers
-    except Exception as exc:  # pragma: no cover — defensive
+    except Exception as exc:  # pragma: no cover — defensive  # noqa: BLE001
         designed["error"] = str(exc)[:200]
     # Soft notice only — missing HyperFrames must not fail ffmpeg-only production or --strict
     if not designed.get("ok"):
@@ -486,7 +486,7 @@ def cmd_doctor(args: argparse.Namespace) -> int:
                 }
             except Exception as ens_exc:  # noqa: BLE001 — doctor soft
                 tunnel["auto_ensure_error"] = str(ens_exc)[:200]
-    except Exception as exc:  # pragma: no cover
+    except Exception as exc:  # pragma: no cover  # noqa: BLE001
         tunnel = {"ok": None, "skipped": True, "error": str(exc)[:160], "advisory": True}
     report["comfy_tunnel"] = tunnel
 
@@ -605,7 +605,7 @@ def cmd_doctor(args: argparse.Namespace) -> int:
         from grok_oauth import probe as grok_oauth_probe
 
         grok_oauth = grok_oauth_probe()
-    except Exception as exc:  # pragma: no cover
+    except Exception as exc:  # pragma: no cover  # noqa: BLE001
         grok_oauth = {"ok": False, "error": str(exc)[:200]}
     report["grok_oauth"] = {
         "ok": bool(grok_oauth.get("ok")),

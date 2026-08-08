@@ -497,7 +497,7 @@ def cmd_takes(args: argparse.Namespace) -> int:
                 note=status,
                 actor="cli-takes",
             )
-        except Exception:
+        except Exception:  # noqa: BLE001
             pass
         report["root"] = str(root)
         report["action"] = action

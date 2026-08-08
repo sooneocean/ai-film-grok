@@ -306,7 +306,7 @@ def concat_picture_timeline(
                 full_join_styles = [full_join_styles[0], *aligned, full_join_styles[-1]]
         except RenderError:
             raise
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             log(f"plate transition_ops align skipped: {exc}"[:160])
     full_join_use_ts = resolve_join_transition_secs(
         spec.get("join_transition_secs"),

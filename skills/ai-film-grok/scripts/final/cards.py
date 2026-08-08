@@ -76,7 +76,7 @@ def sub_png(
             from subtitle_typesetter import break_text_semantically
 
             lines = break_text_semantically(text, max_chars=18)
-        except Exception:
+        except Exception:  # noqa: BLE001
             lines = [text]
 
         font = ImageFont.truetype(font_path, max(30, width // 21))

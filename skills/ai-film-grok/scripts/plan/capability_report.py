@@ -91,7 +91,7 @@ def suggest_i2v_from_canary(
         from film_spec import resolve_i2v_profile
 
         profile = resolve_i2v_profile()
-    except Exception:
+    except Exception:  # noqa: BLE001
         profile = "h3_primary"
     out["i2v_profile"] = profile
     if profile in {"ltx23_primary", "ltx23_adult"}:

@@ -745,7 +745,7 @@ def assets_check(root: Path, *, sync_first: bool = True) -> dict[str, Any]:
                 if axis_idx < prev:
                     state_issues.append(f"state_regression:{sid}:{axis}:{label}<{axis_list[prev]}")
                 prev_levels[axis] = max(prev, axis_idx)
-    except Exception:
+    except Exception:  # noqa: BLE001
         pass
     has_state_regression = len(state_issues) > 0
 

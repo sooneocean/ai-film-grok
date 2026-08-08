@@ -62,7 +62,7 @@ def _coverage_issues(shots: list[dict[str, Any]]) -> list[dict[str, Any]]:
             embedded.extend(
                 (shot, entry) for entry in validate_dialogue_broll(shot, shot_id=shot_id)
             )
-        except Exception:
+        except Exception:  # noqa: BLE001
             issues.append(
                 _issue(
                     "DIALOGUE_BROLL_INVALID",

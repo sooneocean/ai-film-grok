@@ -395,7 +395,7 @@ def build_dispatch(
         from film_spec import resolve_i2v_profile
 
         i2v_profile = resolve_i2v_profile()
-    except Exception:
+    except Exception:  # noqa: BLE001
         pass
 
     # Capability hygiene once per media-ish ring
@@ -689,7 +689,7 @@ def build_dispatch(
             from production_gates import load_pilot_approval, pilot_is_user_approved
 
             pilot_ok_now = pilot_is_user_approved(load_pilot_approval(root))
-        except Exception:
+        except Exception:  # noqa: BLE001
             pilot_ok_now = False
         if pilot_ok_now and not gates.get("clips_complete"):
             bulk_rec = read_json(root / "receipts" / "bulk-preflight.json") or {}
@@ -712,7 +712,7 @@ def build_dispatch(
 
             h3_cfg = resolve_h3_config(spec_for_routing if isinstance(spec_for_routing, dict) else {})
             h3_on = bool(h3_cfg.get("enabled")) if isinstance(h3_cfg, dict) else False
-        except Exception:
+        except Exception:  # noqa: BLE001
             h3_on = False
             try:
                 sp = spec_for_routing if isinstance(spec_for_routing, dict) else {}
@@ -723,7 +723,7 @@ def build_dispatch(
                         or str(sp.get("_i2v_profile") or "") in {"hybrid_h3", "h3_primary"}
                     )
                 )
-            except Exception:
+            except Exception:  # noqa: BLE001
                 h3_on = False
         if h3_on:
             pre(
@@ -746,7 +746,7 @@ def build_dispatch(
             lane = next_machine_lane_action(root, prefer_ship_prep=True)
             if lane:
                 pre(lane["id"], lane["cmd"], lane["why"], "visual")
-        except Exception:
+        except Exception:  # noqa: BLE001
             pre(
                 "gate-auto",
                 f'aifilm gate-auto --root "{r}"',
@@ -881,7 +881,7 @@ def build_dispatch(
             # Prefer heat over bulk when hard_fail; still surface when only needs_boost
             actions = [a for a in actions if a.get("id") != "heat-boost"]
             actions.insert(0, heat_action)
-    except Exception:
+    except Exception:  # noqa: BLE001
         heat_status = None
 
     provisional_primary = (
@@ -1022,7 +1022,7 @@ def build_dispatch(
                     2,
                     f"优先：aifilm state-index plan（{len(si.get('generate_plan') or [])} 项）",
                 )
-        except Exception:
+        except Exception:  # noqa: BLE001
             pass
         # Wave 4/5: surface heat boost already selected as primary (see pre-primary insert)
         if (
@@ -1359,7 +1359,7 @@ def build_dispatch(
             # Prefer action id; fall back to cli: prefix rows
             if get_route(f"cli:{route_catalog_id}") is not None:
                 route_catalog_id = f"cli:{route_catalog_id}"
-    except Exception:
+    except Exception:  # noqa: BLE001
         pass
 
     packet = {

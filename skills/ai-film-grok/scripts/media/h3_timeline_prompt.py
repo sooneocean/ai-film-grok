@@ -234,7 +234,7 @@ def _camera_seed(shot: dict[str, Any]) -> str:
         from motion_prompt_spine import motion_tier_for
 
         return tier_hint.get(motion_tier_for(shot), tier_hint["medium"])
-    except Exception:
+    except Exception:  # noqa: BLE001
         return tier_hint["medium"]
 
 
@@ -297,7 +297,7 @@ def continuity_header(
             from motion_prompt_spine import spoken_dialogue_text
 
             compact = bool(spoken_dialogue_text(shot))
-        except Exception:
+        except Exception:  # noqa: BLE001
             compact = False
     if compact:
         lines = [
@@ -786,7 +786,7 @@ def compile_h3_timeline_prompt(
         from input_fidelity import inject_story_beat_into_prompt
 
         body = inject_story_beat_into_prompt(body, shot_x)
-    except Exception:
+    except Exception:  # noqa: BLE001
         pass
     if include_provider_prefix:
         return f"{provider_prefix(mode)} {body}".strip()

@@ -60,7 +60,7 @@ def _env_skip(root: Path | str | None = None) -> bool:
             film_root=root,
             call_site="composition_fill_gate._env_skip",
         )
-    except Exception:
+    except Exception:  # noqa: BLE001
         return os.environ.get("AIFILM_SKIP_COMPOSITION_FILL", "").strip().lower() in {
             "1",
             "true",
@@ -635,7 +635,7 @@ def audit_film_composition_fill(
             for s in tl.get("shots") or []:
                 if isinstance(s, dict) and s.get("id"):
                     ids.append(str(s["id"]))
-        except Exception:
+        except Exception:  # noqa: BLE001
             ids = []
     if not ids:
         kf_dir = root / "keyframes"

@@ -142,7 +142,7 @@ def run_pil_caption_burn(root: Path, *, video: Path, srt: Path, out: Path) -> di
         from render_final import stable_path_for_ffmpeg_filter
 
         srt_use = stable_path_for_ffmpeg_filter(srt_use, suffix=".srt", prefix="aifilm-srt")
-    except Exception:
+    except Exception:  # noqa: BLE001
         srt_use = Path(srt)
     cmd = [
         sys.executable,
@@ -188,7 +188,7 @@ def ensure_captions_after_hf(root: Path, *, final_mp4: Path) -> dict[str, Any]:
                 for i in idxs:
                     start, end = cues[i]
                     timestamps.append(round(start + max(0.05, (end - start) / 2), 3))
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             # A1 · keep fallback stamps but surface probe fail (no silent skip)
             cue_probe_error = f"srt cue probe failed: {exc}"[:200]
 

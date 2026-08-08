@@ -132,7 +132,7 @@ def scale_promote_skip(root: Path | str | None = None) -> bool:
             film_root=root,
             call_site="scale_fallback.scale_promote_skip",
         )
-    except Exception:
+    except Exception:  # noqa: BLE001
         return os.environ.get("AIFILM_SKIP_SCALE_PROMOTE_GATE", "").strip().lower() in {
             "1",
             "true",

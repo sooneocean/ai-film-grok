@@ -354,7 +354,7 @@ def build_shot_intent(
         from film_spec import resolve_h3_config
 
         h3_cfg = resolve_h3_config(spec)
-    except Exception:
+    except Exception:  # noqa: BLE001
         h3_cfg = {
             "enabled": False,
             "audio_policy": "prefer_native",
@@ -476,7 +476,7 @@ def build_shot_intent(
         from motion_prompt_spine import core_fields
 
         core = core_fields(spec, shot)
-    except Exception:
+    except Exception:  # noqa: BLE001
         core = {}
     continuity = str(dsl.get("chain_mode") or "").lower() == "continue" or bool(
         core.get("continuity_required")
@@ -1213,7 +1213,7 @@ def preflight_route_plan(
                         str(item.get("shot_id")) for item in jobs if isinstance(item, dict)
                     },
                 )
-            except Exception:
+            except Exception:  # noqa: BLE001
                 blockers.append("PILOT_GATE_BLOCKED")
     blockers = sorted(set(blockers))
     return {

@@ -1186,7 +1186,7 @@ def sfx_clip_for_kind(kind: str, *, amp: float = 0.2) -> Any:
             sparkle,
             whoosh,
         )
-    except Exception:
+    except Exception:  # noqa: BLE001
         # minimal fallbacks
         sr = 44100
         n = int(sr * 0.2)

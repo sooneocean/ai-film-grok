@@ -292,7 +292,7 @@ def run_dual_track_mix_stage(
             os.environ.get("AIFILM_SFX_REVERB", "").strip() in {"1", "true", "yes"}
         ):
             sfx_dsp += f",aecho=1.0:1.0:{ac['reverb_time'] * 1000}:{ac['wet_level']}"
-    except Exception:
+    except Exception:  # noqa: BLE001
         sfx_dsp = "anull"
     mix_spotting["sfx_dsp_applied"] = sfx_dsp
 
@@ -622,7 +622,7 @@ def run_dual_track_mix_stage(
         validate_audio_tracks_contract(spec, audio_dir=audio_dir, require_artifacts=True)
     except SoundPlanError:
         raise
-    except Exception as exc:  # pragma: no cover — probe must never fail final
+    except Exception as exc:  # pragma: no cover — probe must never fail final  # noqa: BLE001
         mix_spotting["loudness_error"] = str(exc)[:200]
         if mix_spotting.get("report_path"):
             with contextlib.suppress(Exception):

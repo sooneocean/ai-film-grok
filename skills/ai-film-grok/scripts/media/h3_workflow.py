@@ -253,7 +253,7 @@ def _prompt_for_shot(
     else:
         try:
             film = _load_spec(root)
-        except Exception:
+        except Exception:  # noqa: BLE001
             # Unit tests / prompt-only calls may lack film-spec; spine still works.
             film = {}
 
@@ -282,7 +282,7 @@ def _prompt_for_shot(
                 fam_id = resolve_prompt_family_for_shot(work_shot)
                 if fam_id:
                     work_shot = apply_combo_family_to_shot(work_shot, fam_id)
-        except Exception:
+        except Exception:  # noqa: BLE001
             work_shot = shot if isinstance(shot, dict) else {}
     # Per-shot override for A/B: dsl.prompt_format = flat | timeline | official
     dsl0 = work_shot.get("dsl") if isinstance(work_shot.get("dsl"), dict) else {}
@@ -295,7 +295,7 @@ def _prompt_for_shot(
         from h3_official_prompt import resolve_prompt_dialect
 
         dialect = resolve_prompt_dialect(work_shot)
-    except Exception:
+    except Exception:  # noqa: BLE001
         dialect = "legacy"
 
     if fmt in {"flat", "spine", "paragraph"}:
@@ -451,7 +451,7 @@ def _prompt_for_shot(
             raise H3WorkflowError(str(exc)) from exc
     except H3WorkflowError:
         raise
-    except Exception:
+    except Exception:  # noqa: BLE001
         pass
     return prompt
 
@@ -624,7 +624,7 @@ def plan_h3_shot(
             has_still=still is not None,
             has_last=last_path is not None,
         )
-    except Exception:
+    except Exception:  # noqa: BLE001
         plan["generation_lane"] = None
     # Material fidelity: unified GenerationRequest receipt (StillSource + prompt + refs)
     try:
@@ -1164,7 +1164,7 @@ def run_h3_shot(
                     )
             except H3WorkflowError:
                 raise
-            except Exception:
+            except Exception:  # noqa: BLE001
                 pass
         # I2.4 · restricted shots need generation request receipt (auto-build if missing)
         try:
@@ -1176,7 +1176,7 @@ def run_h3_shot(
             )
         except GenerationRequestError as exc:
             raise H3WorkflowError(str(exc)) from exc
-        except Exception:
+        except Exception:  # noqa: BLE001
             pass
         # E4 · ban midframe composite / poison-archive still as I2V source
         try:
@@ -1190,7 +1190,7 @@ def run_h3_shot(
                 st = (man.get("stills") or {}).get(str(shot_id))
                 if isinstance(st, dict):
                     still_rec = st
-            except Exception:
+            except Exception:  # noqa: BLE001
                 still_rec = {}
             assert_still_record_safe_for_i2v(
                 still_rec,
@@ -1199,7 +1199,7 @@ def run_h3_shot(
             )
         except StillProvenanceError as exc:
             raise H3WorkflowError(str(exc)) from exc
-        except Exception:
+        except Exception:  # noqa: BLE001
             pass
         # Wave 3 · composition fill before burn (EP02 postage-stamp / fullbody)
         try:
@@ -1349,7 +1349,7 @@ def run_h3_shot(
             (prompt_dir / f"{shot_id}.h3.official.txt").write_text(
                 prompt + "\n", encoding="utf-8"
             )
-    except Exception:
+    except Exception:  # noqa: BLE001
         pass
     takes_dir = base / "takes" / shot_id
     takes_dir.mkdir(parents=True, exist_ok=True)
