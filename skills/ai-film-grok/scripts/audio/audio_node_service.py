@@ -197,7 +197,7 @@ def _available(kind: str) -> bool:
             import torch  # noqa: F401
 
             return True
-        except Exception:
+        except Exception:  # noqa: BLE001
             return False
     if kind == "sfx":
         try:
@@ -490,7 +490,7 @@ def _gpu_health() -> dict[str, Any]:
         except (OSError, subprocess.SubprocessError):
             pass
         return report
-    except Exception:
+    except Exception:  # noqa: BLE001
         return {"available": False}
 
 
@@ -779,7 +779,7 @@ async def _execute(job_id: str, kind: str, payload: dict[str, Any]) -> None:
                 "path": str(target),
             }
         )
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         target.unlink(missing_ok=True)
         target.with_suffix(".raw.wav").unlink(missing_ok=True)
         target.with_suffix(".source.wav").unlink(missing_ok=True)
@@ -811,7 +811,7 @@ async def _execute_music_batch(job_id: str, payload: dict[str, Any]) -> None:
                 "artifacts": artifacts,
             }
         )
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         if target_dir.is_dir():
             for path in target_dir.glob("*"):
                 if path.is_file():

@@ -101,7 +101,7 @@ def classify_evidence(root: Path) -> dict[str, Any]:
         from production_gates import pilot_is_user_approved
 
         pilot_user = pilot_is_user_approved(pilot) if pilot else False
-    except Exception:
+    except Exception:  # noqa: BLE001
         pilot_user = bool(
             isinstance(pilot, dict)
             and str(pilot.get("approved_by") or "").lower() == "user"

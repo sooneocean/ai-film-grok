@@ -620,7 +620,7 @@ def _audio_video_clock_ok(
     try:
         v = float(pdur(video))
         a = float(pdur(audio_src))
-    except Exception:
+    except Exception:  # noqa: BLE001
         return False, 0.0, 0.0, 999.0
     skew = abs(v - a)
     return skew <= max_skew_sec, v, a, skew

@@ -58,7 +58,7 @@ def narration_en_for_shot(shot: dict[str, Any]) -> str:
 def _err(msg: str) -> Exception:
     try:
         from export_composition import ComposeExportError as E
-    except Exception:
+    except Exception:  # noqa: BLE001
         E = ValueError  # type: ignore
     return E(msg)
 def parse_srt(path: Path) -> list[dict[str, Any]]:

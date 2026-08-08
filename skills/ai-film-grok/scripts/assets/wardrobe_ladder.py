@@ -418,7 +418,7 @@ def render_contact_sheet(bible: dict[str, Any], character_id: str, *, root: Path
                 with Image.open(state_path) as source:
                     source.load()
                     tile.paste(ImageOps.contain(source.convert("RGB"), tile.size), (0, 0))
-            except Exception:
+            except Exception:  # noqa: BLE001
                 exists = False
         if not exists:
             ImageDraw.Draw(tile).text((12, 12), "MISSING / INVALID", fill="#ffb4b4")

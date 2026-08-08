@@ -74,7 +74,7 @@ def grok_permission_mode(config_path: Path) -> str | None:
         import tomllib
 
         config = tomllib.loads(config_path.read_text(encoding="utf-8"))
-    except Exception:
+    except Exception:  # noqa: BLE001
         return "unreadable"
     for section in (config, config.get("ui") or {}, config.get("cli") or {}):
         if isinstance(section, dict) and isinstance(section.get("permission_mode"), str):

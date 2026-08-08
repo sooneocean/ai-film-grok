@@ -715,7 +715,7 @@ def meaning_gate_enabled(spec: dict[str, Any] | None) -> bool:
             film_root=None,  # root optional at lint time; closeout sync_armed still catches
             call_site="dramatic_meaning.strict_enabled",
         )
-    except Exception:
+    except Exception:  # noqa: BLE001
         meaning_skip = os.environ.get("AIFILM_SKIP_MEANING_GATE", "").strip().lower() in {
             "1",
             "true",

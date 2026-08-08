@@ -90,7 +90,7 @@ def load_render_context(
             from final.heartbeat import write_final_heartbeat
 
             write_final_heartbeat(root, stage=stage, detail=detail)
-        except Exception:
+        except Exception:  # noqa: BLE001
             pass
 
     try:
@@ -98,7 +98,7 @@ def load_render_context(
 
         ff_to = apply_final_ffmpeg_timeout_env()
         _hb("start", f"render_final enter ffmpeg_timeout={ff_to}s")
-    except Exception:
+    except Exception:  # noqa: BLE001
         _hb("start", "render_final enter")
 
     try:

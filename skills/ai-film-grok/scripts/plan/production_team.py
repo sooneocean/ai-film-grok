@@ -197,7 +197,7 @@ def snapshot_capabilities(
                     ],
                     "receipt": str(capacity_receipt),
                 }
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001
                 capacity = {"ok": False}
                 observations["rtx5090_capacity"] = {
                     "ok": False,
@@ -243,7 +243,7 @@ def snapshot_capabilities(
                     receipt_path=capacity_receipt,
                 )
             capabilities.append(capability)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         observations["rtx5090_armory"] = {"ok": False, "error": type(exc).__name__}
 
     tts = probe_tts()
@@ -342,7 +342,7 @@ def snapshot_capabilities(
             report = provider.probe(root=snapshot_root)
             available = bool(report.ok and report.available)
             reason = report.reason
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             available = False
             reason = f"{type(exc).__name__}: provider probe failed"
         capability = _capability(
@@ -397,7 +397,7 @@ def snapshot_capabilities(
             story_observation.update({"available": story_available, "verified": story_verified})
         except LocalLLMError as exc:
             story_observation.update({"available": False, "error": exc.code})
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             story_observation.update({"available": False, "error": type(exc).__name__})
     capabilities.extend(
         [

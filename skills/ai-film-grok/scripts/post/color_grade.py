@@ -172,7 +172,7 @@ def plan_shot_grades(root: Path | str) -> dict[str, Any]:
         from visual_bible import derive_lighting_timeline
 
         lighting_timeline = derive_lighting_timeline(all_shots_raw)
-    except Exception:
+    except Exception:  # noqa: BLE001
         pass
     lighting_by_shot: dict[str, dict[str, Any]] = {
         str(t.get("shot_id")): t for t in lighting_timeline if isinstance(t, dict)

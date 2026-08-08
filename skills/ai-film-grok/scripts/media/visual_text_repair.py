@@ -191,7 +191,7 @@ def repair_clip(
                 )
                 if sha256_file(output) == (existing.get("output") or {}).get("sha256"):
                     return {**existing, "path": str(existing_path), "deduplicated": True}
-        except Exception:
+        except Exception:  # noqa: BLE001
             pass
     lock = root_path / "work" / f".visual-text-repair-{sha256_file(source)[:16]}.lock"
     lock.parent.mkdir(exist_ok=True)

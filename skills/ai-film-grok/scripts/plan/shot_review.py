@@ -243,7 +243,7 @@ def create_shot_review(
     try:
         spec = read_json(Path(root) / "film-spec.json") or {}
         film_heat = str(spec.get("heat_scale") or "").strip().lower()
-    except Exception:
+    except Exception:  # noqa: BLE001
         film_heat = ""
     mute_frame_required = film_heat == "max" and heat_phase in {"act", "climax"}
     if mute_frame_required and approve and "coitus" not in normalized_scores:

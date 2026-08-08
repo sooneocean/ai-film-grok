@@ -295,7 +295,7 @@ def _attach_craft_prepends(_manifest, actions, craft_stage, gates, pre, r, root,
         from film_spec import resolve_i2v_profile
 
         i2v_profile = resolve_i2v_profile()
-    except Exception:
+    except Exception:  # noqa: BLE001
         pass
 
     # Capability hygiene once per media-ish ring
@@ -595,7 +595,7 @@ def _attach_plate_preflight(_manifest, build_evidence, craft_stage, gates, pre, 
             from production_gates import load_pilot_approval, pilot_is_user_approved
 
             pilot_ok_now = pilot_is_user_approved(load_pilot_approval(root))
-        except Exception:
+        except Exception:  # noqa: BLE001
             pilot_ok_now = False
         if pilot_ok_now and not gates.get("clips_complete"):
             bulk_rec = read_json(root / "receipts" / "bulk-preflight.json") or {}
@@ -618,7 +618,7 @@ def _attach_plate_preflight(_manifest, build_evidence, craft_stage, gates, pre, 
 
             h3_cfg = resolve_h3_config(spec_for_routing if isinstance(spec_for_routing, dict) else {})
             h3_on = bool(h3_cfg.get("enabled")) if isinstance(h3_cfg, dict) else False
-        except Exception:
+        except Exception:  # noqa: BLE001
             h3_on = False
             try:
                 sp = spec_for_routing if isinstance(spec_for_routing, dict) else {}
@@ -629,7 +629,7 @@ def _attach_plate_preflight(_manifest, build_evidence, craft_stage, gates, pre, 
                         or str(sp.get("_i2v_profile") or "") in {"hybrid_h3", "h3_primary"}
                     )
                 )
-            except Exception:
+            except Exception:  # noqa: BLE001
                 h3_on = False
         if h3_on:
             pre(
@@ -652,7 +652,7 @@ def _attach_plate_preflight(_manifest, build_evidence, craft_stage, gates, pre, 
             lane = next_machine_lane_action(root, prefer_ship_prep=True)
             if lane:
                 pre(lane["id"], lane["cmd"], lane["why"], "visual")
-        except Exception:
+        except Exception:  # noqa: BLE001
             pre(
                 "gate-auto",
                 f'aifilm gate-auto --root "{r}"',
@@ -769,7 +769,7 @@ def _select_priorities(i2v_profile, include_capability, r, refresh_capability, r
             # Prefer heat over bulk when hard_fail; still surface when only needs_boost
             actions = [a for a in actions if a.get("id") != "heat-boost"]
             actions.insert(0, heat_action)
-    except Exception:
+    except Exception:  # noqa: BLE001
         heat_status = None
 
     provisional_primary = (
@@ -900,7 +900,7 @@ def _build_agent_playbook(actions, cap, craft, craft_stage, gates, heat_status, 
                     2,
                     f"优先：aifilm state-index plan（{len(si.get('generate_plan') or [])} 项）",
                 )
-        except Exception:
+        except Exception:  # noqa: BLE001
             pass
         # Wave 4/5: surface heat boost already selected as primary (see pre-primary insert)
         if (
@@ -1232,7 +1232,7 @@ def _stage_route_catalog(craft_stage, next_id, pipeline) -> tuple[Any, Any]:
             # Prefer action id; fall back to cli: prefix rows
             if get_route(f"cli:{route_catalog_id}") is not None:
                 route_catalog_id = f"cli:{route_catalog_id}"
-    except Exception:
+    except Exception:  # noqa: BLE001
         pass
     return route_catalog_id, stage_proj
 

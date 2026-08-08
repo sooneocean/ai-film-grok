@@ -143,7 +143,7 @@ def plan_craft_for_join(
     """Refine a base craft using heat/color/cues."""
     try:
         craft = normalize_edit_craft(base_craft)
-    except Exception:
+    except Exception:  # noqa: BLE001
         craft = "soft_glue"
 
     ph, nh = _heat(prev), _heat(nxt)
@@ -214,7 +214,7 @@ def plan_join_transition_secs(
     for c in crafts:
         try:
             craft = normalize_edit_craft(c)
-        except Exception:
+        except Exception:  # noqa: BLE001
             craft = "soft_glue"
         intent, _ = craft_to_intent_style(craft)
         if craft == "mood_hold":

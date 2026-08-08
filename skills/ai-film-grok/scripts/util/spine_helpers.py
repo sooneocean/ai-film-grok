@@ -28,7 +28,7 @@ def pilot_user_ok(root: Path) -> bool:
         from production_gates import pilot_is_user_approved
 
         return pilot_is_user_approved(pilot_approval)
-    except Exception:
+    except Exception:  # noqa: BLE001
         return bool(
             str(pilot_approval.get("approved_by") or "").lower() == "user"
             and str(pilot_approval.get("user_phrase") or "").strip()

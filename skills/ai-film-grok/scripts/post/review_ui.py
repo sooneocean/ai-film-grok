@@ -198,7 +198,7 @@ def make_handler(root: Path, token: str):
                 from urllib.parse import parse_qs, urlparse
 
                 qtok = (parse_qs(urlparse(self.path).query).get("token") or [""])[0]
-            except Exception:
+            except Exception:  # noqa: BLE001
                 qtok = ""
             return (
                 secrets.compare_digest(header, token)

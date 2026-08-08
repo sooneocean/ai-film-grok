@@ -77,7 +77,7 @@ def motion_core_skip_enabled(root: Path | str | None = None) -> bool:
             film_root=root,
             call_site="motion_prompt_spine.motion_core_skip_enabled",
         )
-    except Exception:
+    except Exception:  # noqa: BLE001
         return os.environ.get("AIFILM_SKIP_MOTION_CORE", "").strip().lower() in {
             "1",
             "true",
@@ -258,7 +258,7 @@ def dsl_action_parts(shot: dict[str, Any]) -> list[str]:
         v_act = visual_prompt_action(shot)
         if v_act and v_act not in parts:
             parts.append(v_act)
-    except Exception:
+    except Exception:  # noqa: BLE001
         nar = str(shot.get("nar") or "").strip()
         if not parts and nar and len(nar) <= 120:
             parts.append(nar)
@@ -521,7 +521,7 @@ def build_motion_prompt(
         from input_fidelity import inject_story_beat_into_prompt
 
         body = inject_story_beat_into_prompt(body, shot)
-    except Exception:
+    except Exception:  # noqa: BLE001
         pass
     if include_provider_prefix:
         return f"{provider_prefix(mode)} {body}".strip()
@@ -664,7 +664,7 @@ def build_h3_temporal_prompt(
 
         joined = inject_story_beat_into_prompt("\n".join(segs), shot)
         segs = joined.split("\n")
-    except Exception:
+    except Exception:  # noqa: BLE001
         pass
 
     # Inject 2V reference stage when reference images are available.
@@ -711,7 +711,7 @@ def ensure_motion_core_in_prompt(
         from input_fidelity import inject_story_beat_into_prompt
 
         out = inject_story_beat_into_prompt(out, shot)
-    except Exception:
+    except Exception:  # noqa: BLE001
         pass
     df = dramatic_function_of(shot)
     if (
@@ -751,7 +751,7 @@ def ensure_motion_core_in_prompt(
                 out = merge_timeline_into_author(
                     out, spec, shot, duration_sec=duration_sec
                 )
-        except Exception:
+        except Exception:  # noqa: BLE001
             pass
 
     return out.strip()

@@ -89,7 +89,7 @@ def spoken_text_of(shot: dict[str, Any], intent: dict[str, Any] | None = None) -
         t = spoken_dialogue_text(shot)
         if t:
             return t
-    except Exception:
+    except Exception:  # noqa: BLE001
         pass
     cues = shot.get("audio_cues") if isinstance(shot.get("audio_cues"), list) else []
     for cue in cues:
@@ -237,7 +237,7 @@ def resolve_h3_mode_core(
             from motion_prompt_spine import motion_tier_for
 
             motion_tier = motion_tier_for(sh)
-        except Exception:
+        except Exception:  # noqa: BLE001
             motion_tier = "medium"
 
     explicit = explicit_h3_mode(sh, intent)
@@ -427,7 +427,7 @@ def effect_tips(mode: str, mode_res: dict[str, Any] | None = None) -> list[str]:
         from h3_combo_eval import winner_tips_from_registry
 
         tips.extend(winner_tips_from_registry())
-    except Exception:
+    except Exception:  # noqa: BLE001
         pass
     if mode == "i2v":
         tips.append("I2V 单首帧：源 still 须已是目标体位/状态；软肖像 prompt 会静")
@@ -464,7 +464,7 @@ def preferred_mode_for_lane(lane: str) -> str | None:
         from h3_combo_eval import load_combo_winners
 
         data = load_combo_winners()
-    except Exception:
+    except Exception:  # noqa: BLE001
         return None
     if not data:
         return None
@@ -499,7 +499,7 @@ def infer_combo_lane(
             from motion_prompt_spine import motion_tier_for
 
             motion_tier = motion_tier_for(sh)
-        except Exception:
+        except Exception:  # noqa: BLE001
             motion_tier = "medium"
     heat = str(intent.get("heat_phase") or sh.get("heat_phase") or "").strip().lower()
     flags = [str(f) for f in (intent.get("difficulty_flags") or [])]
@@ -536,7 +536,7 @@ def annotate_combo_resolve(
         lanes = data.get("lanes") if isinstance(data.get("lanes"), dict) else {}
         entry = lanes.get(lane) if isinstance(lanes.get(lane), dict) else {}
         family = (entry or {}).get("prompt_family")
-    except Exception:
+    except Exception:  # noqa: BLE001
         pass
     pack = dict(pack)
     pack["combo_lane"] = lane

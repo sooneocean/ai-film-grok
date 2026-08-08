@@ -8,6 +8,7 @@ Without approval, at most PILOT_MAX_SHOTS_WITHOUT_APPROVAL distinct shot_ids may
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import hmac
 import json
@@ -27,6 +28,7 @@ from film_spec import (
 )
 from util import read_json
 from util.errors import FilmError
+from util.logger import log
 
 PILOT_MAX_SHOTS_WITHOUT_APPROVAL = 3
 PILOT_APPROVAL_NAME = "pilot-approval.json"
@@ -58,14 +60,10 @@ def _env_skip_armed(
             film_root=root,
             call_site=call_site,
         )
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         # C5.1 · surface fallback path (legacy direct env read)
-        try:
-            from util.logger import log
-
+        with contextlib.suppress(Exception):  # logging must never suppress env read
             log.debug("skip_flag unavailable for %s at %s: %s", name, call_site, exc)
-        except Exception:
-            pass
         return os.environ.get(name, "").strip().lower() in {"1", "true", "yes", "on"}
 
 
@@ -286,9 +284,7 @@ def _assert_dialogue_benchmark_receipt(
         raise ProductionGateError(message)
 
 
-def assert_dialogue_drama_production_evidence(
-    root: Path, *, force: bool = False
-) -> dict[str, Any]:
+def assert_dialogue_drama_production_evidence(root: Path, *, force: bool = False) -> dict[str, Any]:
     """Hard-gate dialogue final/bulk on TTS, package, lipsync, and benchmark proof.
 
     H3 prefer_native / post-lipsync freeze: skip when force or
@@ -666,7 +662,11 @@ def assert_heat_allows_final(
                 film_root=root,
                 call_site="assert_heat_allows_final",
             )
-        except Exception:
+        except Exception as exc:  # noqa: BLE001
+            log.debug(
+                "skip_flag unavailable for AIFILM_SKIP_HEAT_FINAL_GATE; fallback to direct env read: %s",
+                exc,
+            )
             skipped = os.environ.get("AIFILM_SKIP_HEAT_FINAL_GATE", "").strip().lower() in {
                 "1",
                 "true",
@@ -798,9 +798,7 @@ def _measured_map_for_root(root: Path | None) -> dict[str, float]:
     try:
         out = measured_vo_by_shot(base)
     except Exception as exc:
-        raise ProductionGateError(
-            f"loop-risk measured VO: probe failed: {exc}"
-        ) from exc
+        raise ProductionGateError(f"loop-risk measured VO: probe failed: {exc}") from exc
     return out if isinstance(out, dict) else {}
 
 
@@ -827,7 +825,8 @@ def _shot_would_stream_loop(
             dramatic_function=dramatic_function,
         )
         return int(plan.get("loops") or 0) > 0
-    except Exception:
+    except Exception as exc:  # noqa: BLE001
+        log.warning("loop-risk policy unavailable; using legacy threshold: %s", exc)
         # Fall back to legacy threshold if policy import fails
         return float(vo_sec) > LOOP_RISK_VO_SEC and float(plate_sec) <= 6.5
 
@@ -861,7 +860,10 @@ def loop_risk_shots_from_spec(
                     est_vo_sec=shot.get("est_vo_sec"),
                     measured_by_shot=measured,
                 )
-            except Exception:
+            except Exception as exc:  # noqa: BLE001
+                log.debug(
+                    "measured VO probe failed for shot %s; using estimate: %s", shot.get("id"), exc
+                )
                 vo = float(shot.get("est_vo_sec") or estimate_nar_vo_sec(nar))
         else:
             try:
@@ -1141,9 +1143,11 @@ def anti_boring_variety_report(spec: dict[str, Any]) -> dict[str, Any]:
     # D1: main-beat duration floor (don't crush sustained beats into a PPT)
     for sh in shots:
         sid = str(sh.get("id") or "?")
-        fn = str(
-            sh.get("dramatic_function") or sh.get("beat") or sh.get("function") or ""
-        ).strip().lower()
+        fn = (
+            str(sh.get("dramatic_function") or sh.get("beat") or sh.get("function") or "")
+            .strip()
+            .lower()
+        )
         if fn not in _ANTI_BORING_MAIN_BEAT_FUNCTIONS:
             continue
         try:
@@ -1426,9 +1430,7 @@ def assert_headroom_protected(
 # Hardness (2026-08-07 · face-transition plan): **default HARD** for all policy /
 # read-back issues. Legacy soft only when film-spec sets transition_policy_soft=true
 # (continue-seam violations stay hard even then). Escape env still wins.
-_TRANSITION_POLICY_CONTINUE = frozenset(
-    {"continue", "match", "match_cut", "match-cut", "byte"}
-)
+_TRANSITION_POLICY_CONTINUE = frozenset({"continue", "match", "match_cut", "match-cut", "byte"})
 # Scene hard-cut 太花哨的转场（references/hf-transition-policy.md：whip 太快 / grid 太花）
 _FLASHY_SCENE_STYLES = frozenset({"whip", "grid"})
 # 段落/章间转场允许的 xfade 风格（fade 家族 + dissolve）
@@ -1470,9 +1472,11 @@ def _shot_chain_mode(shot: dict[str, Any]) -> str:
     if not isinstance(shot, dict):
         return ""
     dsl = shot.get("dsl") if isinstance(shot.get("dsl"), dict) else {}
-    return str(
-        shot.get("chain_mode") or dsl.get("chain_mode") or shot.get("join") or ""
-    ).strip().lower()
+    return (
+        str(shot.get("chain_mode") or dsl.get("chain_mode") or shot.get("join") or "")
+        .strip()
+        .lower()
+    )
 
 
 def transition_policy_report(spec: dict[str, Any]) -> dict[str, Any]:
@@ -1524,9 +1528,9 @@ def transition_policy_report(spec: dict[str, Any]) -> dict[str, Any]:
         incoming = shots[i + 1] if i + 1 < n else {}
         chain = _shot_chain_mode(incoming)
         df = str((incoming or {}).get("dramatic_function") or "").strip().lower()
-        role = str(
-            (incoming or {}).get("role") or (incoming or {}).get("kind") or ""
-        ).strip().lower()
+        role = (
+            str((incoming or {}).get("role") or (incoming or {}).get("kind") or "").strip().lower()
+        )
 
         # intro/outro / pure-MG → allow all (HF catalog open)
         if role in _RELAX_ROLES:
@@ -1593,7 +1597,9 @@ def transition_policy_report(spec: dict[str, Any]) -> dict[str, Any]:
 
     # Soft-style soup: consecutive identical soft xfade reads as mush on 9:16.
     # punchy → max run 2; silk/auto → max run 3 (third/fourth same style fails).
-    fluency = str(spec.get("transition_fluency") or spec.get("edit_fluency") or "auto").strip().lower()
+    fluency = (
+        str(spec.get("transition_fluency") or spec.get("edit_fluency") or "auto").strip().lower()
+    )
     max_same = 2 if fluency == "punchy" else 3
     run_style: str | None = None
     run_len = 0
@@ -1603,9 +1609,9 @@ def transition_policy_report(spec: dict[str, Any]) -> dict[str, Any]:
         style_s = str(style).strip().lower() if style else None
         incoming = shots[i + 1] if i + 1 < n else {}
         chain = _shot_chain_mode(incoming)
-        role = str(
-            (incoming or {}).get("role") or (incoming or {}).get("kind") or ""
-        ).strip().lower()
+        role = (
+            str((incoming or {}).get("role") or (incoming or {}).get("kind") or "").strip().lower()
+        )
         if role in _RELAX_ROLES or chain in _TRANSITION_POLICY_CONTINUE:
             run_style, run_len = None, 0
             continue
@@ -1813,9 +1819,9 @@ def transition_export_readback_report(spec: dict[str, Any]) -> dict[str, Any]:
 
         incoming = shots[i + 1] if i + 1 < len(shots) else {}
         chain = _shot_chain_mode(incoming)
-        role = str(
-            (incoming or {}).get("role") or (incoming or {}).get("kind") or ""
-        ).strip().lower()
+        role = (
+            str((incoming or {}).get("role") or (incoming or {}).get("kind") or "").strip().lower()
+        )
         df = str((incoming or {}).get("dramatic_function") or "").strip().lower()
 
         # intro/outro / pure-MG → relax (HF catalog open), but op base must still be valid
@@ -1827,8 +1833,7 @@ def transition_export_readback_report(spec: dict[str, Any]) -> dict[str, Any]:
                         "join_index": i,
                         "base": base,
                         "message": (
-                            f"join {i} (relaxed role): op base={base!r} must be "
-                            f"hard_cut|xfade"
+                            f"join {i} (relaxed role): op base={base!r} must be hard_cut|xfade"
                         ),
                     }
                 )
@@ -1853,9 +1858,7 @@ def transition_export_readback_report(spec: dict[str, Any]) -> dict[str, Any]:
                 )
             continue
         if df == "chapter_transition":
-            if base != "xfade" or (
-                op_style is not None and op_style not in _PARAGRAPH_STYLES
-            ):
+            if base != "xfade" or (op_style is not None and op_style not in _PARAGRAPH_STYLES):
                 issues.append(
                     {
                         "code": "EXPORT_READBACK_PARAGRAPH_BAD",
@@ -1878,8 +1881,7 @@ def transition_export_readback_report(spec: dict[str, Any]) -> dict[str, Any]:
                         "join_index": i,
                         "base": base,
                         "message": (
-                            f"join {i}: intent=soft but built op base={base!r} "
-                            f"(must be xfade)"
+                            f"join {i}: intent=soft but built op base={base!r} (must be xfade)"
                         ),
                     }
                 )
@@ -1916,8 +1918,7 @@ def transition_export_readback_report(spec: dict[str, Any]) -> dict[str, Any]:
                         "join_index": i,
                         "base": base,
                         "message": (
-                            f"join {i}: intent=hard but built op base={base!r} "
-                            f"(must be hard_cut)"
+                            f"join {i}: intent=hard but built op base={base!r} (must be hard_cut)"
                         ),
                     }
                 )
@@ -2055,9 +2056,7 @@ def style_bible_consistency_report(
         }
 
     bible = load_bible(Path(root))
-    hero_shots = [
-        s for s in shots if str(s.get("shot_role") or "").strip().lower() == "hero"
-    ]
+    hero_shots = [s for s in shots if str(s.get("shot_role") or "").strip().lower() == "hero"]
     cm = bible.get("cast_masters") if isinstance(bible.get("cast_masters"), dict) else {}
     if hero_shots and "hero" not in cm:
         issues.append(

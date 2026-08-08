@@ -198,7 +198,7 @@ def cmd_final(args: argparse.Namespace) -> int:
                 film_root=root,
                 call_site="cmd_final.skip_canonical_truth",
             )
-        except Exception:
+        except Exception:  # noqa: BLE001
             pass
     if not skip_truth:
         try:
@@ -229,7 +229,7 @@ def cmd_final(args: argparse.Namespace) -> int:
             skip_edit_director = str(
                 _os_ed.environ.get("AIFILM_SKIP_EDIT_DIRECTOR") or ""
             ).strip().lower() in {"1", "true", "yes", "on"}
-        except Exception:
+        except Exception:  # noqa: BLE001
             pass
     if not skip_edit_director:
         try:
@@ -342,7 +342,7 @@ def cmd_final(args: argparse.Namespace) -> int:
                 film_root=root,
                 call_site="cmd_final.skip_cinematic",
             )
-        except Exception:
+        except Exception:  # noqa: BLE001
             skip_cinematic = str(_os.environ.get("AIFILM_SKIP_CINEMATIC") or "").strip().lower() in {
                 "1",
                 "true",
@@ -1209,7 +1209,7 @@ def cmd_review_final(args: argparse.Namespace) -> int:
         from heat_check import heat_check as _heat_check
 
         heat_rep_final = _heat_check(root)
-    except Exception as exc:  # pragma: no cover
+    except Exception as exc:  # pragma: no cover  # noqa: BLE001
         heat_rep_final = {"ok": False, "error": str(exc)}
     with contextlib.suppress(OSError):
         write_json(

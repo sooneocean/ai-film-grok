@@ -173,7 +173,7 @@ def procedural_music_rnb(
             brightness=brightness,
             key_shift=key_shift,
         )
-    except Exception:
+    except Exception:  # noqa: BLE001
         pass
     n = int(SR * max(0.5, dur))
     t = np.linspace(0, dur, n, endpoint=False)

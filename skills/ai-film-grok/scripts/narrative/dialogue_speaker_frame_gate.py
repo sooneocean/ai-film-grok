@@ -293,7 +293,7 @@ def assert_dialogue_speaker_frame_contract(
                 note=f"speaker_frame ok hard={bool(hard)} shots={report.get('shot_count')}",
                 source="assert_dialogue_speaker_frame_contract",
             )
-        except Exception:
+        except Exception:  # noqa: BLE001
             pass
     return report
 

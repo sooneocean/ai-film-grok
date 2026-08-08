@@ -65,7 +65,7 @@ def doctor() -> int:
             return 0
         print(f"fail: HTTP {exc.code}")
         return 1
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         print(f"fail: unreachable ({exc})")
         print("hint: start ACE-Step / music API, or put beds in assets/bgm/rnb/")
         return 1

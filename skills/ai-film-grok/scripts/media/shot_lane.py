@@ -143,7 +143,7 @@ def missing_anatomy_attestation(
     base = _root(root)
     try:
         from anatomy_safety import shot_requires_anatomy_safety
-    except Exception:
+    except Exception:  # noqa: BLE001
         return False
     if not shot_requires_anatomy_safety(base, str(shot_id), shot=shot):
         return False
@@ -162,7 +162,7 @@ def _spoken(shot: dict[str, Any], intent: dict[str, Any] | None) -> str:
         from h3_mode import spoken_text_of
 
         return spoken_text_of(shot, intent)
-    except Exception:
+    except Exception:  # noqa: BLE001
         pass
     return str(shot.get("spoken_text") or "").strip()
 
@@ -172,7 +172,7 @@ def _screen(shot: dict[str, Any], intent: dict[str, Any] | None) -> str:
         from h3_mode import screen_mode_of
 
         return screen_mode_of(shot, intent)
-    except Exception:
+    except Exception:  # noqa: BLE001
         return str(shot.get("screen_mode") or "").strip().lower()
 
 
@@ -183,7 +183,7 @@ def _is_restricted(shot: dict[str, Any], intent: dict[str, Any] | None) -> bool:
         from anatomy_safety import shot_is_restricted
 
         return shot_is_restricted(shot)
-    except Exception:
+    except Exception:  # noqa: BLE001
         heat = str(shot.get("heat_phase") or "").strip().lower()
         wardrobe = str(shot.get("wardrobe_state") or "").strip().lower()
         return heat in {"foreplay", "act", "climax"} or wardrobe in {
@@ -199,7 +199,7 @@ def _wants_continue(shot: dict[str, Any]) -> bool:
         from h3_mode import wants_continue_shot
 
         return wants_continue_shot(shot)
-    except Exception:
+    except Exception:  # noqa: BLE001
         dsl = shot.get("dsl") if isinstance(shot.get("dsl"), dict) else {}
         chain = str(dsl.get("chain_mode") or shot.get("chain_mode") or "").strip().lower()
         return chain == "continue" or bool(str(shot.get("parent_shot_id") or "").strip())
@@ -218,7 +218,7 @@ def _size_token(shot: dict[str, Any]) -> str:
         from h3_mode import shot_size_token
 
         return shot_size_token(shot)
-    except Exception:
+    except Exception:  # noqa: BLE001
         return str(shot.get("shot_size") or "").strip().lower()
 
 
@@ -381,7 +381,7 @@ def resolve_shot_lane(
             from h3_workflow import _approved_still
 
             has_still = _approved_still(base, sid) is not None
-        except Exception:
+        except Exception:  # noqa: BLE001
             has_still = False
     if has_still is None:
         has_still = False
@@ -391,7 +391,7 @@ def resolve_shot_lane(
 
             lp, _ = resolve_last_frame_path(base, sid, shot=sh)
             has_last = bool(lp is not None and lp.is_file())
-        except Exception:
+        except Exception:  # noqa: BLE001
             has_last = False
     if has_last is None:
         has_last = False
@@ -415,7 +415,7 @@ def resolve_shot_lane(
                 has_last=bool(has_last),
                 wants_continue=cont,
             )
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             mode_res = {
                 "mode": "i2v" if has_still else "t2v",
                 "alt_mode": None,
@@ -465,7 +465,7 @@ def resolve_shot_lane(
             from film_spec_profile import resolve_i2v_profile
 
             profile_norm = str(resolve_i2v_profile() or "h3_primary")
-        except Exception:
+        except Exception:  # noqa: BLE001
             profile_norm = "h3_primary"
         # film-spec override
         try:
@@ -475,7 +475,7 @@ def resolve_shot_lane(
                 if v:
                     profile_norm = v
                     break
-        except Exception:
+        except Exception:  # noqa: BLE001
             pass
 
     return {
@@ -537,7 +537,7 @@ def resolve_film_shot_lanes(
             from production_router import build_shot_intent
 
             intent = build_shot_intent(spec, sh)
-        except Exception:
+        except Exception:  # noqa: BLE001
             intent = None
         row = resolve_shot_lane(
             sh,

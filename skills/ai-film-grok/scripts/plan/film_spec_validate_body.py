@@ -275,7 +275,7 @@ def _validate_shots_loop(
                 from edit_policy import apply_shot_edit_rhythm_defaults
 
                 apply_shot_edit_rhythm_defaults(shot)
-            except Exception:
+            except Exception:  # noqa: BLE001
                 pass
             duration = shot.get("duration_sec")
             if duration is None:

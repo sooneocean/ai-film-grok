@@ -155,7 +155,7 @@ def enrich_console_state(root: Path | str, state: dict[str, Any]) -> dict[str, A
     try:
         from web.director_live_ext import project_director_live
         state["director_live"] = project_director_live(base)
-    except Exception:
+    except Exception:  # noqa: BLE001
         state["director_live"] = {"kind": "director-center-live", "available": False}
     return state
 

@@ -42,7 +42,7 @@ def resolve_final_voice_mix_config(args: Any, spec: dict[str, Any]) -> dict[str,
     if resolve_voice_tracks is not None:
         try:
             voice_policy = resolve_voice_tracks(spec)
-        except Exception:
+        except Exception:  # noqa: BLE001
             voice_policy = {}
     if voice_policy.get("nar_gain") is not None:
         with contextlib.suppress(TypeError, ValueError):

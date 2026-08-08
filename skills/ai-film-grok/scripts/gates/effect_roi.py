@@ -4,6 +4,7 @@
 Wave E1–E3 (2026-08-07): stop burning H3 on bad stills; multi-axis scorecard;
 meat mean floor → reburn list (never pure-mean promote as sole truth).
 """
+
 from __future__ import annotations
 
 import os
@@ -12,6 +13,7 @@ from pathlib import Path
 from typing import Any
 
 from util import read_json, utc_now, write_json
+from util.logger import log
 
 RECEIPT_SCORECARD = Path("receipts/effect-scorecard.json")
 RECEIPT_REBURN = Path("receipts/weak-take-reburn.json")
@@ -56,8 +58,11 @@ def still_feed_blocks_h3(root: Path | str) -> dict[str, Any]:
                 film_root=base,
                 call_site="still_feed_blocks_h3",
             )
-        except Exception:
-            pass
+        except Exception as exc:  # noqa: BLE001
+            log.debug(
+                "skip audit (AIFILM_SKIP_STILL_FEED_GATE) failed; skip already decided by env: %s",
+                exc,
+            )
         return {
             "blocked": False,
             "skipped": True,
@@ -102,15 +107,15 @@ def still_feed_blocks_h3(root: Path | str) -> dict[str, Any]:
         primary = "composition-fill-ensure"
         next_cmd = (
             f'python -c "from composition_fill_gate import audit_film_composition_fill; '
-            f'import json; print(json.dumps(audit_film_composition_fill('
+            f"import json; print(json.dumps(audit_film_composition_fill("
             f"'{r}', auto_remedy=True), default=str))\"\n"
-            f'# or per-shot: ensure_fill_frame then register-still'
+            f"# or per-shot: ensure_fill_frame then register-still"
         )
     elif face_hard or hard:
         primary = "still-challenge-repair"
         next_cmd = (
             f'aifilm still-challenge next --root "{r}"\n'
-            f'# then register-still --anatomy-safe / face enroll bind'
+            f"# then register-still --anatomy-safe / face enroll bind"
         )
     elif peak:
         primary = "state-index"
@@ -250,8 +255,7 @@ def _is_meat_shot(sh: dict[str, Any]) -> bool:
     heat = str(sh.get("heat_phase") or "").lower()
     df = str(sh.get("dramatic_function") or "").lower()
     return any(
-        x in heat or x in df
-        for x in ("act", "climax", "meat", "coitus", "sex", "union", "rhythm")
+        x in heat or x in df for x in ("act", "climax", "meat", "coitus", "sex", "union", "rhythm")
     )
 
 
@@ -285,7 +289,8 @@ def build_effect_scorecard(
             # hard entries may be shot ids or codes
             if s and not s.isupper() and " " not in s[:20]:
                 fill_hard_ids.add(s.split(":")[0])
-    except Exception:
+    except Exception as exc:  # noqa: BLE001
+        log.warning("composition_fill audit failed; assuming ok: %s", exc)
         cfa = {"ok": True}
 
     rows: list[dict[str, Any]] = []
@@ -308,9 +313,7 @@ def build_effect_scorecard(
         meat = _is_meat_shot(sh)
         floor = MEAN_MEAT_FLOOR if meat else MEAN_NORMAL_FLOOR
         below = mean_f is not None and mean_f < floor
-        hijack = bool(pref.get("composition_hijack")) or (
-            pref.get("composition_ok") is False
-        )
+        hijack = bool(pref.get("composition_hijack")) or (pref.get("composition_ok") is False)
         fill_bad = sid in fill_hard_ids
         ah_note = sl.get("composition_anti_hijack") if isinstance(sl, dict) else None
         multi = int(sl.get("take_count") or 0) >= 2
@@ -342,11 +345,7 @@ def build_effect_scorecard(
             weak.append(
                 {
                     "shot_id": sid,
-                    "reason": (
-                        "below_mean_floor"
-                        if below
-                        else "composition_hijack"
-                    ),
+                    "reason": ("below_mean_floor" if below else "composition_hijack"),
                     "mean": mean_f,
                     "floor": floor,
                     "meat": meat,
@@ -364,7 +363,8 @@ def build_effect_scorecard(
 
         trip = audit_face_lock_triple(base, write_receipt=False)
         face_master = bool(trip.get("master_eligible"))
-    except Exception:
+    except Exception as exc:  # noqa: BLE001
+        log.warning("face_lock_triple audit failed; assuming master_eligible: %s", exc)
         trip = {"ok": True, "master_eligible": True}
 
     reburn_payload = {
@@ -396,9 +396,7 @@ def build_effect_scorecard(
         "weak_takes": weak[:40],
         "promote_rule": "anti_hijack_before_mean; ban pure-mean multi-seed",
         "next_cmd": (
-            f'aifilm h3 run-next --root "{base}" --execute --max 5  # reburn weak'
-            if weak
-            else None
+            f'aifilm h3 run-next --root "{base}" --execute --max 5  # reburn weak' if weak else None
         ),
     }
     if write:
@@ -429,8 +427,11 @@ def assert_face_lock_allows_promote(root: Path | str, *, promote: bool) -> dict[
                 film_root=base,
                 call_site="assert_face_lock_allows_promote",
             )
-        except Exception:
-            pass
+        except Exception as exc:  # noqa: BLE001
+            log.debug(
+                "skip audit (AIFILM_SKIP_FACE_LOCK_PROMOTE) failed; skip already decided by env: %s",
+                exc,
+            )
         return {"ok": True, "promote_blocked": False, "skipped": True, "reason": "skip env"}
 
     try:

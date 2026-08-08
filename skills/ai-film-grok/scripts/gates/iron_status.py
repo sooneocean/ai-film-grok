@@ -119,20 +119,20 @@ def iron_floors() -> dict[str, Any]:
         from edit_policy import DEFAULT_SEX_DURATION_FLOOR
 
         out["sex_duration_floor"] = DEFAULT_SEX_DURATION_FLOOR
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         out["sex_duration_floor_error"] = str(exc)[:80]
     try:
         from i2v_motion_gate import MEAN_MEAT_FLOOR, MEAN_NORMAL_FLOOR
 
         out["mean_normal"] = MEAN_NORMAL_FLOOR
         out["mean_meat"] = MEAN_MEAT_FLOOR
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         out["mean_error"] = str(exc)[:80]
     try:
         from final.delivery_class import PLATE_BORING_MEAT_FLOOR
 
         out["plate_boring_meat_floor"] = PLATE_BORING_MEAT_FLOOR
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         # A1 · surface import/probe fail (never leave floor missing silently)
         out["plate_boring_meat_floor_error"] = str(exc)[:80]
     return out
@@ -191,7 +191,7 @@ def iron_status_report(root: Path | str | None = None) -> dict[str, Any]:
                         "promote_ban": data.get("promote_ban"),
                         "boring": data.get("boring"),
                     }
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             film["error"] = str(exc)[:160]
 
     return {

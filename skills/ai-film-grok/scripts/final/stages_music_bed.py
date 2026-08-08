@@ -419,7 +419,7 @@ def materialize_music_bed(
             from make_sfx_bed import last_rnb_style, pick_rnb_style  # type: ignore
 
             mix_spotting["procedural_style"] = last_rnb_style() or pick_rnb_style(music_seed)
-        except Exception:
+        except Exception:  # noqa: BLE001
             mix_spotting["procedural_style"] = "unknown"
         log(
             f"BGM procedural seed={music_seed} style={mix_spotting.get('procedural_style')} "

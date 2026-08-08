@@ -94,7 +94,7 @@ def motion_tier_for_shot(
                 wardrobe_state=wardrobe_state,
             )["optical_tier"]
         )
-    except Exception:
+    except Exception:  # noqa: BLE001
         # Offline fallback (import cycle / partial tree) — keep product floors usable
         heat = str(heat_phase or "").strip().lower()
         df = str(dramatic_function or "").strip().lower()
@@ -529,7 +529,7 @@ def i2v_motion_gate_skip_enabled(root: Path | str | None = None) -> bool:
             film_root=root,
             call_site="i2v_motion_gate_skip_enabled",
         )
-    except Exception:
+    except Exception:  # noqa: BLE001
         return os.environ.get("AIFILM_SKIP_I2V_MOTION_GATE", "").strip().lower() in {
             "1",
             "true",
@@ -678,7 +678,7 @@ def write_mean_sidecar(video: Path, mean: float, **extra: Any) -> Path:
                 source="mean_sidecar",
                 motion_ok=float(mean) >= floor,
             )
-    except Exception:
+    except Exception:  # noqa: BLE001
         pass
     return side
 

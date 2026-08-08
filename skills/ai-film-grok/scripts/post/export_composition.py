@@ -207,7 +207,7 @@ def build_timeline_package(
                 duration_sec = probe_duration_sec(clip_path, label=f"export-compose:{sid}")
             except MediaDurationError as exc:
                 raise ComposeExportError(str(exc)) from exc
-            except Exception:
+            except Exception:  # noqa: BLE001
                 # last resort: film-spec plan only if media probe path unavailable
                 try:
                     duration_sec = float(shot.get("duration_sec") or 0)
@@ -431,7 +431,7 @@ def _fluency_export_meta(
         visual_fit = (
             str(spec.get("visual_fit") or default_visual_fit(spec) or "slot").strip().lower()
         )
-    except Exception:
+    except Exception:  # noqa: BLE001
         visual_fit = str(spec.get("visual_fit") or "slot").strip().lower()
     long_form = bool(spec.get("long_form") or spec.get("require_continuity_chain"))
     # Heuristic: mostly-hard joins + vo fit → continue-chain style plate

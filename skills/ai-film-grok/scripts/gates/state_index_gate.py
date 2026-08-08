@@ -39,7 +39,7 @@ def _shots_from_spec(spec: dict[str, Any]) -> list[dict[str, Any]]:
         from film_spec import validate_film_spec
 
         out = list(validate_film_spec(copy.deepcopy(spec), assign_missing_ids=False))
-    except Exception:
+    except Exception:  # noqa: BLE001
         for scene in spec.get("scenes") or []:
             if not isinstance(scene, dict):
                 continue
@@ -95,7 +95,7 @@ def _find_keyframe(
         best = pick_best_keyframe(root, shot_id)
         if best is not None and best.is_file():
             return best
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         # A1 · keep keyframes/ fallback but surface probe fail (no silent swallow)
         if probe_errors is not None:
             probe_errors.append(f"{shot_id}: pick_best_keyframe failed: {exc}"[:160])
@@ -175,7 +175,7 @@ def run_state_index_check(root: Path) -> dict[str, Any]:
         from visual_bible import migrate_to_v2, resolve_state_photo
 
         bible = migrate_to_v2(bible)
-    except Exception:
+    except Exception:  # noqa: BLE001
         resolve_state_photo = None  # type: ignore
 
     csm = (
@@ -338,7 +338,7 @@ def run_state_index_check(root: Path) -> dict[str, Any]:
             dialogue_i2i_route = route_dialogue_i2i(
                 frw_receipt=read_json(root / "receipts" / "frw-key-capability.json"),
             )
-        except Exception:  # fail closed even when a plugin installation is partial
+        except Exception:  # fail closed even when a plugin installation is partial  # noqa: BLE001
             dialogue_i2i_route = {
                 "status": "local_preflight_required",
                 "selected_provider": None,

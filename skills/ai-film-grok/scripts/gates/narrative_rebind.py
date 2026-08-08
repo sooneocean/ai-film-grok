@@ -205,7 +205,7 @@ def assert_narrative_rebind(root: Path | str, *, hard: bool = True) -> dict[str,
             call_site="assert_narrative_rebind",
         ):
             return {"ok": True, "skipped": True, "escape": "AIFILM_SKIP_NARRATIVE_REBIND=1"}
-    except Exception:
+    except Exception:  # noqa: BLE001
         if os.environ.get("AIFILM_SKIP_NARRATIVE_REBIND", "").strip().lower() in {
             "1",
             "true",

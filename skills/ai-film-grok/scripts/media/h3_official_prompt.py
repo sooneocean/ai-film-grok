@@ -83,7 +83,7 @@ def _auto_dialect_for_shot(shot: dict[str, Any]) -> str:
 
         has_dlg = bool(spoken_dialogue_text(shot))
         tier = motion_tier_for(shot)
-    except Exception:
+    except Exception:  # noqa: BLE001
         has_dlg = False
         tier = "medium"
         for cue in shot.get("audio_cues") or []:
@@ -136,7 +136,7 @@ def map_official_mode(mode: str) -> str:
 def _dur(shot: dict[str, Any], default: float = 5.0) -> float:
     try:
         return max(2.0, min(8.0, float(shot.get("duration_sec") or default)))
-    except Exception:
+    except Exception:  # noqa: BLE001
         return default
 
 
@@ -145,7 +145,7 @@ def _tier(shot: dict[str, Any]) -> str:
         from motion_prompt_spine import motion_tier_for
 
         return str(motion_tier_for(shot) or "medium").lower()
-    except Exception:
+    except Exception:  # noqa: BLE001
         dsl = shot.get("dsl") if isinstance(shot.get("dsl"), dict) else {}
         return str(
             dsl.get("prompt_tier") or shot.get("prompt_tier") or "medium"
@@ -184,7 +184,7 @@ def _collect_dialogue_events(shot: dict[str, Any]) -> list[dict[str, str]]:
                     "speaker": str(shot.get("speaker") or "").strip(),
                 }
             ]
-    except Exception:
+    except Exception:  # noqa: BLE001
         pass
     return []
 
@@ -261,7 +261,7 @@ def _action(shot: dict[str, Any]) -> str:
         from motion_prompt_spine import dsl_action_parts
 
         parts = dsl_action_parts(shot)
-    except Exception:
+    except Exception:  # noqa: BLE001
         dsl = shot.get("dsl") if isinstance(shot.get("dsl"), dict) else {}
         parts = [
             str(dsl.get(k) or "").strip()
@@ -558,7 +558,7 @@ def _segment_action_phrases(shot: dict[str, Any], *, duration_sec: float) -> lis
             if body:
                 out.append((t0, body))
         return out[:2]  # at most Shot 2 + Shot 3 for short H3 clips
-    except Exception:
+    except Exception:  # noqa: BLE001
         return []
 
 

@@ -380,7 +380,7 @@ def bulk_preflight(
             film_root=root,
             call_site="workflow_pack.bulk_preflight.crop_master",
         )
-    except Exception:
+    except Exception:  # noqa: BLE001
         skip_crop = os.environ.get("AIFILM_SKIP_CROP_MASTER_STILL", "").strip().lower() in {
             "1",
             "true",
@@ -433,7 +433,7 @@ def bulk_preflight(
                 add("anatomy_stills", False, hard=True, error=str(exc)[:120])
             else:
                 add("anatomy_stills", True, skipped=True, error=str(exc)[:120])
-        except Exception:
+        except Exception:  # noqa: BLE001
             add("anatomy_stills", True, skipped=True, error=str(exc)[:120])
 
     # geometry sample: keyframes 9:16 when present
@@ -453,7 +453,7 @@ def bulk_preflight(
                     ratio = h / max(w, 1)
                     if w < 704 or h < 1280 or abs(ratio - (16 / 9)) > 0.12:
                         geo_bad.append(p.name)
-                except Exception:
+                except Exception:  # noqa: BLE001
                     continue
     add("geometry", len(geo_bad) == 0, bad=geo_bad[:10])
 
@@ -514,7 +514,7 @@ def bulk_preflight(
             film_root=root,
             call_site="workflow_pack.bulk_preflight.variety",
         )
-    except Exception:
+    except Exception:  # noqa: BLE001
         skip_variety = os.environ.get("AIFILM_SKIP_VARIETY_PREFLIGHT", "").strip().lower() in {
             "1",
             "true",
@@ -526,7 +526,7 @@ def bulk_preflight(
             from util.logger import log
 
             log.warning("bulk_preflight variety skipped via env root=%s", root)
-        except Exception:
+        except Exception:  # noqa: BLE001
             pass
         add("variety", True, skipped=True, escape="AIFILM_SKIP_VARIETY_PREFLIGHT=1")
     else:
@@ -565,7 +565,7 @@ def bulk_preflight(
             film_root=root,
             call_site="workflow_pack.bulk_preflight.duration",
         )
-    except Exception:
+    except Exception:  # noqa: BLE001
         skip_dur = os.environ.get("AIFILM_SKIP_DURATION_TARGET", "").strip().lower() in {
             "1",
             "true",
@@ -577,7 +577,7 @@ def bulk_preflight(
             from util.logger import log
 
             log.warning("bulk_preflight duration_target skipped via env root=%s", root)
-        except Exception:
+        except Exception:  # noqa: BLE001
             pass
         add("duration_target", True, skipped=True, escape="AIFILM_SKIP_DURATION_TARGET=1")
     else:
@@ -620,7 +620,7 @@ def bulk_preflight(
                 # Only trust media sum when most timeline shots have measurable clips
                 if measured >= max(3, int(0.5 * max(len(shot_ids), 1))):
                     media_sum = acc
-            except Exception:
+            except Exception:  # noqa: BLE001
                 media_sum = None
 
             dur_rep = check_duration_target(spec, media_sum_sec=media_sum)
@@ -1007,7 +1007,7 @@ def variety_pixel_bind(root: Path | str, *, write: bool = True) -> dict[str, Any
             film_root=root,
             call_site="variety_pixel_bind",
         )
-    except Exception:
+    except Exception:  # noqa: BLE001
         _pix_skip = os.environ.get("AIFILM_SKIP_VARIETY_PIXEL", "").strip().lower() in {
             "1",
             "true",
@@ -1170,7 +1170,7 @@ def assert_variety_preflight(
                 "skipped": True,
                 "escape": "AIFILM_SKIP_VARIETY_PREFLIGHT=1",
             }
-    except Exception:
+    except Exception:  # noqa: BLE001
         if os.environ.get("AIFILM_SKIP_VARIETY_PREFLIGHT", "").strip().lower() in {
             "1",
             "true",
@@ -1757,7 +1757,7 @@ def ship_prep(
                 film_root=root,
                 call_site="ship_prep.variety",
             )
-        except Exception:
+        except Exception:  # noqa: BLE001
             variety_env_skip = os.environ.get(
                 "AIFILM_SKIP_VARIETY_PREFLIGHT", ""
             ).strip().lower() in {"1", "true", "yes", "on"}
@@ -2362,7 +2362,7 @@ def _ship_prep_draft_plans(root: Path, steps: list[dict[str, Any]], write: bool)
                 draft_and_save(root)
                 has_plan = md_path.is_file()
                 detail = "drafted music-director plan (prefer_native)"
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001
                 detail = f"draft fail:{str(exc)[:100]}"
         elif prefer_native and has_plan:
             detail = "music-director plan present"
@@ -2401,7 +2401,7 @@ def _ship_prep_draft_plans(root: Path, steps: list[dict[str, Any]], write: bool)
                 draft_and_save(root, force=False)
                 has_ed = ed_path.is_file()
                 ed_detail = "drafted edit-director plan"
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001
                 ed_detail = f"draft fail:{str(exc)[:100]}"
         elif not has_ed:
             ed_detail = "missing edit-director plan"
@@ -2443,7 +2443,7 @@ def _ship_prep_pk_block(root: Path, steps: list[dict[str, Any]], write: bool, sk
                 film_root=root,
                 call_site="ship_prep.pk_compare",
             )
-        except Exception:
+        except Exception:  # noqa: BLE001
             pk_env_skip = os.environ.get("AIFILM_SKIP_SHIP_PK", "").strip().lower() in {
                 "1",
                 "true",

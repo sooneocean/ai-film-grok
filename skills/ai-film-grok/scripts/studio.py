@@ -188,7 +188,7 @@ def build_studio(
     for root in discover_films(studio_dir):
         try:
             films.append(summarize_film(root))
-        except Exception:
+        except Exception:  # noqa: BLE001
             broken.append(root.name)
 
     # most-recent first
@@ -236,7 +236,7 @@ def _film_live(root: Path) -> dict | None:
         from web.director_live_ext import project_director_live
 
         return project_director_live(Path(root), include_token=False)
-    except Exception:
+    except Exception:  # noqa: BLE001
         return None
 
 
@@ -350,7 +350,7 @@ def _build_studio_live_inner(
     for rid, root, live in entries:
         try:
             title = summarize_film(root).get("title", rid)
-        except Exception:
+        except Exception:  # noqa: BLE001
             title = rid
         attention = _film_attention(live)
         films_out.append({"id": rid, "title": title, "live": live, "attention": attention})

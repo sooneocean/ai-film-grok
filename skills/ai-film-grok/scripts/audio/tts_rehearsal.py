@@ -540,7 +540,7 @@ def bind_receipt_to_spec_timing(
             if isinstance(raw, dict):
                 try:
                     shots = validate_film_spec(raw, assign_missing_ids=False)
-                except Exception:
+                except Exception:  # noqa: BLE001
                     for scene in raw.get("scenes") or []:
                         if not isinstance(scene, dict):
                             continue

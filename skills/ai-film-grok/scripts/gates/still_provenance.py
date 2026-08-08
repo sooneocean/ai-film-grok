@@ -40,7 +40,7 @@ def _env_skip(root: Path | None = None) -> bool:
                 call_site="env_skip",
             )
         )
-    except Exception:
+    except Exception:  # noqa: BLE001
         return os.environ.get("AIFILM_SKIP_STILL_PROVENANCE", "").strip().lower() in {
             "1",
             "true",

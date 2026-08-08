@@ -39,7 +39,7 @@ def generation_request_skip_strict(root: Path | str | None = None) -> bool:
             film_root=root,
             call_site="generation_request.generation_request_skip_strict",
         )
-    except Exception:
+    except Exception:  # noqa: BLE001
         return os.environ.get("AIFILM_SKIP_GENERATION_REQUEST", "").strip().lower() in {
             "1",
             "true",
@@ -60,7 +60,7 @@ def _find_shot(root: Path, shot_id: str) -> tuple[dict[str, Any], dict[str, Any]
         from continue_handoff import find_shot
 
         shot = find_shot(spec, shot_id)
-    except Exception:
+    except Exception:  # noqa: BLE001
         shot = None
     if not isinstance(shot, dict):
         raise GenerationRequestError(f"shot not found: {shot_id}")
@@ -74,7 +74,7 @@ def _asset_hints(root: Path, shot: dict[str, Any]) -> tuple[list[str], dict[str,
 
         rep = build_asset_prompt_hints(root, shot)
         return list(rep.get("lines") or []), rep
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         return [], {"ok": False, "error": str(exc)[:120]}
 
 
@@ -107,7 +107,7 @@ def _assemble_text(
             negative = str(assembled.get("negative") or assembled.get("negatives") or "")
             meta["assembler"] = "PromptInjector"
             meta["state_photo_paths"] = assembled.get("state_photo_paths")
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             prompt = str(shot.get("nar") or shot.get("action") or "")
             meta["assembler"] = f"fallback:{type(exc).__name__}"
     else:
@@ -117,7 +117,7 @@ def _assemble_text(
             mode = kind if kind in {"i2v", "flf", "r2v", "t2v"} else "i2v"
             prompt = build_motion_prompt(spec, shot, mode=mode, include_provider_prefix=True)
             meta["assembler"] = "motion_prompt_spine"
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             prompt = str(
                 shot.get("dsl", {}).get("motion") if isinstance(shot.get("dsl"), dict) else ""
             ) or str(shot.get("nar") or "")
@@ -165,7 +165,7 @@ def build_generation_request(
         cont = resolve_continue_handoff(base, shot_id, shot=shot, spec=spec)
         if cont.get("ok") and cont.get("end_frame"):
             cont_end = cont.get("end_frame")
-    except Exception:
+    except Exception:  # noqa: BLE001
         cont = None
 
     still_entry = resolve_still_source(
@@ -205,7 +205,7 @@ def build_generation_request(
                 wants_continue=wants_cont,
                 refs_override=refs_override,
             )
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             media_pack = {"error": str(exc)[:200]}
 
     prompt, negative, text_meta = _assemble_text(base, spec, shot, kind=k)
@@ -219,7 +219,7 @@ def build_generation_request(
         if prior_lines:
             prompt = ("\n".join(prior_lines) + "\n" + prompt).strip()
             text_meta["prior_evidence"] = prior_lines
-    except Exception:
+    except Exception:  # noqa: BLE001
         prior_lines = []
 
     image_refs: list[dict[str, Any]] = []
@@ -399,7 +399,7 @@ def shot_requires_generation_request(root: Path | str, shot_id: str) -> bool:
         from anatomy_safety import shot_requires_anatomy_safety
 
         return bool(shot_requires_anatomy_safety(base, str(shot_id)))
-    except Exception:
+    except Exception:  # noqa: BLE001
         # Fall back: film heat max / genre adult
         spec = read_json(base / "film-spec.json") or {}
         if not isinstance(spec, dict):

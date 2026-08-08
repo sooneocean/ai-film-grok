@@ -299,7 +299,7 @@ def run_env_plate(
         report["register_rc"] = proc.returncode
         try:
             report["register"] = json.loads((proc.stdout or "").strip().splitlines()[-1])
-        except Exception:
+        except Exception:  # noqa: BLE001
             report["register_stdout"] = (proc.stdout or "")[:400]
 
     report["ok"] = True

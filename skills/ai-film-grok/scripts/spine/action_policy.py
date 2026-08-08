@@ -93,7 +93,7 @@ def _catalog_overlay() -> dict[str, dict[str, Any]]:
                 continue
             out[rid] = route
         return out
-    except Exception:
+    except Exception:  # noqa: BLE001
         return {}
 
 
@@ -140,5 +140,5 @@ def catalog_advance_ids() -> frozenset[str]:
             for r in list_routes(advance_only=True)
             if r.get("id")
         )
-    except Exception:
+    except Exception:  # noqa: BLE001
         return frozenset()

@@ -488,7 +488,7 @@ def compact_dispatch(packet: dict[str, Any]) -> dict[str, Any]:
                         }
                     )
                     compact["attention"] = attention[:6]
-    except Exception:
+    except Exception:  # noqa: BLE001
         pass
 
     # Wave 5: slim heat surface for agent loops (only when adult-max active)
