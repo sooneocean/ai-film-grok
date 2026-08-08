@@ -94,7 +94,8 @@ jobs:
               json.loads(reg.read_text(encoding="utf-8"))
               print("OK", reg)
           PY
-          python skills/ai-film-grok/scripts/aifilm skill list >/dev/null
+          skills/ai-film-grok/scripts/aifilm --help >/dev/null
+          skills/ai-film-grok/scripts/aifilm skill list >/dev/null
 
       - name: Test shipped skill and root contracts
         run: |

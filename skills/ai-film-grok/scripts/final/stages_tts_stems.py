@@ -106,7 +106,7 @@ def build_shot_audio_stems(
                 film_root=root,
                 call_site="render_final.force_allow_clips",
             )
-        except Exception:
+        except Exception:  # noqa: BLE001
             force_allow_clips = os.environ.get(
                 "AIFILM_SKIP_DIALOGUE_PACKAGE_GATE", ""
             ).strip().lower() in {
@@ -191,7 +191,7 @@ def build_shot_audio_stems(
                 if directed is not None:
                     native_audio = directed
                     native_audio_gain = 1.0
-            except Exception:
+            except Exception:  # noqa: BLE001
                 pass
         caption_lang = str(
             spec.get("caption_lang") or (spec.get("voice_policy") or {}).get("caption_lang") or "zh"
@@ -337,7 +337,7 @@ def build_shot_audio_stems(
         ):
             try:
                 color_payload = resolve_shot_vocal_color(shot, policy=voice_policy, seed=i * 17)
-            except Exception:
+            except Exception:  # noqa: BLE001
                 color_payload = {}
         if not non_vo_coverage and dialogue_audio_lane == "post_tts":
             color_text = str(color_payload.get("text") or "").strip()
@@ -464,7 +464,7 @@ def build_shot_audio_stems(
 
             default_fit = default_visual_fit(spec)
             use_fit = resolve_shot_visual_fit(spec, shot)
-        except Exception:
+        except Exception:  # noqa: BLE001
             es = spec.get("edit_strategy") if isinstance(spec.get("edit_strategy"), dict) else {}
             es_mode = str(es.get("mode") or "").strip().lower()
             default_fit = "vo" if es_mode in {"voice_coupled", "punchy"} else "slot"

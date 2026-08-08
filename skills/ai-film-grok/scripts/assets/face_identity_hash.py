@@ -37,7 +37,7 @@ def _ahash(image_path: Path, hash_size: int = 8) -> str | None:
 
     try:
         img = Image.open(image_path).convert("L").resize((hash_size, hash_size))
-    except Exception:
+    except Exception:  # noqa: BLE001
         return None
 
     pixels = (

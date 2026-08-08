@@ -205,7 +205,7 @@ def write_continue_handoff(
 
                 if is_poison_blocked(base, shot_id, shot=shot_d):
                     block_codes.append("POISON_SOURCE_STILL")
-            except Exception:
+            except Exception:  # noqa: BLE001
                 pass
             try:
                 from endframe_wardrobe import lint_endframe_no_redress
@@ -250,7 +250,7 @@ def write_continue_handoff(
                 }
                 if not fill.get("ok") and not fill.get("skipped"):
                     block_codes.append("ENDFRAME_COMPOSITION_FILL")
-            except Exception:
+            except Exception:  # noqa: BLE001
                 pass
             if block_codes:
                 meta["safe_for_continue"] = False
@@ -342,7 +342,7 @@ def resolve_continue_handoff(
             safe = False
             if "POISON_SOURCE_STILL" not in block_codes:
                 block_codes.append("POISON_SOURCE_STILL")
-    except Exception:
+    except Exception:  # noqa: BLE001
         pass
     out["block_codes"] = block_codes
     out["safe_for_continue"] = safe

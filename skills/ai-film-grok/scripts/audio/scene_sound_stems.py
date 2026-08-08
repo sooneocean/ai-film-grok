@@ -78,7 +78,7 @@ def _approved_performance(root: Path, event: dict[str, Any], asset: Path, actual
         from performance_candidates import receipt_is_signed
 
         signed = receipt_is_signed(data)
-    except Exception:
+    except Exception:  # noqa: BLE001
         signed = False
     if (
         data.get("schema") != "aifilm-performance-candidate-v1"

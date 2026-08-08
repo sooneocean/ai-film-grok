@@ -19,7 +19,7 @@ def _utc() -> str | None:
         from util import utc_now
 
         return utc_now()
-    except Exception:
+    except Exception:  # noqa: BLE001
         return None
 
 
@@ -31,7 +31,7 @@ def load_attestation_ledger(root: Path | str | None) -> dict[str, Any]:
         from util import read_json
 
         data = read_json(base / LEDGER_REL) or {}
-    except Exception:
+    except Exception:  # noqa: BLE001
         data = {}
     if not isinstance(data, dict):
         data = {}

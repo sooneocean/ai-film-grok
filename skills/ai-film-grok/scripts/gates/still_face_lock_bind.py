@@ -32,7 +32,7 @@ def _env_skip(root: Path | None) -> bool:
                 call_site="still_face_lock_bind",
             )
         )
-    except Exception:
+    except Exception:  # noqa: BLE001
         return os.environ.get("AIFILM_SKIP_STILL_FACE_LOCK", "").strip().lower() in {
             "1",
             "true",

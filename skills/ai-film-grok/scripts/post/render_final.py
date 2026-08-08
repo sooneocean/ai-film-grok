@@ -953,7 +953,7 @@ def main(argv: list[str] | None = None) -> int:
                 from sound_plan import _license_sidecar_for
 
                 side_ok = bool(_license_sidecar_for(p) if p.is_file() else False)
-            except Exception:
+            except Exception:  # noqa: BLE001
                 side_ok = False
             if not side_ok:
                 raise RenderError(
@@ -965,7 +965,7 @@ def main(argv: list[str] | None = None) -> int:
             from final.heartbeat import write_final_heartbeat
 
             write_final_heartbeat(root_for_timeout, stage="done", detail="ok")
-        except Exception:
+        except Exception:  # noqa: BLE001
             pass
         print(json.dumps(result, ensure_ascii=False, indent=2))
         return 0
@@ -977,7 +977,7 @@ def main(argv: list[str] | None = None) -> int:
         try:
             hb = _read_json(root_for_timeout / "receipts" / "final-heartbeat.json") or {}
             stage = str(hb.get("stage") or "unknown")
-        except Exception:
+        except Exception:  # noqa: BLE001
             pass
         try:
             from final.heartbeat import write_final_timeout_receipt
@@ -989,7 +989,7 @@ def main(argv: list[str] | None = None) -> int:
                 error=str(exc),
             )
             next_cmd = (_read_json(rec_path) or {}).get("next_cmd")
-        except Exception:
+        except Exception:  # noqa: BLE001
             next_cmd = (
                 f'aifilm final --root "{root_for_timeout}" --lipsync off '
                 f"# timed out stage={stage}; raise AIFILM_FFMPEG_TIMEOUT"

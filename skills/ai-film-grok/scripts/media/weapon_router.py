@@ -217,7 +217,7 @@ def build_weapon_route(
         if inv and inv.get("tier"):
             inventory_tier = str(inv["tier"])
         inventory_line = inventory_summary_line()
-    except Exception:
+    except Exception:  # noqa: BLE001
         inv = None
     return {
         **common,

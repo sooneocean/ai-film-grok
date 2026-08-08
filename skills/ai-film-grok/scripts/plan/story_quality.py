@@ -153,7 +153,7 @@ def _debrief_from_graph_or_root(
             from script_value_debrief import load_debrief
 
             return load_debrief(root)
-        except Exception:
+        except Exception:  # noqa: BLE001
             return None
     return None
 
@@ -184,7 +184,7 @@ def score_value_dims(debrief: dict[str, Any] | None) -> dict[str, float]:
             "dead_air_risk": score_dead_air_awareness(debrief),
             "debrief_present": 1.0,
         }
-    except Exception:
+    except Exception:  # noqa: BLE001
         return {
             "promise_clarity": 0.5,
             "beat_value_coverage": 0.5,

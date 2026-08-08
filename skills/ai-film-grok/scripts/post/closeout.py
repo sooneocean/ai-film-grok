@@ -21,7 +21,7 @@ def _export_name(root: Path) -> str:
         from next_actions import _export_desktop_name
 
         return _export_desktop_name(root)
-    except Exception:
+    except Exception:  # noqa: BLE001
         return "GrokFilm"
 
 
@@ -43,7 +43,7 @@ def _final_next_cmd(root: Path) -> str:
             return f'aifilm edit-director apply --root "{root}"'
         if st.get("next_cmd") and "edit-director" in str(st.get("next_cmd")):
             return str(st["next_cmd"])
-    except Exception:
+    except Exception:  # noqa: BLE001
         pass
     return default
 

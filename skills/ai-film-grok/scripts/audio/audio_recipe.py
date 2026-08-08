@@ -532,7 +532,7 @@ def probe_caps_for_root(root: Any | None = None) -> dict[str, bool]:
 
         info = lipsync_probe()
         lipsync_ready = bool(info.get("ready"))
-    except Exception:
+    except Exception:  # noqa: BLE001
         pass
     try:
         from pathlib import Path
@@ -542,7 +542,7 @@ def probe_caps_for_root(root: Any | None = None) -> dict[str, bool]:
         if root is not None:
             hit = resolve_music_template(Path(root), mood="rnb", mode="auto", seed=0)
             music_library = hit is not None
-    except Exception:
+    except Exception:  # noqa: BLE001
         pass
     # Sung provider readiness: external HeartMuLa (AIFILM_MUSIC_ARGV) OR a local
     # fallback (bundled local TTS adapter) — no longer blocked on the external dep.
@@ -550,7 +550,7 @@ def probe_caps_for_root(root: Any | None = None) -> dict[str, bool]:
         from sung_provider import sung_provider_ready as _sung_ready  # type: ignore
 
         sung_provider_ready = bool(_sung_ready())
-    except Exception:
+    except Exception:  # noqa: BLE001
         import os
 
         sung_provider_ready = bool((os.environ.get("AIFILM_MUSIC_ARGV") or "").strip())

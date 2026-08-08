@@ -425,7 +425,7 @@ def audit(root: Path, *, write: bool = True) -> dict[str, Any]:
         lufs_strict = bool(band.get("strict"))
         lufs_min = float(band.get("lufs_min", -17.5))
         lufs_max = float(band.get("lufs_max", -14.5))
-    except Exception:
+    except Exception:  # noqa: BLE001
         lufs_strict = bool(spec_for_lufs.get("lufs_strict"))
         lufs_min = float(spec_for_lufs.get("lufs_min", -23))
         lufs_max = float(spec_for_lufs.get("lufs_max", -14))
@@ -464,7 +464,7 @@ def audit(root: Path, *, write: bool = True) -> dict[str, Any]:
                     hard.append(row)
                 else:
                     warnings.append(row)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         warnings.append({"code": "FIVE_TRACK_PROBE", "message": str(exc)[:160]})
     spec = read_json(root / "film-spec.json") or {}
     shots = [
@@ -724,10 +724,10 @@ def audit(root: Path, *, write: bool = True) -> dict[str, Any]:
     # P2-1: face identity drift — pixel fingerprints in receipts/face-identity.json
     try:
         from face_identity import post_audit_face_status
-    except Exception:
+    except Exception:  # noqa: BLE001
         try:
             from face_identity import post_audit_face_status  # type: ignore
-        except Exception:
+        except Exception:  # noqa: BLE001
             post_audit_face_status = None  # type: ignore
     if post_audit_face_status is not None:
         face_st = post_audit_face_status(root)
@@ -836,7 +836,7 @@ def audit(root: Path, *, write: bool = True) -> dict[str, Any]:
                             "message": f"audio-bible: {err.get('message', '')}",
                         }
                     )
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001
                 # A1 · premium: bible probe fail is hard (no silent skip)
                 hard.append(
                     {
@@ -859,7 +859,7 @@ def audit(root: Path, *, write: bool = True) -> dict[str, Any]:
                             "message": f"post-bible: {err.get('message', '')}",
                         }
                     )
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001
                 hard.append(
                     {
                         "code": "POST_BIBLE_PROBE_ERROR",

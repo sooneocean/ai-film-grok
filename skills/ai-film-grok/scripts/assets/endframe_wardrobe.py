@@ -36,7 +36,7 @@ def _env_skip(root: Path | str | None = None) -> bool:
             film_root=root,
             call_site="endframe_wardrobe._env_skip",
         )
-    except Exception:
+    except Exception:  # noqa: BLE001
         return os.environ.get("AIFILM_SKIP_ENDFRAME_WARDROBE", "").strip().lower() in {
             "1",
             "true",
@@ -74,7 +74,7 @@ def _extract(video: Path, t_mode: str, out: Path) -> Path | None:
         ]
     try:
         subprocess.run(cmd, capture_output=True, check=False, timeout=45)
-    except Exception:
+    except Exception:  # noqa: BLE001
         return None
     return out if out.is_file() and out.stat().st_size > 80 else None
 
@@ -89,7 +89,7 @@ def _skin_ratio(png: Path) -> float | None:
     try:
         im = Image.open(png).convert("RGB").resize((64, 96))
         arr = np.asarray(im)
-    except Exception:
+    except Exception:  # noqa: BLE001
         return None
     # center band (exclude letterbox edges)
     band = arr[20:80, 12:52]
@@ -195,7 +195,7 @@ def assert_endframe_no_redress(
     try:
         write_json(out, {**rep, "kind": "endframe-wardrobe", "clip": str(video)})
         rep["receipt"] = str(out)
-    except Exception:
+    except Exception:  # noqa: BLE001
         pass
     if hard and not rep.get("ok") and not rep.get("skipped") and not rep.get("soft"):
         raise EndframeWardrobeError(

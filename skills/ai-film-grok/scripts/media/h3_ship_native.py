@@ -131,7 +131,7 @@ def _mean_volume_db(path: Path) -> float | None:
         from core.media_ops import probe_native_audio_mean_volume
 
         return probe_native_audio_mean_volume(path, timeout=60.0)
-    except Exception:
+    except Exception:  # noqa: BLE001
         return None
 
 
@@ -555,7 +555,7 @@ def ship_native(
             raise H3ShipNativeError("AIFILM_SKIP_H3_SHIP_NATIVE=1")
     except H3ShipNativeError:
         raise
-    except Exception:
+    except Exception:  # noqa: BLE001
         if os.environ.get("AIFILM_SKIP_H3_SHIP_NATIVE", "").strip().lower() in {
             "1",
             "true",

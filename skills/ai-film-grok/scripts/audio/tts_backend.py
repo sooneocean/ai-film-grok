@@ -534,7 +534,7 @@ def probe_grok_tts() -> dict[str, Any]:
             "language": grok_tts_language(),
             "has_imagine_video": g.get("has_imagine_video"),
         }
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         return {"ok": False, "error": str(exc)[:200]}
 
 
@@ -548,7 +548,7 @@ def probe_qwen3_tts() -> dict[str, Any]:
             "model": get_config().qwen3_tts_model,
             "ref_audio": bool(get_config().qwen3_tts_ref_audio),
         }
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         return {"ok": False, "error": str(exc)[:240], "model": get_config().qwen3_tts_model}
 
 
@@ -583,7 +583,7 @@ def probe_audio_node() -> dict[str, Any]:
             if variants.get("voice_design") is True
             else "audio node is missing required tts_variants.voice_design handshake",
         }
-    except Exception:
+    except Exception:  # noqa: BLE001
         return {"ok": False, "error": "audio node health check failed"}
 
 
@@ -1753,7 +1753,7 @@ def synthesize(
                     },
                 )
                 result["partial_receipt"] = str(path)
-            except Exception:
+            except Exception:  # noqa: BLE001
                 pass  # never block audio write on receipt I/O
     return result
 

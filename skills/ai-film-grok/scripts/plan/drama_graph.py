@@ -816,7 +816,7 @@ def build_jobs_summary(
         from narrative_control import control_status
 
         narrative = control_status(root)
-    except Exception as exc:  # pragma: no cover - defensive status path
+    except Exception as exc:  # pragma: no cover - defensive status path  # noqa: BLE001
         narrative = {"canonical": False, "error": str(exc)[:160]}
     if narrative and narrative.get("canonical"):
         semantic = narrative.get("semantic") or {}

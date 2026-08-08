@@ -56,21 +56,21 @@ def generation_ready_report(root: Path | str) -> dict[str, Any]:
         from still_source import audit_film_still_sources
 
         ssa = audit_film_still_sources(base)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         ssa = {"ok": True, "hard": [], "peak_missing": [], "error": str(exc)[:120]}
     # F3 · still ↔ current face-lock enroll bind
     try:
         from gates.still_face_lock_bind import audit_film_still_face_lock_bind
 
         flb = audit_film_still_face_lock_bind(base, write_receipt=True, max_shots=40)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         flb = {"ok": True, "hard": [], "error": str(exc)[:120]}
     # P0 2026-08-07: keyframe subject-fill audit (postage-stamp / cast fullbody)
     try:
         from composition_fill_gate import audit_film_composition_fill
 
         cfa = audit_film_composition_fill(base, auto_remedy=False, max_shots=80)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         cfa = {"ok": True, "hard": [], "checked": 0, "error": str(exc)[:120]}
     shots: list[dict[str, Any]] = []
     if isinstance(spec, dict):
@@ -96,7 +96,7 @@ def generation_ready_report(root: Path | str) -> dict[str, Any]:
                 flf_eligible += 1
             elif first and not last:
                 flf_missing_last += 1
-    except Exception:
+    except Exception:  # noqa: BLE001
         pass
     peak_missing = list(ssa.get("peak_missing") or [])
     hard = list(ssa.get("hard") or [])

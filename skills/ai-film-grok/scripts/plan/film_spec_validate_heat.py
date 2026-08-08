@@ -95,7 +95,7 @@ def apply_heat_cast_and_adult_tail(
     # spice_level default from heat/audience
     try:
         from edit_policy import HARDCORE_CRAFT_SPINE, normalize_spice_level
-    except Exception:  # pragma: no cover
+    except Exception:  # pragma: no cover  # noqa: BLE001
         normalize_spice_level = None  # type: ignore
         HARDCORE_CRAFT_SPINE = ()  # type: ignore
     spice_level = spec.get("spice_level")
@@ -160,7 +160,7 @@ def apply_heat_cast_and_adult_tail(
                     source_excerpt = (
                         str(norm.get("raw_excerpt") or norm.get("logline") or "").strip() or None
                     )
-        except Exception:
+        except Exception:  # noqa: BLE001
             source_excerpt = source_excerpt
 
     heat_rep = lint_heat_arc(
@@ -274,7 +274,7 @@ def apply_heat_cast_and_adult_tail(
     if still_src_strict is True:
         try:
             from i2v_motion_gate import lint_still_source_policy
-        except Exception:  # pragma: no cover
+        except Exception:  # pragma: no cover  # noqa: BLE001
             lint_still_source_policy = None  # type: ignore
         if lint_still_source_policy is not None:
             still_rep = lint_still_source_policy(shots)
@@ -320,7 +320,7 @@ def apply_heat_cast_and_adult_tail(
             vo_fix = apply_vo_spice_auto(
                 shots, spice_level=str(spice_level) if spice_level else "extreme"
             )
-        except Exception:  # pragma: no cover
+        except Exception:  # pragma: no cover  # noqa: BLE001
             vo_fix = {"fixed": 0, "ids": []}
         if int(vo_fix.get("fixed") or 0) > 0:
             notes = list(spec.get("_heat_notes") or [])

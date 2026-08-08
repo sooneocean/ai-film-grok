@@ -235,7 +235,7 @@ def transition_frame_audit_closeout_status(
                 "codes": [],
                 "detail": "AIFILM_SKIP_TRANSITION_FRAME_AUDIT",
             }
-    except Exception:
+    except Exception:  # noqa: BLE001
         if os.environ.get("AIFILM_SKIP_TRANSITION_FRAME_AUDIT", "").strip().lower() in {
             "1",
             "true",
@@ -268,7 +268,7 @@ def transition_frame_audit_closeout_status(
     try:
         spec = read_json(root / "film-spec.json") or {}
         soft = isinstance(spec, dict) and spec.get("transition_policy_soft") is True
-    except Exception:
+    except Exception:  # noqa: BLE001
         soft = False
 
     fresh = transition_frame_audit_fresh(root)

@@ -203,7 +203,7 @@ def doctor() -> int:
                 print(f"GET {path} → HTTP {exc.code} (server up)")
                 print("ok: server reachable")
                 return 0
-        except Exception:
+        except Exception:  # noqa: BLE001
             continue
     print("fail: cannot reach CosyVoice server")
     return 1

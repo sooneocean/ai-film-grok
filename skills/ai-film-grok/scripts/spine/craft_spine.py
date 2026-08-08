@@ -294,7 +294,7 @@ def detect_craft_stage(
                     detail = "heat-boost-before-bulk"
             elif hs.get("needs_boost") and stage in {"beats", "shots", "media"}:
                 blockers.append("heat_needs_boost")
-    except Exception:
+    except Exception:  # noqa: BLE001
         heat = None
 
     checklist = {

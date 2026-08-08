@@ -249,10 +249,10 @@ class PromptInjector:
         state_photo_records: list[dict[str, Any]] = []
         try:
             from visual_bible import resolve_state_photo
-        except Exception:
+        except Exception:  # noqa: BLE001
             try:
                 from visual_bible import resolve_state_photo  # type: ignore
-            except Exception:
+            except Exception:  # noqa: BLE001
                 resolve_state_photo = None  # type: ignore
 
         for hid in heroine_ids:
@@ -547,7 +547,7 @@ class PromptInjector:
 
             content = resolve_content_channels(shot)
             shot_action = visual_prompt_action(shot)
-        except Exception:
+        except Exception:  # noqa: BLE001
             content = {}
             shot_action = str(dsl.get("action") or "").strip()
 
@@ -603,7 +603,7 @@ class PromptInjector:
             cues = normalize_sound_cues(shot.get("sound_cues"))
             if cues:
                 sound_line = "Ambient/SFX cues (not dialogue): " + ", ".join(cues)
-        except Exception:
+        except Exception:  # noqa: BLE001
             tone_line = ""
             sound_line = ""
 
@@ -644,7 +644,7 @@ class PromptInjector:
                     pc = str(cont["prompt_clause"])
                     if pc not in parts:
                         parts.insert(0, pc)
-            except Exception:
+            except Exception:  # noqa: BLE001
                 pass
             if shot_action and f"Motion/Action: {shot_action}" not in parts:
                 # Avoid duplicating action already present via spine dsl join

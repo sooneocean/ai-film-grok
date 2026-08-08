@@ -1523,5 +1523,5 @@ def _check_story_quality(graph: dict[str, Any]) -> dict[str, Any]:
         if meta.get("root"):
             root = meta.get("root")
         return check_story_quality(graph, root=root)
-    except Exception:
+    except Exception:  # noqa: BLE001
         return {}

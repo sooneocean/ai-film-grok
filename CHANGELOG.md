@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.41.40] - 2026-08-08
+
+### Hardened (observability · H2 fail-closed gates + silent-except eradication)
+- **Fail-closed gates (H2.2)**: correctness gates in `gates/production_gates.py` raise `ProductionGateError` on probe failure (no silent `return {ok:True}`). Added characterization tests (`tests/test_gates_fail_closed.py`) locking this invariant — `assert_heat_allows_final` raises on probe failure; `_load_json` / loop-risk fallbacks degrade explicitly **and** log.
+- **Silent-except eradication (H2.3)**: all truly-silent `except Exception: pass / return {}` swallow sites in `gates/` now log (`util.logger.log` → stderr) and degrade explicitly — `effect_roi`, `gate_auto`, `identity_generation_lock`, `partner_cast_gate`, `preflight`, `production_gates` (loop-risk legacy-threshold / VO-estimate fallbacks + skip-flag env fallbacks). Error-surfaced report patterns (`steps.append(ok=False, detail=…)`, `_append_probe_error`) left intact — correct explicit-degrade.
+- **Observability (H2.1)**: `util/logger.py` (library → stderr, structured diagnostics) confirmed in place; remaining `print(json.dumps(...))` are stdout contracts (CLI result emitters / adapter subprocess outputs) preserved per plan rule — no library debug noise on stdout.
+- **Lint gate (H2.4)**: `docs/REVIEW_CHECKLIST.md` C5.4 bolded to **CR BLOCKER**; `ruff` `BLE001` (broad-except) adopted as a new-code gate (411 existing intentional broad-excepts acknowledged via `# noqa: BLE001`). Bare `except:` already banned by `B001`.
+- **Tests:** `test_heat_final_gate_fail_closed`, `test_identity_load_json_degrades_with_log`, `test_partner_load_json_degrades_with_log`, `test_loop_risk_legacy_fallback_logs`.
+
 ## [2.41.39] - 2026-08-08
 
 ### Hardened (reliability · H1 fail-soft projection + top-level guard)

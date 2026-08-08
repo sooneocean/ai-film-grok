@@ -211,7 +211,7 @@ def _canary_media_is_approved(root: Path, data: dict[str, Any]) -> bool:
         from media_qa import analyze_media
 
         report = analyze_media(media, require_audio=False, require_motion=False)
-    except Exception:
+    except Exception:  # noqa: BLE001
         return False
     return bool(
         report.get("ok")
@@ -881,7 +881,7 @@ def _resolve_profile_for_routing() -> str:
         from film_spec import resolve_i2v_profile
 
         return resolve_i2v_profile()
-    except Exception:
+    except Exception:  # noqa: BLE001
         return "h3_primary"
 
 
@@ -908,7 +908,7 @@ def preferred(*, root: Path | None = None) -> I2VProvider:
 
         profile = resolve_i2v_profile()
         primary_name = default_i2v_provider()
-    except Exception:
+    except Exception:  # noqa: BLE001
         profile = "h3_primary"
         primary_name = "comfy-h3"
     requested = profile
@@ -955,7 +955,7 @@ def registry_report(*, root: Path | None = None) -> dict[str, Any]:
     for name, provider in _REGISTRY.items():
         try:
             report = provider.probe(root=root)
-        except Exception as exc:  # pragma: no cover — defensive
+        except Exception as exc:  # pragma: no cover — defensive  # noqa: BLE001
             report = CapabilityReport(provider=name, ok=False, reason=str(exc)[:200])
         entries.append(
             {
@@ -1029,7 +1029,7 @@ class LocalComfyH3Provider(I2VProvider):
             detail = probe(base_url)
             capacity = submission_capacity(base_url)
             armory = probe_armory(base_url)
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             return CapabilityReport(
                 provider=self.name,
                 ok=False,

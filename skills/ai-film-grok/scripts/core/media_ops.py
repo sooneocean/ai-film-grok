@@ -221,14 +221,14 @@ def _auto_promote_last_to_next(
             upsert_join,
         )
         from util import sha256_file as chain_sha
-    except Exception:
+    except Exception:  # noqa: BLE001
         return None
     spec_path = root / "film-spec.json"
     if not spec_path.is_file() or not clip_path.is_file():
         return None
     try:
         spec = read_json(spec_path)
-    except Exception:
+    except Exception:  # noqa: BLE001
         return None
     shots = flatten_shots(spec)
     prev = next((s for s in shots if str(s.get("id")) == str(shot_id)), None)
@@ -339,7 +339,7 @@ def _auto_promote_last_to_next(
             "byte_identical_to_prev_last": True,
         }
         save_manifest(root, manifest)
-    except Exception:
+    except Exception:  # noqa: BLE001
         pass
     return {
         "ok": True,
@@ -386,7 +386,7 @@ def normalize_clip(
         # If source shorter, slow slightly up to 1.33x then freeze-pad via tpad if needed.
         try:
             src_dur = media_duration(src)
-        except Exception:
+        except Exception:  # noqa: BLE001
             src_dur = duration
         if src_dur > 0 and duration > src_dur * 1.001:
             factor = min(duration / src_dur, 1.34)

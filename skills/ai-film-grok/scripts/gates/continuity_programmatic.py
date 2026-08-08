@@ -218,7 +218,7 @@ def assert_continuity_programmatic(root: Path | str, *, hard: bool = True) -> di
             call_site="assert_continuity_programmatic",
         ):
             return {"ok": True, "skipped": True, "escape": "AIFILM_SKIP_CONTINUITY_PROG=1"}
-    except Exception:
+    except Exception:  # noqa: BLE001
         if os.environ.get("AIFILM_SKIP_CONTINUITY_PROG", "").strip().lower() in {
             "1",
             "true",

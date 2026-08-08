@@ -378,7 +378,7 @@ def _motion_below_floor(
         )
         floor = ev.get("floor")
         return (not bool(ev.get("ok"))), (float(floor) if floor is not None else None)
-    except Exception:
+    except Exception:  # noqa: BLE001
         return False, None
 
 
@@ -572,7 +572,7 @@ def _poison_blocked(root: Path, shot_id: str) -> bool:
         from shot_lane import is_poison_blocked
 
         return bool(is_poison_blocked(root, shot_id))
-    except Exception:
+    except Exception:  # noqa: BLE001
         pass
     man = read_json(root / "manifest.json") or {}
     stills = man.get("stills") if isinstance(man, dict) else {}
@@ -651,7 +651,7 @@ def classify_fill_idle_shot(
             if crep.get("wants_continue") and not crep.get("ok"):
                 cont_blocked = True
                 shot = {**shot, "_continue_handoff_blocked": True}
-        except Exception:
+        except Exception:  # noqa: BLE001
             cont_blocked = False
 
     # First/last media pack: FLF needs end still; R2V uses last as pose ref.
@@ -664,7 +664,7 @@ def classify_fill_idle_shot(
         if lp is not None and lp.is_file():
             has_last = True
             last_path = lp
-    except Exception:
+    except Exception:  # noqa: BLE001
         has_last = False
         last_path = None
 
@@ -799,7 +799,7 @@ def classify_fill_idle_shot(
             reasons.append("anatomy_still_not_safe")
             cmd = None
             # stay primary_h3 / P0 so h3 list still surfaces the blocker
-    except Exception:
+    except Exception:  # noqa: BLE001
         pass
 
     return {
@@ -1580,7 +1580,7 @@ def _soft_identity_penalty(
                     check=False,
                     timeout=30,
                 )
-            except Exception:
+            except Exception:  # noqa: BLE001
                 # Hang/timeout/start fail → skip identity pixel compare (soft)
                 caution.append("identity_midframe_timeout_or_fail")
                 return penalty, caution
@@ -1605,9 +1605,9 @@ def _soft_identity_penalty(
                 elif l1 > 25:
                     penalty += 3.0
                     caution.append("identity_l1_watch")
-            except Exception:
+            except Exception:  # noqa: BLE001
                 pass
-    except Exception:
+    except Exception:  # noqa: BLE001
         pass
     return penalty, caution
 
@@ -1661,7 +1661,7 @@ def score_take_for_pk(
                 caution.append("composition_weak")
             else:
                 score += min(6.0, float(ah_meta.get("score") or 0) * 5.0)
-    except Exception:
+    except Exception:  # noqa: BLE001
         ah_meta = None
     return {
         **take,
@@ -1733,7 +1733,7 @@ def pk_compare(
                         if m is not None:
                             write_mean_sidecar(p, m)
                             t["mean"] = m
-                    except Exception:
+                    except Exception:  # noqa: BLE001
                         pass
         if not takes:
             continue
@@ -2436,7 +2436,7 @@ def fill_idle_until_empty(
                     _path = base / "receipts" / "fill-idle-until-empty.json"
                     _path.parent.mkdir(parents=True, exist_ok=True)
                     _wj(_path, _hb)
-                except Exception:
+                except Exception:  # noqa: BLE001
                     pass
                 recover = recover_capacity_contention(
                     free_first=bool(free_first),
@@ -2615,7 +2615,7 @@ def write_fill_idle_evidence(
         path.parent.mkdir(parents=True, exist_ok=True)
         write_json(path, evidence)
         evidence["path"] = str(path)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         evidence["write_error"] = str(exc)[:160]
     return evidence
 
@@ -2958,7 +2958,7 @@ def run_next_fill_idle(
         last_out["next_after"] = after.get("next")
         last_out["command_after"] = after.get("command")
         last_out["pending_after"] = after.get("pending_count")
-    except Exception:
+    except Exception:  # noqa: BLE001
         last_out["next_after"] = None
 
     try:
@@ -2968,7 +2968,7 @@ def run_next_fill_idle(
         rec.parent.mkdir(parents=True, exist_ok=True)
         write_json(rec, last_out)
         last_out["receipt"] = str(rec)
-    except Exception:
+    except Exception:  # noqa: BLE001
         pass
     return last_out
 

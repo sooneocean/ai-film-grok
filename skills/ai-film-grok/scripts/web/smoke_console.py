@@ -247,7 +247,7 @@ def run_studio_phase(failures):
                 stop = HTTPConnection("127.0.0.1", port)
                 req(stop, "POST", "/api/stop", token=token, body={})
                 stop.close()
-            except Exception:
+            except Exception:  # noqa: BLE001
                 pass
             try:
                 proc.wait(timeout=5)
@@ -675,7 +675,7 @@ def main() -> int:
             stop = HTTPConnection("127.0.0.1", port)
             req(stop, "POST", "/api/stop", token=token, body={})
             stop.close()
-        except Exception:
+        except Exception:  # noqa: BLE001
             pass
         try:
             proc.wait(timeout=5)

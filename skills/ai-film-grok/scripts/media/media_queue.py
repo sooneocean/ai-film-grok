@@ -135,7 +135,7 @@ def _inventory_weapon_tags() -> str:
         motion = (primary_for("image-to-video") or {}).get("id") or "minimax-h3-i2v-pilot"
         tts = (primary_for("tts_zh_ship") or {}).get("id") or "edge_tts_zh"
         return f"weapons: still={still} edit={edit} motion={motion} tts={tts}"
-    except Exception:
+    except Exception:  # noqa: BLE001
         return (
             "weapons: still=qwen-image-2512-quality "
             "edit=qwen-image-edit-2511-local motion=minimax-h3-i2v-pilot tts=edge_tts_zh"
@@ -652,7 +652,7 @@ class MediaQueue:
                                         (primary_for("image-to-video") or {}).get("id")
                                         or motion_p
                                     )
-                                except Exception:
+                                except Exception:  # noqa: BLE001
                                     pass
                                 raise _queue_error(
                                     f"shot {shot_id!r} is {lane_why} → local motion primary "
@@ -776,7 +776,7 @@ class MediaQueue:
                     film_root=self.root,
                     call_site="media_queue.add bulk_preflight",
                 )
-            except Exception:
+            except Exception:  # noqa: BLE001
                 skip_pf = os.environ.get("AIFILM_SKIP_BULK_PREFLIGHT", "").strip().lower() in {
                     "1",
                     "true",
@@ -791,7 +791,7 @@ class MediaQueue:
                         "media_queue bulk_preflight skipped via env root=%s",
                         self.root,
                     )
-                except Exception:
+                except Exception:  # noqa: BLE001
                     pass
             force_pf = require_preflight or os.environ.get(
                 "AIFILM_REQUIRE_BULK_PREFLIGHT", ""

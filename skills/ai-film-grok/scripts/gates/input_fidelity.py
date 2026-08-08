@@ -1132,7 +1132,7 @@ def assert_fidelity_allows_final(
             call_site="assert_fidelity_allows_final",
         ):
             return {"ok": True, "skipped": True, "reason": "AIFILM_SKIP_FIDELITY_FINAL_GATE"}
-    except Exception:
+    except Exception:  # noqa: BLE001
         if (os.environ.get("AIFILM_SKIP_FIDELITY_FINAL_GATE") or "").strip().lower() in {
             "1",
             "true",

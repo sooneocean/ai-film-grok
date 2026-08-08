@@ -146,7 +146,7 @@ def _jwt_payload(token: str) -> dict[str, Any]:
         raw = base64.urlsafe_b64decode(mid + pad)
         data = json.loads(raw.decode("utf-8"))
         return data if isinstance(data, dict) else {}
-    except Exception:
+    except Exception:  # noqa: BLE001
         return {}
 
 
@@ -200,7 +200,7 @@ def _save_auth_entry(storage_key: str, entry: dict[str, Any], path: Path | None 
     p = path or auth_path()
     try:
         data = json.loads(p.read_text(encoding="utf-8"))
-    except Exception:
+    except Exception:  # noqa: BLE001
         data = {}
     if not isinstance(data, dict):
         data = {}
@@ -229,7 +229,7 @@ def refresh_access_token(entry: dict[str, Any]) -> dict[str, Any]:
             conf = json.loads(resp.read().decode())
             if conf.get("token_endpoint"):
                 token_url = str(conf["token_endpoint"])
-    except Exception:
+    except Exception:  # noqa: BLE001
         pass
     form = {
         "grant_type": "refresh_token",

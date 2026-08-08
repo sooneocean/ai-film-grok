@@ -35,7 +35,7 @@ def skip_enabled(root: Path | str | None = None) -> bool:
             film_root=root,
             call_site="cinematic_gate.skip_enabled",
         )
-    except Exception:
+    except Exception:  # noqa: BLE001
         return os.environ.get("AIFILM_SKIP_CINEMATIC_GATE", "").strip().lower() in {
             "1",
             "true",
@@ -169,7 +169,7 @@ def run_cinematic_gate(
                 shot_ids = [
                     str(s["id"]) for s in validate_film_spec(spec, assign_missing_ids=False)
                 ]
-            except Exception:
+            except Exception:  # noqa: BLE001
                 for scene in spec.get("scenes") or []:
                     if not isinstance(scene, dict):
                         continue
@@ -255,7 +255,7 @@ def run_cinematic_gate(
                     if not gate_path.is_file()
                     else f"ok={None if not isinstance(gate, dict) else gate.get('ok')}"
                 )
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             detail = f"auto_i2v failed: {exc}"[:200]
         steps.append(
             _step(
@@ -284,7 +284,7 @@ def run_cinematic_gate(
                 film_root=base,
                 call_site="cinematic_gate.variety",
             )
-        except Exception:
+        except Exception:  # noqa: BLE001
             variety_skip = os.environ.get("AIFILM_SKIP_VARIETY_PREFLIGHT", "").strip().lower() in {
                 "1",
                 "true",
@@ -370,7 +370,7 @@ def run_cinematic_gate(
             try:
                 sp = read_json(base / "film-spec.json") or {}
                 heat = str((sp or {}).get("heat_scale") or "").lower()
-            except Exception:
+            except Exception:  # noqa: BLE001
                 heat = ""
             hard_ft = heat in {"max", "hot", "extreme"}
             steps.append(
@@ -416,7 +416,7 @@ def run_cinematic_gate(
         try:
             sp = read_json(base / "film-spec.json") or {}
             heat = str((sp or {}).get("heat_scale") or "").lower()
-        except Exception:
+        except Exception:  # noqa: BLE001
             heat = ""
         hard_er = heat in {"max", "hot", "extreme"}
         steps.append(

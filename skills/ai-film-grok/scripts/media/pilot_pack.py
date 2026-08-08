@@ -70,7 +70,7 @@ def _state_index_gaps(root: Path) -> dict[str, Any]:
             "gaps": report.get("gaps") or report.get("missing") or report.get("issues") or [],
             "summary": report.get("summary") or report.get("why"),
         }
-    except Exception:
+    except Exception:  # noqa: BLE001
         rec = read_json(root / "receipts" / "state-index.json") or {}
         return {
             "ok": rec.get("ok") is not False,
@@ -114,7 +114,7 @@ def _h3_mode_trio(
             sid = str(sh["id"])
             try:
                 intent = build_shot_intent(spec, sh)
-            except Exception:
+            except Exception:  # noqa: BLE001
                 intent = {}
             role = str(sh.get("shot_role") or intent.get("shot_role") or "hero")
             has_still = (root / "stills" / f"{sid}.png").is_file() or (
@@ -337,7 +337,7 @@ def pilot_pack(root: Path | str, *, shots: list[str] | None = None) -> dict[str,
             if isinstance(sh, dict):
                 try:
                     lane_by_shot[str(sid)] = resolve_shot_lane(sh, root=base).get("lane")
-                except Exception:
+                except Exception:  # noqa: BLE001
                     lane_by_shot[str(sid)] = None
             try:
                 fr = assert_keyframe_ready_for_h3(
@@ -348,9 +348,9 @@ def pilot_pack(root: Path | str, *, shots: list[str] | None = None) -> dict[str,
                     "codes": fr.get("codes"),
                     "skipped": fr.get("skipped"),
                 }
-            except Exception:
+            except Exception:  # noqa: BLE001
                 fill_by_shot[str(sid)] = {"ok": None}
-    except Exception:
+    except Exception:  # noqa: BLE001
         pass
     fill_all_ok = bool(fill_by_shot) and all(
         v.get("ok") is True or v.get("skipped") for v in fill_by_shot.values()
@@ -551,7 +551,7 @@ def assert_pilot_go_allows_bulk(root: Path | str, *, force: bool = False) -> dic
             call_site="assert_pilot_go_allows_bulk",
         ):
             return {"skipped": True, "reason": "env"}
-    except Exception:
+    except Exception:  # noqa: BLE001
         if os.environ.get("AIFILM_SKIP_PILOT_GO_GATE", "").strip() in {"1", "true", "yes"}:
             return {"skipped": True, "reason": "env"}
     base = _root(root)

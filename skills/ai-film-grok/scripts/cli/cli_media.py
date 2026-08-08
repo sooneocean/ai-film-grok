@@ -584,7 +584,7 @@ def cmd_lock_style(args: argparse.Namespace) -> int:
             fi.enroll(root, char_id, cdest, label=char_id)
             if char_id != "hero":
                 fi.enroll(root, "hero", cdest, label=char_id)
-        except Exception:
+        except Exception:  # noqa: BLE001
             pass
 
     # Medium flag → fingerprint if missing
@@ -714,7 +714,7 @@ def cmd_register_still(args: argparse.Namespace) -> int:
         if not isinstance(spec, dict):
             spec = {}
         aspect = str(spec.get("aspect_ratio") or aspect)
-    except Exception:
+    except Exception:  # noqa: BLE001
         spec = {}
     from media_qa import analyze_still_geometry, lint_still_not_character_sheet
     from quality_gates import evaluate_keyframe, require_quality, write_quality_receipt
@@ -759,7 +759,7 @@ def cmd_register_still(args: argparse.Namespace) -> int:
                 )
         except FilmError:
             raise
-        except Exception:
+        except Exception:  # noqa: BLE001
             composition_fill_rep = None
     # P0 2026-07-29: one still must not be approved for multiple shots (byte-identical)
     if args.status == "approved":
@@ -787,7 +787,7 @@ def cmd_register_still(args: argparse.Namespace) -> int:
             assert_still_source_for_register(root, shot_id=str(args.shot_id), playable_action=pa)
         except InputFidelityError as exc:
             raise FilmError(str(exc)) from exc
-        except Exception:
+        except Exception:  # noqa: BLE001
             pass
     if args.status == "approved":
         from anatomy_safety import AnatomySafetyError, require_anatomy_safe
@@ -811,7 +811,7 @@ def cmd_register_still(args: argparse.Namespace) -> int:
             assert_dialogue_still_for_register(root, str(args.shot_id))
         except ProductionGateError as exc:
             raise FilmError(str(exc)) from exc
-        except Exception:
+        except Exception:  # noqa: BLE001
             pass
         if not identity_approved:
             raise FilmError(
@@ -829,7 +829,7 @@ def cmd_register_still(args: argparse.Namespace) -> int:
             assert_scale_promote_allowed(root, review_note=review_note, kind="still")
         except ScalePromoteBanError as exc:
             raise FilmError(str(exc)) from exc
-        except Exception:
+        except Exception:  # noqa: BLE001
             pass
         # 卸装不回穿 still 源：undressed/bare 禁 sole-ref 全装 cast master
         heat_scale = str(spec.get("heat_scale") or "").strip().lower()
@@ -919,7 +919,7 @@ def cmd_register_still(args: argparse.Namespace) -> int:
                             cast = dsl.get("cast") if isinstance(dsl.get("cast"), list) else []
                             if cast:
                                 char_guess = str(cast[0])
-                except Exception:
+                except Exception:  # noqa: BLE001
                     char_guess = ""
             receipt = fi.load_receipt(root)
             enrolled = receipt.get("enrolled") if isinstance(receipt.get("enrolled"), dict) else {}
@@ -942,7 +942,7 @@ def cmd_register_still(args: argparse.Namespace) -> int:
                         film_root=root,
                         call_site="register_still.face_identity",
                     )
-                except Exception:
+                except Exception:  # noqa: BLE001
                     skip_face = os.environ.get("AIFILM_SKIP_FACE_IDENTITY", "").strip().lower() in {
                         "1",
                         "true",
@@ -961,7 +961,7 @@ def cmd_register_still(args: argparse.Namespace) -> int:
                     )
         except FilmError:
             raise
-        except Exception:
+        except Exception:  # noqa: BLE001
             face_id_result = None
     manifest = load_manifest(root)
     manifest.setdefault("stills", {})[record["shot_id"]] = record
@@ -1068,7 +1068,7 @@ def cmd_register_clip(args: argparse.Namespace) -> int:
             )
         except EndframeWardrobeError as exc:
             raise FilmError(str(exc)) from exc
-        except Exception:
+        except Exception:  # noqa: BLE001
             pass
         if endpoint not in ALLOWED_VIDEO_ENDPOINTS:
             raise FilmError(
@@ -1208,7 +1208,7 @@ def cmd_register_clip(args: argparse.Namespace) -> int:
             engine=eng,
             mode="i2v",
         )
-    except Exception:
+    except Exception:  # noqa: BLE001
         pass
     # M4 · shot-evidence + motion mean hard gate on approved clips (v2.40.7)
     mean_val = None
@@ -1216,7 +1216,7 @@ def cmd_register_clip(args: argparse.Namespace) -> int:
         from i2v_motion_gate import evaluate_shot_motion, measure_mean_absdiff
 
         mean_val = measure_mean_absdiff(Path(record.get("path") or source))
-    except Exception:
+    except Exception:  # noqa: BLE001
         mean_val = None
     try:
         from shot_evidence import write_shot_evidence
@@ -1232,7 +1232,7 @@ def cmd_register_clip(args: argparse.Namespace) -> int:
             source="register-clip",
             extra={"status": str(args.status or ""), "endpoint": str(endpoint or "")},
         )
-    except Exception:
+    except Exception:  # noqa: BLE001
         pass
     if str(args.status or "") == "approved":
         try:
@@ -1244,7 +1244,7 @@ def cmd_register_clip(args: argparse.Namespace) -> int:
                 film_root=root,
                 call_site="register_clip.motion_mean",
             )
-        except Exception:
+        except Exception:  # noqa: BLE001
             skip_mean = os.environ.get("AIFILM_SKIP_MOTION_MEAN", "").strip().lower() in {
                 "1",
                 "true",
@@ -1272,13 +1272,13 @@ def cmd_register_clip(args: argparse.Namespace) -> int:
                         )
                         wardrobe_state = sh.get("wardrobe_state") or dsl.get("wardrobe_state")
                         break
-            except Exception:
+            except Exception:  # noqa: BLE001
                 pass
             tags = getattr(args, "tags", None)
             tag_list = [str(t) for t in tags] if isinstance(tags, (list, tuple)) else []
             try:
                 from i2v_motion_gate import evaluate_shot_motion
-            except Exception:
+            except Exception:  # noqa: BLE001
                 evaluate_shot_motion = None  # type: ignore
             if evaluate_shot_motion is not None:
                 grade = evaluate_shot_motion(
@@ -1300,7 +1300,7 @@ def cmd_register_clip(args: argparse.Namespace) -> int:
                     )
     try:
         record["duration_sec"] = media_duration(Path(record["path"]))
-    except Exception:
+    except Exception:  # noqa: BLE001
         record["duration_sec"] = None
     qa["path"] = record["path"]
     record.update(
@@ -1337,7 +1337,7 @@ def cmd_register_clip(args: argparse.Namespace) -> int:
                 "mute_native",
             }:
                 h3_audio = candidate
-        except Exception:
+        except Exception:  # noqa: BLE001
             pass
         record["provider"] = "comfy-h3"
         record["h3"] = True
@@ -1782,7 +1782,7 @@ def cmd_reencode_clips(args: argparse.Namespace) -> int:
                 return None
             a, b = raw.split("x", 1)
             return int(a), int(b)
-        except Exception:
+        except Exception:  # noqa: BLE001
             return None
 
     for shot in shots:
@@ -1859,7 +1859,7 @@ def cmd_reencode_clips(args: argparse.Namespace) -> int:
             )
             try:
                 record["duration_sec"] = media_duration(Path(record["path"]))
-            except Exception:
+            except Exception:  # noqa: BLE001
                 record["duration_sec"] = None
             qa["path"] = record["path"]
             record.update(

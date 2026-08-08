@@ -416,7 +416,7 @@ def cmd_write_spec(args: argparse.Namespace) -> int:
                 film_root=root,
                 call_site="write_spec.duration_target",
             )
-        except Exception:
+        except Exception:  # noqa: BLE001
             skip_dt = os.environ.get("AIFILM_SKIP_DURATION_TARGET", "").strip().lower() in {
                 "1",
                 "true",

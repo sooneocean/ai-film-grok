@@ -27,6 +27,7 @@ from production_gates import (
 )
 from util import read_json, utc_now
 from util.errors import FilmError
+from util.logger import log
 
 ECCHI_TONE = re.compile(
     r"色气|里番|同人|诱惑|后宫|sensual|ecchi|seductive|rnb|soul",
@@ -139,7 +140,7 @@ def run_preflight(root: Path) -> dict[str, Any]:
             shots_for_frame: list = []
             try:
                 shots_for_frame = validate_film_spec(copy.deepcopy(spec), assign_missing_ids=False)
-            except Exception:
+            except Exception:  # noqa: BLE001
                 for scene in spec.get("scenes") or []:
                     if not isinstance(scene, dict):
                         continue
@@ -158,7 +159,7 @@ def run_preflight(root: Path) -> dict[str, Any]:
                         fix="改 framing/motion：每个主角完整头部 + 头顶留白；空间不足时裁脚，不得裁头",
                     )
                     hard.append(issue)
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             soft.append(
                 _issue(
                     "soft",
@@ -171,9 +172,7 @@ def run_preflight(root: Path) -> dict[str, Any]:
     # --- VO / loop (Kei) + TTS rehearsal measured timing ---
     tts_timing: dict[str, Any] | None = None
     if spec:
-        tts_timing, score = _apply_preflight_tts_and_heat(
-            root, spec, hard, soft, score
-        )
+        tts_timing, score = _apply_preflight_tts_and_heat(root, spec, hard, soft, score)
         _apply_preflight_art_and_edit(root, spec, style, hard, soft)
 
     # --- pilot (S3 + 2026-07-17) ---
@@ -254,7 +253,7 @@ def run_preflight(root: Path) -> dict[str, Any]:
                 for entry in (shot.get("dialogue_broll") or [])
                 if isinstance(entry, dict) and str(entry.get("id") or "").strip()
             )
-        except Exception:
+        except Exception:  # noqa: BLE001
             # fall back to raw ids without full validation
             for scene in spec.get("scenes") or []:
                 if not isinstance(scene, dict):
@@ -312,7 +311,7 @@ def run_preflight(root: Path) -> dict[str, Any]:
                         fix="aifilm status 重算 gates；补齐 register-clip",
                     )
                 )
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             soft.append(
                 _issue(
                     "soft",
@@ -345,7 +344,7 @@ def run_preflight(root: Path) -> dict[str, Any]:
                         ),
                     )
                 )
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             soft.append(
                 _issue(
                     "soft",
@@ -372,7 +371,7 @@ def run_preflight(root: Path) -> dict[str, Any]:
                     fix="status.evidence 区分 intent/executed/human_review；勿把 plan 当交付",
                 )
             )
-    except Exception:
+    except Exception:  # noqa: BLE001
         evidence = None
 
     # designed-post tooling (soft)
@@ -439,7 +438,7 @@ def run_preflight(root: Path) -> dict[str, Any]:
                         fix=f'aifilm post-plan --root "{root}" init --owner hyperframes',
                     )
                 )
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             _append_probe_error(
                 hard,
                 soft,
@@ -447,7 +446,7 @@ def run_preflight(root: Path) -> dict[str, Any]:
                 exc=exc,
                 fix="check compose_preview.has_valid_preview_receipt",
             )
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         soft.append(
             _issue(
                 "soft", "hyperframes_probe_error", str(exc)[:200], fix="检查 compose_render 导入"
@@ -537,7 +536,7 @@ def run_preflight(root: Path) -> dict[str, Any]:
                     fix="prefer png / high-quality jpg; eye-check for blocky mush",
                 )
             )
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         soft.append(
             _issue(
                 "soft",
@@ -587,7 +586,7 @@ def run_preflight(root: Path) -> dict[str, Any]:
                     fix=f'aifilm state-index plan --root "{root}"',
                 )
             )
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         soft.append(
             _issue(
                 "soft",
@@ -599,24 +598,50 @@ def run_preflight(root: Path) -> dict[str, Any]:
 
     try:
         from timeline_clock import audit_timeline_clock
+
         clock = audit_timeline_clock(root, write=True)
         if clock.get("dual_clock"):
-            hard.append(_issue("hard", "DUAL_TIMELINE_CLOCK", str(clock.get("error") or "dual clock"), fix=str(clock.get("next_cmd") or "")))
-    except Exception as exc:
+            hard.append(
+                _issue(
+                    "hard",
+                    "DUAL_TIMELINE_CLOCK",
+                    str(clock.get("error") or "dual clock"),
+                    fix=str(clock.get("next_cmd") or ""),
+                )
+            )
+    except Exception as exc:  # noqa: BLE001
         soft.append(_issue("soft", "timeline_clock_probe_error", str(exc)[:200]))
     try:
         from post_doctor import run_post_doctor
+
         doctor = run_post_doctor(root, write=True)
         for iss in doctor.get("hard") or []:
             if not isinstance(iss, dict):
                 continue
             code = str(iss.get("code") or "")
-            sev = "hard" if code in {"DOUBLE_BURN_RISK", "SRT_OVERLAP", "SRT_BAD_CUE", "DUAL_TIMELINE_CLOCK", "CAPTION_PIXEL_RED"} else "soft"
-            (hard if sev=="hard" else soft).append(_issue(sev, code, str(iss.get("message") or code), fix=str(iss.get("fix") or "")))
+            sev = (
+                "hard"
+                if code
+                in {
+                    "DOUBLE_BURN_RISK",
+                    "SRT_OVERLAP",
+                    "SRT_BAD_CUE",
+                    "DUAL_TIMELINE_CLOCK",
+                    "CAPTION_PIXEL_RED",
+                }
+                else "soft"
+            )
+            (hard if sev == "hard" else soft).append(
+                _issue(sev, code, str(iss.get("message") or code), fix=str(iss.get("fix") or ""))
+            )
         for iss in doctor.get("soft") or []:
             if isinstance(iss, dict):
-                soft.append(_issue("soft", str(iss.get("code") or "post_doctor"), str(iss.get("message") or "")))
-    except Exception as exc:
+                soft.append(
+                    _issue(
+                        "soft", str(iss.get("code") or "post_doctor"), str(iss.get("message") or "")
+                    )
+                )
+    except Exception as exc:  # noqa: BLE001
         soft.append(_issue("soft", "post_doctor_probe_error", str(exc)[:200]))
 
     hard_ok = len(hard) == 0
@@ -625,7 +650,7 @@ def run_preflight(root: Path) -> dict[str, Any]:
 
         next_actions = build_next_actions(root, gates=gates)
         pipeline_stage = detect_pipeline_stage(root, gates=gates)
-    except Exception:
+    except Exception:  # noqa: BLE001
         next_actions = []
         pipeline_stage = {"stage": "unknown", "label_zh": "未知"}
 
@@ -756,7 +781,7 @@ def _apply_preflight_tts_and_heat(
                     fix="拆 nar / 升 duration_sec / 重 tts-rehearse；勿指望 final loop",
                 )
             )
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         soft.append(
             _issue(
                 "soft",
@@ -768,7 +793,7 @@ def _apply_preflight_tts_and_heat(
 
     try:
         risk = loop_risk_shots_from_spec(spec, measured_by_shot=measured_map or None, root=root)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         risk = []
         _append_probe_error(
             hard,
@@ -808,11 +833,9 @@ def _apply_preflight_tts_and_heat(
             from edit_policy import default_visual_fit
 
             global_fit = (
-                str(spec.get("visual_fit") or default_visual_fit(spec) or "slot")
-                .strip()
-                .lower()
+                str(spec.get("visual_fit") or default_visual_fit(spec) or "slot").strip().lower()
             )
-        except Exception:
+        except Exception:  # noqa: BLE001
             global_fit = str(spec.get("visual_fit") or "slot").strip().lower()
         for scene in spec.get("scenes") or []:
             if not isinstance(scene, dict):
@@ -852,7 +875,7 @@ def _apply_preflight_tts_and_heat(
                     ),
                 )
             )
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         _append_probe_error(
             hard,
             soft,
@@ -880,13 +903,12 @@ def _apply_preflight_tts_and_heat(
                     "soft",
                     "EQUAL_SLOT_PPT_RISK",
                     "; ".join(
-                        str(i.get("message") or i.get("code"))
-                        for i in (ppt.get("issues") or [])
+                        str(i.get("message") or i.get("code")) for i in (ppt.get("issues") or [])
                     ),
                     fix="set visual_fit:vo (dialogue_drama default) or vary duration_sec / re-I2V",
                 )
             )
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         _append_probe_error(
             hard,
             soft,
@@ -909,9 +931,7 @@ def _apply_preflight_tts_and_heat(
                     if isinstance(sh, dict):
                         heat_shots.append(sh)
             intent = (
-                spec.get("director_intent")
-                if isinstance(spec.get("director_intent"), dict)
-                else {}
+                spec.get("director_intent") if isinstance(spec.get("director_intent"), dict) else {}
             )
             heat_rep = lint_heat_arc(
                 heat_shots,
@@ -1039,9 +1059,7 @@ def _apply_preflight_tts_and_heat(
                     )
             # Erotic impact A floor
             impact = (
-                spec.get("_erotic_impact")
-                if isinstance(spec.get("_erotic_impact"), dict)
-                else {}
+                spec.get("_erotic_impact") if isinstance(spec.get("_erotic_impact"), dict) else {}
             )
             score = impact.get("score")
             floor = float(spec.get("erotic_impact_floor") or 75.0)
@@ -1068,7 +1086,7 @@ def _apply_preflight_tts_and_heat(
                         fix=f'aifilm heat boost --root "{root}" --apply',
                     )
                 )
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         # A1 · heat/erotic impact probe must not silent-green under adult max IRON
         _append_probe_error(
             hard,
@@ -1129,7 +1147,7 @@ def _apply_preflight_tts_and_heat(
                         fix="run write-spec to inject stance, or set viewpoint/focal_character by hand",
                     )
                 )
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         _append_probe_error(
             hard,
             soft,
@@ -1147,7 +1165,7 @@ def _apply_preflight_tts_and_heat(
         check_voice = vo_voice or "zh-CN-XiaoxiaoNeural"
         try:
             assert_voice_backend_compatible(tts, check_voice)
-        except Exception as tts_exc:
+        except Exception as tts_exc:  # noqa: BLE001
             hard.append(
                 _issue(
                     "hard",
@@ -1183,7 +1201,7 @@ def _apply_preflight_tts_and_heat(
             from tts_backend import probe_voicebox  # type: ignore
 
             vb = probe_voicebox()
-        except Exception as exc:  # pragma: no cover
+        except Exception as exc:  # pragma: no cover  # noqa: BLE001
             vb = {"ok": False, "error": str(exc)}
         if not vb.get("ok"):
             soft.append(
@@ -1197,9 +1215,7 @@ def _apply_preflight_tts_and_heat(
 
     # BGM mood
     tone = ""
-    intent = (
-        spec.get("director_intent") if isinstance(spec.get("director_intent"), dict) else {}
-    )
+    intent = spec.get("director_intent") if isinstance(spec.get("director_intent"), dict) else {}
     tone = str(intent.get("tone") or "") + " " + str(spec.get("title") or "")
     sp = spec.get("sound_plan") if isinstance(spec.get("sound_plan"), dict) else {}
     mood = str(sp.get("mood") or "").lower()
@@ -1257,7 +1273,7 @@ def _apply_preflight_tts_and_heat(
                 )
                 vml_codes = list(live.get("codes") or [])
                 vml = live
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001
                 _append_probe_error(
                     hard,
                     soft,
@@ -1300,7 +1316,7 @@ def _apply_preflight_tts_and_heat(
                 )
                 fch_codes = list(live_fc.get("codes") or [])
                 fch = live_fc
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001
                 _append_probe_error(
                     hard,
                     soft,
@@ -1323,11 +1339,7 @@ def _apply_preflight_tts_and_heat(
         )
 
     # Meaningful motion (story-bearing dynamics)
-    mm = (
-        spec.get("_meaningful_motion")
-        if isinstance(spec.get("_meaningful_motion"), dict)
-        else {}
-    )
+    mm = spec.get("_meaningful_motion") if isinstance(spec.get("_meaningful_motion"), dict) else {}
     mm_codes = list(mm.get("codes") or [])
     if not mm_codes:
         shots_mm: list = []
@@ -1342,7 +1354,7 @@ def _apply_preflight_tts_and_heat(
                 live_mm = lint_meaningful_motion(shots_mm)
                 mm_codes = list(live_mm.get("codes") or [])
                 mm = live_mm
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001
                 _append_probe_error(
                     hard,
                     soft,
@@ -1395,7 +1407,7 @@ def _apply_preflight_tts_and_heat(
                 hard.append(ab_issue)
             else:
                 soft.append(ab_issue)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         soft.append(
             _issue(
                 "soft",
@@ -1418,7 +1430,7 @@ def _apply_preflight_tts_and_heat(
                     "hard",
                     "face_identity_gate",
                     f"face-identity gate: {fi_report.get('codes')} — "
-                    f"{(fi_report.get('issues') or [{}])[0].get('message','')[:120]}",
+                    f"{(fi_report.get('issues') or [{}])[0].get('message', '')[:120]}",
                     fix=(
                         "aifilm face-identity enroll-bible && aifilm face-identity audit --root "
                         f'"{root}"（漂移 keyframe 重拍/重编辑后再批准）'
@@ -1431,7 +1443,7 @@ def _apply_preflight_tts_and_heat(
                     "soft",
                     "face_identity_gate",
                     f"face-identity advisory: {fi_report.get('codes')} — "
-                    f"{(fi_report.get('issues') or [{}])[0].get('message','')[:120]}",
+                    f"{(fi_report.get('issues') or [{}])[0].get('message', '')[:120]}",
                     fix=(
                         "aifilm face-identity enroll-bible && aifilm face-identity audit --root "
                         f'"{root}"'
@@ -1450,7 +1462,7 @@ def _apply_preflight_tts_and_heat(
                 ),
             )
         )
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         soft.append(
             _issue(
                 "soft",
@@ -1494,7 +1506,7 @@ def _apply_preflight_art_and_edit(
                 hard.append(hr_issue)
             else:
                 soft.append(hr_issue)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         soft.append(
             _issue(
                 "soft",
@@ -1534,7 +1546,7 @@ def _apply_preflight_art_and_edit(
                 hard.append(tp_issue)
             else:
                 soft.append(tp_issue)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         soft.append(
             _issue(
                 "soft",
@@ -1566,7 +1578,7 @@ def _apply_preflight_art_and_edit(
                 hard.append(rb_issue)
             else:
                 soft.append(rb_issue)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         soft.append(
             _issue(
                 "soft",
@@ -1603,7 +1615,7 @@ def _apply_preflight_art_and_edit(
                 hard.append(sb_issue)
             else:
                 soft.append(sb_issue)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         _sb_heat = str(spec.get("heat_scale") or "").lower() in {"max", "hot", "extreme"}
         _sb_sev = "hard" if _sb_heat else "soft"
         _sb_iss = _issue(
@@ -1690,15 +1702,15 @@ def _apply_preflight_art_and_edit(
                                 ),
                             )
                         )
-                except Exception:
-                    pass
-    except Exception as exc:
+                except Exception as exc:  # noqa: BLE001
+                    log.debug("skipped soft issue for shot %s: %s", sh.get("id"), exc)
+    except Exception as exc:  # noqa: BLE001
         # A1 · when speaker-frame is hard mode, probe failure must hard-block
         try:
             from dialogue_speaker_frame_gate import speaker_frame_hard_enabled as _sfh
 
             _sf_hard_err = _sfh(spec)
-        except Exception:
+        except Exception:  # noqa: BLE001
             _sf_hard_err = False
         _sev = "hard" if _sf_hard_err else "soft"
         _iss = _issue(
@@ -1725,12 +1737,7 @@ def _apply_preflight_art_and_edit(
             applied = isinstance(spec.get("_dialogue_audio_lanes"), dict)
             strict = spec.get("dialogue_audio_lane_strict") is True
             lane_hard = bool(inv) or (
-                bool(miss)
-                and (
-                    strict
-                    or applied
-                    or speaker_frame_hard_enabled(spec)
-                )
+                bool(miss) and (strict or applied or speaker_frame_hard_enabled(spec))
             )
             msg = (
                 f"dialogue_audio_lane missing={miss[:8]} invalid={inv[:4]} "
@@ -1749,12 +1756,12 @@ def _apply_preflight_art_and_edit(
                 hard.append(lane_issue)
             else:
                 soft.append(lane_issue)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         try:
             from dialogue_speaker_frame_gate import speaker_frame_hard_enabled as _sfh2
 
             _lane_hard_err = _sfh2(spec)
-        except Exception:
+        except Exception:  # noqa: BLE001
             _lane_hard_err = False
         _lane_sev = "hard" if _lane_hard_err else "soft"
         _lane_iss = _issue(
@@ -1806,7 +1813,7 @@ def _apply_preflight_art_and_edit(
                 hard.append(dm_issue)
             else:
                 soft.append(dm_issue)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         soft.append(
             _issue(
                 "soft",
@@ -1852,7 +1859,7 @@ def _apply_preflight_art_and_edit(
                     hard.append(pc_issue)
                 else:
                     soft.append(pc_issue)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         soft.append(
             _issue(
                 "soft",
@@ -1897,7 +1904,7 @@ def _apply_preflight_art_and_edit(
                     hard.append(comp_issue)
                 else:
                     soft.append(comp_issue)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         soft.append(
             _issue(
                 "soft",
@@ -1943,7 +1950,7 @@ def _apply_preflight_art_and_edit(
                 hard.append(dc_issue)
             else:
                 soft.append(dc_issue)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         soft.append(
             _issue(
                 "soft",
@@ -1966,9 +1973,7 @@ def _apply_preflight_art_and_edit(
         # Load locations from assets-registry if it exists
         reg = read_json(root / "assets-registry.json") or {}
         locations = (
-            reg.get("locations")
-            if isinstance(reg.get("locations"), dict)
-            else reg.get("locations")
+            reg.get("locations") if isinstance(reg.get("locations"), dict) else reg.get("locations")
         )
         if shots_loc and locations:
             loc_rep = lint_locations(shots_loc, locations)
@@ -1986,7 +1991,7 @@ def _apply_preflight_art_and_edit(
                         ),
                     )
                 )
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         _append_probe_error(
             hard,
             soft,
@@ -2010,8 +2015,7 @@ def _apply_preflight_art_and_edit(
         pace_chart = intent.get("pace_chart") if isinstance(intent, dict) else None
 
         total_dur = (
-            sum(float(s.get("duration_sec") or 0) for s in shots_p4 if isinstance(s, dict))
-            or None
+            sum(float(s.get("duration_sec") or 0) for s in shots_p4 if isinstance(s, dict)) or None
         )
 
         # P4-16: act structure fulfillment
@@ -2050,9 +2054,7 @@ def _apply_preflight_art_and_edit(
 
         # P4-18: music spotting beat alignment
         sound_plan = spec.get("sound_plan") if isinstance(spec, dict) else {}
-        music_spotting = (
-            sound_plan.get("music_spotting") if isinstance(sound_plan, dict) else None
-        )
+        music_spotting = sound_plan.get("music_spotting") if isinstance(sound_plan, dict) else None
         if music_spotting and isinstance(music_spotting, list):
             beats = intent.get("beats") if isinstance(intent, dict) else None
             music_rep = verify_music_spotting(music_spotting, beats, total_duration=total_dur)
@@ -2065,10 +2067,8 @@ def _apply_preflight_art_and_edit(
                     fix="修正 music_spotting beat_ref / start_sec / end_sec 与 beats 时间轴对齐",
                 )
                 soft.append(p4_issue)
-    except Exception as exc:
-        p4_hard = (
-            spec.get("act_structure_strict") is True or spec.get("pace_chart_strict") is True
-        )
+    except Exception as exc:  # noqa: BLE001
+        p4_hard = spec.get("act_structure_strict") is True or spec.get("pace_chart_strict") is True
         _append_probe_error(
             hard,
             soft,
@@ -2143,7 +2143,7 @@ def _apply_preflight_art_and_edit(
                             fix="continue 缝 byte match + 禁 dissolve 盖缝；见 continuity_programmatic",
                         )
                     )
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001
                 _append_probe_error(
                     hard,
                     soft,
@@ -2151,7 +2151,7 @@ def _apply_preflight_art_and_edit(
                     exc=exc,
                     fix="check continuity_programmatic.check_continuity_programmatic",
                 )
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         _append_probe_error(
             hard,
             soft,
@@ -2164,9 +2164,7 @@ def _apply_preflight_art_and_edit(
     try:
         cast_voices = spec.get("cast_voices") if isinstance(spec.get("cast_voices"), dict) else {}
         for role, vid in cast_voices.items():
-            if isinstance(vid, str) and (
-                vid.lower().startswith("ja-") or "ja-jp" in vid.lower()
-            ):
+            if isinstance(vid, str) and (vid.lower().startswith("ja-") or "ja-jp" in vid.lower()):
                 hard.append(
                     _issue(
                         "hard",
@@ -2185,7 +2183,7 @@ def _apply_preflight_art_and_edit(
                     fix="set dialogue_spoken_lang=zh",
                 )
             )
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         _append_probe_error(
             hard,
             soft,

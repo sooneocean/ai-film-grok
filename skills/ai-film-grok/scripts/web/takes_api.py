@@ -159,7 +159,7 @@ def review_take(
             raise WebConsoleForbidden("hard gates blocking — cannot review takes")
     except WebConsoleForbidden:
         raise
-    except Exception:
+    except Exception:  # noqa: BLE001
         pass
     from core.film_io import load_manifest, save_manifest
     from take_registry import set_take_review
@@ -176,7 +176,7 @@ def review_take(
                     raise WebConsoleConflict("approval ledger revision is stale")
             except WebConsoleError:
                 raise
-            except Exception:
+            except Exception:  # noqa: BLE001
                 pass
         try:
             result = set_take_review(
@@ -216,6 +216,6 @@ def review_take(
             note=status or "review",
             actor="director-center",
         )
-    except Exception:
+    except Exception:  # noqa: BLE001
         pass
     return {"ok": True, "result": result, "compare": get_takes(base, sid), "audit": audit}

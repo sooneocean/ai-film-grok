@@ -93,7 +93,7 @@ def _preview_ok(root: Path) -> bool:
         from compose_preview import has_valid_preview_receipt
 
         return has_valid_preview_receipt(root)
-    except Exception:
+    except Exception:  # noqa: BLE001
         rec = read_json(root / "receipts" / "compose-preview.json") or {}
         return bool(
             isinstance(rec, dict)
@@ -131,7 +131,7 @@ def _past_story_planning(root: Path) -> bool:
 
         if pilot_is_user_approved(load_pilot_approval(root)):
             return True
-    except Exception:
+    except Exception:  # noqa: BLE001
         pass
     man = read_json(root / "manifest.json") or {}
     clips = man.get("clips") if isinstance(man.get("clips"), dict) else {}
@@ -155,7 +155,7 @@ def _debrief_next_action(root: Path, root_s: str) -> dict[str, str] | None:
         from script_value_debrief import load_debrief
 
         deb = load_debrief(root)
-    except Exception:
+    except Exception:  # noqa: BLE001
         deb = None
     if not deb:
         return {
@@ -228,7 +228,7 @@ def _first_ltx23_audio_candidate(root: Path, spec: dict[str, Any]) -> dict[str, 
         return None
     try:
         from production_router import build_shot_intent
-    except Exception:
+    except Exception:  # noqa: BLE001
         return None
     man = read_json(root / "manifest.json") or {}
     clips = man.get("clips") if isinstance(man.get("clips"), dict) else {}
@@ -245,7 +245,7 @@ def _first_ltx23_audio_candidate(root: Path, spec: dict[str, Any]) -> dict[str, 
                 continue
             try:
                 intent = build_shot_intent(spec, shot)
-            except Exception:
+            except Exception:  # noqa: BLE001
                 continue
             if intent.get("content_class") == "restricted_local":
                 continue
@@ -367,7 +367,7 @@ def detect_pipeline_stage(
             },
         )
         craft_line = format_craft_line(craft, compact=True)
-    except Exception:
+    except Exception:  # noqa: BLE001
         craft = {}
         craft_line = ""
     try:
@@ -455,7 +455,7 @@ def build_next_actions(
         inv_still = (primary_for("text-to-image") or {}).get("id")
         inv_edit = (primary_for("local-image-edit") or {}).get("id")
         inv_motion = (primary_for("image-to-video") or {}).get("id")
-    except Exception:
+    except Exception:  # noqa: BLE001
         pass
 
     def _with_primary(why: str, *, kind: str = "motion") -> str:
@@ -548,7 +548,7 @@ def build_next_actions(
                     f'aifilm design-go --root "{r}"',
                     "设计期 GO：debrief+fidelity+variety 一页（不代签 pilot）",
                 )
-        except Exception:
+        except Exception:  # noqa: BLE001
             pass
 
     # Pilot path (before bulk clips)
@@ -558,7 +558,7 @@ def build_next_actions(
         from production_gates import pilot_is_user_approved
 
         pilot_ok = pilot_is_user_approved(pilot_approval)
-    except Exception:
+    except Exception:  # noqa: BLE001
         pilot_ok = False
 
     score_ok = (
@@ -619,7 +619,7 @@ def build_next_actions(
                 if hs.get("hard_fail"):
                     # Prefer heat over more I2V when scale is failing
                     pass
-        except Exception:
+        except Exception:  # noqa: BLE001
             pass
 
     if not gates.get("clips_complete"):
@@ -639,7 +639,7 @@ def build_next_actions(
                         kind="still",
                     ),
                 )
-        except Exception:
+        except Exception:  # noqa: BLE001
             pass
         # Bulk / H3 only after gates.spec is green (recompute_gates / validate_film_spec).
         # Pilot-approved + invalid film-spec must not race to h3/media-queue primary.
@@ -670,7 +670,7 @@ def build_next_actions(
                     h3_block.get("enabled") is True
                     or film_profile in {"hybrid_h3", "h3_primary", "ltx23_adult"}
                 )
-            except Exception:
+            except Exception:  # noqa: BLE001
                 h3_enabled = False
             is_h3_primary = film_profile == "h3_primary"
             is_ltx23_adult = film_profile in {"ltx23_adult", "ltx23_primary"}
@@ -764,7 +764,7 @@ def build_next_actions(
                                 "仍帧未绿：still-challenge / composition-fill 先验后生"
                             ),
                         )
-                except Exception:
+                except Exception:  # noqa: BLE001
                     still_feed_block = False
                 if is_h3_primary:
                     # Default multi-agent safe: batch only. Overnight drain needs exclusive flag.
@@ -900,7 +900,7 @@ def build_next_actions(
                 if lane:
                     add(lane["id"], lane["cmd"], lane["why"])
                     machine_pending = True
-            except Exception:
+            except Exception:  # noqa: BLE001
                 add(
                     "gate-auto",
                     f'aifilm gate-auto --root "{r}"',
@@ -946,7 +946,7 @@ def build_next_actions(
                             f'aifilm edit-director status --root "{r}"',
                             "剪辑总监 blocked — 先修 cut/route",
                         )
-                except Exception:
+                except Exception:  # noqa: BLE001
                     add(
                         "edit-director-status",
                         f'aifilm edit-director status --root "{r}"',
@@ -965,7 +965,7 @@ def build_next_actions(
                     f'# promote: aifilm upscale promote --root "{r}" --shot-id <id>',
                     "film-spec upscale.enabled — selects 后 formal Real-ESRGAN（禁静默 promote）",
                 )
-        except Exception:
+        except Exception:  # noqa: BLE001
             pass
         preview_ok = _preview_ok(root)
         rehearse_ok = _tts_rehearse_ok(root)
@@ -1022,7 +1022,7 @@ def build_next_actions(
                         f'aifilm edit-director status --root "{r}"',
                         "剪辑总监 blocked — 先修 approved takes / cut_state",
                     )
-            except Exception:
+            except Exception:  # noqa: BLE001
                 add(
                     "edit-director-status",
                     f'aifilm edit-director status --root "{r}"',
@@ -1112,7 +1112,7 @@ def build_next_actions(
                 from agent_review_final import agent_review_stale
 
                 assist_stale = agent_review_stale(root)
-            except Exception:
+            except Exception:  # noqa: BLE001
                 assist_stale = True
             if assist_stale:
                 add(
@@ -1168,7 +1168,7 @@ def build_next_actions(
                     f'aifilm final --root "{r}" --lipsync off --music-mood rnb --tts-backend edge',
                     "sound_plan 仍是 intent — 需 final/混音才算 executed",
                 )
-        except Exception:
+        except Exception:  # noqa: BLE001
             pass
 
     if gates.get("final_complete") and not gates.get("desktop_exported"):
@@ -1216,7 +1216,7 @@ def format_stage_line(pipeline: dict[str, Any], *, compact: bool = True) -> str:
             from craft_spine import format_craft_line
 
             cl = format_craft_line(pipeline["craft"], compact=True)
-        except Exception:
+        except Exception:  # noqa: BLE001
             cl = ""
     if cl:
         craft_bit = f" | {cl}"
